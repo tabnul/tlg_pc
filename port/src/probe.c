@@ -404,6 +404,39 @@ static void fault(int sig, siginfo_t *info, void *context) {
             snprintf(line, sizeof(line), "  %s=%016llx%s", regs[r], (unsigned long long)uc->uc_mcontext.gregs[ids[r]], r == 3 || r == 7 ? "\n" : " ");
             ssize_t written_=write(2, line, strlen(line)); (void)written_;
         }
+        {   /* The faulting bytes, so the log names the instruction without the eboot at hand.
+             * A short read means the mapping ends inside the window: print what arrived. */
+            unsigned char op[16];
+            struct iovec lo = {op, sizeof(op)}, ro = {(void *)rip, sizeof(op)};
+            ssize_t got = process_vm_readv(getpid(), &lo, 1, &ro, 1, 0);
+            if (got > 0) {
+                char hex[33];
+                for (ssize_t i = 0; i < got && i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", op[i]);
+                snprintf(line, sizeof(line), "  insn @0x%lx: %s\n", (unsigned long)(rip - (uintptr_t)image), hex);
+                ssize_t written_=write(2, line, strlen(line)); (void)written_;
+            }
+        }
+        {   /* The words each register points at: a NULL field is the usual culprit, and the
+             * object is gone once the process dies. Twelve qwords reach the fields a lookup
+             * table, a count and a flag sit at. A window that runs off the end of a mapping
+             * comes back short rather than failing, so print however many words arrived. */
+            static const char *mregs[] = {"rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","r8","r9","r10","r11","r12","r13","r14","r15"};
+            static const int mids[] = {REG_RAX,REG_RBX,REG_RCX,REG_RDX,REG_RSI,REG_RDI,REG_RBP,REG_RSP,
+                                       REG_R8,REG_R9,REG_R10,REG_R11,REG_R12,REG_R13,REG_R14,REG_R15};
+            for (int r = 0; r < 16; ++r) {
+                uintptr_t at = (uintptr_t)uc->uc_mcontext.gregs[mids[r]];
+                if (at < 0x10000) continue;
+                uint64_t word[12];
+                struct iovec lo = {word, sizeof(word)}, ro = {(void *)at, sizeof(word)};
+                ssize_t got = process_vm_readv(getpid(), &lo, 1, &ro, 1, 0);
+                if (got < 8) continue;   /* unmapped, or less than one whole word to show */
+                int nq = (int)got / 8;
+                char hex[208];
+                for (int i = 0; i < nq; ++i) snprintf(hex + i * 17, 18, "%016llx ", (unsigned long long)word[i]);
+                snprintf(line, sizeof(line), "  mem %s=0x%lx: %s\n", mregs[r], (unsigned long)at, hex);
+                ssize_t written_=write(2, line, strlen(line)); (void)written_;
+            }
+        }
         for (int depth = 0; depth < 24 && rbp; ++depth) {
             uintptr_t frame[2];
             struct iovec local = {frame, sizeof(frame)}, remote = {(void *)rbp, sizeof(frame)};
