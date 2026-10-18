@@ -315,4 +315,9 @@ s32 ImageInfo::SliceOf(const ImageInfo& info, s32 mip) const {
     return addr_diff / guest_size;
 }
 
+u64 ReadbackSize(const ImageInfo& info) {
+    return u64(info.pitch) * info.size.height * info.size.depth * info.resources.layers *
+           (info.num_bits / 8);
+}
+
 } // namespace VideoCore

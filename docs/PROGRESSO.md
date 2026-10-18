@@ -76,6 +76,7 @@ Cada linha é um bug que impedia o jogo de avançar ou estragava a imagem, com a
 | Texturas tremendo e piscando | FSR3 e jitter do GoW3; cache de texturas com 2 GB | Imagem nativa; orçamento de 5600 MB |
 | Crash após tirar a lança | Leitura curta de textura (assert `JsTex.cpp:459`) com páginas re-protegidas | Leitura em laço até completar |
 | Jogo mudo | NGS2 era um placeholder silencioso | Módulo NGS2 nativo do firmware |
+| Fechou com erro (código 23) após ~34 min: `buffer.cpp:135` "Failed allocating buffer (size 0x0, memory type 2)" | Imagem de color buffer com extensão zero — hint CB/DB com uma dimensão 0, ou `ColorBuffer::Height()` = 0 quando o slice é menor que uma linha — e o readback de 0 bytes pedia um buffer Vulkan de tamanho 0, que o driver recusa | `CbDbExtent::Valid()` só aceita hint com as duas dimensões; `ColorBuffer::Height()` nunca devolve 0; o readback (`ReadbackSize`) é pulado com aviso quando não cabe na alocação (slice de menos de uma linha); teste `image-extent-test` |
 
 ## O que falta
 

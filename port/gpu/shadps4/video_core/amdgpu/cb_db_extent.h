@@ -14,8 +14,12 @@ union CbDbExtent {
     };
     u32 raw;
 
+    /// A hint is only usable when it carries both dimensions: a half-zero raw value (the
+    /// NOP payload of a CB/DB setup that does not describe a real extent) would otherwise
+    /// build a zero-row image, which the driver happily creates and which then reads back
+    /// as a 0-byte copy.
     bool Valid() const {
-        return raw != 0;
+        return width != 0 && height != 0;
     }
 };
 

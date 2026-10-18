@@ -185,8 +185,7 @@ void TextureCache::ProcessDownloadImages() {
         for (const ImageId image_id : download_images) {
             const auto& image = slot_images[image_id];
             if (False(image.flags & ImageFlagBits::GpuModified)) continue;
-            const u64 size = u64{image.info.pitch} * image.info.size.height *
-                image.info.size.depth * image.info.resources.layers * (image.info.num_bits / 8);
+            const u64 size = ReadbackSize(image.info);
             if (!pending_readbacks.CanFit(size)) {
                 ++readbacks_waited;
                 scheduler.Finish();
@@ -276,14 +275,32 @@ void TextureCache::ProcessDownloadImages() {
     }
 }
 
+// A readback that copies nothing, or more than the guest allocation holds, cannot run: the
+// staging pool would build a 0-size Vulkan buffer (the driver refuses it and the assert turns
+// into a dead game) or the write-back would run past the image's memory. Both mean an image
+// was created degenerate upstream, so the first few are logged with the numbers that disagree.
+static void LogSkippedReadback(const Image& image) {
+    static std::atomic<unsigned> logged{0};
+    if (logged.fetch_add(1, std::memory_order_relaxed) >= 8) {
+        return;
+    }
+    const auto& info = image.info;
+    LOG_WARNING(Render_Vulkan,
+                "Skipping readback of image {:#x}: {}x{}x{} pitch {} x {} bits = {} bytes, guest {} bytes",
+                info.guest_address, info.size.width, info.size.height, info.size.depth, info.pitch,
+                info.num_bits, ReadbackSize(info), info.guest_size);
+}
+
 std::optional<TextureCache::PendingDownload> TextureCache::RecordImageDownload(ImageId image_id) {
     Image& image = slot_images[image_id];
     if (False(image.flags & ImageFlagBits::GpuModified)) {
         return std::nullopt;
     }
-    const u32 download_size = image.info.pitch * image.info.size.height * image.info.size.depth *
-                              image.info.resources.layers * (image.info.num_bits / 8);
-    ASSERT(download_size <= image.info.guest_size);
+    const u64 download_size = ReadbackSize(image.info);
+    if (download_size == 0 || download_size > image.info.guest_size) {
+        LogSkippedReadback(image);
+        return std::nullopt;
+    }
     const auto download =
         runtime.GetStagingPool().Request(download_size, MemoryType::HostCached, 16, true);
     const vk::BufferImageCopy image_download = {
@@ -302,7 +319,8 @@ std::optional<TextureCache::PendingDownload> TextureCache::RecordImageDownload(I
         .imageExtent = {image.info.size.width, image.info.size.height, image.info.size.depth},
     };
     runtime.DownloadImage(&image, download.buffer, std::span{&image_download, 1});
-    return PendingDownload{image.info.guest_address, download_size, download};
+    // The guard above leaves download_size <= guest_size, which is a u32.
+    return PendingDownload{image.info.guest_address, u32(download_size), download};
 }
 
 void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
@@ -312,9 +330,11 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
     if (False(image.flags & ImageFlagBits::GpuModified)) {
         return;
     }
-    const u32 download_size = image.info.pitch * image.info.size.height * image.info.size.depth *
-                              image.info.resources.layers * (image.info.num_bits / 8);
-    ASSERT(download_size <= image.info.guest_size);
+    const u64 download_size = ReadbackSize(image.info);
+    if (download_size == 0 || download_size > image.info.guest_size) {
+        LogSkippedReadback(image);
+        return;
+    }
     const auto download =
         runtime.GetStagingPool().Request(download_size, MemoryType::HostCached, 16, !sync);
     const vk::BufferImageCopy image_download = {
