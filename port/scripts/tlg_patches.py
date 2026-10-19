@@ -151,8 +151,10 @@ def file_offset(eboot, offset, length):
 # the frame size, so a wider frame stretched the 16:9 view. Its post-tan code spills the same 13
 # registers on both paths (0x1de06af and 0x1de076c); doing that once before the branch frees
 # 0x1de076c-0x1de07e1 for a routine, called instead of `vmulss xmm8,xmm10,[rsp+160h]` (m11), that
-# sets m00 = m11 / frame aspect when the camera aspect is within 1.70-1.85. Other cameras (square
-# targets, or those taking the aspect from the frame size) are left alone.
+# sets m00 = m11 / frame aspect when the camera aspect is within 1.70-1.85. Cameras that take the
+# aspect from the frame size (the main gameplay camera once the mode is patched) would keep the
+# 16:9 width and lose height (Vert-); they get m11 = m00 * 16/9 first, so they widen the same way.
+# Other cameras (square targets) are left alone.
 HOR_PLUS_CALL = 0x1de0584
 HOR_PLUS_CALL_EXPECTED = bytes.fromhex('c52a59842460010000')
 HOR_PLUS_CALL_NEW = bytes.fromhex('e8e30100000f1f4000')  # call 0x1de076c; nop
@@ -166,15 +168,17 @@ HOR_PLUS_BLOCK_EXPECTED = bytes.fromhex(
     'c5f829bc24f0000000c5f829a42400010000c5f8299c2410010000c5f829942420010000c5f8298c243001000'
     '0c57829a42440010000c57829942450010000c578298c2460010000c5f829b42470010000c5f829ac2480010000')
 # Spills, vucomiss xmm14,[rbx+408h]; je 0x1de07e1; the unchanged fov path ending in jmp 0x1de083a;
-# then at 0x1de076c: vmovss xmm3,[rsp+168h] (aspect); vmulss xmm8,xmm10,xmm3; skip unless
-# 1.70 <= aspect <= 1.85; vmulss xmm10,xmm8,[1/frame aspect]; ret; f32 1.70, 1.85, 1/frame aspect.
+# then at 0x1de076c: vmovss xmm3,[rsp+168h] (aspect); an aspect within 0.02 of the frame's becomes
+# 16:9; vmulss xmm8,xmm10,xmm3; skip unless 1.70 <= aspect <= 1.85; vmulss xmm10,xmm8,[1/frame
+# aspect]; ret; f32 1.70, 1.85, 16/9, then the frame aspect - 0.02 and + 0.02 and 1/frame aspect.
 HOR_PLUS_BLOCK_NEW = bytes.fromhex(
     'c5f8298424c0000000c57829ac24d0000000c578299c24e0000000c5f829bc24f0000000c5f829a42400010000c5'
     'f8299c2410010000c5f829942420010000c5f8298c2430010000c57829a42440010000c57829942450010000c578'
     '298c2460010000c5f829b42470010000c5f829ac2480010000c5782eb3080400000f84bd000000c58a5905f81271'
     '00c57a11b42490010000e88ed36d00c5fa100dea127100c5f25ec0c5fa118304040000c5fa11830c040000c5fa10'
-    '842490010000c5fa118308040000e9ce000000c5fa109c2468010000c52a59c3c5f82e1d170000007214c5f82e1d'
-    '11000000770ac53a59150b0000009090c39a99d93fcdccec3f')
+    '842490010000c5fa118308040000e9ce000000'
+    'c5fa109c2468010000c5f82e1d410000007212c5f82e1d3b0000007708c5fa101d29000000c52a59c3c5f82e1d15'
+    '0000007212c5f82e1d0f0000007708c53a591515000000c39a99d93fcdccec3f398ee33f')
 
 
 # UI canvas: the UI init copies {1920, 1080, 1920, 1080} from 0x2525480 (its only reference) into
@@ -208,7 +212,8 @@ def resolution_writes(eboot, size):
     if width * 9 > height * 16:
         call = checked_offset(eboot, HOR_PLUS_CALL, HOR_PLUS_CALL_EXPECTED)
         block = checked_offset(eboot, HOR_PLUS_BLOCK, HOR_PLUS_BLOCK_EXPECTED)
-        new = HOR_PLUS_BLOCK_NEW + struct.pack('<f', height / width)
+        aspect = width / height
+        new = HOR_PLUS_BLOCK_NEW + struct.pack('<3f', aspect - 0.02, aspect + 0.02, height / width)
         new += b'\xcc' * (len(HOR_PLUS_BLOCK_EXPECTED) - len(new))
         writes += [(block, new, f'Hor+: {HOR_PLUS_BLOCK:#x} 16:9 cameras -> {width}:{height}'),
                    (call, HOR_PLUS_CALL_NEW, f'Hor+: {HOR_PLUS_CALL:#x} calls it')]
