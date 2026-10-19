@@ -37,6 +37,9 @@ TEXT = {
     'Fullscreen': ('Fullscreen', 'Tela cheia'),
     'vsync': ('VSync', 'VSync'),
     'frame_rate': ('Frame rate (experimental)', 'Taxa de quadros (experimental)'),
+    'resolution': ('Resolution', 'Resolução'),
+    'resolution_hint': ('Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
+                        'Renderizado nativamente; mais largo que 16:9 mostra mais da cena e leva o HUD às bordas'),
     'fps_30': ('30 FPS (as on PS4)', '30 FPS (como no PS4)'),
     'fps_60': ('60 FPS', '60 FPS'),
     'fps_unlocked': ('Unlocked (up to the display)', 'Livre (até a taxa do monitor)'),
@@ -139,6 +142,14 @@ GAME_LANGUAGE_NAMES = {'en': 'English', 'fr': 'Français', 'es_ES': 'Español (E
 UI_LANGUAGES = ['auto', 'pt_BR', 'en_US']
 UI_LANGUAGE_NAMES = {'pt_BR': 'Português (Brasil)', 'en_US': 'English (US)'}
 DISPLAY_MODES = ['Windowed', 'Borderless', 'Fullscreen']
+
+
+def resolution_label(size):
+    """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
+    width, height = (int(n) for n in size.split('x'))
+    ratio = width / height
+    name = '32:9' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
+    return f'{width} × {height} ({name})'
 # The PS4 buttons the remap dialog lists, with what they do in The Last Guardian when known.
 PS4_BUTTONS = [
     ('cross', 'Cross (X)', ('jump', 'pular')), ('circle', 'Circle', None), ('square', 'Square', None),
@@ -314,7 +325,10 @@ class Launcher:
         spin.grid(row=3, column=1, sticky='w', padx=6, pady=(6, 0))
         spin.bind('<FocusOut>', lambda _: self.changed())
         ttk.Label(video, text=self.t('vram_hint'), foreground='#777', wraplength=360).grid(row=4, column=0, columnspan=2, sticky='w')
-        self.build_filters(video, 7)
+        self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, resolution_label)
+        ttk.Label(video, text=self.t('resolution_hint'), foreground='#777', wraplength=320).grid(
+            row=8, column=0, columnspan=2, sticky='w')
+        self.build_filters(video, 9)
 
         log_frame = ttk.LabelFrame(main, text='Log', padding=4)
         log_frame.grid(row=2, column=2, sticky='nsew', **pad)
