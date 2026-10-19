@@ -86,8 +86,13 @@ DEFAULT_SETTINGS = {
     'mouse_invert_y': False,
     'key_map': {},                 # PS4 button -> 'Key|Mouse Left' (empty: the default)
     'frame_rate': '30',            # 30 | 60 | unlocked (scripts/tlg_patches.py; TLG_FPS wins)
+    'resolution': '1920x1080',     # WxH (scripts/tlg_patches.py; TLG_RESOLUTION wins)
 }
 FRAME_RATES = ['30', '60', 'unlocked']
+# 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI).
+RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
+               '2560x1080', '3440x1440', '3840x1600', '5120x2160',
+               '3840x1080', '5120x1440']
 # The frame rate mode prepare() really applied (another eboot build stays at 30).
 applied_frame_rate = '30'
 
@@ -285,6 +290,11 @@ def frame_rate(settings):
     return os.environ.get('TLG_FPS') or str(settings.get('frame_rate', '30'))
 
 
+def resolution(settings):
+    """The requested render and output size "WxH": TLG_RESOLUTION, else the launcher's setting."""
+    return os.environ.get('TLG_RESOLUTION') or str(settings.get('resolution', '1920x1080'))
+
+
 def mods_dir():
     """TLG_MODS_DIR, else USER_DIR/mods (created empty on first use so the player sees where
     to drop shadPS4/GoldHEN cheat XML files)."""
@@ -336,7 +346,7 @@ def prepare(settings, log=print):
         [*python_command(scripts / 'link_modules.py'), game, '--out', str(OUT_DIR), '--modules', *modules],
         [*python_command(scripts / 'content_profile.py'), game, '--out', str(OUT_DIR)],
         [*python_command(scripts / 'tlg_patches.py'), game, '--out', str(OUT_DIR), '--mode', frame_rate(settings),
-         '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config())],
+         '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config()), '--resolution', resolution(settings)],
     ]
     for step in steps:
         result = subprocess.run(step, cwd=str(scripts), capture_output=True, text=True,
