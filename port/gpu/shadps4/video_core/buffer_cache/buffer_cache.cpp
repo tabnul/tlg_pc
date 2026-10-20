@@ -61,6 +61,29 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
       stream_buffer{instance, scheduler, MemoryType::Stream, STREAM_BUFFER_SIZE},
       gds_buffer{instance, 0, GDS_BUFFER_SIZE, MemoryType::Stream, "GDS Buffer"},
       memory_semaphore{instance} {
+    // Opt-in only: the launcher's 60-FPS profile enables this while the default/30-FPS path
+    // retains the established 512 KiB fault window and one-range download behavior.
+    if (const char* forced = std::getenv("TLG_BUFFER_READBACK_BATCH_MB")) {
+        char* end{};
+        const u64 mib = std::strtoull(forced, &end, 10);
+        if (end != forced && *end == '\0' && mib != 0) {
+            readback_batch_limit = std::clamp<u64>(mib, 1, 256) * 1_MB;
+        }
+    }
+    if (const char* diag = std::getenv("TLG_BUFFER_READBACK_STATS")) {
+        readback_stats_enabled = *diag == '1';
+    }
+    if (readback_batch_limit || readback_stats_enabled) {
+        const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::steady_clock::now().time_since_epoch())
+                                .count();
+        readback_report_ns.store(static_cast<u64>(now_ns), std::memory_order_relaxed);
+        std::printf("GPU: coherent buffer readback batching %s (limit %llu MiB)%s\n",
+                    readback_batch_limit ? "enabled" : "disabled",
+                    static_cast<unsigned long long>(readback_batch_limit >> 20),
+                    readback_stats_enabled ? "; statistics enabled" : "");
+    }
+
     // tlg: TLG_MAX_BUFFER_MB lowers the driver's buffer size limit as the arenas see it
     // (diagnostics: reproduces AMD on Windows 2048, RADV 4095 on any GPU).
     u64 max_buffer = instance.GetMaxBufferSize();
@@ -192,8 +215,52 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
 void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size) {
     boost::container::small_vector<vk::BufferCopy, 1> copies;
     u64 total_size_bytes = 0;
+    u64 copy_size_bytes = 0;
     const VAddr arena_base = arena->cpu_addr;
-    memory_tracker->ForEachDownloadRange<false>(device_addr, size, [&](u64 address, u64 size) {
+    VAddr download_addr = device_addr;
+    u64 download_size = size;
+
+    if (readback_stats_enabled) {
+        readback_requests.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    // A CPU fault must see every preceding GPU write before it resumes, so the wait itself
+    // cannot be deferred. At 60 FPS, however, the first fault can download all exact dirty
+    // buffer islands in this sparse arena with one submission. Later faults then find clean
+    // pages instead of serializing behind the increasingly long open-scene GPU queue.
+    //
+    // The cap is based on exact copied bytes, not the arena's virtual size. If a title really
+    // dirties more than the configured limit, retain the conservative request window rather
+    // than allocate an unexpectedly large staging buffer. No dirty data is ever discarded.
+    if (readback_batch_limit) {
+        u64 candidate_bytes = 0;
+        bool over_limit = false;
+        gpu_modified_ranges.ForEachInRange(arena_base, arena->size_bytes,
+                                            [&](VAddr start, VAddr end) {
+            if (over_limit) {
+                return;
+            }
+            constexpr u64 align = 64;
+            const u64 range_bytes = Common::AlignUp(end - start, align);
+            if (range_bytes > readback_batch_limit - candidate_bytes) {
+                over_limit = true;
+                return;
+            }
+            candidate_bytes += range_bytes;
+        });
+        if (!over_limit && candidate_bytes != 0) {
+            download_addr = arena_base;
+            download_size = arena->size_bytes;
+            if (readback_stats_enabled) {
+                readback_full_arena_batches.fetch_add(1, std::memory_order_relaxed);
+            }
+        } else if (over_limit && readback_stats_enabled) {
+            readback_limit_fallbacks.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
+
+    memory_tracker->ForEachDownloadRange<false>(download_addr, download_size,
+                                                 [&](u64 address, u64 size) {
         const auto add_download = [&](VAddr start, VAddr end) {
             const u64 new_offset = start - arena_base;
             const u64 new_size = end - start;
@@ -206,12 +273,23 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
             constexpr u64 align = 64ULL;
             constexpr u64 mask = ~(align - 1ULL);
             total_size_bytes += (new_size + align - 1) & mask;
+            copy_size_bytes += new_size;
         };
         gpu_modified_ranges.ForEachInRange(address, size, add_download);
         gpu_modified_ranges.Subtract(address, size);
     });
     if (total_size_bytes == 0) {
+        if (readback_stats_enabled) {
+            readback_empty_requests.fetch_add(1, std::memory_order_relaxed);
+        }
+        ReportReadbackStats();
         return;
+    }
+    if (readback_stats_enabled) {
+        readback_gpu_completions.fetch_add(1, std::memory_order_relaxed);
+        readback_copy_ranges.fetch_add(copies.size(), std::memory_order_relaxed);
+        readback_copy_bytes.fetch_add(copy_size_bytes, std::memory_order_relaxed);
+        readback_staging_bytes.fetch_add(total_size_bytes, std::memory_order_relaxed);
     }
     const auto download = staging_pool.Request(total_size_bytes, VideoCore::MemoryType::HostCached);
     for (auto& copy : copies) {
@@ -226,7 +304,42 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         memory->TryWriteBacking(dst_addr, download.mapped + (copy.dstOffset - download.offset),
                                 copy.size);
     }
-    memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
+    memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
+    ReportReadbackStats();
+}
+
+void BufferCache::ReportReadbackStats() {
+    if (!readback_stats_enabled) {
+        return;
+    }
+    const u64 now_ns = static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                           std::chrono::steady_clock::now().time_since_epoch())
+                                           .count());
+    u64 report_ns = readback_report_ns.load(std::memory_order_relaxed);
+    if (now_ns - report_ns < 5'000'000'000ULL ||
+        !readback_report_ns.compare_exchange_strong(report_ns, now_ns,
+                                                    std::memory_order_relaxed)) {
+        return;
+    }
+    const u64 requests = readback_requests.exchange(0, std::memory_order_relaxed);
+    const u64 empty_requests = readback_empty_requests.exchange(0, std::memory_order_relaxed);
+    const u64 full_batches = readback_full_arena_batches.exchange(0, std::memory_order_relaxed);
+    const u64 fallbacks = readback_limit_fallbacks.exchange(0, std::memory_order_relaxed);
+    const u64 completions = readback_gpu_completions.exchange(0, std::memory_order_relaxed);
+    const u64 ranges = readback_copy_ranges.exchange(0, std::memory_order_relaxed);
+    const u64 copy_bytes = readback_copy_bytes.exchange(0, std::memory_order_relaxed);
+    const u64 staging_bytes = readback_staging_bytes.exchange(0, std::memory_order_relaxed);
+    std::printf("Buffer readbacks (5 s): requests %llu (%llu empty), full-arena batches %llu, "
+                "limit fallbacks %llu, GPU completions %llu, ranges %llu, copied %.2f MiB, "
+                "staging %.2f MiB\n",
+                static_cast<unsigned long long>(requests),
+                static_cast<unsigned long long>(empty_requests),
+                static_cast<unsigned long long>(full_batches),
+                static_cast<unsigned long long>(fallbacks),
+                static_cast<unsigned long long>(completions),
+                static_cast<unsigned long long>(ranges), copy_bytes / 1048576.0,
+                staging_bytes / 1048576.0);
+    std::fflush(stdout);
 }
 
 namespace {
