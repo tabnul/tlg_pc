@@ -78,6 +78,8 @@ DEFAULT_SETTINGS = {
     'show_fps': False,
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
+    'level_select': False,         # tlg.ini; tlg_lua.cpp
+    'bridge_fix': False,
     'vram_budget_mb': 5600,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
@@ -498,6 +500,8 @@ def launch(settings, seconds=0, extra_env=None):
         'display_mode': str(settings['display_mode']).lower(),  # the game's keys: windowed|borderless|fullscreen
         'vsync': int(bool(settings['vsync'])),
         'show_fps': int(bool(settings['show_fps'])),
+        'level_select': int(bool(settings.get('level_select', False))),
+        'bridge_fix': int(bool(settings.get('bridge_fix', False))),
         'mouse_enabled': int(bool(settings.get('mouse_enabled', True))),
         'mouse_sensitivity': f"{float(settings.get('mouse_sensitivity', 1.0)):.2f}",
         'mouse_invert_y': int(bool(settings.get('mouse_invert_y', False))),
