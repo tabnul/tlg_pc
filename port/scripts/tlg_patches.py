@@ -188,6 +188,15 @@ HOR_PLUS_BLOCK_NEW = bytes.fromhex(
 # edges. Widening only the projection leaves the screen grey.
 UI_SIZE = 0x2525480
 UI_SIZE_EXPECTED = struct.pack('<4i', 1920, 1080, 1920, 1080)
+# Guide (button hint box) draw, 0x190fdf0: scales its 1920x1080 layout to the UI canvas with
+# width/1920 and height/1080 and its 16 px corners with width*16/1920 (these four floats, used
+# only there). With a wider canvas the box stretched sideways; dividing by the canvas width keeps it square.
+GUIDE_SCALE = 0x24efa14
+GUIDE_SCALE_EXPECTED = struct.pack('<4f', 1 / 1920, 1 / 1080, -32, 16 / 1920)
+# Subtitle draw, 0x1c30320: the same width/1920, height/1080 scale (these two floats, used only
+# there) stretched the subtitle lines sideways on a wider canvas.
+SUBTITLE_SCALE = 0x24f1464
+SUBTITLE_SCALE_EXPECTED = struct.pack('<2f', 1 / 1920, 1 / 1080)
 
 
 def checked_offset(eboot, address, expected):
@@ -221,6 +230,12 @@ def resolution_writes(eboot, size):
         ui_width = round(1080 * width / height)
         writes.append((ui, struct.pack('<4i', ui_width, 1080, ui_width, 1080),
                        f'UI: {UI_SIZE:#x} canvas 1920x1080 -> {ui_width}x1080'))
+        guide = checked_offset(eboot, GUIDE_SCALE, GUIDE_SCALE_EXPECTED)
+        writes.append((guide, struct.pack('<4f', 1 / ui_width, 1 / 1080, -32, 16 / ui_width),
+                       f'UI: {GUIDE_SCALE:#x} hint box scale 1920 -> {ui_width}'))
+        subtitle = checked_offset(eboot, SUBTITLE_SCALE, SUBTITLE_SCALE_EXPECTED)
+        writes.append((subtitle, struct.pack('<2f', 1 / ui_width, 1 / 1080),
+                       f'UI: {SUBTITLE_SCALE:#x} subtitle scale 1920 -> {ui_width}'))
     return writes
 
 
