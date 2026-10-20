@@ -49,6 +49,8 @@ TEXT = {
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
+    'dlaa': ('DLAA anti-aliasing (NVIDIA RTX: stable foliage edges; F8 in game)',
+             'Anti-aliasing DLAA (NVIDIA RTX: bordas estáveis na folhagem; F8 no jogo)'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -175,7 +177,7 @@ def sdl_key_name(keysym):
 SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
-INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '0', 'color_brightness': '0.00',
+INI_DEFAULTS = {'dlaa': '1', 'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '0', 'color_brightness': '0.00',
                 'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '1.00'}
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
                 'color_saturation': (0.0, 2.0), 'color_gamma': (0.5, 2.0)}
@@ -368,7 +370,7 @@ class Launcher:
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
         self.ini_vars = {}
-        for offset, key in ((2, 'smaa'), (4, 'color_adjust')):
+        for offset, key in ((2, 'smaa'), (4, 'color_adjust'), (9, 'dlaa')):
             var = tk.BooleanVar(value=ini[key] not in ('0', ''))
             self.ini_vars[key] = var
             ttk.Checkbutton(parent, text=self.t(key), variable=var, command=self.filters_changed).grid(
@@ -390,7 +392,7 @@ class Launcher:
             spin.bind('<FocusOut>', lambda _: self.filters_changed())
 
     def filters_changed(self):
-        values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
+        values = {'dlaa': int(self.ini_vars['dlaa'].get()), 'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
         for key, (low, high) in COLOR_RANGES.items():
             try:

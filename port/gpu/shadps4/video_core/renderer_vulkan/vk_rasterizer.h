@@ -165,6 +165,8 @@ public:
 
 private:
     void PrepareRenderState(const GraphicsPipeline* pipeline);
+    /// tlg: geometry drawn into this depth gets the upscaler's sub-pixel jitter.
+    bool JitterDepth(VideoCore::ImageId depth);
     RenderState BeginRendering(const GraphicsPipeline* pipeline);
     RenderState BeginRenderingFull(const GraphicsPipeline* pipeline);
     /// tlg: a draw continuing the open render pass with the same inputs gets the same render
