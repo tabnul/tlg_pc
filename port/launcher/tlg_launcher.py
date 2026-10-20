@@ -53,8 +53,12 @@ TEXT = {
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
-    'dlaa': ('DLAA anti-aliasing (NVIDIA RTX: stable foliage edges; F8 in game)',
-             'Anti-aliasing DLAA (NVIDIA RTX: bordas estáveis na folhagem; F8 no jogo)'),
+    'dlaa': ('DLAA anti-aliasing, experimental (NVIDIA RTX: stable foliage edges; F8 in game)',
+             'Anti-aliasing DLAA, experimental (NVIDIA RTX: bordas estáveis na folhagem; F8 no jogo)'),
+    'dlaa_hint': ('Not yet tested in a full playthrough: some scenes may still flicker or show blocks '
+                  '(as on the cave water and on the face of the boy before). Press F8 to turn it off there, and please report it.',
+                  'Ainda não testado num jogo completo: algumas cenas ainda podem piscar ou mostrar blocos '
+                  '(como na água da caverna e no rosto do menino antes). Aperte F8 para desligar ali e, por favor, avise.'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -441,6 +445,8 @@ class Launcher:
             self.ini_vars[key] = var
             ttk.Checkbutton(parent, text=self.t(key), variable=var, command=self.filters_changed).grid(
                 row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
+        ttk.Label(parent, text=self.t('dlaa_hint'), foreground='#777', wraplength=360, justify='left').grid(
+            row=row + 10, column=0, columnspan=2, sticky='w', padx=(16, 0))
         ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 3, column=0, sticky='w')
         self.sharpener = ttk.Combobox(parent, values=[self.t('sharpen_' + k) for k in SHARPENERS],
                                       state='readonly', width=16)
