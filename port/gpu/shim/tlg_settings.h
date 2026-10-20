@@ -44,7 +44,7 @@ struct Values {
     std::atomic<bool> show_fps{false};
     /// DLAA (NVIDIA DLSS at native size on the game's motion vectors, vk_temporal_upscaler);
     /// off: the game's own SMAA only. F8 switches it (a label shows which one for a moment).
-    std::atomic<bool> dlaa{true};
+    std::atomic<bool> dlaa{false};
     /// Enhancements (menu, live): shadow map resolution as a multiple of the game's 2048
     /// (1, 2 or 4; vk_scene_resolution SetShadowScale). 8192 looked barely different, ~8 FPS.
     std::atomic<int> shadow_scale{1};
