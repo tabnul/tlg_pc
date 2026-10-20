@@ -68,6 +68,7 @@ std::atomic<bool> loading{false};
 std::atomic<u32> loading_done{0}, loading_total{0};
 std::atomic<u32> background_done{0}, background_total{0};
 bool dirty = false; // settings changed while open: saved on close
+std::chrono::steady_clock::time_point aa_label_until{}; // the AA label after F8
 int requested_tab = -1; // switch on the next frame (L1/R1, Q/E, menu opened)
 // The game's text dialog (SetTextEntry), guarded by imgui_mutex.
 bool text_entry_active = false;
@@ -405,6 +406,16 @@ void ImageTab() {
     }
     ImGui::SeparatorText(TL("Anti-aliasing", "Anti-aliasing"));
     if (BeginRows("##antialiasing")) {
+        // tlg: DLAA needs DLSS (tlg_dlss.dll, an NVIDIA RTX card); the game's own SMAA runs either way.
+        ImGui::BeginDisabled(!s.dlss_supported);
+        CheckRow("DLAA (NVIDIA DLSS)", s.dlaa,
+                 !s.dlss_supported ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("Needs an NVIDIA RTX card and tlg_dlss.dll.", "Precisa de uma placa NVIDIA RTX e do tlg_dlss.dll."))
+                 : TL("Stable, smooth edges on foliage, feathers and railings: DLSS at native resolution on the game's own motion vectors. Off: the game's own anti-aliasing only. F8 switches it in game.",
+                      "Bordas estáveis e suaves em folhagem, penas e grades: DLSS na resolução nativa com os vetores de movimento do próprio jogo. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo."));
+        CheckRow(TL("Show anti-aliasing label", "Mostrar rótulo do anti-aliasing"), s.aa_label,
+                 TL("Shows which anti-aliasing is on in the top right corner (always shown briefly after F8).",
+                    "Mostra qual anti-aliasing está ativo no canto superior direito (sempre por um instante após F8)."));
+        ImGui::EndDisabled();
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",
                     "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."));
@@ -1528,6 +1539,15 @@ bool HandleEvent(const SDL_Event& event) {
             Vulkan::FrameCapture::Request();
             return true;
         }
+        // tlg: F8 switches between DLAA and the game's own SMAA (saved; the label shows briefly).
+        if (down && !event.key.repeat && event.key.key == SDLK_F8) {
+            auto& settings = TlgSettings::Get();
+            settings.dlaa = !settings.dlaa;
+            aa_label_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            std::printf("AA: %s (F8)\n", settings.dlaa ? "DLAA" : "game SMAA");
+            TlgSettings::Save();
+            return true;
+        }
         // tlg: F10 shows or hides the performance overlay (FPS counter) at any time.
         if (down && !event.key.repeat && event.key.key == SDLK_F10) {
             auto& settings = TlgSettings::Get();
@@ -1659,11 +1679,18 @@ static bool NoticeActive() {
     return std::chrono::steady_clock::now() < notice_until;
 }
 
+/// tlg: the AA label (top right): always with `aa_label`, else for a moment after F8.
+bool AaLabelOn() {
+    const auto& s = TlgSettings::Get();
+    return s.upscaler == TlgSettings::UpscalerDlss &&
+           (s.aa_label || std::chrono::steady_clock::now() < aa_label_until);
+}
+
 bool Visible() {
     const auto& s = TlgSettings::Get();
     const auto now = std::chrono::steady_clock::now();
     return initialized && (loading || background_total || menu_open || text_entry_active || choice_active ||
-                           message_active || progress_on || now < progress_until || now < toast_until ||
+                           message_active || progress_on || now < progress_until || now < toast_until || AaLabelOn() ||
                            NoticeActive() ||
                            choice_retiring || s.show_fps ||
                            (s.actor_watch_supported && s.enemy_health_bar));
@@ -1827,6 +1854,19 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
     if (NoticeActive() && !menu_open) {
         NoticeBox();
+    }
+    if (AaLabelOn() && !menu_open) {
+        const auto& s = TlgSettings::Get();
+        const bool dlaa = s.dlaa && s.jitter && s.dlss_supported;
+        const ImVec2 size = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos({size.x - 8.0f, 8.0f}, ImGuiCond_Always, {1.0f, 0.0f});
+        ImGui::SetNextWindowBgAlpha(0.6f);
+        ImGui::Begin("##aa_label", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                         ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
+                         ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+        ImGui::TextUnformatted(dlaa ? "AA: DLAA  (F8)" : "AA: game SMAA  (F8)");
+        ImGui::End();
     }
     ImGui::Render();
 

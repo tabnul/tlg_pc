@@ -109,6 +109,10 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.rcas = i != 0;
     } else if (key == "rcas_strength") {
         v.rcas_strength = TlgGraphics::ParseRcasStrength(value.empty() ? -1 : i);
+    } else if (key == "dlaa") {
+        v.dlaa = i != 0;
+    } else if (key == "aa_label") {
+        v.aa_label = i != 0;
     } else if (key == "smaa") {
         v.smaa = i != 0;
     } else if (key == "cas") {
@@ -237,7 +241,7 @@ void Load() {
         {"TLG_MOUSE", "mouse_enabled"},              {"TLG_MOUSE_SENS", "mouse_sensitivity"},
         {"TLG_MOUSE_INVERT_Y", "mouse_invert_y"},    {"TLG_MOUSE_SMOOTHING", "mouse_smoothing"},
         {"TLG_MOUSE_ACCEL", "mouse_accel"},          {"TLG_MOUSE_DEADZONE", "mouse_deadzone"},
-        {"TLG_SMAA", "smaa"},
+        {"TLG_SMAA", "smaa"},                        {"TLG_DLAA", "dlaa"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
     };
     for (const auto& [env, key] : env_keys) {
@@ -300,6 +304,9 @@ bool FixedRenderSession() {
 }
 
 int RenderPreset() {
+    // The resolution patch (TLG_RESOLUTION_PATCH, run.py) renders natively: no reduced presets.
+    static const bool resolution_patch = std::getenv("TLG_RESOLUTION_PATCH") != nullptr;
+    if (resolution_patch) return NativeAA;
     const auto& v = Get();
     return FixedRenderSession() ? v.startup_preset :
         v.upscaler == UpscalerTaa ? NativeAA : v.preset.load();
@@ -370,9 +377,9 @@ void Save() {
                  int(v.mouse_enabled.load()), v.mouse_sensitivity.load(), int(v.mouse_invert_y.load()),
                  v.mouse_smoothing.load(), v.mouse_accel.load(), v.mouse_deadzone.load(), v.key_map.c_str());
     std::fprintf(file,
-                 "smaa=%d\ncas=%d\ncas_strength=%d\ncolor_adjust=%d\ncolor_brightness=%.2f\n"
-                 "color_contrast=%.2f\ncolor_saturation=%.2f\ncolor_gamma=%.2f\n",
-                 int(v.smaa.load()), int(v.cas.load()), v.cas_strength.load(),
+                 "dlaa=%d\naa_label=%d\nsmaa=%d\ncas=%d\ncas_strength=%d\ncolor_adjust=%d\n"
+                 "color_brightness=%.2f\ncolor_contrast=%.2f\ncolor_saturation=%.2f\ncolor_gamma=%.2f\n",
+                 int(v.dlaa.load()), int(v.aa_label.load()), int(v.smaa.load()), int(v.cas.load()), v.cas_strength.load(),
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     // Read by run.sh at start.

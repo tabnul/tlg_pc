@@ -24,7 +24,7 @@ layout(push_constant) uniform Constants {
     vec2 size;         // pixels
     vec2 jitter;       // current viewport shift in render pixels (x right, y down)
     vec2 previous_jitter;
-    uint mode;         // motion: 1 = object motion vectors available; debug: 0 motion, 1 raw
+    uint mode;         // motion: 1 = object motion vectors available, 2 = game motion; debug: 0 motion, 1 raw
                        // depth, 2 view z / 50, 3 reprojected previous frame, 4 |difference|
 };
 
@@ -84,7 +84,11 @@ void main() {
     imageStore(color_img, pixel, vec4(mix(current.rgb, mv_color, 0.75), current.a));
 #else
     vec2 result = motion;
-    if (mode == 1) {
+    if (mode == 2) {
+        // tlg: the game's own motion target (UV units, current - previous, unjittered).
+        const vec2 game = texelFetch(object_tex, pixel, 0).rg;
+        result = any(isnan(game)) || any(isinf(game)) ? vec2(0.0) : -game * size;
+    } else if (mode == 1) {
         const vec4 object_motion = texelFetch(object_tex, pixel, 0);
         // A later ordinary draw may have covered this pixel without touching the motion
         // target. Its final depth then differs from the depth stored with the vector.

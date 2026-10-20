@@ -218,6 +218,41 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
     cmdbuf.dispatch((width + 7) / 8, (height + 7) / 8, 1);
 }
 
+void CameraMotion::RecordGameMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_view,
+                                    vk::ImageView game_view, vk::ImageView motion_view,
+                                    u32 width, u32 height) {
+    const PushConstants push{
+        .size = {float(width), float(height)},
+        .mode = 2u,
+    };
+    const vk::DescriptorImageInfo depth_info{.imageView = depth_view,
+                                             .imageLayout = vk::ImageLayout::eGeneral};
+    const vk::DescriptorImageInfo motion_info{.imageView = motion_view,
+                                              .imageLayout = vk::ImageLayout::eGeneral};
+    const vk::DescriptorImageInfo game_info{.imageView = game_view,
+                                            .imageLayout = vk::ImageLayout::eGeneral};
+    const std::array<vk::WriteDescriptorSet, 3> writes = {{
+        {.dstBinding = 0,
+         .descriptorCount = 1,
+         .descriptorType = vk::DescriptorType::eSampledImage,
+         .pImageInfo = &depth_info},
+        {.dstBinding = 1,
+         .descriptorCount = 1,
+         .descriptorType = vk::DescriptorType::eStorageImage,
+         .pImageInfo = &motion_info},
+        {.dstBinding = 2,
+         .descriptorCount = 1,
+         .descriptorType = vk::DescriptorType::eSampledImage,
+         .pImageInfo = &game_info},
+    }};
+    cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, *motion_pipeline);
+    cmdbuf.pushDescriptorSetKHR(vk::PipelineBindPoint::eCompute, *motion_pipeline_layout, 0,
+                                writes);
+    cmdbuf.pushConstants(*motion_pipeline_layout, vk::ShaderStageFlagBits::eCompute, 0,
+                         sizeof(push), &push);
+    cmdbuf.dispatch((width + 7) / 8, (height + 7) / 8, 1);
+}
+
 void CameraMotion::OnConstants(const float* data) {
     // Scene constants: far plane 3000, 1/far, and the render size.
     if (data[0] != 3000.0f || data[4] < 64.0f || data[5] < 64.0f ||
