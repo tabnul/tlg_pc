@@ -90,6 +90,10 @@ public:
         return game_motion_on && game_motion_ok && jitter_active && !dlss_failed;
     }
     [[nodiscard]] u64 SkyMotionPs() const noexcept { return sky_motion_ps; }
+    /// The game's SMAA blending-weight pass (vertex shader; edges 0ea3ec8b, blend 0811cca2).
+    /// While DLAA runs it is cleared instead: zero weights make the blend pass a plain copy,
+    /// so DLSS gets the unfiltered, temporally consistent edges it expects.
+    [[nodiscard]] bool SkipGameSmaa(u64 vs_hash) const;
     /// The scene depth size of the last sky pass (the game's render size, patched or not).
     [[nodiscard]] std::array<u32, 2> GameSize() const noexcept { return game_size; }
     /// The sky pass writes the HDR scene, the motion target and the scene depth of a frame.
@@ -153,6 +157,7 @@ private:
 
     void Run();
     void RunGameMotion();
+    void AdvanceJitter();
     void RunScaled();
     void RunUiOnly(VideoCore::ImageId color, VideoCore::ImageId depth);
     void EnsureUiResources(u32 width, u32 height, vk::Format color, vk::Format depth);
@@ -218,6 +223,12 @@ private:
     std::array<float, 2> jitter{};
     u32 jitter_index = 0;
     bool reset = true;
+    /// DLAA's own history reset: the shared `reset` is set every frame by the UI and FSR paths.
+    bool game_reset = true;
+    /// The emulator starts several frames per game frame; DLAA counts game frames instead.
+    std::chrono::steady_clock::time_point last_game_motion{};
+    bool jitter_started = false;
+    bool jitter_pending = false; ///< RunGameMotion ran: advance at the next display pass
     u64 frame_id = 0;
     std::chrono::steady_clock::time_point last_frame{};
 

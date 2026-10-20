@@ -76,6 +76,7 @@ DEFAULT_SETTINGS = {
     'game_language': 'pt_BR',
     'ui_language': 'auto',         # auto | pt_BR | en_US
     'show_fps': False,
+    'skip_logos': False,           # scripts/tlg_patches.py --skip-logos; TLG_SKIP_LOGOS=1 too
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
     'vram_budget_mb': 5600,
@@ -349,7 +350,8 @@ def prepare(settings, log=print):
         [*python_command(scripts / 'link_modules.py'), game, '--out', str(OUT_DIR), '--modules', *modules],
         [*python_command(scripts / 'content_profile.py'), game, '--out', str(OUT_DIR)],
         [*python_command(scripts / 'tlg_patches.py'), game, '--out', str(OUT_DIR), '--mode', frame_rate(settings),
-         '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config()), '--resolution', resolution(settings)],
+         '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config()), '--resolution', resolution(settings),
+         *(['--skip-logos'] if settings.get('skip_logos') else [])],
     ]
     for step in steps:
         result = subprocess.run(step, cwd=str(scripts), capture_output=True, text=True,

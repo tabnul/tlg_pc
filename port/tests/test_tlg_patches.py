@@ -101,7 +101,9 @@ def resolution_elf(expected=True):
     for address, original in ((t.RESOLUTION_ENTRY, t.RESOLUTION_EXPECTED),
                                (t.HOR_PLUS_CALL, t.HOR_PLUS_CALL_EXPECTED),
                                (t.HOR_PLUS_BLOCK, t.HOR_PLUS_BLOCK_EXPECTED),
-                               (t.UI_SIZE, t.UI_SIZE_EXPECTED)):
+                               (t.UI_SIZE, t.UI_SIZE_EXPECTED),
+                               (t.GUIDE_SCALE, t.GUIDE_SCALE_EXPECTED),
+                               (t.SUBTITLE_SCALE, t.SUBTITLE_SCALE_EXPECTED)):
         offset = address - t.GHIDRA_BASE
         image[offset:offset + len(original)] = original if expected else b'\xcc' * len(original)
     return plain_elf(image)
@@ -122,8 +124,11 @@ class ResolutionPatchTests(unittest.TestCase):
     def test_ultrawide_gets_hor_plus_and_a_wider_ui(self):
         writes = t.resolution_writes(resolution_elf(), (3840, 1600))
         offsets = {offset: data for offset, data, _ in writes}
-        self.assertEqual(len(writes), 4)
+        self.assertEqual(len(writes), 6)
         self.assertEqual(offsets[t.UI_SIZE - t.GHIDRA_BASE], struct.pack('<4i', 2592, 1080, 2592, 1080))
+        self.assertEqual(offsets[t.GUIDE_SCALE - t.GHIDRA_BASE],
+                         struct.pack('<4f', 1 / 2592, 1 / 1080, -32, 16 / 2592))
+        self.assertEqual(offsets[t.SUBTITLE_SCALE - t.GHIDRA_BASE], struct.pack('<2f', 1 / 2592, 1 / 1080))
         block = offsets[t.HOR_PLUS_BLOCK - t.GHIDRA_BASE]
         self.assertEqual(len(block), len(t.HOR_PLUS_BLOCK_EXPECTED))
         self.assertIn(struct.pack('<f', 1600 / 3840), block)

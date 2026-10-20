@@ -353,6 +353,7 @@ bool TemporalUpscaler::OnFrameStart() {
     TlgSettings::Get().active_render_width = Scaled() ? render_width : scene_targets.Size().width;
     TlgSettings::Get().active_render_height = Scaled() ? render_height : scene_targets.Size().height;
     if (changed || !dispatched_last_frame) reset = true;
+    if (changed) game_reset = true;
     if (changed) jitter_index = 0;
     applied_preset = preset;
     applied_output = output;
@@ -380,11 +381,27 @@ bool TemporalUpscaler::OnFrameStart() {
     }
     // CameraMotion::OnDisplayPass has already cleared Depth(). Use the context's render
     // size, which survives the frame boundary (Performance 960 -> 1920 needs 32 phases).
+    // DLAA: the emulator starts about three frames per game frame, so the game's own post
+    // (RunGameMotion) advances the jitter; a mid-frame change would shift part of the G-buffer.
+    if (jitter_active && game_motion_on && game_motion_ok && jitter_started && !changed) {
+        // Applied here, at the display pass: the trigger runs after the next frame's depth
+        // prepass, and a change there would jitter the prepass and the G-buffer differently.
+        if (jitter_pending) {
+            jitter_pending = false;
+            AdvanceJitter();
+        }
+        return changed;
+    }
+    AdvanceJitter();
+    jitter_started = true;
+    return changed;
+}
+
+void TemporalUpscaler::AdvanceJitter() {
     const u32 phases = Scaled() ? Motion::JitterPhases(render_width, target_width)
         : Motion::JitterPhases(scene_targets.Size().width, 1920);
     jitter_index = jitter_index % phases + 1;
     jitter = {Halton(jitter_index, 2) - 0.5f, Halton(jitter_index, 3) - 0.5f};
-    return changed;
 }
 
 void TemporalUpscaler::OnGameMotionPass(VideoCore::ImageId scene, VideoCore::ImageId motion,
@@ -403,6 +420,7 @@ void TemporalUpscaler::OnDispatch(u64 cs_hash) {
             RunGameMotion();
         } else {
             reset = true;
+            game_reset = true;
         }
         game_frame.valid = false;
         return;
@@ -1116,6 +1134,8 @@ void TemporalUpscaler::RunGameMotion() {
     float frame_ms = std::chrono::duration<float, std::milli>(now - last_frame).count();
     if (frame_ms <= 0.0f || frame_ms > 200.0f) frame_ms = 16.6f;
     last_frame = now;
+    // Fresh history after a settings change, a skipped frame, or a menu or loading screen.
+    reset = game_reset || now - last_game_motion > std::chrono::milliseconds(100);
     if (!RecordDlss(cmdbuf,
                     {color.GetImage(), color_view, color.info.pixel_format,
                      vk::ImageAspectFlagBits::eColor, w, h},
@@ -1125,7 +1145,41 @@ void TemporalUpscaler::RunGameMotion() {
         return;
     }
     reset = false;
+    game_reset = false;
+    last_game_motion = now;
+    jitter_pending = true; // for the next game frame (OnFrameStart)
     dispatched_last_frame = true;
+    // Debug (settings or toggle): the game's motion vectors over the DLAA result, signed.
+    if (TlgSettings::Get().debug_view == TlgSettings::DebugMotion ||
+        TlgToggle::Disabled(TlgToggle::DlaaMotionView)) {
+        own_barrier(vk::Image(output_image), vk::ImageLayout::eGeneral, all, rw,
+                    vk::ImageLayout::eGeneral, all, rw);
+        const vk::DescriptorImageInfo out_info{.imageView = *output_view,
+                                               .imageLayout = vk::ImageLayout::eGeneral};
+        const vk::DescriptorImageInfo mask_info{.imageView = *reactive_view,
+                                                .imageLayout = vk::ImageLayout::eGeneral};
+        const vk::DescriptorImageInfo motion_info{.imageView = *motion_view,
+                                                  .imageLayout = vk::ImageLayout::eGeneral};
+        const std::array<vk::WriteDescriptorSet, 5> writes = {{
+            {.dstBinding = 0, .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &out_info},
+            {.dstBinding = 1, .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &out_info},
+            {.dstBinding = 2, .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageImage, .pImageInfo = &mask_info},
+            {.dstBinding = 3, .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &motion_info},
+            {.dstBinding = 4, .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage, .pImageInfo = &motion_info},
+        }};
+        const u32 mode = 3;
+        cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, *merge_pipeline);
+        cmdbuf.pushDescriptorSetKHR(vk::PipelineBindPoint::eCompute, *merge_pipeline_layout, 0,
+                                    writes);
+        cmdbuf.pushConstants(*merge_pipeline_layout, vk::ShaderStageFlagBits::eCompute, 0,
+                             sizeof(mode), &mode);
+        cmdbuf.dispatch((w + 7) / 8, (h + 7) / 8, 1);
+    }
     // The DLSS output replaces the scene (B10G11R11 has no alpha to keep).
     own_barrier(vk::Image(output_image), vk::ImageLayout::eGeneral, all, rw,
                 vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eTransfer,
@@ -1431,7 +1485,10 @@ float TemporalUpscaler::SceneMipBias() const {
     if (!Active() || TlgSettings::Get().upscaler == TlgSettings::UpscalerTaa) return 0.0f;
     const float render = float(TlgSettings::Get().active_render_width.load());
     const float output = float(Scaled() ? target_width : 1920u);
-    return render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
+    float bias = render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
+    // DLSS guide: log2(render / output) - 1; the resolve keeps the extra detail stable.
+    if (UseDlss() && TlgSettings::Get().dlaa) bias -= 1.0f;
+    return bias;
 }
 
 bool TemporalUpscaler::Scaled() const {
@@ -2130,6 +2187,11 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
     return ok;
 }
 
+bool TemporalUpscaler::SkipGameSmaa(u64 vs_hash) const {
+    return vs_hash == 0x0a449aef && GameMotion() &&
+           !TlgToggle::Disabled(TlgToggle::DlaaSkipGameSmaa);
+}
+
 bool TemporalUpscaler::UseDlss() const {
     const Dlss* dlss = Dlss::Get();
     return TlgSettings::Get().upscaler == TlgSettings::UpscalerDlss && dlss && dlss->Available() &&
@@ -2140,7 +2202,10 @@ bool TemporalUpscaler::RecordDlss(vk::CommandBuffer cmdbuf, const Dlss::Resource
                                   const Dlss::Resource& depth, u32 w, u32 h, u32 ow, u32 oh,
                                   float frame_ms, bool hdr, std::array<float, 2> frame_jitter) {
     Dlss* dlss = Dlss::Get();
-    const Dlss::FeatureDesc desc{w, h, ow, oh, Dlss::QualityForScale(float(ow) / float(w)), hdr};
+    const u64 tests = __atomic_load_n(&runtime_disabled_optimizations, __ATOMIC_RELAXED);
+    const Dlss::FeatureDesc desc{w, h, ow, oh, Dlss::QualityForScale(float(ow) / float(w)), hdr,
+                                 u32(tests >> 60),
+                                 !TlgToggle::Disabled(TlgToggle::DlssAutoExposure)};
     bool ok = true;
     if (!dlss->HasFeature(desc)) {
         // The previous feature may still be in use by submitted work; `cmdbuf` stays open.

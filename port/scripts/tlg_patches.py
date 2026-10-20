@@ -188,6 +188,36 @@ HOR_PLUS_BLOCK_NEW = bytes.fromhex(
 # edges. Widening only the projection leaves the screen grey.
 UI_SIZE = 0x2525480
 UI_SIZE_EXPECTED = struct.pack('<4i', 1920, 1080, 1920, 1080)
+# Guide (button hint box) draw, 0x190fdf0: scales its 1920x1080 layout to the UI canvas with
+# width/1920 and height/1080 and its 16 px corners with width*16/1920 (these four floats, used
+# only there). With a wider canvas the box stretched sideways; dividing by the canvas width keeps it square.
+GUIDE_SCALE = 0x24efa14
+GUIDE_SCALE_EXPECTED = struct.pack('<4f', 1 / 1920, 1 / 1080, -32, 16 / 1920)
+# Subtitle draw, 0x1c30320: the same width/1920, height/1080 scale (these two floats, used only
+# there) stretched the subtitle lines sideways on a wider canvas.
+SUBTITLE_SCALE = 0x24f1464
+SUBTITLE_SCALE_EXPECTED = struct.pack('<2f', 1 / 1920, 1 / 1080)
+
+
+# Boot logos: the game init (0x1231d62) fills a table of four 0x1c-byte entries at rsp+0x6f0
+# (black lead-in, China health warning, SIE logo, Japan Studio logo), each starting with an
+# enabled int, and shows the enabled ones in turn. These writes clear the three set to 1.
+LOGO_ENABLES = [
+    (0x1231d79, 'lead-in'),
+    (0x1231df4, 'SIE logo'),
+    (0x1231e45, 'Japan Studio logo'),
+]
+LOGO_MOVS = {0x1231d79: 0x6f0, 0x1231df4: 0x728, 0x1231e45: 0x744}
+
+
+def logo_writes(eboot):
+    """[(image offset, new bytes, description)] that skip the boot logos, after checking them."""
+    writes = []
+    for address, what in LOGO_ENABLES:
+        mov = bytes.fromhex('c78424') + struct.pack('<I', LOGO_MOVS[address])
+        offset = checked_offset(eboot, address, mov + struct.pack('<i', 1))
+        writes.append((offset, mov + struct.pack('<i', 0), f'skip logos: {address:#x} {what} off'))
+    return writes
 
 
 def checked_offset(eboot, address, expected):
@@ -221,6 +251,12 @@ def resolution_writes(eboot, size):
         ui_width = round(1080 * width / height)
         writes.append((ui, struct.pack('<4i', ui_width, 1080, ui_width, 1080),
                        f'UI: {UI_SIZE:#x} canvas 1920x1080 -> {ui_width}x1080'))
+        guide = checked_offset(eboot, GUIDE_SCALE, GUIDE_SCALE_EXPECTED)
+        writes.append((guide, struct.pack('<4f', 1 / ui_width, 1 / 1080, -32, 16 / ui_width),
+                       f'UI: {GUIDE_SCALE:#x} hint box scale 1920 -> {ui_width}'))
+        subtitle = checked_offset(eboot, SUBTITLE_SCALE, SUBTITLE_SCALE_EXPECTED)
+        writes.append((subtitle, struct.pack('<2f', 1 / ui_width, 1 / 1080),
+                       f'UI: {SUBTITLE_SCALE:#x} subtitle scale 1920 -> {ui_width}'))
     return writes
 
 
@@ -267,7 +303,8 @@ def compile_mods(game_dir, eboot, mods_dir, mods_config, lines):
         return []
 
 
-def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution=None):
+def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution=None,
+            skip_logos=False):
     """Writes out/patches.bin for the mode plus any enabled mod; returns (applied mode, lines).
     Any problem with the frame rate patches (other eboot build, unexpected bytes) falls back to
     30 FPS without them; a mod problem only drops that mod, never the frame rate patches."""
@@ -325,7 +362,15 @@ def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution
             lines.append(f'Resolution: {error}: not applied, 1920x1080')
         for _, data, what in res_writes:
             lines.append(f'Resolution patch {what} ({data.hex()})')
-    writes = fps_writes + mod_writes + res_writes
+    logo = []
+    if skip_logos or os.environ.get('TLG_SKIP_LOGOS') == '1':
+        try:
+            logo = logo_writes(read_eboot_elf(game_dir))
+        except ValueError as error:
+            lines.append(f'Skip logos: {error}: not applied')
+        for _, data, what in logo:
+            lines.append(f'Patch {what} ({data.hex()})')
+    writes = fps_writes + mod_writes + res_writes + logo
     write_patch_file(Path(out_dir) / 'patches.bin', writes)
     lines.append(f'Frame rate: {mode} FPS mode, {len(writes)} patch writes')
     return mode, lines
@@ -339,8 +384,10 @@ def main():
     p.add_argument('--mods-dir', help='folder of shadPS4/GoldHEN cheat XML files')
     p.add_argument('--mods-config', help='mods.json: {"enabled": [...], "disabled": [...]}')
     p.add_argument('--resolution', help='WxH, e.g. 3440x1440 (default 1920x1080)')
+    p.add_argument('--skip-logos', action='store_true', help='skip the boot logos')
     a = p.parse_args()
-    _, lines = prepare(a.game_dir, a.out, a.mode, a.mods_dir, a.mods_config, a.resolution)
+    _, lines = prepare(a.game_dir, a.out, a.mode, a.mods_dir, a.mods_config, a.resolution,
+                       a.skip_logos)
     print('\n'.join(lines))
 
 
