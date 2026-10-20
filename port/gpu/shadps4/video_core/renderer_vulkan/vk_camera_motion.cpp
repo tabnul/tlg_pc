@@ -221,9 +221,16 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
 void CameraMotion::RecordGameMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_view,
                                     vk::ImageView game_view, vk::ImageView motion_view,
                                     u32 width, u32 height) {
+    // Mode 3 also needs both cameras: it replaces vectors the hair inherited from behind it.
+    const bool fix = Ready() && !TlgToggle::Disabled(TlgToggle::DlaaMotionFix);
     const PushConstants push{
+        .reproject = Multiply(previous.view, current.inv_view),
+        .proj = current.proj,
+        .prev_proj = previous.proj,
         .size = {float(width), float(height)},
-        .mode = 2u,
+        .jitter = jitter,
+        .previous_jitter = previous_jitter,
+        .mode = fix ? 3u : 2u,
     };
     const vk::DescriptorImageInfo depth_info{.imageView = depth_view,
                                              .imageLayout = vk::ImageLayout::eGeneral};
