@@ -1274,15 +1274,21 @@ PipelineCache::Result PipelineCache::GetProgram(PipelineSelection& sel, HwStage 
         // pointers in the registers; ahead of the GPU thread that memory may already be
         // reused. A fault returns here (runtime_fault_recover) and the draw is left to the GPU
         // thread. A jump out of the specialization leaks its partial allocations (rare).
+        // A draw-preparation worker also keeps an outer recovery point around the whole draw.
+        // Restore it after this narrower resource-table walk so later speculative reads in the
+        // same worker can fall back too. Clearing the pointer here made those faults enter the
+        // normal GPU readback path while the GPU thread was waiting for this worker.
+        sigjmp_buf* outer_recover = runtime_fault_recover;
         sigjmp_buf recover;
         if (sigsetjmp(recover, 0)) {
+            runtime_fault_recover = outer_recover;
             worker.failed = true;
             return {};
         }
         runtime_fault_recover = &recover;
         info.RefreshFlatBuf();
         auto spec = Shader::StageSpecialization(info, runtime_info, profile, binding);
-        runtime_fault_recover = nullptr;
+        runtime_fault_recover = outer_recover;
         const auto it = std::ranges::find(program->modules, spec, &Program::Module::spec);
         if (it == program->modules.end()) {
             worker.failed = true;

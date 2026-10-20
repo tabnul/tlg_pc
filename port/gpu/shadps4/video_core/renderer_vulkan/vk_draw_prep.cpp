@@ -446,6 +446,18 @@ void DrawPreparation::WorkerLoop(std::stop_token stop, u32 index) {
             if (ordinal < target->num_draws &&
                 target->seq >= gpu_seq.load(std::memory_order_acquire)) {
                 auto& draw = target->draws[ordinal];
+                // Everything below is speculative and can read pointers from guest resource
+                // tables. If one points at GPU-protected memory, waiting for a GPU-thread
+                // readback here deadlocks: the GPU thread drains this preparation work before
+                // it processes commands. Leave this draw to the GPU thread instead.
+                sigjmp_buf recover;
+                if (sigsetjmp(recover, 0)) {
+                    runtime_fault_recover = nullptr;
+                    draw.state.store(PreparedDraw::Unavailable, std::memory_order_release);
+                    ++ordinal;
+                    return;
+                }
+                runtime_fault_recover = &recover;
                 prep_worker.stages.clear();
                 prep_worker.failed = false;
                 sel.draw_indirect_params = {};
@@ -475,6 +487,7 @@ void DrawPreparation::WorkerLoop(std::stop_token stop, u32 index) {
                 } else {
                     draw.state.store(PreparedDraw::Unavailable, std::memory_order_release);
                 }
+                runtime_fault_recover = nullptr;
             }
             ++ordinal;
         });
