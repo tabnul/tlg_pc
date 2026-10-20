@@ -241,6 +241,9 @@ struct JitterControl {
     u32 index = 0; ///< jitter-eligible draws since the sky pass
 } jitter_control;
 
+/// Meshes (index address, count) drawn jittered into a scene depth since the sky pass.
+std::vector<std::pair<VAddr, u32>> jittered_meshes;
+
 bool Listed(const std::vector<u32>& list, u32 ps) {
     return std::find(list.begin(), list.end(), ps) != list.end();
 }
@@ -249,6 +252,7 @@ void ReadJitterControl() {
     auto& control = jitter_control;
     const u32 count = control.index;
     control.index = 0;
+    jittered_meshes.clear(); // a new frame
     control.map = false;
     static const char* path = std::getenv("TLG_JITTER_CONTROL");
     static auto last = std::chrono::steady_clock::time_point{};
@@ -1264,6 +1268,36 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
          regs.depth_control.depth_write_enable) &&
         !SamplesSceneDepth() && JitterInRange(pipeline->FragmentHash())) {
         draw_jitter = upscaler->Jitter();
+    }
+    // A redraw of a mesh already drawn jittered into this depth takes the same shift, sampling
+    // or not: water shading (ps 05adfd4d, 4755277d) tests LessEqual against its own depth
+    // pre-pass (ps 26c53528) and flickered where the two disagreed (2026-10-21).
+    if (upscaler->Enabled() && is_indexed && db_desc.first && JitterDepth(db_desc.first)) {
+        const std::pair mesh{regs.index_base_address.Address<VAddr>() +
+                                 u64(index_offset) * 4, regs.num_indices};
+        const bool known = std::find(jittered_meshes.begin(), jittered_meshes.end(), mesh) !=
+                           jittered_meshes.end();
+        if (draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f) {
+            if (!known && regs.depth_control.depth_write_enable) jittered_meshes.push_back(mesh);
+        } else if (known) {
+            draw_jitter = upscaler->Jitter();
+        }
+    }
+    if (jitter_control.map && db_desc.first && JitterDepth(db_desc.first)) {
+        // The map also describes the draw: indices, depth state, blend, jitter, bound images.
+        std::string images;
+        for (const auto image_id : bound_images) {
+            const auto& info = texture_cache.GetImage(image_id).info;
+            images += fmt::format(" {}x{}:{}{}#{}", info.size.width, info.size.height,
+                                  u32(info.pixel_format), info.props.is_depth ? "d" : "",
+                                  image_id.index);
+        }
+        std::printf("Jitter draw: ps %08x indices %u inst %u zwrite %u zfunc %u blend %u "
+                    "depth #%u jittered %d images%s\n",
+                    pipeline->FragmentHash(), regs.num_indices, regs.num_instances.NumInstances(),
+                    u32(regs.depth_control.depth_write_enable), u32(regs.depth_control.depth_func),
+                    u32(regs.blend_control[0].enable), db_desc.first.index,
+                    int(draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f), images.c_str());
     }
     UpdateDynamicState(pipeline, is_indexed);
     MarkPass(pipeline, state);
