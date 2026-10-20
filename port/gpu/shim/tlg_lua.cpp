@@ -144,6 +144,58 @@ void Dump(const char* buffer, uint64_t size, const char* name) {
     std::ofstream(std::string(dir) + "/" + std::to_string(count++) + "_" + file, std::ios::binary)
         .write(buffer, static_cast<std::streamsize>(size));
 }
+
+// Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusiony
+// and DanielSvoboda, applied to the source. Startup gets the QA menu (in game: hold L1, press
+// L3); the title menu's press-build level select is enabled (hold L1 as the menu closes).
+constexpr std::string_view QaMenu = R"(
+if not _TLGQA then _TLGQA=true
+local function Registered(f) for _,v in ipairs(tick_funcs) do if v==f then return true end end return false end
+RegisterTick(function()
+  if MS.PadGetHold(PadButton.L1) and MS.PadGetDown(PadButton.L3) then
+    if Registered(ControllerMenu.Tick) then
+      if ControllerMenu.Hide then ControllerMenu.Hide() luaCommand("trico resume") end
+    else DelayExec(function() RegisterTick(ControllerMenu.Tick) end) luaCommand("trico pause") end
+  end
+end)
+Load("game/scripts/_editor/ControllerMenu")
+end
+)";
+
+/// Edits game chunk `name` for the debug menus and the bridge fix; true when it changed.
+bool GameEdits(std::string& patched, std::string_view name) {
+    const auto& s = TlgSettings::Get();
+    if (s.level_select && name == "data_trico/game/scripts/startup.lua") {
+        patched += QaMenu;
+        return true;
+    }
+    if (s.level_select && name == "data_trico/game/scripts/stages/s01_Opening/missionScript.lua") {
+        // Only the test guarding the L1 level select, not the press build's other changes.
+        static constexpr std::string_view Test = "if gameConfig_buildId_Press==true then";
+        static constexpr std::string_view Hold = "if MS.PadGetHold(PadButton.L1) then";
+        for (size_t at = patched.find(Test); at != std::string::npos;
+             at = patched.find(Test, at + 1)) {
+            const size_t next = patched.find_first_not_of(" \t\r\n", at + Test.size());
+            if (next != std::string::npos && patched.compare(next, Hold.size(), Hold) == 0) {
+                patched.replace(at, Test.size(), "if true then");
+                return true;
+            }
+        }
+        return false;
+    }
+    // Bridge fix (setting bridge_fix): the GoldHEN "Collapsing Bridge Freeze Fix". The slow
+    // motion while the bridge in the pit collapses can leave the game frozen; skip it.
+    static constexpr std::string_view SlowMotion = "MS.SetGameSpeed(0.10, 0.2)";
+    if (s.bridge_fix && name == "data_trico/game/scripts/stages/s10_Pit/missionScript.lua") {
+        const size_t at = patched.find(SlowMotion);
+        if (at == std::string::npos) {
+            return false;
+        }
+        patched.insert(at, "--");
+        return true;
+    }
+    return false;
+}
 } // namespace
 
 extern "C" void tlg_lua_status(uintptr_t loadbuffer) {
@@ -165,12 +217,18 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     }
     Dump(buffer, size, name);
     static constexpr std::string_view Marker = "function RegisterTick(";
-    if (std::string_view(buffer, size).find(Marker) != std::string_view::npos) {
-        std::string patched(buffer, size);
+    std::string patched(buffer, size);
+    bool changed = false;
+    if (patched.find(Marker) != std::string::npos) {
         patched += Bootstrap;
         std::printf("Lua: settings tick added to %s\n", name ? name : "?");
-        std::fflush(stdout);
-        return original(L, options, patched.data(), patched.size(), name);
+        changed = true;
     }
-    return original(L, options, buffer, size, name);
+    if (name && GameEdits(patched, name)) {
+        std::printf("Lua: edited %s\n", name);
+        changed = true;
+    }
+    std::fflush(stdout);
+    return changed ? original(L, options, patched.data(), patched.size(), name)
+                   : original(L, options, buffer, size, name);
 }
