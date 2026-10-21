@@ -16,10 +16,15 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
+import time
 
+import backports_table
+import logtail
 import shader_cache
+import userdata
 
 # A packaged build (PyInstaller) keeps its folders next to the executable: scripts/, out/, user/.
 FROZEN = bool(getattr(sys, 'frozen', False))
@@ -28,9 +33,21 @@ sys.path.insert(0, str(PORT_DIR / 'scripts'))
 import mod_patches  # noqa: E402
 REPO_DIR = PORT_DIR.parent
 OUT_DIR = PORT_DIR / 'out'
-USER_DIR = PORT_DIR / 'user'
-MODS_DIR = USER_DIR / 'mods'          # shadPS4/GoldHEN cheat XML files the player drops in
-MODS_CONFIG = USER_DIR / 'mods.json'  # {"enabled": [...], "disabled": [...]}
+
+
+def user_dir():
+    """The folder of saves, tlg.ini, mods, backups and GPU caches: TLG_USER_DIR, else the per-user
+    pointer file (survives reinstalling; the Qt launcher's Saves screen sets it), else
+    <port folder>/user (userdata.py has the rules). Always call this instead of caching it."""
+    return userdata.user_dir(PORT_DIR)
+
+
+def __getattr__(name):  # USER_DIR (the Tk launcher, older code) is the current folder
+    if name == 'USER_DIR':
+        return user_dir()
+    raise AttributeError(name)
+
+
 LOG_DIR = OUT_DIR / 'logs'
 PROBE = OUT_DIR / ('tlg-probe.exe' if os.name == 'nt' else 'tlg-probe')
 KEEP_LOGS = 30
@@ -55,6 +72,64 @@ def default_language(game_dir=''):
     """The game language the launcher starts with for the CUSA in game_dir (US by default)."""
     title = shader_cache.title_id(game_dir) if game_dir else None
     return DEFAULT_LANGUAGE_BY_TITLE.get(title, 'es_LA')
+
+
+# Every language key either disc has (the Qt launcher's names table covers them all).
+GAME_LANGUAGES = {**LANGUAGES_US, **LANGUAGES_EU}
+# The closest choice when the system's language is missing from the disc.
+_LANGUAGE_SIBLING = {'pt_BR': 'pt_PT', 'pt_PT': 'pt_BR', 'es_LA': 'es_ES', 'es_ES': 'es_LA',
+                     'fr_CA': 'fr', 'fr': 'fr_CA'}
+_LANGUAGE_PREFIX = {'en': 'en', 'pt': 'pt_BR', 'es': 'es_LA', 'fr': 'fr', 'de': 'de', 'it': 'it', 'nl': 'nl',
+                    'pl': 'pl', 'tr': 'tr', 'ru': 'ru', 'fi': 'fi', 'sv': 'sv', 'da': 'da', 'no': 'no', 'nb': 'no',
+                    'nn': 'no', 'ar': 'ar'}
+
+
+def system_game_language(environ=None):
+    """The game language that follows the system one (LC_ALL, LC_MESSAGES, LANG, then the locale):
+    pt_PT/pt_BR, es_ES/es_LA and fr_CA/fr by region; English when this game has no such language."""
+    environ = os.environ if environ is None else environ
+    code = next((environ[name] for name in ('LC_ALL', 'LC_MESSAGES', 'LANG') if environ.get(name)), '')
+    if not code:
+        try:
+            import locale
+            code = locale.getlocale()[0] or ''
+        except Exception:
+            code = ''
+    parts = re.split(r'[_\-.@]', code.strip().lower())
+    windows = {'english': 'en', 'portuguese': 'pt', 'spanish': 'es', 'french': 'fr', 'german': 'de',
+               'italian': 'it', 'dutch': 'nl', 'polish': 'pl', 'turkish': 'tr', 'russian': 'ru'}
+    language = windows.get(parts[0], parts[0])
+    region = parts[1] if len(parts) > 1 else ''
+    if language == 'pt':
+        return 'pt_PT' if region in ('pt', 'portugal') else 'pt_BR'
+    if language == 'es':
+        return 'es_ES' if region in ('es', 'spain') else 'es_LA'
+    if language == 'fr':
+        return 'fr_CA' if region in ('ca', 'canada') else 'fr'
+    return _LANGUAGE_PREFIX.get(language, 'en')
+
+
+def game_language_choices(settings):
+    """The game language box of the Qt launcher: 'auto', the languages the disc has and the saved
+    choice even when the disc lacks it (never changed behind the player's back)."""
+    keys = ['auto'] + list(game_languages(settings.get('game_dir', '')))
+    choice = settings.get('game_language', 'auto')
+    return keys + [choice] if choice in GAME_LANGUAGES and choice not in keys else keys
+
+
+def resolve_game_language(settings, environ=None):
+    """The language key the game gets: the saved choice when the disc has it; 'auto' follows the
+    system (or its closest variant); anything else is English, as before."""
+    table = game_languages(settings.get('game_dir', ''))
+    choice = settings.get('game_language', 'auto')
+    if choice in table:
+        return choice
+    if choice == 'auto':
+        system = system_game_language(environ)
+        for key in (system, _LANGUAGE_SIBLING.get(system)):
+            if key in table:
+                return key
+    return 'en'
 
 # TLG defaults (see README "Opções" and the reasons in each comment).
 DEFAULT_ENV = {
@@ -90,6 +165,10 @@ DEFAULT_SETTINGS = {
     'key_map': {},                 # PS4 button -> 'Key|Mouse Left' (empty: the default)
     'frame_rate': '30',            # 30 | 60 | unlocked (scripts/tlg_patches.py; TLG_FPS wins)
     'resolution': '1920x1080',     # WxH (scripts/tlg_patches.py; TLG_RESOLUTION wins)
+    'gpu_readbacks': '2',          # TLG_READBACKS: 2 precise (the game reads GPU compute results), 0 fast
+    'stick_deadzone': 10,          # percent; runtime_pad.c TLG_STICK_DEADZONE
+    'close_on_play': True,         # Qt launcher: close about 2 s after the game starts
+    'reopen_launcher': True,       # ... and open again when the game exits
 }
 FRAME_RATES = ['30', '60', 'unlocked']
 # 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI).
@@ -150,7 +229,7 @@ def load_settings():
     except (OSError, ValueError):
         pass
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
-    ini = read_ini(USER_DIR / 'tlg.ini')
+    ini = read_ini(user_dir() / 'tlg.ini')
     try:
         if 'mouse_enabled' in ini:
             settings['mouse_enabled'] = ini['mouse_enabled'] != '0'
@@ -169,6 +248,48 @@ def save_settings(settings):
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+# Messages about the player's game folder (en, pt) the Qt launcher can show; none blocks only as a
+# warning in this port (check_game reports missing files and the unbuilt probe).
+TEXT = {}
+WARNINGS = set()
+
+
+def message(key, portuguese=None, **fmt):
+    en, pt = TEXT[key]
+    if portuguese is None:
+        return f'{pt.format(**fmt)}\n{en.format(**fmt)}'
+    return (pt if portuguese else en).format(**fmt)
+
+
+class GameError(RuntimeError):
+    """A problem with the player's game files (TEXT key + detail)."""
+
+    def __init__(self, key, detail):
+        super().__init__(f'{key}: {detail}')
+        self.key, self.detail = key, detail
+
+
+def blocking(problems):
+    """The problems of check_game that keep Play disabled (all but the warnings)."""
+    return [problem for problem in problems if problem[0] not in WARNINGS]
+
+
+def experimental_states(settings):
+    """The player's choices of the Qt launcher's Graphics/Fixes switches (tlg.ini + settings)."""
+    return backports_table.read_states(read_ini(user_dir() / 'tlg.ini'), settings)
+
+
+def save_experimental(settings, states):
+    """Writes the switches: tlg.ini keys (the in-game menu's own file) and the start-up switches
+    kept in settings.json."""
+    user_dir().mkdir(parents=True, exist_ok=True)
+    backports_table.write_ini(user_dir() / 'tlg.ini', backports_table.ini_updates(states))
+    for item in backports_table.ITEMS:
+        if item.store == 'launcher':
+            settings[item.key] = backports_table.effective(item, states) != '0'
+    save_settings(settings)
 
 
 def check_game(game_dir):
@@ -232,7 +353,7 @@ def shader_cache_serials(settings):
 def gpu_user_dir():
     """Where the GPU backend keeps its caches (shaders, pipelines): the saves folder, on every OS.
     TLG_GPU_USER_DIR moves it."""
-    return Path(os.environ.get('TLG_GPU_USER_DIR') or USER_DIR)
+    return Path(os.environ.get('TLG_GPU_USER_DIR') or user_dir())
 
 
 def shader_cache_size(settings):
@@ -287,6 +408,11 @@ def run_script(argv):
         runpy.run_path(str(script), run_name='__main__')
     except SystemExit as stop:
         return stop.code if isinstance(stop.code, int) else (0 if stop.code is None else 1)
+    except Exception as error:  # noqa: BLE001  never PyInstaller's "unhandled exception" dialog
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        print(f'{script.name}: {error}', file=sys.stderr, flush=True)  # last line: the reason
+        return 1
     return 0
 
 
@@ -301,15 +427,15 @@ def resolution(settings):
 
 
 def mods_dir():
-    """TLG_MODS_DIR, else USER_DIR/mods (created empty on first use so the player sees where
+    """TLG_MODS_DIR, else user_dir()/mods (created empty on first use so the player sees where
     to drop shadPS4/GoldHEN cheat XML files)."""
-    directory = Path(os.environ.get('TLG_MODS_DIR') or MODS_DIR)
+    directory = Path(os.environ.get('TLG_MODS_DIR') or user_dir() / 'mods')
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
 def mods_config():
-    return Path(os.environ.get('TLG_MODS_CONFIG') or MODS_CONFIG)
+    return Path(os.environ.get('TLG_MODS_CONFIG') or user_dir() / 'mods.json')
 
 
 def list_mods(settings):
@@ -374,18 +500,32 @@ def prepare(settings, log=print):
 ISA_TABLE = OUT_DIR / 'isa-rewrite.bin'
 
 
+def probe_env():
+    """The environment tlg-probe needs to start: on Linux the libraries packaged with the port
+    (SDL3, FFmpeg, ...) live in out/lib, and the frozen launcher's own LD_LIBRARY_PATH (PyInstaller's
+    _internal) is replaced by the one it had at start."""
+    env = os.environ.copy()
+    if os.name != 'nt':
+        original = env.pop('LD_LIBRARY_PATH_ORIG', None) if FROZEN else env.get('LD_LIBRARY_PATH')
+        bundled = OUT_DIR / 'lib'
+        paths = [str(bundled)] if bundled.is_dir() else []
+        if original:
+            paths.append(original)
+        if paths:
+            env['LD_LIBRARY_PATH'] = os.pathsep.join(paths)
+        else:
+            env.pop('LD_LIBRARY_PATH', None)
+    return env
+
+
 def cpu_missing_sets(log=print):
     """Instruction sets `tlg-probe --cpu-features` reports missing ([] when complete); None when the
     probe could not tell (it did not start: the table is then built anyway, see isa_table). A CPU
     that lacks a set nothing can rewrite (AVX and older) stops here (exit 20) with the probe's reason.
     The probe gets the same library path as the game (out/lib in the Linux package)."""
-    env = os.environ.copy()
-    bundled = OUT_DIR / 'lib'
-    if os.name != 'nt' and bundled.is_dir():
-        env['LD_LIBRARY_PATH'] = os.pathsep.join(filter(None, [str(bundled), os.environ.get('LD_LIBRARY_PATH')]))
     try:
         result = subprocess.run([str(PROBE), '--cpu-features'], stdin=subprocess.DEVNULL, capture_output=True,
-                                text=True, timeout=30, creationflags=NO_WINDOW, env=env)
+                                text=True, timeout=30, creationflags=NO_WINDOW, env=probe_env())
     except (OSError, subprocess.SubprocessError):
         return []  # no probe yet: check_game reports it
     if result.returncode == 20:
@@ -454,13 +594,16 @@ def build_env(settings, extra=None):
     for key, value in DEFAULT_ENV.items():
         env.setdefault(key, value)  # explicit TLG_* in the environment always win
     env['TLG_GC_BUDGET_MB'] = os.environ.get('TLG_GC_BUDGET_MB', str(int(settings['vram_budget_mb'])))
+    env['TLG_READBACKS'] = os.environ.get('TLG_READBACKS', str(settings.get('gpu_readbacks', '2')))
+    env['TLG_STICK_DEADZONE'] = os.environ.get(
+        'TLG_STICK_DEADZONE', f"{int(settings.get('stick_deadzone', 10)) / 100:.2f}")
     env['TLG_LANGUAGE'] = os.environ.get('TLG_LANGUAGE', str(
-        game_languages(settings.get('game_dir')).get(settings['game_language'], 1)))
+        game_languages(settings.get('game_dir')).get(resolve_game_language(settings), 1)))
     if settings.get('ui_language', 'auto') != 'auto':
         env['TLG_UI_LANG'] = settings['ui_language']
     # Without the console module the port's own mixer (runtime_ngs2.c) plays the audio.
     env['TLG_NGS2'] = 'native' if ngs2_module(settings) else 'hle'
-    env['TLG_CONFIG'] = str(USER_DIR / 'tlg.ini')
+    env['TLG_CONFIG'] = str(user_dir() / 'tlg.ini')
     # Window name and app id (matches tlg-pc.desktop for Alt+Tab and the dock) and icon.
     env.setdefault('TLG_APP_NAME', 'The Last Guardian')
     env.setdefault('TLG_APP_ID', 'tlg-pc')
@@ -477,13 +620,20 @@ def build_env(settings, extra=None):
         env['TLG_RESOLUTION_PATCH'] = applied_resolution
     restart = f'"{sys.executable}" --play' if FROZEN else f'"{sys.executable}" "{Path(__file__).resolve()}"'
     env.setdefault('TLG_RESTART_COMMAND', restart)
-    # Linux package: the libraries built with the port (SDL3, FFmpeg, ...) are in out/lib.
-    bundled = OUT_DIR / 'lib'
-    if os.name != 'nt' and bundled.is_dir():
-        env['LD_LIBRARY_PATH'] = os.pathsep.join(filter(None, [str(bundled), os.environ.get('LD_LIBRARY_PATH')]))
+    # Linux package: the libraries built with the port (SDL3, FFmpeg, ...) are in out/lib, never the
+    # frozen launcher's own (PyInstaller's _internal).
+    if os.name != 'nt':
+        libraries = probe_env().get('LD_LIBRARY_PATH')
+        if libraries:
+            env['LD_LIBRARY_PATH'] = libraries
+        else:
+            env.pop('LD_LIBRARY_PATH', None)
     # Shaders and pipelines beside the saves (the GPU reads it when it starts; before, Linux used
     # shadPS4's ~/.local/share/shadPS4 and Windows <saves>/user).
     env['TLG_GPU_USER_DIR'] = str(gpu_user_dir())
+    # Start-up switches the player changed in the Qt launcher (TLG_<name>=0/1); untouched ones add
+    # nothing, and TLG_* set outside the launcher win.
+    env.update(backports_table.environment(experimental_states(settings), os.environ))
     if extra:
         env.update(extra)
     return env
@@ -504,11 +654,113 @@ def new_log():
     return log
 
 
-def launch(settings, seconds=0, extra_env=None):
+def desktop_env():
+    """Environment for the programs the launcher opens for the player (browser, file manager): never
+    the frozen launcher's LD_LIBRARY_PATH (a browser started with it loads PyInstaller's libraries
+    and dies silently)."""
+    env = os.environ.copy()
+    if os.name != 'nt' and FROZEN:
+        original = env.pop('LD_LIBRARY_PATH_ORIG', None)
+        if original:
+            env['LD_LIBRARY_PATH'] = original
+        else:
+            env.pop('LD_LIBRARY_PATH', None)
+    return env
+
+
+def open_external(target):
+    """Opens a URL or a local path with the system's handler, detached from the launcher.
+    Returns True when a handler was started."""
+    target = str(target)
+    try:
+        if os.name == 'nt':
+            os.startfile(target)  # noqa: S606 (the player's own link or folder)
+            return True
+        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
+        subprocess.Popen([opener, target], env=desktop_env(), stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return True
+    except OSError:
+        try:
+            import webbrowser
+            return bool(webbrowser.open(target))
+        except Exception:
+            return False
+
+
+def detach_options():
+    """Popen options that make the game an independent process: closing the launcher (or its
+    terminal) does not reach it. Linux: its own session. Windows: its own process group, no console."""
+    if os.name == 'nt':
+        return {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS}
+    return {'start_new_session': True}
+
+
+def wait_for_exit(pid):
+    """Blocks until process pid ends (no window, no Qt: a closed launcher's watcher)."""
+    if os.name == 'nt':
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x00100000, False, int(pid))   # SYNCHRONIZE
+        if handle:
+            kernel.WaitForSingleObject(handle, 0xFFFFFFFF)
+            kernel.CloseHandle(handle)
+        return
+    while True:
+        try:
+            os.kill(int(pid), 0)
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            pass
+        try:   # a zombie (exited, not yet reaped) counts as ended
+            if Path(f'/proc/{int(pid)}/stat').read_text().split(') ', 1)[1][:1] == 'Z':
+                return
+        except (OSError, IndexError):
+            pass
+        time.sleep(1.0)
+
+
+def reopen_after(pid):
+    """Starts a detached watcher that opens the Qt launcher again once the game (pid) exits."""
+    if FROZEN:
+        cmd = [sys.executable, '--reopen-after', str(pid)]
+    else:
+        cmd = [sys.executable, str(Path(__file__).resolve().parent / 'tlg_launcher_qt.py'),
+               '--reopen-after', str(pid)]
+    try:
+        subprocess.Popen(cmd, env=desktop_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, **detach_options())
+        return True
+    except OSError:
+        return False
+
+
+def raise_open_file_limit():
+    """Linux: lifts the open-file limit to its hard maximum; the game inherits it. A desktop session
+    starts programs with a soft limit of 1024 (systemd DefaultLimitNOFILESoft), which the GPU code can
+    pass while it loads the pipeline cache (iss_pc 2cbcb28: SDL then failed to create the window)."""
+    if os.name == 'nt':
+        return
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if hard != resource.RLIM_INFINITY and soft < hard:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+    except (ImportError, OSError, ValueError):
+        pass
+
+
+def launch(settings, seconds=0, extra_env=None, detached=False):
     """Writes the in-game settings, starts the game; returns (process, log path).
-    The process's combined output is a text pipe; the caller copies it to the log."""
-    USER_DIR.mkdir(parents=True, exist_ok=True)
-    update_ini(USER_DIR / 'tlg.ini', {
+    detached=False (Tk launcher, command line): the process's combined output is a text pipe; the
+    caller copies it to the log. detached=True (Qt launcher): the game writes straight into the log
+    file and runs in its own session, so closing the launcher never reaches it; follow the file with
+    logtail.LogTail and wait() for the exit code."""
+    data = user_dir()
+    data.mkdir(parents=True, exist_ok=True)
+    key_map = settings.get('key_map') or {}
+    update_ini(data / 'tlg.ini', {
         'display_mode': str(settings['display_mode']).lower(),  # the game's keys: windowed|borderless|fullscreen
         'vsync': int(bool(settings['vsync'])),
         'show_fps': int(bool(settings['show_fps'])),
@@ -517,15 +769,29 @@ def launch(settings, seconds=0, extra_env=None):
         'mouse_enabled': int(bool(settings.get('mouse_enabled', True))),
         'mouse_sensitivity': f"{float(settings.get('mouse_sensitivity', 1.0)):.2f}",
         'mouse_invert_y': int(bool(settings.get('mouse_invert_y', False))),
-        'key_map': key_map_spec(settings.get('key_map') or {}),
+        'key_map': key_map_spec(key_map) if isinstance(key_map, dict) else str(key_map),
     })
     log = new_log()
+    try:   # saves copied aside before every start; never blocks the game
+        import savemanager
+        note = savemanager.backup_before_play(data)
+    except Exception as error:  # noqa: BLE001
+        note = f'Save backup failed, starting anyway: {error}'
+    if note:
+        print(note, flush=True)
     cmd = [str(PROBE), str(OUT_DIR / 'boot-linked.bin'), '--app0', settings['game_dir'],
-           '--user', str(USER_DIR), '--content-profile', str(OUT_DIR / 'content.bin'),
+           '--user', str(data), '--content-profile', str(OUT_DIR / 'content.bin'),
            '--patches', str(OUT_DIR / 'patches.bin'), '--timeout', str(int(seconds))]
     if ISA_TABLE.is_file():
         cmd += ['--isa-rewrite', str(ISA_TABLE)]
-    process = subprocess.Popen(cmd, cwd=str(USER_DIR), env=build_env(settings, extra_env),
+    raise_open_file_limit()
+    if detached:
+        with open(log, 'wb') as out:   # the child keeps its own copy of the descriptor
+            process = subprocess.Popen(cmd, cwd=str(data), env=build_env(settings, extra_env),
+                                       stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
+                                       **detach_options())
+        return process, log
+    process = subprocess.Popen(cmd, cwd=str(data), env=build_env(settings, extra_env),
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                encoding='utf-8', errors='replace', bufsize=1)
     return process, log
@@ -547,9 +813,10 @@ def main(argv=None):
     if os.environ.get('TLG_NGS2') == 'hle':
         settings['native_audio'] = False
     problems = check_game(settings['game_dir'])
-    if problems:
-        for kind, detail in problems:
-            print(f'{"Compile primeiro" if kind == "not_built" else "Faltando"}: {detail}', file=sys.stderr)
+    for kind, detail in problems:
+        print(f'{"Compile primeiro / Build first" if kind == "not_built" else "Faltando / Missing"}: {detail}',
+              file=sys.stderr)
+    if blocking(problems):
         return 1
     notes = []
     prepare(settings, log=lambda line: notes.append(line) if line.startswith('Frame rate') else None)

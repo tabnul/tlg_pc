@@ -37,7 +37,7 @@ Tudo vem do **seu** PS4 (GoldHEN + Itemzflow). Nada disso vai no download. Use *
 
 1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
 2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows).
+3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher novo (Qt), com telas de Gráficos, Controles, Correções, Saves, Mods, Suporte e Atualizações. O launcher antigo continua ao lado como **The Last Guardian (classic)**. Por padrão o launcher fecha quando o jogo abre e volta quando o jogo fecha (dá para mudar em Gráficos → Áudio e launcher).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
 5. Escolha o idioma do jogo (inglês, português, espanhol ou francês) e clique em **Jogar**. A primeira partida demora um pouco mais.
@@ -77,7 +77,7 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 
 - Saves: `user/savedata/`, ao lado do executável (guarde essa pasta ao atualizar)
 - Logs: `out/logs/` (`out/last_run.log` é o da última sessão; mande ele junto se reportar um problema)
-- Configurações do launcher: `~/.config/tlg-launcher/` (Linux) ou `%APPDATA%\tlg-launcher` (Windows)
+- Configurações do launcher: `~/.config/tlg-launcher/` (Linux) ou `%APPDATA%\tlg-launcher` (Windows). Se você escolher outra pasta de dados em **Saves e dados**, o caminho fica em `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` no Windows)
 
 ### Problemas
 
@@ -116,7 +116,7 @@ Everything comes from **your own** PS4 (GoldHEN + Itemzflow). None of it is in t
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
-3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows).
+3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the new (Qt) launcher, with Graphics, Controls, Fixes, Saves, Mods, Support and Updates screens. The old launcher is still next to it as **The Last Guardian (classic)**. By default the launcher closes when the game starts and comes back when the game closes (change it in Graphics → Audio and launcher).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick the game language (English, Portuguese, Spanish or French) and click **Play**. The first start takes a little longer.
@@ -156,7 +156,7 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 
 - Saves: `user/savedata/` next to the executable (keep this folder when updating)
 - Logs: `out/logs/` (`out/last_run.log` is the latest session; attach it to bug reports)
-- Launcher settings: `~/.config/tlg-launcher/` (Linux) or `%APPDATA%\tlg-launcher` (Windows)
+- Launcher settings: `~/.config/tlg-launcher/` (Linux) or `%APPDATA%\tlg-launcher` (Windows). If you pick another data folder in **Saves & data**, its path is kept in `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` on Windows)
 
 ### Problems
 

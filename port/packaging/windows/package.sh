@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Builds dist/tlg-windows-x86_64.zip after `bash build.sh` in an MSYS2 CLANG64 shell:
-# "The Last Guardian.exe" (the launcher, frozen with PyInstaller so players need no Python),
-# "Play The Last Guardian.exe" (starts the game with the saved settings), out/tlg-probe.exe with
+# Builds dist/$PORT_SLUG-windows-x86_64.zip after `bash build.sh` in an MSYS2 CLANG64 shell:
+# "$PORT_NAME.exe" (the Qt Quick launcher) and "$PORT_NAME (classic).exe" (the Tk launcher),
+# both frozen with PyInstaller (packaging/launcher.spec) so players need no Python, Qt or Tk,
+# "Play $PORT_NAME.exe" (starts the game with the saved settings), out/tlg-probe.exe with
 # the CLANG64 DLLs it loads, the preparation scripts and the player README. No game or console
 # file may ship. Freezing uses a Windows Python 3.10+ (python.org or actions/setup-python;
 # WINPYTHON overrides) and a private venv in out/pyenv.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
+# shellcheck source=../port.env
+source packaging/port.env
 source ./msys2-env.sh
 [[ -f out/tlg-probe.exe && -f out/tlg-gpu-capabilities.exe && -f out/tlg-play.exe ]] || { echo 'Build first: bash build.sh' >&2; exit 1; }
-name=${TLG_PACKAGE_NAME:-tlg-windows-x86_64}
+name=${TLG_PACKAGE_NAME:-$PORT_SLUG-windows-x86_64}
 
 python=${WINPYTHON:-}
 if [[ -z $python ]]; then
@@ -23,23 +26,25 @@ export USERPROFILE=${USERPROFILE:-$(cygpath -w "/c/Users/$(id -un)")}
 if [[ ! -x out/pyenv/Scripts/python.exe ]]; then
     "$python" -m venv out/pyenv
 fi
-out/pyenv/Scripts/python.exe -m pip install -q --disable-pip-version-check pyinstaller iced-x86==1.21.0
+out/pyenv/Scripts/python.exe -m pip install -q --disable-pip-version-check pyinstaller iced-x86==1.21.0 "$PORT_QT_PACKAGE"
 hidden=()
 for module in argparse base64 collections hashlib json re shutil struct tempfile xml.etree.ElementTree \
-              urllib.request runpy ctypes.wintypes msvcrt iced_x86; do
-    hidden+=(--hidden-import "$module")
+              urllib.request runpy multiprocessing ctypes.wintypes msvcrt iced_x86; do
+    hidden+=("$module")
 done
-out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN --windowed \
-    --name "The Last Guardian" --icon "$(cygpath -w "$PWD/launcher/tlg.ico")" --distpath out/pyi-dist \
-    --workpath out/pyi-work --specpath out/pyi-work --paths "$(cygpath -w "$PWD/scripts")" \
-    --paths "$(cygpath -w "$PWD/launcher")" "${hidden[@]}" "$(cygpath -w "$PWD/launcher/tlg_launcher.py")"
+# One folder, two launchers sharing their libraries; native Windows paths go to the spec in the
+# environment (it joins them with pathlib), the icon is the same .ico as before.
+TLG_SPEC_NAME=$PORT_NAME TLG_SPEC_ROOT=$(cygpath -w "$PWD") TLG_SPEC_ICON=$(cygpath -w "$PWD/launcher/$PORT_ICON.ico") \
+TLG_SPEC_QT=$PORT_LAUNCHER TLG_SPEC_TK=$PORT_LAUNCHER_CLASSIC TLG_SPEC_HIDDEN="${hidden[*]}" \
+    out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN \
+    --distpath out/pyi-dist --workpath out/pyi-work "$(cygpath -w "$PWD/packaging/launcher.spec")"
 
 dest=out/stage/$name
 rm -rf -- out/stage
 mkdir -p "$dest/out" "$dest/launcher" "$dest/system_lib"
-cp -r "out/pyi-dist/The Last Guardian/." "$dest/"
-llvm-strip -o "$dest/Play The Last Guardian.exe" out/tlg-play.exe
-cp launcher/tlg.ico launcher/tlg.png "$dest/launcher/"
+cp -r "out/pyi-dist/$PORT_NAME/." "$dest/"
+llvm-strip -o "$dest/Play $PORT_NAME.exe" out/tlg-play.exe
+cp launcher/$PORT_ICON.ico launcher/$PORT_ICON.png "$dest/launcher/"
 # The executables without debug information, where tlg_run.py looks for them (out/).
 for exe in tlg-probe.exe tlg-gpu-capabilities.exe; do
     llvm-strip --strip-debug -o "$dest/out/$exe" "out/$exe"
@@ -82,7 +87,14 @@ find "$dest" -name __pycache__ -prune -exec rm -r {} +
 cp LICENSE packaging/README-player.md "$dest/"
 printf '%s\r\n' 'Coloque aqui o libSceNgs2.sprx do firmware do seu PS4 (/system/common/lib) para ter som.' \
     'Put libSceNgs2.sprx from your PS4 firmware (/system/common/lib) here for audio.' > "$dest/system_lib/LEIA-ME.txt"
+# The release name (vYYYY.MM.DD-<commit> or the pushed v* tag, as the CI publishes it): the launcher
+# shows it and compares it with the latest release.
+if [[ ${GITHUB_REF:-} == refs/tags/v* ]]; then echo "$GITHUB_REF_NAME" > "$dest/VERSION"
+elif [[ -n ${GITHUB_SHA:-} ]]; then printf 'v%s-%s\n' "$(date -u +%Y.%m.%d)" "${GITHUB_SHA::7}" > "$dest/VERSION"; fi
 bash packaging/check_package.sh "$dest"
+# Only these hashed package files may be replaced by the in-place updater (launcher/update_install.py).
+if [[ ! -f "$dest/VERSION" ]]; then git rev-parse --short HEAD > "$dest/VERSION"; fi
+out/pyenv/Scripts/python.exe launcher/update_install.py --manifest "$dest" "$(tr -d '\r\n' < "$dest/VERSION")"
 mkdir -p dist
 rm -f "dist/$name.zip"
 (cd out/stage && powershell -NoProfile -Command "Compress-Archive -Path '$name' -DestinationPath '../../dist/$name.zip'")
