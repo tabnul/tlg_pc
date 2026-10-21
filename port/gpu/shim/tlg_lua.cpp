@@ -148,17 +148,21 @@ void Dump(const char* buffer, uint64_t size, const char* name) {
 // Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusiony
 // and DanielSvoboda, applied to the source. Startup gets the QA menu (in game: hold L1, press
 // L3); the title menu's press-build level select is enabled (hold L1 as the menu closes).
+// The game is paused while the QA menu is open. The menu also closes itself when a stage is
+// picked, so its Hide resumes: paused, the new stage's fade-in (a game-time delay) never came.
 constexpr std::string_view QaMenu = R"(
 if not _TLGQA then _TLGQA=true
 local function Registered(f) for _,v in ipairs(tick_funcs) do if v==f then return true end end return false end
 RegisterTick(function()
   if MS.PadGetHold(PadButton.L1) and MS.PadGetDown(PadButton.L3) then
     if Registered(ControllerMenu.Tick) then
-      if ControllerMenu.Hide then ControllerMenu.Hide() luaCommand("trico resume") end
-    else DelayExec(function() RegisterTick(ControllerMenu.Tick) end) luaCommand("trico pause") end
+      if ControllerMenu.Hide then ControllerMenu.Hide() end
+    else _TLGQA_UNLOAD=true DelayExec(function() RegisterTick(ControllerMenu.Tick) end) luaCommand("trico pause") end
   end
 end)
 Load("game/scripts/_editor/ControllerMenu")
+local hide = ControllerMenu.Hide
+ControllerMenu.Hide = function() hide() luaCommand("trico resume") end
 end
 )";
 
@@ -167,6 +171,27 @@ bool GameEdits(std::string& patched, std::string_view name) {
     const auto& s = TlgSettings::Get();
     if (s.level_select && name == "data_trico/game/scripts/startup.lua") {
         patched += QaMenu;
+        return true;
+    }
+    if (s.level_select && name == "data_trico/game/scripts/common/GameSetupTbl.lua") {
+        // A stage started from the QA menu is loaded on top of the current one (StartStage
+        // unloads nothing), so each switch held two stages and ran the GPU heap out of memory.
+        // Do what the game's own restart does: disconnect the stage's regions, preload the new
+        // ones, then unload what is still disconnected. The common regions stay.
+        static constexpr std::string_view Blocker = "self.timeBlocker = CreateTimeBlocker()";
+        static constexpr std::string_view Preloaded =
+            "DelayExec( function() self:Start_Stage_2nd_PreloadWait(area) end )";
+        const size_t blocker = patched.find(Blocker);
+        const size_t preloaded = patched.find(Preloaded);
+        if (blocker == std::string::npos || preloaded == std::string::npos || preloaded < blocker) {
+            return false;
+        }
+        patched.insert(preloaded, "if _TLGQA_UNLOAD then _TLGQA_UNLOAD = nil RegionController.UnloadAll_IfDisconnect() end ");
+        patched.insert(blocker + Blocker.size(),
+                       " if _TLGQA_UNLOAD then for _, v in ipairs(Class('Region')) do"
+                       " if OBJ[v].status ~= 'None' and not string.find(v, 'RG_common') then"
+                       " RegionController.Disconnect(OBJ[v].regionName) end end"
+                       " self:Disconnect_CommonRegion() end");
         return true;
     }
     if (s.level_select && name == "data_trico/game/scripts/stages/s01_Opening/missionScript.lua") {
