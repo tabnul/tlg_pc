@@ -15,6 +15,7 @@
 
 #include <SDL3/SDL.h>
 #include "tlg_settings.h"
+#include "tlg_lab.h"
 #include "tlg_orbs.h"
 #include "tlg_actors.h"
 #include "tlg_graphics.h"
@@ -478,6 +479,102 @@ void ImageTab() {
     }
 }
 
+// tlg: tuning tests, all live. The fixed rows are saved in tlg.ini; the rows from TLG_LAB
+// (tlg_lab.h) are not: they last until reset or the game closes.
+void LabTab() {
+    auto& s = TlgSettings::Get();
+    ImGui::SeparatorText(TL("Textures and effects", "Texturas e efeitos"));
+    if (BeginRows("##lab_fixed")) {
+        Row(TL("Texture LOD bias (DLAA)", "LOD bias das texturas (DLAA)"));
+        int bias = s.lod_bias;
+        char bias_text[32];
+        std::snprintf(bias_text, sizeof(bias_text), "%+.2f", bias * 0.25f);
+        if (ImGui::SliderInt("##value", &bias, -12, 4, bias_text, ImGuiSliderFlags_AlwaysClamp)) {
+            Store(s.lod_bias, std::clamp(bias, -12, 4), true);
+        }
+        Help(TL("Sharper (below 0) or softer (above 0) textures on the scene under DLAA. -1.00 is NVIDIA's advice for native resolution; lower can shimmer on grass and stone. No effect without DLAA.",
+                "Texturas mais nítidas (abaixo de 0) ou mais suaves (acima de 0) na cena com DLAA. -1,00 é o conselho da NVIDIA para resolução nativa; mais baixo pode cintilar na grama e na pedra. Sem efeito sem DLAA."));
+        ImGui::PopID();
+        static const char* const aniso_labels[] = {TL("Game", "Jogo"), "2x", "4x", "8x", "16x"};
+        static const int aniso_values[] = {0, 2, 4, 8, 16};
+        ChoiceRow(TL("Anisotropic filtering", "Filtragem anisotrópica"), s.aniso, aniso_labels, aniso_values, 5,
+                  TL("Keeps ground and wall textures sharp at shallow angles. The game uses trilinear and 4x. Recommended: 16x, the cost is very small.",
+                     "Mantém nítidas as texturas do chão e das paredes em ângulos rasos. O jogo usa trilinear e 4x. Recomendado: 16x, o custo é muito pequeno."));
+        static const char* const half_labels[] = {TL("Game (half)", "Jogo (metade)"), TL("Full", "Completa")};
+        static const int half_values[] = {1, 2};
+        ChoiceRow(TL("Fog, particles and AO resolution", "Resolução de névoa, partículas e AO"), s.half_scale, half_labels, half_values, 2,
+                  TL("Draws the game's half-resolution targets (fog, particles, light shafts, AO) at full resolution: fewer blocky edges around the boy and Trico. Experimental: costs GPU time; if something breaks, set it back to Game.",
+                     "Desenha os alvos em meia resolução do jogo (névoa, partículas, raios de luz, AO) em resolução completa: menos bordas em blocos em volta do menino e do Trico. Experimental: custa tempo de GPU; se algo quebrar, volte para Jogo."));
+        static const char* const wind_labels[] = {TL("Game", "Jogo"), TL("0 (every frame)", "0 (todo quadro)"), "1", "2", "3"};
+        static const int wind_values[] = {-1, 0, 1, 2, 3};
+        const std::string wind_game = TlgLab::WindGame();
+        static std::string wind_help;
+        wind_help = std::string(TL("Frames skipped between wind updates of feathers, cloth and plants. 0 animates every frame: smoother at a CPU cost. The game's value now: ",
+                                   "Quadros pulados entre as atualizações do vento em penas, tecido e plantas. 0 anima todo quadro: mais suave, com custo de CPU. Valor do jogo agora: ")) +
+                    (wind_game.empty() ? "?" : wind_game);
+        ChoiceRow(TL("Wind animation frame skip", "Pulo de quadros da animação do vento"), s.wind_skip, wind_labels, wind_values, 5, wind_help.c_str());
+        ImGui::EndTable();
+    }
+    const std::vector<TlgLab::Row> rows = TlgLab::Rows();
+    ImGui::SeparatorText(TL("Game values (lab.txt, not saved)", "Valores do jogo (lab.txt, não salvos)"));
+    if (rows.empty()) {
+        ImGui::TextDisabled("%s", std::getenv("TLG_LAB") ? TL("No rows in the TLG_LAB file.", "Nenhuma linha no arquivo TLG_LAB.")
+                                                         : TL("Start with port\\tools\\jitter\\start.cmd for the lab rows (TLG_LAB).", "Inicie com port\\tools\\jitter\\start.cmd para as linhas do lab (TLG_LAB)."));
+    } else if (ImGui::BeginTable("##lab_rows", 3, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch, 0.40f);
+        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 0.44f);
+        ImGui::TableSetupColumn("game", ImGuiTableColumnFlags_WidthStretch, 0.16f);
+        for (size_t i = 0; i < rows.size(); ++i) {
+            const TlgLab::Row& row = rows[i];
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            if (row.active) {
+                ImGui::TextColored(ImVec4(0.85f, 0.72f, 0.45f, 1.0f), "%s", row.label.c_str());
+            } else {
+                ImGui::TextUnformatted(row.label.c_str());
+            }
+            ImGui::TableNextColumn();
+            ImGui::PushID(int(i));
+            const ImGuiStyle& style = ImGui::GetStyle();
+            ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("R").x + style.FramePadding.x * 2 + style.ItemSpacing.x));
+            // A "=" row shows the game's value until it is moved.
+            float v = row.value;
+            if (!row.active && row.mode == '=' && !row.game.empty()) {
+                v = std::strtof(row.game.c_str(), nullptr);
+            }
+            if (ImGui::SliderFloat("##value", &v, row.lo, row.hi, row.format.c_str())) {
+                TlgLab::Set(i, v);
+            }
+            Help(row.help.empty() ? nullptr : row.help.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("R")) {
+                TlgLab::Reset(i);
+            }
+            Help(TL("Back to the game's value.", "Volta ao valor do jogo."));
+            ImGui::PopID();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", row.game.empty() ? "?" : row.game.c_str());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Spacing();
+    if (ImGui::Button(TL("Reset all", "Restaurar tudo"))) {
+        TlgLab::ResetAll();
+        s.lod_bias = -4;
+        s.aniso = 16;
+        s.half_scale = 1;
+        s.wind_skip = -1;
+        dirty = true;
+    }
+    Help(TL("Fixed rows back to their defaults, lab rows back to the game's values.", "Linhas fixas aos padrões, linhas do lab aos valores do jogo."));
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", TL("Ctrl+click a slider to type a value. The right column is the game's own value (the part the row changes). Rows change the game's objects every 15 frames and follow area changes; pausing stops them.",
+                                 "Ctrl+clique num controle para digitar um valor. A coluna da direita é o valor do próprio jogo (a parte que a linha muda). As linhas mudam os objetos do jogo a cada 15 quadros e seguem as trocas de área; pausar as interrompe."));
+    ImGui::PopTextWrapPos();
+}
+
 void PerformanceTab() {
     namespace G = TlgGraphics;
     auto& s = TlgSettings::Get();
@@ -648,7 +745,7 @@ void Menu() {
         return;
     }
     footer_help = nullptr;
-    constexpr int TabCount = 4;
+    constexpr int TabCount = 5;
     const ImGuiIO& io = ImGui::GetIO();
     if (!io.WantTextInput) {
         const int step = ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) || ImGui::IsKeyPressed(ImGuiKey_E, false) ? 1
@@ -662,7 +759,7 @@ void Menu() {
     const float footer = ImGui::GetFrameHeightWithSpacing() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 2.0f;
     if (ImGui::BeginTabBar("##tabs")) {
         static const char* const tabs[TabCount] = {"Overlay", TL("Image", "Imagem"), TL("Performance", "Desempenho"),
-                                                   TL("Controls", "Controles")};
+                                                   TL("Controls", "Controles"), "Lab"};
         for (int tab = 0; tab < TabCount; ++tab) {
             const ImGuiTabItemFlags flags = requested_tab == tab ? ImGuiTabItemFlags_SetSelected : 0;
             if (!ImGui::BeginTabItem(tabs[tab], nullptr, flags)) {
@@ -677,6 +774,7 @@ void Menu() {
                 case 1: ImageTab(); break;
                 case 2: PerformanceTab(); break;
                 case 3: ControlsTab(); break;
+                case 4: LabTab(); break;
                 default: OverlayTab(); break;
                 }
             }

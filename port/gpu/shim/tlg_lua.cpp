@@ -2,7 +2,9 @@
 // tlg: the game's Lua loadbuffer (HavokScript) is redirected here (src/probe.c,
 // install_lua_hook). utils.lua gets a tick that loads "--TLGSET" every 15 frames; that chunk
 // is replaced by code applying the Effects settings to the game's post-process objects, so
-// menu changes apply live. "--TLGLOG <text>" chunks print <text> (data out of Lua).
+// menu changes apply live, plus the Lab rows (tlg_lab.h). "--TLGLOG <text>" chunks print <text>
+// (data out of Lua); "--TLGVAL <row> <value>" chunks report a Lab row's game value.
+#include "tlg_lab.h"
 #include "tlg_settings.h"
 #include <cstdint>
 #include <cstdio>
@@ -124,6 +126,7 @@ std::string SetChunk() {
                       subtitle_shift);
         code += line;
     }
+    code += TlgLab::Lua(s.wind_skip.load());
     code += DevChunk();
     return code;
 }
@@ -233,6 +236,10 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     if (StartsWith(buffer, size, "--TLGLOG ")) {
         std::printf("Lua: %.*s\n", static_cast<int>(size - 9), buffer + 9);
         std::fflush(stdout);
+        return original(L, options, Empty.data(), Empty.size(), name);
+    }
+    if (StartsWith(buffer, size, "--TLGVAL ")) {
+        TlgLab::Report(std::string_view(buffer + 9, size - 9));
         return original(L, options, Empty.data(), Empty.size(), name);
     }
     if (StartsWith(buffer, size, "--TLGSET")) {

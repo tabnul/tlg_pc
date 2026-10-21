@@ -5,6 +5,7 @@
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/texture_cache/sampler.h"
+#include "tlg_settings.h"
 
 namespace VideoCore {
 
@@ -12,9 +13,10 @@ Sampler::Sampler(const Vulkan::Instance& instance, const AmdGpu::Sampler& sample
                  const AmdGpu::BorderColorBuffer border_color_base, const bool is_depth, float extra_lod_bias) {
     using namespace Vulkan;
     // tlg: 16x anisotropic filtering on mipmapped, linearly filtered textures; depth compares,
-    // point lookups and single-level targets keep the guest's filter.
-    constexpr float forced_aniso = 16.0f;
-    const bool force_aniso = !is_depth &&
+    // point lookups and single-level targets keep the guest's filter. Lab tab aniso (0: the
+    // game's own filter); TextureCache::GetSampler keys samplers by it.
+    const float forced_aniso = float(TlgSettings::Get().aniso.load());
+    const bool force_aniso = forced_aniso > 1.0f && !is_depth &&
                              sampler.xy_min_filter != AmdGpu::Filter::Point &&
                              sampler.xy_min_filter != AmdGpu::Filter::AnisoPoint &&
                              sampler.mip_filter != AmdGpu::MipFilter::None && sampler.MaxLod() > 0.0f;

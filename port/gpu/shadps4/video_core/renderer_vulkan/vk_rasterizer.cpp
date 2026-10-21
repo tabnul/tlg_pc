@@ -236,10 +236,12 @@ VideoCore::ImageId Rasterizer::FindTargetMemoized(VideoCore::TextureCache::Image
 // Rule switches to test a fix without a rebuild: "follow" also shifts draws that depth-test a
 // depth a jittered draw wrote (no scene depth sampled); "nomesh" turns the same-mesh rule off and
 // "nodecal" the SamplesSceneDepth rule.
+// Lab half_scale: "halfonly <ps hex>" upscales only the half-resolution passes of these pixel
+// shaders, "halfnot <ps hex>" keeps these native (to find which pass breaks or gains).
 namespace {
 struct JitterControl {
     std::vector<std::pair<u32, u32>> ranges;
-    std::vector<u32> skip, only, never;
+    std::vector<u32> skip, only, never, half_only, half_not;
     bool map = false;
     bool follow = false, no_mesh = false, no_decal = false;
     u32 index = 0; ///< jitter-eligible draws since the sky pass
@@ -340,6 +342,8 @@ void ReadJitterControl() {
         auto* list = !std::strcmp(token, "skip") ? &next.skip
                      : !std::strcmp(token, "only") ? &next.only
                      : !std::strcmp(token, "not")  ? &next.never
+                     : !std::strcmp(token, "halfonly") ? &next.half_only
+                     : !std::strcmp(token, "halfnot")  ? &next.half_not
                                                     : nullptr;
         if (list) {
             if (std::fscanf(file, "%x", &hash) == 1) list->push_back(hash);
@@ -361,8 +365,9 @@ void ReadJitterControl() {
     std::fclose(file);
     // Logged when the file changes (a "map" token prints every time: remove it after one map).
     const auto summary = fmt::format(
-        "{} ranges, {} only, {} not, {} skipped{}{}{}", next.ranges.size(), next.only.size(),
-        next.never.size(), next.skip.size(), next.follow ? ", follow" : "",
+        "{} ranges, {} only, {} not, {} skipped, {} halfonly, {} halfnot{}{}{}",
+        next.ranges.size(), next.only.size(), next.never.size(), next.skip.size(),
+        next.half_only.size(), next.half_not.size(), next.follow ? ", follow" : "",
         next.no_mesh ? ", nomesh" : "", next.no_decal ? ", nodecal" : "");
     static std::string last_summary;
     if (next.map || summary != last_summary) {
@@ -1207,6 +1212,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         scene_debug_frame = scene_debug && std::remove(scene_debug) == 0;
         scene_targets->debug = scene_debug_frame;
         scene_targets->SetShadowScale(u32(std::clamp(TlgSettings::Get().shadow_scale.load(), 1, 4)));
+        scene_targets->SetHalfScale(TlgSettings::Get().half_scale.load() >= 2 ? 2u : 1u);
         scene_targets->ShadowReport();
     }
     bind_prepared = used_prepared;
@@ -3030,6 +3036,27 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
         const auto& depth = texture_cache.GetImage(db_desc.first);
         if (scene_targets->Eligible(depth) && !depth.binding.needs_rebind) {
             shadow_scale = scene_targets->Upscale(depth);
+        }
+    }
+    // tlg: Lab half_scale: a pass into the half-resolution effect targets (fog, particles, AO)
+    // draws into their upscaled proxies the same way; all its attachments must have them.
+    if (!shadow_scale && !reduced && scene_targets->HalfUpscaled() && key.num_samples == 1) {
+        const u32 ps = key.mrt_mask ? pipeline->GetStage(Shader::SwStage::Fragment).pgm_hash : 0;
+        const auto& control = jitter_control;
+        const bool allowed = (control.half_only.empty() || Listed(control.half_only, ps)) &&
+                             !Listed(control.half_not, ps);
+        VideoCore::ImageId first = db_desc.first;
+        for (u32 cb = 0; cb < cb_descs.size() && key.mrt_mask; ++cb) {
+            if ((key.mrt_mask >> cb & 1) && cb_descs[cb].first) {
+                first = cb_descs[cb].first;
+                break;
+            }
+        }
+        if (allowed && first) {
+            const auto& image = texture_cache.GetImage(first);
+            if (scene_targets->Eligible(image) && !image.binding.needs_rebind) {
+                shadow_scale = scene_targets->Upscale(image);
+            }
         }
     }
     if (shadow_scale) reduced = true;

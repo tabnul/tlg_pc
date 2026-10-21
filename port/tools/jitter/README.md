@@ -36,3 +36,14 @@ Empty the file to go back to normal.
 ## Live Lua (`port\out\jitter\lua_exec.lua`)
 Runs every time the file is saved. The starting copy logs the stage, the fade and the loading state, which
 helps with black screens after a stage switch.
+
+## Lab tab (Insert, last tab)
+Graphics tuning tests, all live:
+- Texture LOD bias (under DLAA), anisotropic filtering, full-resolution fog/particles/AO and the wind
+  animation frame skip. These are saved in `tlg.ini`; "Reset all" puts them back.
+- Rows from `port\out\jitter\lab.txt` (a copy of `lab.txt` here; edit it while the game runs). Each
+  row scales, offsets or sets one property of the game's own objects (fog, LOD, far plane, shadow
+  splits). The right column is the game's value. These are not saved.
+
+Full-resolution effects, per shader (in `control.txt`): `halfonly <ps>` / `halfnot <ps>` limit which
+passes are drawn at full resolution, to find the one that breaks. They work while DLAA is on.

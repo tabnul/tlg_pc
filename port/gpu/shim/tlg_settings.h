@@ -57,6 +57,11 @@ struct Values {
     /// post-process and camera objects through Lua (tlg_lua.cpp). 100 = as shipped.
     std::atomic<int> bloom{100}, dof{100}, motion_blur{100}, chromatic{0}, vignette{0},
         ssao{100}, ssr{100}, game_sharpen{100}, shadow_distance{100}, lod{100};
+    /// Lab tab (menu, live; tuning tests): texture LOD bias under DLAA in quarter steps (-4 =
+    /// -1.0, the DLSS guide value), anisotropic filtering forced on mipmapped textures (0 = the
+    /// game's own), the half-resolution effect targets drawn at 2x (fog, particles, AO;
+    /// vk_scene_resolution SetHalfScale) and the wind skinning frame skip (-1 = the game's 1).
+    std::atomic<int> lod_bias{-4}, aniso{16}, half_scale{1}, wind_skip{-1};
     /// Performance overlay (tlg_perf_stats.h): items shown, font size and background opacity
     /// in percent, corner (0 top left, 1 top right, 2 bottom left, 3 bottom right), layout
     /// (0 one line, 1 one item per line). menu_tab: the menu's last tab.

@@ -32,6 +32,12 @@ public:
     /// The upscale factor of `image` (0 when it is no upscaled shadow map).
     u32 Upscale(const VideoCore::Image&) const;
     bool ShadowsUpscaled() const { return shadow_scale > 1; }
+    /// tlg: the half-resolution effect targets (fog, particles, AO: single-level color and
+    /// depth at half the game's frame size) get proxies `scale` times their size, at the native
+    /// scene size only (Lab tab half_scale; 1 = native). Passes drawing into them use the
+    /// proxies like the shadow passes (Rasterizer), other access resolves them.
+    bool SetHalfScale(u32 scale);
+    bool HalfUpscaled() const { return half_scale > 1 && !Reduced(); }
     void ShadowReport(); ///< once per frame: prints proxy use every 120 frames
     /// A reduced proxy can stand in for the image: a 1920x1080 scene target or, scaled by
     /// the same factor, a half-resolution (960x540) one (toggle SceneHalfRes).
@@ -105,6 +111,8 @@ private:
     Lookup lookup;
     SceneResolution::Size size;
     u32 shadow_scale = 1;
+    u32 half_scale = 1;
+    SceneResolution::Size half_size; ///< half the game's frame size (TLG_RESOLUTION_PATCH)
     u32 shadow_frames = 0, shadow_passes = 0, shadow_samples = 0, shadow_fills = 0,
         shadow_resolves = 0;
     void Reset();

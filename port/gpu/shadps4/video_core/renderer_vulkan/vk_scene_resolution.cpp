@@ -80,11 +80,18 @@ static u32 SizeDivisor(const VideoCore::ImageInfo& i, SceneResolution::Size scen
 }
 u32 SceneTargets::Upscale(const VideoCore::Image& image) const {
     const auto& i = image.info;
-    return shadow_scale > 1 && i.props.is_depth && i.size.width == 2048 && i.size.height == 2048 &&
-                   i.size.depth == 1 && i.resources.layers <= 8 && i.resources.levels == 1 &&
-                   i.num_samples == 1 && image.backing && image.backing->num_samples == 1
-               ? shadow_scale
-               : 0;
+    if (shadow_scale > 1 && i.props.is_depth && i.size.width == 2048 && i.size.height == 2048 &&
+        i.size.depth == 1 && i.resources.layers <= 8 && i.resources.levels == 1 &&
+        i.num_samples == 1 && image.backing && image.backing->num_samples == 1) {
+        return shadow_scale;
+    }
+    if (HalfUpscaled() && i.size.width == half_size.width && i.size.height == half_size.height &&
+        i.size.depth == 1 && i.resources.layers == 1 && i.resources.levels == 1 &&
+        i.num_samples == 1 && !i.props.is_block && image.backing &&
+        image.backing->num_samples == 1) {
+        return half_scale;
+    }
+    return 0;
 }
 bool SceneTargets::Eligible(const VideoCore::Image& image) const {
     const auto& i = image.info;
@@ -129,10 +136,29 @@ bool SceneTargets::SetShadowScale(u32 scale) {
     std::printf("Shadow maps: %ux native (live)\n", scale);
     return true;
 }
+bool SceneTargets::SetHalfScale(u32 scale) {
+    if (scale == half_scale) return false;
+    if (!half_size.width) {
+        u32 width = 1920, height = 1080;
+        if (const char* patch = std::getenv("TLG_RESOLUTION_PATCH")) {
+            if (std::sscanf(patch, "%ux%u", &width, &height) != 2 || !width || !height) {
+                width = 1920;
+                height = 1080;
+            }
+        }
+        half_size = {width / 2, height / 2};
+    }
+    Reset();
+    half_scale = scale;
+    std::printf("Half-resolution targets %ux%u: %ux (live)\n", half_size.width, half_size.height,
+                scale);
+    return true;
+}
 void SceneTargets::ShadowReport() {
-    if (shadow_scale < 2 || ++shadow_frames < 120) return;
-    std::printf("Shadow maps %ux: %u proxy passes, %u proxy samples, %u fills, %u resolves "
-                "(120 frames)\n", shadow_scale, shadow_passes, shadow_samples, shadow_fills,
+    if ((shadow_scale < 2 && !HalfUpscaled()) || ++shadow_frames < 120) return;
+    std::printf("Upscaled targets (shadows %ux, half-res %ux): %u proxy passes, %u proxy "
+                "samples, %u fills, %u resolves (120 frames)\n", shadow_scale,
+                HalfUpscaled() ? half_scale : 1u, shadow_passes, shadow_samples, shadow_fills,
                 shadow_resolves);
     shadow_frames = shadow_passes = shadow_samples = shadow_fills = shadow_resolves = 0;
 }

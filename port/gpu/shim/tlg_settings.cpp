@@ -66,7 +66,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         return;
     }
     if (key == "menu_tab") {
-        v.menu_tab = i >= 0 && i <= 3 ? i : 0;
+        v.menu_tab = i >= 0 && i <= 4 ? i : 0;
         return;
     }
     const char* cheat_keys[] = {"cheat_health", "cheat_magic", "cheat_item", "cheat_rage", "cheat_orbs",
@@ -133,6 +133,14 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.shadow_scale = i >= 4 ? 4 : i >= 2 ? 2 : 1;
     } else if (std::atomic<int>* effect = EffectSetting(v, key)) {
         *effect = std::clamp(i, 0, 400);
+    } else if (key == "lod_bias") {
+        v.lod_bias = std::clamp(i, -12, 4);
+    } else if (key == "aniso") {
+        v.aniso = i >= 16 ? 16 : i >= 8 ? 8 : i >= 4 ? 4 : i >= 2 ? 2 : 0;
+    } else if (key == "half_scale") {
+        v.half_scale = i >= 2 ? 2 : 1;
+    } else if (key == "wind_skip") {
+        v.wind_skip = std::clamp(i, -1, 4);
     } else if (key == "smaa") {
         v.smaa = i != 0;
     } else if (key == "cas") {
@@ -411,6 +419,8 @@ void Save() {
                  int(v.bridge_fix.load()));
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
+    std::fprintf(file, "lod_bias=%d\naniso=%d\nhalf_scale=%d\nwind_skip=%d\n", v.lod_bias.load(),
+                 v.aniso.load(), v.half_scale.load(), v.wind_skip.load());
     // Read by run.sh at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");

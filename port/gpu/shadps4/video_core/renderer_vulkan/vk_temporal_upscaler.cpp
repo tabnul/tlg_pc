@@ -1487,7 +1487,8 @@ float TemporalUpscaler::SceneMipBias() const {
     const float output = float(Scaled() ? target_width : 1920u);
     float bias = render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
     // DLSS guide: log2(render / output) - 1; the resolve keeps the extra detail stable.
-    if (UseDlss() && TlgSettings::Get().dlaa) bias -= 1.0f;
+    // tlg: Lab tab lod_bias, in quarter steps (default -4: the guide's -1).
+    if (UseDlss() && TlgSettings::Get().dlaa) bias += TlgSettings::Get().lod_bias.load() * 0.25f;
     return bias;
 }
 
