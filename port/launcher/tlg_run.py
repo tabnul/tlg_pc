@@ -426,6 +426,14 @@ def resolution(settings):
     return os.environ.get('TLG_RESOLUTION') or str(settings.get('resolution', '1920x1080'))
 
 
+def resolution_label(size):
+    """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
+    width, height = (int(n) for n in size.split('x'))
+    ratio = width / height
+    name = '32:9' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
+    return f'{width} × {height} ({name})'
+
+
 def mods_dir():
     """TLG_MODS_DIR, else user_dir()/mods (created empty on first use so the player sees where
     to drop shadPS4/GoldHEN cheat XML files)."""
