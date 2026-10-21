@@ -504,7 +504,7 @@ def prepare(settings, log=print):
                 applied_frame_rate = line.split()[2]
             if line.startswith('Resolution patch resolution: '):
                 applied_resolution = line.split()[-2]  # '... 1920x1080 -> WxH (bytes)'
-            if line.startswith('Resolution patch garlic: '):
+            if line.startswith('Patch garlic: '):
                 words = line.split()  # '... GPU heap 2816 -> N MB (bytes)'
                 applied_garlic_extra = int(words[-3]) - int(words[-5])
     isa_table(log)

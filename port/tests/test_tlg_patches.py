@@ -117,21 +117,22 @@ class ResolutionPatchTests(unittest.TestCase):
         for value in (None, '', '1920x1080', 'native', '0x1080', '70000x1080'):
             self.assertIsNone(t.parse_resolution(value))
 
-    def test_16_9_changes_the_mode_and_the_gpu_heap(self):
+    def test_16_9_changes_only_the_mode(self):
         writes = t.resolution_writes(resolution_elf(), (2560, 1440))
-        self.assertEqual(len(writes), 2)
+        self.assertEqual(len(writes), 1)
         self.assertEqual(writes[0][1][:8], struct.pack('<4H', 2560, 1440, 2560, 1440))
-        self.assertEqual(writes[1][0], t.GARLIC_SIZE - t.GHIDRA_BASE)
-        self.assertEqual(writes[1][1], bytes.fromhex('41bf') + struct.pack('<I', (2816 + t.GARLIC_EXTRA_MB) << 20))
 
-    def test_1080p_or_smaller_keeps_the_gpu_heap(self):
-        for size in ((1920, 1080), (1280, 720)):
-            self.assertEqual(len(t.resolution_writes(resolution_elf(), size)), 1)
+    def test_gpu_heap(self):
+        (offset, data, _), = t.garlic_writes(resolution_elf())
+        self.assertEqual(offset, t.GARLIC_SIZE - t.GHIDRA_BASE)
+        self.assertEqual(data, bytes.fromhex('41bf') + struct.pack('<I', (2816 + t.GARLIC_EXTRA_MB) << 20))
+        with self.assertRaises(ValueError):
+            t.garlic_writes(resolution_elf(expected=False))
 
     def test_ultrawide_gets_hor_plus_and_a_wider_ui(self):
         writes = t.resolution_writes(resolution_elf(), (3840, 1600))
         offsets = {offset: data for offset, data, _ in writes}
-        self.assertEqual(len(writes), 7)
+        self.assertEqual(len(writes), 6)
         self.assertEqual(offsets[t.UI_SIZE - t.GHIDRA_BASE], struct.pack('<4i', 2592, 1080, 2592, 1080))
         self.assertEqual(offsets[t.GUIDE_SCALE - t.GHIDRA_BASE],
                          struct.pack('<4f', 1 / 2592, 1 / 1080, -32, 16 / 2592))
