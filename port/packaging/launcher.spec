@@ -6,6 +6,7 @@
 #   TLG_SPEC_NAME   executable name           TLG_SPEC_ROOT   the port/ folder
 #   TLG_SPEC_ICON   .ico (Windows only)       TLG_SPEC_HIDDEN space-separated modules for --script
 #   TLG_SPEC_QT     launcher script (Qt)      TLG_SPEC_TK     launcher script (Tk)
+#   TLG_SPEC_DEFAULT  qt (default) or classic: which launcher gets the plain name
 import os
 from pathlib import Path
 
@@ -101,6 +102,11 @@ def program(a, exe_name):
                debug=False, strip=False, upx=False)
 
 
-qt_exe = program(qt_a, name)
-tk_exe = program(tk_a, name + ' (classic)')
+# TLG_SPEC_DEFAULT=classic swaps the names: the Tk launcher is "$PORT_NAME", Qt is "$PORT_NAME (Qt)".
+if os.environ.get('TLG_SPEC_DEFAULT', 'qt') == 'classic':
+    qt_exe = program(qt_a, name + ' (Qt)')
+    tk_exe = program(tk_a, name)
+else:
+    qt_exe = program(qt_a, name)
+    tk_exe = program(tk_a, name + ' (classic)')
 COLLECT(qt_exe, qt_a.binaries, qt_a.datas, tk_exe, tk_a.binaries, tk_a.datas, strip=False, upx=False, name=name)

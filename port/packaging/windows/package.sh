@@ -34,7 +34,7 @@ for module in argparse base64 collections hashlib json re shutil struct tempfile
 done
 # One folder, two launchers sharing their libraries; native Windows paths go to the spec in the
 # environment (it joins them with pathlib), the icon is the same .ico as before.
-TLG_SPEC_NAME=$PORT_NAME TLG_SPEC_ROOT=$(cygpath -w "$PWD") TLG_SPEC_ICON=$(cygpath -w "$PWD/launcher/$PORT_ICON.ico") \
+TLG_SPEC_NAME=$PORT_NAME TLG_SPEC_DEFAULT=${PORT_DEFAULT_LAUNCHER:-qt} TLG_SPEC_ROOT=$(cygpath -w "$PWD") TLG_SPEC_ICON=$(cygpath -w "$PWD/launcher/$PORT_ICON.ico") \
 TLG_SPEC_QT=$PORT_LAUNCHER TLG_SPEC_TK=$PORT_LAUNCHER_CLASSIC TLG_SPEC_HIDDEN="${hidden[*]}" \
     out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN \
     --distpath out/pyi-dist --workpath out/pyi-work "$(cygpath -w "$PWD/packaging/launcher.spec")"

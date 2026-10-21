@@ -23,7 +23,7 @@ for module in argparse base64 collections hashlib json re shutil struct tempfile
     hidden+=("$module")
 done
 # packaging/launcher.spec freezes both launchers into one folder (shared libraries) and trims Qt.
-TLG_SPEC_NAME=$PORT_NAME TLG_SPEC_ROOT=$PWD TLG_SPEC_QT=$PORT_LAUNCHER TLG_SPEC_TK=$PORT_LAUNCHER_CLASSIC \
+TLG_SPEC_NAME=$PORT_NAME TLG_SPEC_DEFAULT=${PORT_DEFAULT_LAUNCHER:-qt} TLG_SPEC_ROOT=$PWD TLG_SPEC_QT=$PORT_LAUNCHER TLG_SPEC_TK=$PORT_LAUNCHER_CLASSIC \
 TLG_SPEC_HIDDEN="${hidden[*]}" \
     out/pyenv/bin/python -m PyInstaller --noconfirm --clean --log-level WARN \
     --distpath out/pyi-dist --workpath out/pyi-work packaging/launcher.spec

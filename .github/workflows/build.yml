@@ -67,7 +67,9 @@ jobs:
           set -euo pipefail
           smoke=$(mktemp -d)
           tar -C "$smoke" -xzf dist/tlg-linux-x86_64.tar.gz
-          out=$(QT_QPA_PLATFORM=offscreen timeout 120 "$smoke/tlg-linux-x86_64/The Last Guardian" --selftest 2>&1) || { echo "$out"; exit 1; }
+          qt="$smoke/tlg-linux-x86_64/The Last Guardian"
+          if [[ -e "$qt (Qt)" ]]; then qt+=" (Qt)"; fi  # PORT_DEFAULT_LAUNCHER=classic
+          out=$(QT_QPA_PLATFORM=offscreen timeout 120 "$qt" --selftest 2>&1) || { echo "$out"; exit 1; }
           echo "$out"
           grep -qx 'selftest ok' <<<"$out"
       - uses: actions/upload-artifact@v4
@@ -143,7 +145,8 @@ jobs:
           $smoke = Join-Path $env:RUNNER_TEMP 'smoke'
           Remove-Item -Recurse -Force $smoke -ErrorAction SilentlyContinue
           Expand-Archive -Path dist/tlg-windows-x86_64.zip -DestinationPath $smoke
-          $exe = Join-Path $smoke 'tlg-windows-x86_64/The Last Guardian.exe'
+          $exe = Join-Path $smoke 'tlg-windows-x86_64/The Last Guardian (Qt).exe'  # PORT_DEFAULT_LAUNCHER=classic
+          if (-not (Test-Path -LiteralPath $exe)) { $exe = Join-Path $smoke 'tlg-windows-x86_64/The Last Guardian.exe' }
           $outFile = Join-Path $env:RUNNER_TEMP 'selftest.txt'
           Remove-Item $outFile -ErrorAction SilentlyContinue
           $env:QT_QPA_PLATFORM = 'offscreen'

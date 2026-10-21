@@ -37,7 +37,7 @@ Tudo vem do **seu** PS4 (GoldHEN + Itemzflow). Nada disso vai no download. Use *
 
 1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
 2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher novo (Qt), com telas de Gráficos, Controles, Correções, Saves, Mods, Suporte e Atualizações. O launcher antigo continua ao lado como **The Last Guardian (classic)**. Por padrão o launcher fecha quando o jogo abre e volta quando o jogo fecha (dá para mudar em Gráficos → Áudio e launcher).
+3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher clássico, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos). O launcher novo (Qt), com telas de Gráficos, Controles, Correções, Saves, Mods, Suporte e Atualizações, fica ao lado como **The Last Guardian (Qt)**; ele ainda não tem as opções de widescreen/DLAA/efeitos. Por padrão o launcher Qt fecha quando o jogo abre e volta quando o jogo fecha (dá para mudar em Gráficos → Áudio e launcher).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
 5. Escolha o idioma do jogo (inglês, português, espanhol ou francês) e clique em **Jogar**. A primeira partida demora um pouco mais.
@@ -116,7 +116,7 @@ Everything comes from **your own** PS4 (GoldHEN + Itemzflow). None of it is in t
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
-3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the new (Qt) launcher, with Graphics, Controls, Fixes, Saves, Mods, Support and Updates screens. The old launcher is still next to it as **The Last Guardian (classic)**. By default the launcher closes when the game starts and comes back when the game closes (change it in Graphics → Audio and launcher).
+3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the classic launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects). The new (Qt) launcher, with Graphics, Controls, Fixes, Saves, Mods, Support and Updates screens, is next to it as **The Last Guardian (Qt)**; it does not have the widescreen/DLAA/effects options yet. By default the Qt launcher closes when the game starts and comes back when the game closes (change it in Graphics → Audio and launcher).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick the game language (English, Portuguese, Spanish or French) and click **Play**. The first start takes a little longer.
