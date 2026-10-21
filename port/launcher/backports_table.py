@@ -58,11 +58,9 @@ MENU = [
     _menu('Image', 'smaa', 'bool', '0', ('SMAA 1x anti-aliasing', 'Antisserrilhado SMAA 1x'),
           ('Smooths jagged edges on the final image (a little GPU time).',
            'Suaviza as bordas serrilhadas da imagem final (um pouco de tempo de GPU).')),
-    _menu('Image', 'dlaa', 'bool', '0', ('DLAA anti-aliasing (experimental)', 'Anti-aliasing DLAA (experimental)'),
-          ('NVIDIA RTX: stable foliage edges; F8 toggles it in game. Not yet tested in a full playthrough: some '
-           'scenes may still flicker or show blocks. Press F8 to turn it off there, and please report it.',
-           'NVIDIA RTX: bordas estáveis na folhagem; F8 liga e desliga no jogo. Ainda não testado num jogo completo: '
-           'algumas cenas ainda podem piscar ou mostrar blocos. Aperte F8 para desligar ali e, por favor, avise.')),
+    _menu('Image', 'dlaa', 'bool', '1', ('DLAA anti-aliasing', 'Anti-aliasing DLAA'),
+          ("NVIDIA RTX: stable foliage edges; F8 switches to the game's own SMAA.",
+           'NVIDIA RTX: bordas estáveis na folhagem; F8 troca para o SMAA do próprio jogo.')),
     _menu('Image', 'hdr', 'bool', '1', ('HDR', 'HDR'),
           ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
            'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '
