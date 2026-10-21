@@ -1580,6 +1580,32 @@ bool HandleEvent(const SDL_Event& event) {
             TlgSettings::Save();
             return true;
         }
+        // tlg debug (TLG_JITTER_DEBUG=1): F7 switches the DLAA jitter (not saved), F6 marks a
+        // spot: the log gets the draw map and jitter suspects of one frame plus a frame capture.
+        static const bool jitter_debug = [] {
+            const char* env = std::getenv("TLG_JITTER_DEBUG");
+            return env && *env == '1';
+        }();
+        if (down && !event.key.repeat && jitter_debug && event.key.key == SDLK_F7) {
+            auto& settings = TlgSettings::Get();
+            settings.jitter = !settings.jitter;
+            notice_text = settings.jitter ? "Jitter ON" : "Jitter OFF";
+            notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            std::printf("Jitter: %s (F7)\n", settings.jitter ? "on" : "off");
+            std::fflush(stdout);
+            return true;
+        }
+        if (down && !event.key.repeat && jitter_debug && event.key.key == SDLK_F6) {
+            static int marks = 0;
+            TlgSettings::Get().jitter_mark = true;
+            Vulkan::FrameCapture::Request();
+            notice_text = "Mark " + std::to_string(++marks);
+            notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            std::printf("Jitter mark %d (F6, jitter %s)\n", marks,
+                        TlgSettings::Get().jitter ? "on" : "off");
+            std::fflush(stdout);
+            return true;
+        }
         // tlg: F10 shows or hides the performance overlay (FPS counter) at any time.
         if (down && !event.key.repeat && event.key.key == SDLK_F10) {
             auto& settings = TlgSettings::Get();

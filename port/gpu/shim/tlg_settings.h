@@ -35,6 +35,8 @@ struct Values {
     std::atomic<bool> sharpen{true};
     std::atomic<float> sharpness{0.3f};
     std::atomic<bool> jitter{true};
+    /// Debug (TLG_JITTER_DEBUG=1): F6 asks the rasterizer for a marked draw map of one frame.
+    std::atomic<bool> jitter_mark{false};
     std::atomic<bool> reactive{false};
     std::atomic<bool> object_motion{true};
     std::atomic<float> reactive_scale{1.0f};

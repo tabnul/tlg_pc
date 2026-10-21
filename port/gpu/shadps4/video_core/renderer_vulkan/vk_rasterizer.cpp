@@ -233,16 +233,73 @@ VideoCore::ImageId Rasterizer::FindTargetMemoized(VideoCore::TextureCache::Image
 // pass) are shifted; "only <ps hex>": only draws of these pixel shaders; "not <ps hex>": these are
 // never shifted; "skip <ps hex>": draws of that pixel shader are dropped; "map": print the
 // eligible draws of one frame (index, pixel shader). Re-read twice a second.
+// Rule switches to test a fix without a rebuild: "follow" also shifts draws that depth-test a
+// depth a jittered draw wrote (no scene depth sampled); "nomesh" turns the same-mesh rule off and
+// "nodecal" the SamplesSceneDepth rule.
 namespace {
 struct JitterControl {
     std::vector<std::pair<u32, u32>> ranges;
     std::vector<u32> skip, only, never;
     bool map = false;
+    bool follow = false, no_mesh = false, no_decal = false;
     u32 index = 0; ///< jitter-eligible draws since the sky pass
 } jitter_control;
 
 /// Meshes (index address, count) drawn jittered into a scene depth since the sky pass.
 std::vector<std::pair<VAddr, u32>> jittered_meshes;
+
+/// tlg debug (TLG_JITTER_DEBUG=1): scene depths a jittered draw wrote since the sky pass, and the
+/// pixel shaders that disagree with them: each logged once when first seen, counted, listed at F6.
+const bool jitter_debug = [] {
+    const char* env = std::getenv("TLG_JITTER_DEBUG");
+    return env && *env == '1';
+}();
+std::vector<u32> jittered_depths;
+struct JitterSuspect {
+    u32 ps;
+    const char* reason;
+    u64 count;
+};
+std::vector<JitterSuspect> jitter_suspects;
+int jitter_marks = 0;
+
+bool JitteredDepth(u32 depth) {
+    return std::find(jittered_depths.begin(), jittered_depths.end(), depth) !=
+           jittered_depths.end();
+}
+
+/// A draw into a scene depth, after its jitter is decided.
+void NoteJitterDraw(u32 ps, u32 depth, const AmdGpu::DepthControl& z, u32 indices, u32 instances,
+                    bool jittered, bool samples_depth) {
+    if (jittered) {
+        if (!jitter_debug && !jitter_control.follow) return;
+        if (z.depth_write_enable && !JitteredDepth(depth)) jittered_depths.push_back(depth);
+        return;
+    }
+    if (!jitter_debug) return;
+    // Full-screen passes are never shifted on purpose; decal/light volumes sample the depth.
+    if ((indices <= 6 && instances <= 1) || samples_depth || !JitteredDepth(depth)) return;
+    const char* reason = nullptr;
+    if (z.depth_write_enable) {
+        reason = "writes a jittered depth unshifted";
+    } else if (z.depth_enable && z.depth_func != AmdGpu::CompareFunc::Always &&
+               z.depth_func != AmdGpu::CompareFunc::Never) {
+        reason = "tests a jittered depth unshifted";
+    } else {
+        return;
+    }
+    for (auto& suspect : jitter_suspects) {
+        if (suspect.ps == ps && suspect.reason == reason) {
+            ++suspect.count;
+            return;
+        }
+    }
+    jitter_suspects.push_back({ps, reason, 1});
+    std::printf("Jitter suspect: ps %08x %s (indices %u inst %u zwrite %u zfunc %u depth #%u)\n",
+                ps, reason, indices, instances, u32(z.depth_write_enable), u32(z.depth_func),
+                depth);
+    std::fflush(stdout);
+}
 
 bool Listed(const std::vector<u32>& list, u32 ps) {
     return std::find(list.begin(), list.end(), ps) != list.end();
@@ -253,7 +310,21 @@ void ReadJitterControl() {
     const u32 count = control.index;
     control.index = 0;
     jittered_meshes.clear(); // a new frame
-    control.map = false;
+    jittered_depths.clear();
+    // F6: a draw map of this frame and the suspects so far, most frequent first.
+    const bool mark = TlgSettings::Get().jitter_mark.exchange(false);
+    control.map = mark;
+    if (mark) {
+        std::sort(jitter_suspects.begin(), jitter_suspects.end(),
+                  [](const auto& a, const auto& b) { return a.count > b.count; });
+        std::printf("Jitter mark %d map (%u eligible draws last frame, %zu suspects):\n",
+                    ++jitter_marks, count, jitter_suspects.size());
+        for (const auto& suspect : jitter_suspects) {
+            std::printf("  suspect ps %08x %s x%llu\n", suspect.ps, suspect.reason,
+                        static_cast<unsigned long long>(suspect.count));
+        }
+        std::fflush(stdout);
+    }
     static const char* path = std::getenv("TLG_JITTER_CONTROL");
     static auto last = std::chrono::steady_clock::time_point{};
     const auto now = std::chrono::steady_clock::now();
@@ -274,6 +345,12 @@ void ReadJitterControl() {
             if (std::fscanf(file, "%x", &hash) == 1) list->push_back(hash);
         } else if (!std::strcmp(token, "map")) {
             next.map = true;
+        } else if (!std::strcmp(token, "follow")) {
+            next.follow = true;
+        } else if (!std::strcmp(token, "nomesh")) {
+            next.no_mesh = true;
+        } else if (!std::strcmp(token, "nodecal")) {
+            next.no_decal = true;
         } else if (lo == ~0u) {
             lo = u32(std::strtoul(token, nullptr, 10));
         } else {
@@ -282,10 +359,18 @@ void ReadJitterControl() {
         }
     }
     std::fclose(file);
-    std::printf("Jitter control: %zu ranges, %zu only, %zu not, %zu skipped (%u eligible)\n",
-                next.ranges.size(), next.only.size(), next.never.size(), next.skip.size(), count);
-    std::fflush(stdout);
-    // A one-shot map: remove the token from the file to avoid a map every half second.
+    // Logged when the file changes (a "map" token prints every time: remove it after one map).
+    const auto summary = fmt::format(
+        "{} ranges, {} only, {} not, {} skipped{}{}{}", next.ranges.size(), next.only.size(),
+        next.never.size(), next.skip.size(), next.follow ? ", follow" : "",
+        next.no_mesh ? ", nomesh" : "", next.no_decal ? ", nodecal" : "");
+    static std::string last_summary;
+    if (next.map || summary != last_summary) {
+        std::printf("Jitter control: %s (%u eligible)\n", summary.c_str(), count);
+        std::fflush(stdout);
+        last_summary = summary;
+    }
+    next.map = next.map || mark;
     next.index = 0;
     control = std::move(next);
 }
@@ -1259,20 +1344,22 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     // tlg: jitter geometry drawn with the scene depth, not full-screen passes (a shifted
     // full-screen quad leaves an edge column unwritten).
     draw_jitter = {};
+    const bool scene_depth = upscaler->Enabled() && db_desc.first && JitterDepth(db_desc.first);
+    const bool samples_depth = scene_depth && SamplesSceneDepth();
+    const bool geometry = regs.num_indices > 6 || regs.num_instances.NumInstances() > 1;
     // Not volumes that sample a scene depth (decals, lights): they rebuild positions per pixel
     // from the already jittered depth, and a shifted box misplaces what they write into the
     // G-buffer (blocks on the boy's face, ps da3456ba, 2026-10-21).
-    if (upscaler->Enabled() && db_desc.first && JitterDepth(db_desc.first) &&
-        (regs.num_indices > 6 || regs.num_instances.NumInstances() > 1) &&
+    if (scene_depth && geometry &&
         (!TlgToggle::Disabled(TlgToggle::JitterDepthWritesOnly) ||
          regs.depth_control.depth_write_enable) &&
-        !SamplesSceneDepth() && JitterInRange(pipeline->FragmentHash())) {
+        (jitter_control.no_decal || !samples_depth) && JitterInRange(pipeline->FragmentHash())) {
         draw_jitter = upscaler->Jitter();
     }
     // A redraw of a mesh already drawn jittered into this depth takes the same shift, sampling
     // or not: water shading (ps 05adfd4d, 4755277d) tests LessEqual against its own depth
     // pre-pass (ps 26c53528) and flickered where the two disagreed (2026-10-21).
-    if (upscaler->Enabled() && is_indexed && db_desc.first && JitterDepth(db_desc.first)) {
+    if (scene_depth && is_indexed && !jitter_control.no_mesh) {
         const std::pair mesh{regs.index_base_address.Address<VAddr>() +
                                  u64(index_offset) * 4, regs.num_indices};
         const bool known = std::find(jittered_meshes.begin(), jittered_meshes.end(), mesh) !=
@@ -1282,6 +1369,19 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         } else if (known) {
             draw_jitter = upscaler->Jitter();
         }
+    }
+    if (scene_depth) {
+        // tlg debug ("follow"): a draw that depth-tests a depth a jittered draw wrote takes the
+        // same shift, a general form of the same-mesh rule (under test).
+        const auto& z = regs.depth_control;
+        if (jitter_control.follow && geometry && !samples_depth && draw_jitter[0] == 0.0f &&
+            draw_jitter[1] == 0.0f && z.depth_enable && z.depth_func != AmdGpu::CompareFunc::Always &&
+            JitteredDepth(db_desc.first.index)) {
+            draw_jitter = upscaler->Jitter();
+        }
+        NoteJitterDraw(pipeline->FragmentHash(), db_desc.first.index, regs.depth_control,
+                       regs.num_indices, regs.num_instances.NumInstances(),
+                       draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f, samples_depth);
     }
     if (jitter_control.map && db_desc.first && JitterDepth(db_desc.first)) {
         // The map also describes the draw: indices, depth state, blend, jitter, bound images.
@@ -1449,9 +1549,15 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
     push_data.yoffset *= target_scale[1];
     pipeline->BindResources(set_writes, push_data);
     draw_jitter = {};
-    if (upscaler->Enabled() && db_desc.first && JitterDepth(db_desc.first) && !SamplesSceneDepth() &&
+    const bool scene_depth = upscaler->Enabled() && db_desc.first && JitterDepth(db_desc.first);
+    const bool samples_depth = scene_depth && SamplesSceneDepth();
+    if (scene_depth && (jitter_control.no_decal || !samples_depth) &&
         JitterInRange(pipeline->FragmentHash())) {
         draw_jitter = upscaler->Jitter();
+    }
+    if (scene_depth) { // the index count is in GPU memory: ~0u
+        NoteJitterDraw(pipeline->FragmentHash(), db_desc.first.index, Regs().depth_control, ~0u,
+                       1, draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f, samples_depth);
     }
     UpdateDynamicState(pipeline, is_indexed);
     MarkPass(pipeline, state);
