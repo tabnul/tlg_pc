@@ -23,6 +23,8 @@ SETTING_ROWS = {
     's:native_audio': ('native_audio', 'switch', False),
     's:close_on_play': ('close_on_play', 'switch', False),
     's:reopen_launcher': ('reopen_launcher', 'switch', False),
+    's:level_select': ('level_select', 'switch', False),
+    's:bridge_fix': ('bridge_fix', 'switch', False),
     's:vram_budget_mb': ('vram_budget_mb', 'slider', False),
 }
 DISPLAY_MODES = ('Windowed', 'Borderless', 'Fullscreen')
@@ -43,6 +45,7 @@ SECTIONS = (
     ('gfx_sec_vram', ('s:vram_budget_mb',)),
     ('gfx_sec_overlay', ('s:show_fps',) + OVERLAY_IDS),
     ('gfx_sec_launcher', ('s:native_audio', 's:close_on_play', 's:reopen_launcher')),
+    ('gfx_sec_debug', ('s:level_select', 's:bridge_fix')),
 )
 # Sliders greyed out while the switch they belong to is off.
 NEEDS = {'menu:rcas_strength': 'menu:rcas', 'menu:cas_strength': 'menu:cas',
