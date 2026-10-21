@@ -197,6 +197,16 @@ GUIDE_SCALE_EXPECTED = struct.pack('<4f', 1 / 1920, 1 / 1080, -32, 16 / 1920)
 # there) stretched the subtitle lines sideways on a wider canvas.
 SUBTITLE_SCALE = 0x24f1464
 SUBTITLE_SCALE_EXPECTED = struct.pack('<2f', 1 / 1920, 1 / 1080)
+# Garlic (GPU) heap: the render setup (0x1dd3a46) allocates 0xb0000000 bytes (2816 MiB; the Pro
+# path adds 512 MiB) for the game's own allocator (Gomalloc), render targets included. Above
+# 1080p a stage switch, which holds the old and the new stage at once, ran it out of memory
+# ("Garlic: Out of Memory!", then a read of -1). Larger frames get 4064 MiB (also room for
+# supersampling); the launcher grows
+# the direct memory (TLG_DMEM_MB) by the same amount. mov r15d, imm32 caps it below 4 GiB; 32 MiB
+# stay free in case the allocator rounds sizes up in 32 bits.
+GARLIC_SIZE = 0x1dd3a46
+GARLIC_SIZE_EXPECTED = bytes.fromhex('41bf000000b0')
+GARLIC_EXTRA_MB = 1248
 
 
 # Boot logos: the game init (0x1231d62) fills a table of four 0x1c-byte entries at rsp+0x6f0
@@ -257,6 +267,11 @@ def resolution_writes(eboot, size):
         subtitle = checked_offset(eboot, SUBTITLE_SCALE, SUBTITLE_SCALE_EXPECTED)
         writes.append((subtitle, struct.pack('<2f', 1 / ui_width, 1 / 1080),
                        f'UI: {SUBTITLE_SCALE:#x} subtitle scale 1920 -> {ui_width}'))
+    if width * height > 1920 * 1080:
+        garlic = checked_offset(eboot, GARLIC_SIZE, GARLIC_SIZE_EXPECTED)
+        size_mb = 2816 + GARLIC_EXTRA_MB
+        writes.append((garlic, GARLIC_SIZE_EXPECTED[:2] + struct.pack('<I', size_mb << 20),
+                       f'garlic: {GARLIC_SIZE:#x} GPU heap 2816 -> {size_mb} MB'))
     return writes
 
 

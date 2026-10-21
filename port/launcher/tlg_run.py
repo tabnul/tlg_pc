@@ -179,6 +179,8 @@ RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
 applied_frame_rate = '30'
 # The size the resolution patch really applied (None: the game's own 1920x1080).
 applied_resolution = None
+# MiB the Garlic heap patch added to the game's GPU heap (0: none); the direct memory grows with it.
+applied_garlic_extra = 0
 
 # Keyboard and mouse defaults of src/runtime_pad.c, in its key_map syntax ('|': several).
 DEFAULT_KEYS = {
@@ -473,8 +475,9 @@ def set_mod_enabled(key, enabled):
 def prepare(settings, log=print):
     """Builds out/boot-linked.bin, out/content.bin and out/patches.bin (frame rate patches and
     any enabled mod); returns the module list that was linked."""
-    global applied_frame_rate, applied_resolution
+    global applied_frame_rate, applied_resolution, applied_garlic_extra
     applied_resolution = None
+    applied_garlic_extra = 0
     game = settings['game_dir']
     scripts = PORT_DIR / 'scripts'
     modules = ['libc.prx', 'libSceFios2.prx']
@@ -501,6 +504,9 @@ def prepare(settings, log=print):
                 applied_frame_rate = line.split()[2]
             if line.startswith('Resolution patch resolution: '):
                 applied_resolution = line.split()[-2]  # '... 1920x1080 -> WxH (bytes)'
+            if line.startswith('Resolution patch garlic: '):
+                words = line.split()  # '... GPU heap 2816 -> N MB (bytes)'
+                applied_garlic_extra = int(words[-3]) - int(words[-5])
     isa_table(log)
     return modules
 
@@ -626,6 +632,9 @@ def build_env(settings, extra=None):
     # The game renders natively at the patched size: the upscaler stays off (vk_temporal_upscaler).
     if applied_resolution:
         env['TLG_RESOLUTION_PATCH'] = applied_resolution
+    # The larger Garlic heap comes out of direct memory (runtime_memory.c: 5056 MiB retail).
+    if applied_garlic_extra:
+        env.setdefault('TLG_DMEM_MB', str(5056 + applied_garlic_extra))
     restart = f'"{sys.executable}" --play' if FROZEN else f'"{sys.executable}" "{Path(__file__).resolve()}"'
     env.setdefault('TLG_RESTART_COMMAND', restart)
     # Linux package: the libraries built with the port (SDL3, FFmpeg, ...) are in out/lib, never the
