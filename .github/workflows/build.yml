@@ -1,4 +1,4 @@
-# Builds the Linux and Windows packages on every push to main and publishes them as a new
+# Builds the Linux and Windows packages on every push to master and publishes them as a new
 # release tagged vYYYY.MM.DD-<commit>, marked latest. Every release is kept as version history
 # (the old "nightly" release is removed). A pushed tag v* publishes that tag the same way.
 # No game or console file is ever built in or uploaded.
@@ -6,11 +6,11 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     tags: ['v*']
-  # Pull requests to main build both packages (artifacts only): the Release is left untouched.
+  # Pull requests to master build both packages (artifacts only): the Release is left untouched.
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
@@ -133,7 +133,7 @@ jobs:
 
   release:
     needs: [linux, windows]
-    # Only pushes publish (main -> vYYYY.MM.DD-<commit>, v* tags -> that tag); pull requests stop at the artifacts.
+    # Only pushes publish (master -> vYYYY.MM.DD-<commit>, v* tags -> that tag); pull requests stop at the artifacts.
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     permissions:
@@ -201,7 +201,7 @@ jobs:
         # Only after the new release is live: the previous runs and their artifacts go, the
         # current run (the one that produced this release) stays. Releases are not touched,
         # apart from leftover nightly-staging drafts of failed runs.
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         run: |
           set -uo pipefail
           gh release list --limit 100 --json tagName,isDraft \
