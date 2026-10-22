@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Export and import of configuration files (launcher/preset_share.py). The pure parts need no Qt;
+"""Export and import of configuration files (launcher/preset_share.py). Pure parts only;
 the controller test at the end skips without PySide6. Nothing here touches the real settings.json:
 `paths` points the launcher config at a throwaway folder, and the controller test uses its own."""
 import json
@@ -14,20 +14,14 @@ from paths import ROOT
 sys.path.insert(0, str(ROOT / 'launcher'))
 import backports_table  # noqa: E402
 import preset_share  # noqa: E402
-from qt import gfxlogic, logic  # noqa: E402
+import gfxlogic  # noqa: E402
+import tlg_run  # noqa: E402
 
-try:
-    from qt.backend import Backend
-    from qt.graphics import Graphics
-    HAVE_QT = True
-except ImportError:
-    HAVE_QT = False
-
-DEFAULTS = dict(logic.tlg_run.DEFAULT_SETTINGS)
+DEFAULTS = dict(tlg_run.DEFAULT_SETTINGS)
 
 
 def t(key, **fmt):
-    en, _ = logic.tk_text().get(key, (key, key))
+    en, _ = {**preset_share.TEXT, **tlg_run.TEXT}.get(key, (key, key))
     return en.format(**fmt) if fmt else en
 
 
@@ -230,83 +224,6 @@ class ValidationTests(Base):
             self.assertTrue(en and pt)
         for key, (en, pt) in preset_share.TEXT.items():
             self.assertTrue(en and pt, key)
-
-
-@unittest.skipUnless(HAVE_QT, 'PySide6 not installed')
-class ControllerTests(Base):
-    """Import through Graphics: same path as the built-in presets, saved to the temporary folders only."""
-    def setUp(self):
-        super().setUp()
-        patcher = mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': str(self.dir / 'cfg'),
-                                               'TLG_USER_DIR': str(self.dir / 'user')})
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        probes = {'gpu': lambda: ('GPU', '1'), 'pad': lambda: 'pad', 'problems': lambda: [], 'cache': lambda: 0,
-                  'save': lambda: None, 'news': lambda: [], 'version': lambda: 'v1',
-                  'saves': {'running': lambda: False, 'scan': lambda: [], 'open': lambda p: None}}
-        settings = dict(DEFAULTS, game_dir='/g', ui_language='en_US')
-        self.backend = Backend(settings=settings, probes=probes)
-        self.graphics = Graphics(self.backend, {'vram': lambda: 6144, 'version': lambda: 'v1'})
-        self.ini = self.dir / 'user' / 'tlg.ini'
-
-    def saved(self):
-        return json.loads(logic.tlg_run.config_path().read_text())
-
-    def test_export_writes_a_file_with_the_current_values(self):
-        self.graphics.setValue('menu:fsr1', '1')
-        self.graphics.setValue('s:vsync', '0')
-        out = self.dir / 'out' / 'mine'
-        self.graphics.exportPreset('Mine', 'desc', str(out))
-        self.assertEqual(self.graphics.shareTone, 'good')
-        data = json.loads((self.dir / 'out' / 'mine.tlg-preset.json').read_text(encoding='utf-8'))
-        self.assertEqual((data['name'], data['what'], data['port_version']), ('Mine', 'desc', 'v1'))
-        self.assertEqual((data['items']['menu:fsr1'], data['settings']['vsync']), ('1', False))
-        self.assertNotIn('vram_budget_mb', data['settings'])
-        self.graphics.exportPreset('Mine', '', str(self.dir / 'no' / 'such' / '\0bad'))   # unwritable: a message
-        self.assertEqual(self.graphics.shareTone, 'bad')
-
-    def test_import_asks_then_applies_through_the_preset_path(self):
-        self.graphics.applyPreset('balanced')
-        path = self.write(self.valid(name='Friend', items={'menu:fsr1': '1', 'menu:color_contrast': '1.3', 'BP99': '1'},
-                                     settings={'vsync': False, 'gpu_readbacks': '1'}), 'friend.tlg-preset.json')
-        self.graphics.importPreset(str(path))
-        dialog = self.graphics.dialog
-        self.assertTrue(dialog['open'])
-        self.assertEqual([b['id'] for b in dialog['buttons']], ['apply', 'cancel'])
-        self.assertIn('friend', dialog['body'])
-        self.assertTrue(any('BP99' in line for line in dialog['lines']))        # the ignored id is listed
-        self.assertNotIn('color_contrast', self.ini.read_text() if self.ini.exists() else '')   # nothing yet
-        self.graphics.answer('cancel')
-        self.assertEqual(self.saved().get('gpu_readbacks'), '2')
-        self.graphics.importPreset(str(path))
-        self.graphics.answer('apply')
-        saved = self.saved()
-        self.assertEqual((saved['vsync'], saved['gpu_readbacks']), (False, '1'))
-        self.assertIn('color_contrast=1.3', self.ini.read_text())
-        self.assertEqual(preset_share.diff(preset_share.read_preset(path)[0], self.backend.settings,
-                                           self.backend.fix_states), [])
-        self.assertIn('friend', self.graphics.presetText)                       # custom profile with the file name
-        self.assertEqual(self.graphics.exportName, 'friend')
-        self.graphics.setValue('menu:fps_limit', '120')
-        self.assertNotIn('friend', self.graphics.presetText)
-
-    def test_import_of_a_built_in_preset_export_is_recognised_and_bad_files_open_no_apply(self):
-        self.graphics.applyPreset('quality')
-        out = self.dir / 'cur.tlg-preset.json'
-        self.graphics.exportPreset('Cur', '', str(out))
-        self.graphics.applyPreset('performance')
-        self.graphics.importPreset(str(out))
-        self.assertEqual(self.graphics.dialog['body'].count('will change'), 1)
-        self.graphics.answer('apply')
-        self.assertIn('quality', self.graphics.presetText.lower())
-        self.graphics.importPreset(str(out))                                     # same again: nothing to change
-        self.assertEqual([b['id'] for b in self.graphics.dialog['buttons']], ['close'])
-        self.graphics.answer('close')
-        for bad in ('{"format": ', json.dumps(self.valid(version=3))):
-            self.graphics.importPreset(str(self.write(bad, 'bad.json')))
-            self.assertEqual([b['id'] for b in self.graphics.dialog['buttons']], ['close'])
-            self.assertTrue(self.graphics.dialog['lines'])
-            self.graphics.answer('close')
 
 
 if __name__ == '__main__':

@@ -11,18 +11,15 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include <SDL3/SDL.h>
 #include "tlg_settings.h"
 #include "tlg_lab.h"
-#include "tlg_orbs.h"
-#include "tlg_actors.h"
 #include "tlg_graphics.h"
 #include "tlg_perf_stats.h"
-#include "../../src/actor_hook.h"
-
-extern TlgActorSlot tlg_actor_slots[2];
 extern "C" void runtime_restart(void); // src/probe.c: starts run.py again, ends this process
 #include "common/elf_info.h"
 #include "imgui.h"
@@ -209,9 +206,72 @@ void Choice(const char* label, std::atomic<int>& target, const char* const* labe
 // The note for the item under the mouse or the gamepad/keyboard focus, shown in the footer.
 const char* footer_help = nullptr;
 
+std::string footer_text;
+
+const char* TL(const char* en, const char* pt);
+
 void Help(const char* text) {
     if (text && (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) || ImGui::IsItemFocused())) {
         footer_help = text;
+    }
+}
+
+// tlg: a row's default and its value on PS4, shown above its note. No PS4 value: not a PS4 setting
+// or not known.
+struct Marks {
+    std::string def, ps4;
+};
+
+void Help(const char* text, const Marks& marks) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) || ImGui::IsItemFocused()) {
+        footer_text = std::string(TL("Default: ", "Padrão: ")) + marks.def;
+        if (!marks.ps4.empty()) footer_text += " · PS4: " + marks.ps4;
+        if (text) (footer_text += '\n') += text;
+        footer_help = footer_text.c_str();
+    }
+}
+
+// The settings as they are without tlg.ini: the defaults the rows show.
+const TlgSettings::Values& Defaults() {
+    static const TlgSettings::Values defaults{};
+    return defaults;
+}
+
+template <typename T>
+std::string Format(const char* format, T value) {
+    char text[48];
+    std::snprintf(text, sizeof(text), format, value);
+    return text;
+}
+
+std::string OnOff(bool on) {
+    return on ? TL("on", "ligado") : TL("off", "desligado");
+}
+
+std::string ChoiceLabel(const char* const* labels, const int* values, int count, int value) {
+    for (int i = 0; i < count; ++i) {
+        if ((values ? values[i] : i) == value) return labels[i];
+    }
+    return std::to_string(value);
+}
+
+// The Default and PS4 buttons after a slider: the width to leave for them, then the buttons.
+float ResetWidth(bool ps4) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float width = ImGui::CalcTextSize(TL("Default", "Padrão")).x + style.FramePadding.x * 2 + style.ItemSpacing.x;
+    if (ps4) width += ImGui::CalcTextSize("PS4").x + style.FramePadding.x * 2 + style.ItemSpacing.x;
+    return width;
+}
+
+template <typename T>
+void ResetButtons(std::atomic<T>& value, T def, std::optional<T> ps4, const Marks& marks) {
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TL("Default", "Padrão"))) Store(value, def, true);
+    Help(TL("Back to the default.", "Volta ao padrão."), marks);
+    if (ps4) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("PS4")) Store(value, *ps4, true);
+        Help(TL("Back to the value on PS4.", "Volta ao valor do PS4."), marks);
     }
 }
 
@@ -235,39 +295,19 @@ void Row(const char* label) {
     ImGui::PushID(label);
 }
 
-void CheckRow(const char* label, std::atomic<bool>& value, const char* help = nullptr) {
+void CheckRow(const char* label, std::atomic<bool>& value, const char* help, bool def,
+              std::optional<bool> ps4 = std::nullopt) {
     Row(label);
     Checkbox("##value", value);
-    Help(help);
+    Help(help, {OnOff(def), ps4 ? OnOff(*ps4) : ""});
     ImGui::PopID();
 }
 
 void ChoiceRow(const char* label, std::atomic<int>& target, const char* const* labels, const int* values,
-               int count, const char* help = nullptr) {
+               int count, const char* help, int def, std::optional<int> ps4 = std::nullopt) {
     Row(label);
     Choice("##value", target, labels, values, count);
-    Help(help);
-    ImGui::PopID();
-}
-
-// A 0.1x to 100x multiplier with a 1x button.
-void MultiplierRow(const char* label, std::atomic<float>& value, const char* help) {
-    Row(label);
-    const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("1x").x + style.FramePadding.x * 2 + style.ItemSpacing.x));
-    float v = value;
-    if (ImGui::SliderFloat("##value", &v, 0.1f, 100.0f, "%.2fx",
-                           ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp)) {
-        value = TlgOrbs::ClampMultiplier(v);
-        dirty = true;
-    }
-    Help(help);
-    ImGui::SameLine();
-    if (ImGui::SmallButton("1x")) {
-        value = 1.0f;
-        dirty = true;
-    }
-    Help(help);
+    Help(help, {ChoiceLabel(labels, values, count, def), ps4 ? ChoiceLabel(labels, values, count, *ps4) : ""});
     ImGui::PopID();
 }
 
@@ -277,45 +317,46 @@ void InfoRow(const char* label, const char* text) {
     ImGui::PopID();
 }
 
-void SliderRow(const char* label, std::atomic<int>& value, int lo, int hi, const char* format, const char* help) {
+void SliderRow(const char* label, std::atomic<int>& value, int lo, int hi, const char* format, const char* help,
+               int def, std::optional<int> ps4 = std::nullopt) {
     Row(label);
+    const Marks marks{Format(format, def), ps4 ? Format(format, *ps4) : ""};
+    ImGui::SetNextItemWidth(-ResetWidth(ps4.has_value()));
     int v = value;
     if (ImGui::SliderInt("##value", &v, lo, hi, format, ImGuiSliderFlags_AlwaysClamp)) {
         Store(value, std::clamp(v, lo, hi), true);
     }
-    Help(help);
+    Help(help, marks);
+    ResetButtons(value, def, ps4, marks);
     ImGui::PopID();
 }
 
-void FloatRow(const char* label, std::atomic<float>& value, float lo, float hi, const char* format, const char* help) {
+void FloatRow(const char* label, std::atomic<float>& value, float lo, float hi, const char* format, const char* help,
+              float def) {
     Row(label);
+    const Marks marks{Format(format, def), ""};
+    ImGui::SetNextItemWidth(-ResetWidth(false));
     float v = value;
     if (ImGui::SliderFloat("##value", &v, lo, hi, format, ImGuiSliderFlags_AlwaysClamp)) {
         Store(value, std::clamp(v, lo, hi), true);
     }
-    Help(help);
+    Help(help, marks);
+    ResetButtons(value, def, std::optional<float>(), marks);
     ImGui::PopID();
 }
 
-const char* TL(const char* en, const char* pt);
-
-// A float slider over a color range, with a button back to its neutral value.
+// A float slider over a color range; the game's own value (PS4) is the range's neutral one.
 void FloatSliderRow(const char* label, std::atomic<float>& value, const TlgGraphics::ColorRange& range,
-                    const char* help) {
+                    const char* help, float def) {
     Row(label);
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const char* reset = TL("Reset", "Padrão");
-    ImGui::SetNextItemWidth(-(ImGui::CalcTextSize(reset).x + style.FramePadding.x * 2 + style.ItemSpacing.x));
+    const Marks marks{Format("%.2f", def), Format("%.2f", range.neutral)};
+    ImGui::SetNextItemWidth(-ResetWidth(true));
     float v = value;
     if (ImGui::SliderFloat("##value", &v, range.min, range.max, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
         Store(value, TlgGraphics::ClampColor(range, v), true);
     }
-    Help(help);
-    ImGui::SameLine();
-    if (ImGui::SmallButton(reset)) {
-        Store(value, range.neutral, true);
-    }
-    Help(help);
+    Help(help, marks);
+    ResetButtons(value, def, std::optional<float>(range.neutral), marks);
     ImGui::PopID();
 }
 
@@ -363,18 +404,77 @@ std::string OverlayText() {
 constexpr const char* Unsupported = "Unavailable: game version or code signature mismatch.";
 
 
+// tlg: graphics presets (TlgSettings::GraphicsPresetNames): every look setting at once, the
+// texture pack included. Changing a setting by hand shows "Custom".
+const char* PresetLabel(int index, const std::string& name) {
+    return index == 0 ? TL("Stock (as shipped)", "Original (como lançado)")
+           : index == 1 ? TL("Recommended (default)", "Recomendado (padrão)")
+                        : name.c_str();
+}
+
+void PresetRows() {
+    const std::vector<std::string> names = TlgSettings::GraphicsPresetNames();
+    const int current = TlgSettings::MatchingGraphicsPreset();
+    Row(TL("Graphics preset", "Predefinição gráfica"));
+    if (ImGui::BeginCombo("##value", current < 0 ? TL("Custom", "Personalizado") : PresetLabel(current, names[current]))) {
+        for (int i = 0; i < int(names.size()); ++i) {
+            if (ImGui::Selectable(PresetLabel(i, names[i]), i == current)) {
+                TlgSettings::ApplyGraphicsPreset(i);
+                dirty = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    Help(TL("Switches all settings on this tab and the texture pack at once, live. Stock is the game as shipped; Recommended is the default. Your own presets are files in the presets folder, also listed in the launcher.",
+            "Troca de uma vez todas as opções desta aba e o pacote de texturas, ao vivo. Original é o jogo como lançado; Recomendado é o padrão. As suas predefinições são arquivos na pasta presets, também listados no launcher."));
+    ImGui::PopID();
+    static char name[48] = "";
+    Row(TL("Save as preset", "Salvar como predefinição"));
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const char* save = TL("Save", "Salvar");
+    const char* remove = TL("Delete", "Excluir");
+    const bool own = current >= 2;
+    float buttons = ImGui::CalcTextSize(save).x + style.FramePadding.x * 2 + style.ItemSpacing.x;
+    if (own) buttons += ImGui::CalcTextSize(remove).x + style.FramePadding.x * 2 + style.ItemSpacing.x;
+    ImGui::SetNextItemWidth(-buttons);
+    ImGui::InputTextWithHint("##name", TL("name", "nome"), name, sizeof(name));
+    Help(TL("Saves the current settings under this name (an existing preset with the name is replaced).",
+            "Salva as opções atuais com este nome (uma predefinição com o mesmo nome é substituída)."));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(name[0] == '\0');
+    if (ImGui::Button(save) && TlgSettings::SaveGraphicsPreset(name) >= 0) {
+        name[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    if (own) {
+        ImGui::SameLine();
+        if (ImGui::Button(remove)) {
+            TlgSettings::DeleteGraphicsPreset(current);
+        }
+        Help(TL("Deletes the selected preset file. The settings stay as they are.",
+                "Exclui o arquivo da predefinição selecionada. As opções ficam como estão."));
+    }
+    ImGui::PopID();
+}
+
 void ImageTab() {
     namespace G = TlgGraphics;
     auto& s = TlgSettings::Get();
+    const auto& d = Defaults();
+    ImGui::SeparatorText(TL("Preset", "Predefinição"));
+    if (BeginRows("##preset")) {
+        PresetRows();
+        ImGui::EndTable();
+    }
     ImGui::SeparatorText(TL("Display", "Tela"));
     if (BeginRows("##display")) {
         static const char* const modes[] = {TL("Windowed", "Janela"), TL("Borderless window", "Janela sem borda"), TL("Fullscreen", "Tela cheia")};
         ChoiceRow(TL("Display mode", "Modo de exibição"), s.display_mode, G::DisplayModeCount == 3 ? modes : G::DisplayModeNames.data(),
-                  nullptr, G::DisplayModeCount, TL("Windowed, borderless window or exclusive fullscreen.", "Janela, janela sem borda ou tela cheia exclusiva."));
-        CheckRow("VSync", s.vsync, TL("Waits for the monitor: no tearing, a little more input delay.", "Espera o monitor: sem tearing, um pouco mais de atraso de entrada."));
+                  nullptr, G::DisplayModeCount, TL("Windowed, borderless window or exclusive fullscreen.", "Janela, janela sem borda ou tela cheia exclusiva."), d.display_mode);
+        CheckRow("VSync", s.vsync, TL("Waits for the monitor: no tearing, a little more input delay.", "Espera o monitor: sem tearing, um pouco mais de atraso de entrada."), d.vsync);
         CheckRow("HDR", s.hdr,
                  TL("The game's own HDR10 output, used when HDR is on in Windows display settings. Applies after a restart.",
-                    "A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. Vale após reiniciar."));
+                    "A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. Vale após reiniciar."), d.hdr);
         ImGui::EndTable();
     }
     const int iw = s.image_width, ih = s.image_height, ww = s.window_width, wh = s.window_height;
@@ -386,7 +486,7 @@ void ImageTab() {
     ImGui::SeparatorText(TL("Scaling and sharpening", "Escala e nitidez"));
     if (BeginRows("##scaling")) {
         CheckRow(TL("Upscale with FSR 1", "Ampliar com FSR 1"), s.fsr1,
-                 TL("Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).", "Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor)."));
+                 TL("Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).", "Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor)."), d.fsr1, false);
         // tlg: one sharpening filter at a time: FSR 1's RCAS or AMD CAS (stored as rcas / cas).
         static const char* const filters[] = {TL("Off", "Desligada"), "RCAS (FSR 1)", "CAS (AMD)"};
         int filter = s.cas ? 2 : s.rcas ? 1 : 0;
@@ -395,15 +495,16 @@ void ImageTab() {
             Store(s.rcas, filter == 1, true);
             Store(s.cas, filter == 2, true);
         }
+        const Marks filter_marks{filters[d.cas ? 2 : d.rcas ? 1 : 0], filters[0]};
         Help(rcas_blocked && !s.cas && downscaling ? TL("No effect: the game's image is larger than the window.", "Sem efeito: a imagem do jogo é maior que a janela.")
              : rcas_blocked && !s.cas            ? TL("RCAS needs FSR 1 here: the game's image is smaller than the window. CAS works at any size.", "O RCAS precisa do FSR 1 aqui: a imagem do jogo é menor que a janela. O CAS funciona em qualquer tamanho.")
-                                                 : TL("Sharpens the final image. RCAS comes with FSR 1; CAS (AMD Contrast Adaptive Sharpening) is softer on noise and works at any size.", "Deixa a imagem final mais nítida. O RCAS vem com o FSR 1; o CAS (AMD Contrast Adaptive Sharpening) realça menos o ruído e funciona em qualquer tamanho."));
+                                                 : TL("Sharpens the final image. RCAS comes with FSR 1; CAS (AMD Contrast Adaptive Sharpening) is softer on noise and works at any size.", "Deixa a imagem final mais nítida. O RCAS vem com o FSR 1; o CAS (AMD Contrast Adaptive Sharpening) realça menos o ruído e funciona em qualquer tamanho."), filter_marks);
         ImGui::PopID();
         if (s.cas) {
-            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.cas_strength, 0, 100, "%d%%", TL("How strong the CAS sharpening is.", "Quão forte é a nitidez do CAS."));
+            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.cas_strength, 0, 100, "%d%%", TL("How strong the CAS sharpening is.", "Quão forte é a nitidez do CAS."), d.cas_strength);
         } else {
             ImGui::BeginDisabled(!s.rcas || rcas_blocked);
-            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.rcas_strength, 0, 100, "%d%%", TL("How strong the sharpening is.", "Quão forte é a nitidez."));
+            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.rcas_strength, 0, 100, "%d%%", TL("How strong the sharpening is.", "Quão forte é a nitidez."), d.rcas_strength);
             ImGui::EndDisabled();
         }
         ImGui::EndTable();
@@ -415,11 +516,11 @@ void ImageTab() {
         CheckRow("DLAA (NVIDIA DLSS)", s.dlaa,
                  !s.dlss_supported ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("Needs an NVIDIA RTX card and tlg_dlss.dll.", "Precisa de uma placa NVIDIA RTX e do tlg_dlss.dll."))
                  : TL("Stable, smooth edges on foliage, feathers and railings: DLSS at native resolution on the game's own motion vectors. Off: the game's own anti-aliasing only. F8 switches it in game.",
-                      "Bordas estáveis e suaves em folhagem, penas e grades: DLSS na resolução nativa com os vetores de movimento do próprio jogo. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo."));
+                      "Bordas estáveis e suaves em folhagem, penas e grades: DLSS na resolução nativa com os vetores de movimento do próprio jogo. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo."), d.dlaa, false);
         ImGui::EndDisabled();
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",
-                    "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."));
+                    "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."), d.smaa, false);
         ImGui::EndTable();
     }
     ImGui::SeparatorText(TL("Enhancements", "Melhorias"));
@@ -427,42 +528,104 @@ void ImageTab() {
         static const char* const shadow_labels[] = {TL("Game (2048)", "Jogo (2048)"), "4096", "8192"};
         static const int shadow_values[] = {1, 2, 4};
         ChoiceRow(TL("Shadow resolution", "Resolução das sombras"), s.shadow_scale, shadow_labels, shadow_values, 3,
-                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048. Recommended: Game (2048). The sharper edges are hard to see, and 8192 costs about 8 FPS and about 1 GB of video memory.",
-                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo. Recomendado: Jogo (2048). As bordas mais nítidas são difíceis de notar, e 8192 custa cerca de 8 FPS e cerca de 1 GB de memória de vídeo."));
+                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about 1 GB of video memory; recommended when you have the headroom.",
+                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga."), d.shadow_scale, 1);
+        SliderRow(TL("Field of view", "Campo de visão"), s.fov, 50, 110, "%d°",
+                  TL("Camera field of view. Default 70° is as shipped; higher shows more around the boy. Applies while the game runs (not in the paused menu).",
+                     "Campo de visão da câmera. Padrão 70° é o original; mais alto mostra mais em volta do menino. Aplica com o jogo rodando (não no menu pausado)."), d.fov, 70);
         ImGui::EndTable();
     }
     ImGui::SeparatorText(TL("Game effects (100% = as shipped)", "Efeitos do jogo (100% = original)"));
     if (BeginRows("##effects")) {
         SliderRow(TL("Ambient occlusion", "Oclusão de ambiente"), s.ssao, 0, 400, "%d%%",
                   TL("Strength of the contact shadows in corners and under grass. 0% turns the pass off (saves a little GPU time). Above 150% the half-resolution AO shows blocky halos.",
-                     "Força das sombras de contato em cantos e sob a grama. 0% desliga o passe (economiza um pouco de GPU). Acima de 150% a AO em meia resolução mostra halos em blocos."));
+                     "Força das sombras de contato em cantos e sob a grama. 0% desliga o passe (economiza um pouco de GPU). Acima de 150% a AO em meia resolução mostra halos em blocos."), d.ssao, 100);
         SliderRow(TL("Bloom", "Bloom"), s.bloom, 0, 400, "%d%%",
-                  TL("Glow around bright light. 0% turns the pass off.", "Brilho em volta da luz forte. 0% desliga o passe."));
+                  TL("Glow around bright light. 0% turns the pass off.", "Brilho em volta da luz forte. 0% desliga o passe."), d.bloom, 100);
         SliderRow(TL("Screen-space reflections", "Reflexos em espaço de tela"), s.ssr, 0, 400, "%d%%",
-                  TL("Reflections and light glare on water and wet stone. 0% turns the pass off.", "Reflexos e brilho de luz na água e na pedra molhada. 0% desliga o passe."));
+                  TL("Reflections and light glare on water and wet stone. 0% turns the pass off.", "Reflexos e brilho de luz na água e na pedra molhada. 0% desliga o passe."), d.ssr, 100);
         SliderRow(TL("Motion blur", "Desfoque de movimento"), s.motion_blur, 0, 400, "%d%%",
-                  TL("Camera motion blur. 0% turns the pass off.", "Desfoque ao mover a câmera. 0% desliga o passe."));
-        SliderRow(TL("Chromatic aberration", "Aberração cromática"), s.chromatic, 0, 100, "%d%%",
-                  TL("Color fringes toward the screen edges. The game ships with this off: 0% is as shipped.", "Franjas de cor nas bordas da tela. O jogo vem com isto desligado: 0% é o original."));
+                  TL("Camera motion blur. 0% turns the pass off.", "Desfoque ao mover a câmera. 0% desliga o passe."), d.motion_blur, 100);
         SliderRow(TL("Vignette", "Vinheta"), s.vignette, 0, 100, "%d%%",
-                  TL("Darkened screen corners. The game ships with this off: 0% is as shipped.", "Cantos da tela escurecidos. O jogo vem com isto desligado: 0% é o original."));
-        SliderRow(TL("Game sharpening", "Nitidez do jogo"), s.game_sharpen, 0, 400, "%d%%",
-                  TL("The game's own sharpening filter. The difference is hard to see: 100% recommended.", "O filtro de nitidez do próprio jogo. A diferença é difícil de ver: 100% recomendado."));
-        SliderRow(TL("Character detail distance", "Distância de detalhe dos personagens"), s.lod, 25, 400, "%d%%",
-                  TL("How far the boy and Trico keep their detailed models. Higher keeps full detail further away.",
-                     "Até onde o menino e o Trico mantêm os modelos detalhados. Mais alto mantém o detalhe completo mais longe."));
+                  TL("Darkened screen corners. The game ships with this off: 0% is as shipped and recommended.", "Cantos da tela escurecidos. O jogo vem com isto desligado: 0% é o original e o recomendado."), d.vignette, 0);
+        SliderRow(TL("Game sharpening", "Nitidez do jogo"), s.game_sharpen, 0, 100, "%d%%",
+                  TL("The game's own sharpening filter. On by default: 100% is the original and the maximum (recommended).", "O filtro de nitidez do próprio jogo. Ligado por padrão: 100% é o original e o máximo (recomendado)."), d.game_sharpen, 100);
+        SliderRow(TL("Fog distance", "Distância da neblina"), s.fog_distance, 25, 400, "%d%%",
+                  TL("Where the fog starts and reaches full strength. Default 100% is as shipped; lower brings the fog closer.",
+                     "Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo traz a neblina mais perto."), d.fog_distance, 100);
+        ImGui::EndTable();
+    }
+    ImGui::SeparatorText(TL("Wind and foliage", "Vento e vegetação"));
+    if (BeginRows("##wind")) {
+        static const char* const grass_labels[] = {TL("Every 4th frame (game)", "A cada 4 quadros (jogo)"),
+                                                   TL("Every frame (default)", "Todo quadro (padrão)")};
+        static const int grass_values[] = {0, 1};
+        ChoiceRow(TL("Grass animation", "Animação da grama"), s.grass_smooth, grass_labels, grass_values, 2,
+                  TL("The game moves most grass only every 4th frame, which looks choppy at high frame rates. Every frame (default) moves it smoothly.",
+                     "O jogo move a maior parte da grama só a cada 4 quadros, o que fica truncado em taxas altas. Todo quadro (padrão) a move suavemente."), d.grass_smooth, 0);
+        SliderRow(TL("Boy wind (hair + clothing)", "Vento no menino (cabelo + roupa)"), s.boy_wind, 0, 200, "%d%%",
+                  TL("How strongly the wind moves the boy's hair and clothing. Default 100% is as shipped and can look like a storm; 50% is recommended, 30% is calm.",
+                     "Quanto o vento mexe o cabelo e a roupa do menino. Padrão 100% é o original e pode parecer uma tempestade; 50% é o recomendado, 30% é calmo."), d.boy_wind, 100);
+        SliderRow(TL("Tree wind", "Vento nas árvores"), s.tree_wind, 0, 200, "%d%%",
+                  TL("How strongly the wind moves trees, leaves and ivy. Default 100% is as shipped; 50% looks more natural (recommended), 0% keeps them still.",
+                     "Quanto o vento mexe árvores, folhas e hera. Padrão 100% é o original; 50% parece mais natural (recomendado), 0% as deixa paradas."), d.tree_wind, 100);
+        SliderRow(TL("Trico feather wind", "Vento nas penas do Trico"), s.trico_feathers, 0, 400, "%d%%",
+                  TL("How strongly the wind moves Trico's feathers. Default 100% is as shipped; 0% keeps them still.",
+                     "Quanto o vento mexe as penas do Trico. Padrão 100% é o original; 0% as deixa paradas."), d.trico_feathers, 100);
+        ImGui::EndTable();
+    }
+    ImGui::SeparatorText(TL("Textures", "Texturas"));
+    if (BeginRows("##textures")) {
+        Row(TL("Texture LOD bias (DLAA)", "LOD bias das texturas (DLAA)"));
+        int bias = s.lod_bias;
+        char bias_text[32];
+        std::snprintf(bias_text, sizeof(bias_text), "%+.2f", bias * 0.25f);
+        // PS4: the game's own bias (0).
+        const Marks bias_marks{Format("%+.2f", d.lod_bias * 0.25f), Format("%+.2f", 0.0f)};
+        ImGui::SetNextItemWidth(-ResetWidth(true));
+        if (ImGui::SliderInt("##value", &bias, -12, 4, bias_text, ImGuiSliderFlags_AlwaysClamp)) {
+            Store(s.lod_bias, std::clamp(bias, -12, 4), true);
+        }
+        Help(TL("Sharper (below 0) or softer (above 0) scene textures under DLAA; no effect without DLAA. -1.00 is NVIDIA's advice for native resolution. Lower brings out fine detail, mostly on grass (-3.00 has 31% more fine detail than +1.00), but can shimmer in motion.",
+                "Texturas da cena mais nítidas (abaixo de 0) ou mais suaves (acima de 0) com DLAA; sem efeito sem DLAA. -1,00 é o conselho da NVIDIA para resolução nativa. Mais baixo realça detalhes finos, sobretudo na grama (-3,00 tem 31% mais detalhe fino que +1,00), mas pode cintilar em movimento."), bias_marks);
+        ResetButtons(s.lod_bias, d.lod_bias.load(), std::optional<int>(0), bias_marks);
+        ImGui::PopID();
+        static const char* const aniso_labels[] = {TL("Game", "Jogo"), "2x", "4x", "8x", "16x"};
+        static const int aniso_values[] = {0, 2, 4, 8, 16};
+        ChoiceRow(TL("Anisotropic filtering", "Filtragem anisotrópica"), s.aniso, aniso_labels, aniso_values, 5,
+                  TL("Keeps ground and wall textures sharp at shallow angles. The game uses trilinear and 4x. In our tests (a stone path, a pillar hall) 16x looked the same as Game; it stays on because the cost is very small.",
+                     "Mantém nítidas as texturas do chão e das paredes em ângulos rasos. O jogo usa trilinear e 4x. Nos nossos testes (um caminho de pedra, um salão de pilares) 16x ficou igual ao Jogo; fica ligado porque o custo é muito pequeno."), d.aniso, 0);
+        static const auto pack_names = [] {
+            std::vector<std::string> names{TL("Off (default)", "Desligado (padrão)")};
+            for (const auto& name : TlgSettings::TexturePackNames()) names.push_back(name);
+            return names;
+        }();
+        static const auto pack_labels = [] {
+            std::vector<const char*> labels;
+            for (const auto& name : pack_names) labels.push_back(name.c_str());
+            return labels;
+        }();
+        static const auto pack_values = [] {
+            std::vector<int> values;
+            for (int i = 0; i < int(pack_names.size()); ++i) values.push_back(i);
+            return values;
+        }();
+        ChoiceRow(TL("Texture pack", "Pacote de texturas"), s.texture_pack, pack_labels.data(), pack_values.data(),
+                  int(pack_labels.size()),
+                  TL("AI-upscaled versions of the game's textures, made from your own copy of the game (ps4-texturepack-generator, docs/texture-pack.md); the game files are not changed. Switches live; textures appear as they load (a second or two).",
+                     "Versões ampliadas por IA das texturas do jogo, feitas da sua própria cópia do jogo (ps4-texturepack-generator, docs/texture-pack.md); os arquivos do jogo não são alterados. Troca ao vivo; as texturas aparecem conforme carregam (um ou dois segundos)."), d.texture_pack, 0);
         ImGui::EndTable();
     }
     ImGui::SeparatorText(TL("Color", "Cor"));
     if (BeginRows("##color")) {
         CheckRow(TL("Color adjustments", "Ajustes de cor"), s.color_adjust,
-                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). No measurable cost.",
-                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Sem custo mensurável."));
+                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). SDR only; HDR is left as is. Default on (gamma 0.75); off is the game as shipped. No measurable cost.",
+                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Só em SDR; o HDR fica como está. Padrão ligado (gama 0,75); desligado é o jogo original. Sem custo mensurável."), d.color_adjust, false);
         ImGui::BeginDisabled(!s.color_adjust);
-        FloatSliderRow(TL("Brightness", "Brilho"), s.brightness, G::Brightness, TL("Adds light or shadow evenly; 0 is unchanged.", "Clareia ou escurece por igual; 0 não altera."));
-        FloatSliderRow(TL("Contrast", "Contraste"), s.contrast, G::Contrast, TL("Spreads tones away from mid gray; 1 is unchanged.", "Afasta os tons do cinza médio; 1 não altera."));
-        FloatSliderRow(TL("Saturation", "Saturação"), s.saturation, G::Saturation, TL("Color intensity: 0 is black and white, 1 is unchanged.", "Intensidade das cores: 0 é preto e branco, 1 não altera."));
-        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam."));
+        FloatSliderRow(TL("Brightness", "Brilho"), s.brightness, G::Brightness, TL("Adds light or shadow evenly; 0 is unchanged.", "Clareia ou escurece por igual; 0 não altera."), d.brightness);
+        FloatSliderRow(TL("Contrast", "Contraste"), s.contrast, G::Contrast, TL("Spreads tones away from mid gray; 1 is unchanged.", "Afasta os tons do cinza médio; 1 não altera."), d.contrast);
+        FloatSliderRow(TL("Saturation", "Saturação"), s.saturation, G::Saturation, TL("Color intensity: 0 is black and white, 1 is unchanged.", "Intensidade das cores: 0 é preto e branco, 1 não altera."), d.saturation);
+        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 0.75: the game's SDR image is over-lit outdoors. 1 is the game's own.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 0,75: a imagem SDR do jogo é clara demais ao ar livre. 1 é a do jogo."), d.color_gamma);
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
@@ -479,42 +642,11 @@ void ImageTab() {
     }
 }
 
-// tlg: tuning tests, all live. The fixed rows are saved in tlg.ini; the rows from TLG_LAB
-// (tlg_lab.h) are not: they last until reset or the game closes.
+// tlg: tuning tests, all live: the rows from TLG_LAB (tlg_lab.h), not saved; they last until reset
+// or the game closes. Settings that prove worth keeping move to the Image tab.
 void LabTab() {
     auto& s = TlgSettings::Get();
-    ImGui::SeparatorText(TL("Textures and effects", "Texturas e efeitos"));
-    if (BeginRows("##lab_fixed")) {
-        Row(TL("Texture LOD bias (DLAA)", "LOD bias das texturas (DLAA)"));
-        int bias = s.lod_bias;
-        char bias_text[32];
-        std::snprintf(bias_text, sizeof(bias_text), "%+.2f", bias * 0.25f);
-        if (ImGui::SliderInt("##value", &bias, -12, 4, bias_text, ImGuiSliderFlags_AlwaysClamp)) {
-            Store(s.lod_bias, std::clamp(bias, -12, 4), true);
-        }
-        Help(TL("Sharper (below 0) or softer (above 0) textures on the scene under DLAA. -1.00 is NVIDIA's advice for native resolution; lower can shimmer on grass and stone. No effect without DLAA.",
-                "Texturas mais nítidas (abaixo de 0) ou mais suaves (acima de 0) na cena com DLAA. -1,00 é o conselho da NVIDIA para resolução nativa; mais baixo pode cintilar na grama e na pedra. Sem efeito sem DLAA."));
-        ImGui::PopID();
-        static const char* const aniso_labels[] = {TL("Game", "Jogo"), "2x", "4x", "8x", "16x"};
-        static const int aniso_values[] = {0, 2, 4, 8, 16};
-        ChoiceRow(TL("Anisotropic filtering", "Filtragem anisotrópica"), s.aniso, aniso_labels, aniso_values, 5,
-                  TL("Keeps ground and wall textures sharp at shallow angles. The game uses trilinear and 4x. Recommended: 16x, the cost is very small.",
-                     "Mantém nítidas as texturas do chão e das paredes em ângulos rasos. O jogo usa trilinear e 4x. Recomendado: 16x, o custo é muito pequeno."));
-        static const char* const half_labels[] = {TL("Game (half)", "Jogo (metade)"), TL("Full", "Completa")};
-        static const int half_values[] = {1, 2};
-        ChoiceRow(TL("Fog, particles and AO resolution", "Resolução de névoa, partículas e AO"), s.half_scale, half_labels, half_values, 2,
-                  TL("Draws the game's half-resolution targets (fog, particles, light shafts, AO) at full resolution: fewer blocky edges around the boy and Trico. Experimental: costs GPU time; if something breaks, set it back to Game.",
-                     "Desenha os alvos em meia resolução do jogo (névoa, partículas, raios de luz, AO) em resolução completa: menos bordas em blocos em volta do menino e do Trico. Experimental: custa tempo de GPU; se algo quebrar, volte para Jogo."));
-        static const char* const wind_labels[] = {TL("Game", "Jogo"), TL("0 (every frame)", "0 (todo quadro)"), "1", "2", "3"};
-        static const int wind_values[] = {-1, 0, 1, 2, 3};
-        const std::string wind_game = TlgLab::WindGame();
-        static std::string wind_help;
-        wind_help = std::string(TL("Frames skipped between wind updates of feathers, cloth and plants. 0 animates every frame: smoother at a CPU cost. The game's value now: ",
-                                   "Quadros pulados entre as atualizações do vento em penas, tecido e plantas. 0 anima todo quadro: mais suave, com custo de CPU. Valor do jogo agora: ")) +
-                    (wind_game.empty() ? "?" : wind_game);
-        ChoiceRow(TL("Wind animation frame skip", "Pulo de quadros da animação do vento"), s.wind_skip, wind_labels, wind_values, 5, wind_help.c_str());
-        ImGui::EndTable();
-    }
+    const auto& d = Defaults();
     const std::vector<TlgLab::Row> rows = TlgLab::Rows();
     ImGui::SeparatorText(TL("Game values (lab.txt, not saved)", "Valores do jogo (lab.txt, não salvos)"));
     if (rows.empty()) {
@@ -564,8 +696,6 @@ void LabTab() {
         TlgLab::ResetAll();
         s.lod_bias = -4;
         s.aniso = 16;
-        s.half_scale = 1;
-        s.wind_skip = -1;
         dirty = true;
     }
     Help(TL("Fixed rows back to their defaults, lab rows back to the game's values.", "Linhas fixas aos padrões, linhas do lab aos valores do jogo."));
@@ -578,6 +708,7 @@ void LabTab() {
 void PerformanceTab() {
     namespace G = TlgGraphics;
     auto& s = TlgSettings::Get();
+    const auto& d = Defaults();
     // tlg: GoW3's render-resolution and engine-frame-rate patches and the readback shortcuts are not
     // offered: they do not apply to TLG, and the readback ones crash it (it needs precise readbacks).
     ImGui::SeparatorText(TL("Live", "Em tempo real"));
@@ -594,12 +725,12 @@ void PerformanceTab() {
             : TL("Caps the presented frames. Unlocked mode (launcher): Unlimited follows the display refresh, up to 120.",
                  "Limita os quadros apresentados. Modo livre (launcher): Sem limite segue a taxa do monitor, até 120.");
         ChoiceRow(TL("Frame rate limit", "Limite de FPS"), s.fps_limit, fps_labels, G::FpsLimits.data(), int(G::FpsLimits.size()),
-                  fps_tip);
+                  fps_tip, d.fps_limit, 30);
         static const char* const queued_labels[] = {TL("1 (lowest latency)", "1 (menor atraso)"), "2", TL("Unlimited", "Sem limite")};
         ChoiceRow(TL("Frames queued", "Quadros na fila"), s.frames_queued, queued_labels, G::FramesQueued.data(),
-                  int(G::FramesQueued.size()), TL("More frames queued: steadier FPS, slower response to input.", "Mais quadros na fila: FPS mais estável, resposta mais lenta."));
+                  int(G::FramesQueued.size()), TL("More frames queued: steadier FPS, slower response to input.", "Mais quadros na fila: FPS mais estável, resposta mais lenta."), d.frames_queued);
         CheckRow(TL("Compile new shaders in the background", "Compilar shaders novos em segundo plano"), s.async_shaders,
-                 TL("Fewer stutters in new areas; an object or effect may appear a moment later.", "Menos engasgos em áreas novas; um objeto ou efeito pode aparecer um instante depois."));
+                 TL("Fewer stutters in new areas; an object or effect may appear a moment later.", "Menos engasgos em áreas novas; um objeto ou efeito pode aparecer um instante depois."), d.async_shaders);
         ImGui::EndTable();
     }
 }
@@ -607,8 +738,9 @@ void PerformanceTab() {
 void OverlayTab() {
     namespace P = TlgPerfStats;
     auto& s = TlgSettings::Get();
+    const auto& d = Defaults();
     if (BeginRows("##overlay_on")) {
-        CheckRow(TL("Show overlay (F10)", "Mostrar overlay (F10)"), s.show_fps, TL("The performance overlay in a corner of the screen.", "O overlay de desempenho num canto da tela."));
+        CheckRow(TL("Show overlay (F10)", "Mostrar overlay (F10)"), s.show_fps, TL("The performance overlay in a corner of the screen.", "O overlay de desempenho num canto da tela."), d.show_fps);
         ImGui::EndTable();
     }
     ImGui::BeginDisabled(!s.show_fps);
@@ -637,12 +769,12 @@ void OverlayTab() {
     }
     ImGui::SeparatorText(TL("Appearance", "Aparência"));
     if (BeginRows("##appearance")) {
-        SliderRow(TL("Font size", "Tamanho da fonte"), s.overlay_scale, 50, 300, "%d%%", TL("Size of the overlay text.", "Tamanho do texto do overlay."));
+        SliderRow(TL("Font size", "Tamanho da fonte"), s.overlay_scale, 50, 300, "%d%%", TL("Size of the overlay text.", "Tamanho do texto do overlay."), d.overlay_scale);
         static const char* const corners[] = {TL("Top left", "Superior esquerdo"), TL("Top right", "Superior direito"), TL("Bottom left", "Inferior esquerdo"), TL("Bottom right", "Inferior direito")};
-        ChoiceRow(TL("Corner", "Canto"), s.overlay_corner, corners, nullptr, 4, TL("Where the overlay sits.", "Onde o overlay fica."));
-        SliderRow(TL("Background opacity", "Opacidade do fundo"), s.overlay_opacity, 0, 100, "%d%%", TL("0% is no background.", "0% é sem fundo."));
+        ChoiceRow(TL("Corner", "Canto"), s.overlay_corner, corners, nullptr, 4, TL("Where the overlay sits.", "Onde o overlay fica."), d.overlay_corner);
+        SliderRow(TL("Background opacity", "Opacidade do fundo"), s.overlay_opacity, 0, 100, "%d%%", TL("0% is no background.", "0% é sem fundo."), d.overlay_opacity);
         static const char* const layouts[] = {TL("One line", "Uma linha"), TL("One item per line", "Um item por linha")};
-        ChoiceRow(TL("Layout", "Disposição"), s.overlay_layout, layouts, nullptr, 2, TL("Items side by side or stacked.", "Itens lado a lado ou empilhados."));
+        ChoiceRow(TL("Layout", "Disposição"), s.overlay_layout, layouts, nullptr, 2, TL("Items side by side or stacked.", "Itens lado a lado ou empilhados."), d.overlay_layout);
         ImGui::EndTable();
     }
     ImGui::EndDisabled();
@@ -669,24 +801,25 @@ void OverlayTab() {
 // default one unless the launcher's Controls (tlg.ini key_map) or TLG_KEY_MAP changed it.
 void ControlsTab() {
     auto& s = TlgSettings::Get();
+    const auto& d = Defaults();
     ImGui::SeparatorText(TL("Mouse", "Mouse"));
     if (BeginRows("##mouse")) {
         CheckRow(TL("Mouse turns the camera", "Mouse gira a câmera"), s.mouse_enabled,
                  TL("The game window takes the mouse while it has focus. Esc releases it; a click in the window takes it back.",
-                    "A janela do jogo prende o mouse enquanto tem o foco. Esc solta; um clique na janela prende de novo."));
+                    "A janela do jogo prende o mouse enquanto tem o foco. Esc solta; um clique na janela prende de novo."), d.mouse_enabled);
         ImGui::BeginDisabled(!s.mouse_enabled);
         FloatRow(TL("Sensitivity", "Sensibilidade"), s.mouse_sensitivity, 0.1f, 5.0f, "%.2f",
-                 TL("How far the camera turns for the same mouse movement.", "Quanto a câmera gira para o mesmo movimento do mouse."));
+                 TL("How far the camera turns for the same mouse movement.", "Quanto a câmera gira para o mesmo movimento do mouse."), d.mouse_sensitivity);
         CheckRow(TL("Invert Y axis", "Inverter eixo Y"), s.mouse_invert_y,
-                 TL("Moving the mouse forward looks down.", "Empurrar o mouse para frente olha para baixo."));
+                 TL("Moving the mouse forward looks down.", "Empurrar o mouse para frente olha para baixo."), d.mouse_invert_y);
         FloatRow(TL("Smoothing", "Suavização"), s.mouse_smoothing, 0.0f, 0.9f, "%.2f",
                  TL("Evens out the camera motion; higher values feel softer and a little slower.",
-                    "Deixa o movimento da câmera mais uniforme; valores altos ficam mais suaves e um pouco mais lentos."));
+                    "Deixa o movimento da câmera mais uniforme; valores altos ficam mais suaves e um pouco mais lentos."), d.mouse_smoothing);
         FloatRow(TL("Acceleration", "Aceleração"), s.mouse_accel, 0.0f, 2.0f, "%.2f",
-                 TL("Fast movements turn more than slow ones. 0 is linear.", "Movimentos rápidos giram mais que os lentos. 0 é linear."));
+                 TL("Fast movements turn more than slow ones. 0 is linear.", "Movimentos rápidos giram mais que os lentos. 0 é linear."), d.mouse_accel);
         FloatRow(TL("Anti-dead zone", "Anti-zona morta"), s.mouse_deadzone, 0.0f, 0.5f, "%.2f",
                  TL("Small mouse movements skip the game's stick dead zone. Raise it if slow movements do nothing.",
-                    "Movimentos pequenos do mouse pulam a zona morta do analógico do jogo. Aumente se movimentos lentos não fizerem nada."));
+                    "Movimentos pequenos do mouse pulam a zona morta do analógico do jogo. Aumente se movimentos lentos não fizerem nada."), d.mouse_deadzone);
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
@@ -820,55 +953,6 @@ void Menu() {
     }
 }
 
-// Enemy health bar from the damage hook's records (tlg_actors.cpp).
-// Only the copied values are read, never the game's memory: an actor may be gone by now.
-void HealthDisplay() {
-    struct Seen {
-        uint32_t seq = 0;
-        std::chrono::steady_clock::time_point at{};
-    };
-    static Seen seen[2];
-    const auto& s = TlgSettings::Get();
-    if (!s.actor_watch_supported.load()) {
-        return;
-    }
-    const auto now = std::chrono::steady_clock::now();
-    TlgActorSlot slot[2];
-    for (int i = 0; i < 2; ++i) {
-        std::memcpy(&slot[i], const_cast<const TlgActorSlot*>(&tlg_actor_slots[i]), sizeof(slot[i]));
-        if (slot[i].seq != seen[i].seq) {
-            seen[i] = {slot[i].seq, now};
-        }
-    }
-    const auto recent = [&](int i, int seconds) {
-        return seen[i].seq != 0 && now - seen[i].at < std::chrono::seconds(seconds);
-    };
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImDrawList* draw = ImGui::GetForegroundDrawList();
-    const float scale = base_scale;
-    if (s.enemy_health_bar && recent(1, 4) && TlgActors::Valid(slot[1].health, slot[1].max_health)) {
-        // Minimal: a thin green bar centered on the screen's top edge; it shrinks toward the center
-        // so it stays symmetric, with the health in numbers below.
-        const ImVec2 display = ImGui::GetIO().DisplaySize;
-        const float width = 260.0f * scale, height = 5.0f * scale, center = display.x * 0.5f;
-        const float top = 36.0f * scale;
-        const float fraction = TlgActors::Fraction(slot[1].health, slot[1].max_health);
-        draw->AddRectFilled(ImVec2(center - width * 0.5f - scale, top - scale),
-                            ImVec2(center + width * 0.5f + scale, top + height + scale),
-                            IM_COL32(0, 0, 0, 140), 2 * scale);
-        const float half = width * 0.5f * fraction;
-        draw->AddRectFilled(ImVec2(center - half, top), ImVec2(center + half, top + height),
-                            IM_COL32(70, 190, 80, 220), 2 * scale);
-        char text[48];
-        std::snprintf(text, sizeof(text), "%.0f / %.0f", std::ceil(slot[1].health), slot[1].max_health);
-        const float font = ImGui::GetFontSize() * 0.9f;
-        const ImVec2 size = ImGui::GetFont()->CalcTextSizeA(font, FLT_MAX, 0.0f, text);
-        const ImVec2 at{center - size.x * 0.5f, top + height + 4.0f * scale};
-        draw->AddText(ImGui::GetFont(), font, ImVec2(at.x + scale, at.y + scale), IM_COL32(0, 0, 0, 160), text);
-        draw->AddText(ImGui::GetFont(), font, at, IM_COL32(225, 235, 220, 220), text);
-    }
-}
-
 // The game's text dialog: what is typed, and how to finish (keyboard or controller).
 void TextEntryBox() {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -956,13 +1040,11 @@ struct SavePainter {
             dl->AddCircle(c, 5.0f * k, SaveColor(0xff8a8a), 0, 2.0f * k);
         }
     }
-    // The panel itself: shadow, fill, border; then the discreet credit under its right corner.
+    // The panel itself: shadow, fill, border.
     void Panel(float w, float h) const {
         dl->AddRectFilled(P(0, 18), P(w, h + 18), SaveColor(0x000000, 0.35f), 18.0f * k);
         Box(0, 0, w, h, kSavePanel, 18.0f, 0.97f);
         Frame(0, 0, w, h, kSaveBorder, 18.0f, 1.0f);
-        const std::string credit = "@hayatog-dev";
-        Text(w - 6.0f - Width(11.0f, credit), h + 10.0f, 11.0f, 0x4a5568, credit);
     }
     // A save's picture (16:9) or a placeholder; `is_new` draws the dashed "+" slot.
     void Picture(float x, float y, float w, float h, ImTextureData* tex, bool is_new) const {
@@ -1848,8 +1930,7 @@ bool Visible() {
     return initialized && (loading || background_total || menu_open || text_entry_active || choice_active ||
                            message_active || progress_on || now < progress_until || now < toast_until || AaLabelOn() ||
                            NoticeActive() ||
-                           choice_retiring || s.show_fps ||
-                           (s.actor_watch_supported && s.enemy_health_bar));
+                           choice_retiring || s.show_fps);
 }
 
 bool CapturesInput() {
@@ -1995,9 +2076,6 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
     if (TlgSettings::Get().show_fps && !menu_open) {
         FpsCounter();
-    }
-    if (!loading && !menu_open) {
-        HealthDisplay();
     }
     if (background_total && !loading && !menu_open) {
         BackgroundLoading();

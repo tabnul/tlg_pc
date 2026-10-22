@@ -1,67 +1,67 @@
-# Windows: deadlock entre recuperação especulativa e readback da GPU
+# Windows: deadlock between speculative recovery and GPU readback
 
-## Evidência
+## Evidence
 
-O log local `run-20261017-202612.log` parou após 2.427 frames. O relatório
-`FREEZE` mostrou `tlg:DrawPrep1` e `workerThread1` dentro do handler de page fault,
-aguardando `GPU thread (command)`. O thread principal e os demais workers ficaram
-aguardando a renderização. O contador de frames permaneceu parado enquanto os
-vblanks continuavam avançando.
+The local log `run-20261017-202612.log` stopped after 2,427 frames. The `FREEZE`
+report showed `tlg:DrawPrep1` and `workerThread1` inside the page fault handler,
+waiting for `GPU thread (command)`. The main thread and the other workers were
+waiting for rendering. The frame counter stayed still while the vblanks kept
+advancing.
 
-## Causa
+## Cause
 
-`PipelineCache::GetProgram` mantém `programs_mutex` compartilhado enquanto um
-worker especulativo executa `RefreshFlatBuf`/`StageSpecialization`. Esses acessos
-à memória guest têm um ponto de recuperação (`runtime_fault_recover`), pois os
-dados podem estar protegidos pela GPU ou ter sido reutilizados.
+`PipelineCache::GetProgram` holds `programs_mutex` shared while a speculative
+worker runs `RefreshFlatBuf`/`StageSpecialization`. These guest memory accesses
+have a recovery point (`runtime_fault_recover`), because the data may be
+GPU-protected or may have been reused.
 
-No Windows, `vectored_fault` chamava `tlggpu_handle_fault` antes de consultar
-esse ponto. O readback podia enfileirar um comando e aguardar a thread da GPU;
-essa thread, ao precisar publicar/atualizar shaders, precisava adquirir
-`programs_mutex` exclusivamente, ainda retido pelo worker. A espera era circular.
-O handler POSIX já recuperava a leitura especulativa antes do readback.
+On Windows, `vectored_fault` called `tlggpu_handle_fault` before checking that
+point. The readback could queue a command and wait for the GPU thread; that
+thread, when it had to publish or update shaders, needed `programs_mutex`
+exclusively, still held by the worker. The wait was circular. The POSIX handler
+already recovered the speculative read before the readback.
 
-## Correção
+## Fix
 
-O handler Windows agora recupera o acesso especulativo primeiro, usando o
-trampolim `tlg_longjmp` existente. O worker abandona o preparo daquele draw e
-libera o lock. Apenas acessos sem ponto de recuperação entram no rastreamento e
-readback da GPU. Os readbacks precisos e os workers permanecem habilitados.
+The Windows handler now recovers the speculative access first, through the
+existing `tlg_longjmp` trampoline. The worker abandons preparing that draw and
+releases the lock. Only accesses without a recovery point go to the GPU's
+tracking and readback. Precise readbacks and the workers stay enabled.
 
-## Regressão
+## Regression test
 
-`test_windows_fault_recovery.py` extrai o handler de produção e o compila com
-`compat_win.c`. Usa páginas Windows realmente protegidas e verifica:
+`test_windows_fault_recovery.py` extracts the production handler and compiles it
+with `compat_win.c`. It uses really protected Windows pages and checks:
 
-- 100 falhas especulativas recuperadas sem chamar o callback da GPU;
-- limpeza do ponto de recuperação em TLS;
-- falhas normais de leitura e escrita ainda encaminhadas ao rastreamento da GPU.
+- 100 speculative faults recovered without calling the GPU callback;
+- the recovery point in TLS is cleared;
+- normal read and write faults still go to the GPU tracking.
 
-O mesmo teste **falha com o handler anterior**, código 99, e **passa com a
-correção**. O callback simulado falha imediatamente no caminho proibido para não
-deixar o teste preso no deadlock. A etapa foi incluída no CI Windows.
+The same test **fails with the old handler** (code 99) and **passes with the
+fix**. The simulated callback fails at once on the forbidden path, so the test
+does not hang in the deadlock. The step is part of the Windows CI.
 
 ```powershell
 python -m unittest discover -s port/tests -p test_windows_fault_recovery.py -v
 ```
 
-É necessário um compilador MSYS2 CLANG64 no PATH ou em `TLG_TEST_CLANG`.
-Os 12 testes da interface também passaram. O motor completo foi recompilado com
-Clang/MSYS2 e suas DLLs foram empacotadas a partir da árvore de imports.
-A instalação original e os saves do usuário foram preservados.
+It needs an MSYS2 CLANG64 compiler on the PATH or in `TLG_TEST_CLANG`.
+The 12 interface tests passed too. The full engine was rebuilt with
+Clang/MSYS2 and its DLLs were packaged from the import tree.
+The original install and the user's saves were left untouched.
 
-## Validação em execução
+## Validation in a run
 
-Na sessão local `run-20261017-203640.log`, a build recompilada ultrapassou três
-minutos na tela inicial/menu, com estatísticas recentes de 30 FPS e sem relatório
-`FREEZE`. O menu respondeu à entrada e abriu a opção New Game. O teste preservou
-os 8 workers DrawPrep e o readback preciso; não desativou a otimização nem ocultou
-o detector de congelamento. Isso valida a inicialização e a continuidade da
-renderização; a campanha completa não foi testada.
+In the local session `run-20261017-203640.log`, the rebuilt build ran more than
+three minutes on the title screen and menu, with recent statistics at 30 FPS and
+no `FREEZE` report. The menu responded to input and opened New Game. The test
+kept the 8 DrawPrep workers and the precise readback; it did not turn off the
+optimization or hide the freeze detector. This validates start-up and continued
+rendering; the full campaign was not tested.
 
-Em 18 de outubro de 2026, o usuário executou novamente o launcher com a build
-corrigida e confirmou que o jogo funciona. Essa confirmação complementa o teste
-local de inicialização/menu; não representa validação da campanha completa.
+On 18 October 2026 the user ran the launcher again with the fixed build and
+confirmed the game works. This confirmation adds to the local start-up/menu
+test; it is not a validation of the full campaign.
 
-Artefatos locais: `port/dist/tlg-ui-test-windows-fixed.zip` e a cópia de teste
-existente atualizada em `port/dist/tlg-ui-test-windows/`.
+Local artifacts: `port/dist/tlg-ui-test-windows-fixed.zip` and the existing test
+copy, updated, in `port/dist/tlg-ui-test-windows/`.

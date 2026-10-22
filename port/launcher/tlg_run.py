@@ -149,7 +149,8 @@ DEFAULT_SETTINGS = {
     'game_dir': '' if FROZEN else str(REPO_DIR / 'game' / 'CUSA03627'),
     'system_lib_dir': str(PORT_DIR / 'system_lib') if FROZEN else str(REPO_DIR / 'dump' / 'system_lib'),
     'game_language': 'pt_BR',
-    'ui_language': 'auto',         # auto | pt_BR | en_US
+    'texpack_dir': '',             # texture packs folder; empty = texpack_dir()'s default
+    'ui_language': 'en_US',        # auto (system language) | pt_BR | en_US
     'show_fps': False,
     'skip_logos': False,           # scripts/tlg_patches.py --skip-logos; TLG_SKIP_LOGOS=1 too
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
@@ -603,6 +604,24 @@ def window_icon():
         return None
 
 
+def texpack_dir(settings):
+    """The texture packs folder: the one picked in the launcher, else the tools' output folder
+    in a dev run (texpack.py make), else texpack/ in the user folder (the game's own default)."""
+    if settings.get('texpack_dir'):
+        return Path(settings['texpack_dir'])
+    if not FROZEN and (OUT_DIR / 'texpack').is_dir():
+        return OUT_DIR / 'texpack'
+    return user_dir() / 'texpack'
+
+
+def texture_packs(folder):
+    """Pack names in `folder`: subfolders with an index.txt, sorted as the game lists them."""
+    folder = Path(folder)
+    if not folder.is_dir():
+        return []
+    return sorted(entry.name for entry in folder.iterdir() if (entry / 'index.txt').is_file())
+
+
 def build_env(settings, extra=None):
     env = dict(os.environ)
     for key, value in DEFAULT_ENV.items():
@@ -613,11 +632,18 @@ def build_env(settings, extra=None):
         'TLG_STICK_DEADZONE', f"{int(settings.get('stick_deadzone', 10)) / 100:.2f}")
     env['TLG_LANGUAGE'] = os.environ.get('TLG_LANGUAGE', str(
         game_languages(settings.get('game_dir')).get(resolve_game_language(settings), 1)))
-    if settings.get('ui_language', 'auto') != 'auto':
+    if settings.get('ui_language', 'en_US') != 'auto':
         env['TLG_UI_LANG'] = settings['ui_language']
     # Without the console module the port's own mixer (runtime_ngs2.c) plays the audio.
     env['TLG_NGS2'] = 'native' if ngs2_module(settings) else 'hle'
     env['TLG_CONFIG'] = str(user_dir() / 'tlg.ini')
+    if 'TLG_TEXPACK_DIR' not in env:
+        env['TLG_TEXPACK_DIR'] = str(texpack_dir(settings))
+    # A dev run on Windows loads the game's DLLs (SDL3, FFmpeg, libc++) from the MSYS2 toolchain;
+    # without it on PATH the game exits before its first log line.
+    toolchain = Path(os.environ.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'
+    if os.name == 'nt' and not FROZEN and toolchain.is_dir():
+        env['PATH'] = str(toolchain) + os.pathsep + env.get('PATH', '')
     # Window name and app id (matches tlg-pc.desktop for Alt+Tab and the dock) and icon.
     env.setdefault('TLG_APP_NAME', 'The Last Guardian')
     env.setdefault('TLG_APP_ID', 'tlg-pc')
@@ -711,46 +737,6 @@ def detach_options():
     if os.name == 'nt':
         return {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS}
     return {'start_new_session': True}
-
-
-def wait_for_exit(pid):
-    """Blocks until process pid ends (no window, no Qt: a closed launcher's watcher)."""
-    if os.name == 'nt':
-        import ctypes
-        kernel = ctypes.windll.kernel32
-        handle = kernel.OpenProcess(0x00100000, False, int(pid))   # SYNCHRONIZE
-        if handle:
-            kernel.WaitForSingleObject(handle, 0xFFFFFFFF)
-            kernel.CloseHandle(handle)
-        return
-    while True:
-        try:
-            os.kill(int(pid), 0)
-        except ProcessLookupError:
-            return
-        except PermissionError:
-            pass
-        try:   # a zombie (exited, not yet reaped) counts as ended
-            if Path(f'/proc/{int(pid)}/stat').read_text().split(') ', 1)[1][:1] == 'Z':
-                return
-        except (OSError, IndexError):
-            pass
-        time.sleep(1.0)
-
-
-def reopen_after(pid):
-    """Starts a detached watcher that opens the Qt launcher again once the game (pid) exits."""
-    if FROZEN:
-        cmd = [sys.executable, '--reopen-after', str(pid)]
-    else:
-        cmd = [sys.executable, str(Path(__file__).resolve().parent / 'tlg_launcher_qt.py'),
-               '--reopen-after', str(pid)]
-    try:
-        subprocess.Popen(cmd, env=desktop_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, **detach_options())
-        return True
-    except OSError:
-        return False
 
 
 def raise_open_file_limit():

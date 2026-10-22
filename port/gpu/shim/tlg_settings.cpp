@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "tlg_settings.h"
-#include "tlg_orbs.h"
 #include "tlg_graphics.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,9 +27,11 @@ const char* Path() {
 using Effect = std::atomic<int> Values::*;
 constexpr std::pair<const char*, Effect> EffectKeys[] = {
     {"bloom", &Values::bloom}, {"dof", &Values::dof}, {"motion_blur", &Values::motion_blur},
-    {"chromatic_add", &Values::chromatic}, {"vignette_add", &Values::vignette}, {"ssao", &Values::ssao},
+    {"vignette_add", &Values::vignette}, {"ssao", &Values::ssao},
     {"ssr", &Values::ssr},
-    {"game_sharpen", &Values::game_sharpen}, {"shadow_distance", &Values::shadow_distance}, {"lod", &Values::lod}};
+    {"game_sharpen", &Values::game_sharpen}, {"shadow_distance", &Values::shadow_distance},
+    {"trico_feathers", &Values::trico_feathers}, {"boy_wind", &Values::boy_wind}, {"tree_wind", &Values::tree_wind},
+    {"fog_distance", &Values::fog_distance}, {"grass_smooth", &Values::grass_smooth}};
 
 std::atomic<int>* EffectSetting(Values& v, const std::string& key) {
     for (const auto& [name, member] : EffectKeys)
@@ -68,14 +74,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     if (key == "menu_tab") {
         v.menu_tab = i >= 0 && i <= 4 ? i : 0;
         return;
-    }
-    const char* cheat_keys[] = {"cheat_health", "cheat_magic", "cheat_item", "cheat_rage", "cheat_orbs",
-                                "cheat_very_hard", "cheat_double_jumps"};
-    for (unsigned cheat = 0; cheat < TLG_CHEAT_COUNT; ++cheat) {
-        if (key == cheat_keys[cheat]) {
-            v.cheats[cheat] = i != 0;
-            return;
-        }
     }
     if (key == "key_map") {
         v.key_map = value;
@@ -133,14 +131,17 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.shadow_scale = i >= 4 ? 4 : i >= 2 ? 2 : 1;
     } else if (std::atomic<int>* effect = EffectSetting(v, key)) {
         *effect = std::clamp(i, 0, 400);
+    } else if (key == "fov") {
+        v.fov = std::clamp(i, 50, 110);
     } else if (key == "lod_bias") {
         v.lod_bias = std::clamp(i, -12, 4);
+    } else if (key == "texture_pack") {
+        // A pack folder name (presets) or an index (older tlg.ini files).
+        const auto& names = TexturePackNames();
+        const auto found = std::find(names.begin(), names.end(), value);
+        v.texture_pack = found != names.end() ? int(found - names.begin()) + 1 : std::clamp(i, 0, int(names.size()));
     } else if (key == "aniso") {
         v.aniso = i >= 16 ? 16 : i >= 8 ? 8 : i >= 4 ? 4 : i >= 2 ? 2 : 0;
-    } else if (key == "half_scale") {
-        v.half_scale = i >= 2 ? 2 : 1;
-    } else if (key == "wind_skip") {
-        v.wind_skip = std::clamp(i, -1, 4);
     } else if (key == "smaa") {
         v.smaa = i != 0;
     } else if (key == "cas") {
@@ -156,7 +157,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "color_saturation") {
         v.saturation = TlgGraphics::ClampColor(TlgGraphics::Saturation, value.empty() ? 1.0f : f);
     } else if (key == "color_gamma") {
-        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 1.0f : f);
+        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 0.75f : f);
     } else if (key == "frames_queued") {
         v.frames_queued = TlgGraphics::ParseFramesQueued(value.empty() ? -1 : i);
     } else if (key == "render_resolution") {
@@ -171,20 +172,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.stale_readback = i != 0;
     } else if (key == "restart_unconfirmed") {
         v.restart_unconfirmed = i != 0;
-    } else if (key == "enemy_health_bar") {
-        v.enemy_health_bar = i != 0;
-    } else if (key == "red_orb_multiplier") {
-        v.red_orb_multiplier = TlgOrbs::ClampMultiplier(f);
-    } else if (key == "damage_dealt") {
-        v.damage_dealt = TlgOrbs::ClampMultiplier(f);
-    } else if (key == "damage_taken") {
-        v.damage_taken = TlgOrbs::ClampMultiplier(f);
-    } else if (key == "green_orb_multiplier") {
-        v.green_orb_multiplier = TlgOrbs::ClampMultiplier(f);
-    } else if (key == "blue_orb_multiplier") {
-        v.blue_orb_multiplier = TlgOrbs::ClampMultiplier(f);
-    } else if (key == "gold_orb_multiplier") {
-        v.gold_orb_multiplier = TlgOrbs::ClampMultiplier(f);
     } else if (key == "fsr4_auto_exposure") {
         v.fsr4_auto_exposure = i != 0;
     } else if (key == "fsr4_invert_jitter") {
@@ -217,6 +204,34 @@ void Set(Values& v, const std::string& key, const std::string& value) {
 Values& Get() {
     static Values values;
     return values;
+}
+
+namespace {
+const char* PackRoot() {
+    const char* env = std::getenv("TLG_TEXPACK_DIR");
+    return env && env[0] ? env : "texpack";
+}
+} // namespace
+
+const std::vector<std::string>& TexturePackNames() {
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> list;
+        std::error_code error;
+        for (const auto& entry : std::filesystem::directory_iterator(PackRoot(), error)) {
+            if (entry.is_directory() && std::filesystem::exists(entry.path() / "index.txt")) {
+                list.push_back(entry.path().filename().string());
+            }
+        }
+        std::sort(list.begin(), list.end());
+        return list;
+    }();
+    return names;
+}
+
+std::string TexturePackDir(int index) {
+    const auto& names = TexturePackNames();
+    return index >= 1 && index <= int(names.size()) ? std::string(PackRoot()) + "/" + names[index - 1]
+                                                    : std::string();
 }
 
 namespace {
@@ -373,18 +388,6 @@ void Save() {
                  v.debug_view.load(), int(v.show_fps.load()),
                  int(v.fsr4_auto_exposure.load()), int(v.fsr4_invert_jitter.load()));
     std::fprintf(file, "output_res=%dx%d\n", OutputWidths[v.output_res], OutputHeights[v.output_res]);
-    std::fprintf(file, "red_orb_multiplier=%.3f\n", v.red_orb_multiplier.load());
-    std::fprintf(file, "damage_dealt=%.3f\n", v.damage_dealt.load());
-    std::fprintf(file, "damage_taken=%.3f\n", v.damage_taken.load());
-    std::fprintf(file, "green_orb_multiplier=%.3f\n", v.green_orb_multiplier.load());
-    std::fprintf(file, "blue_orb_multiplier=%.3f\n", v.blue_orb_multiplier.load());
-    std::fprintf(file, "gold_orb_multiplier=%.3f\n", v.gold_orb_multiplier.load());
-    std::fprintf(file, "cheat_health=%d\ncheat_magic=%d\ncheat_item=%d\ncheat_rage=%d\ncheat_orbs=%d\n"
-                       "cheat_very_hard=%d\ncheat_double_jumps=%d\n",
-                 int(v.cheats[0].load()), int(v.cheats[1].load()), int(v.cheats[2].load()),
-                 int(v.cheats[3].load()), int(v.cheats[4].load()),
-                 int(v.cheats[5].load()), int(v.cheats[6].load()));
-    std::fprintf(file, "enemy_health_bar=%d\n", int(v.enemy_health_bar.load()));
     std::fprintf(file,
                  "overlay_fps=%d\noverlay_frametime=%d\noverlay_upscaler=%d\noverlay_gpu=%d\n"
                  "overlay_cpu=%d\noverlay_ram=%d\noverlay_vram=%d\noverlay_scale=%d\noverlay_corner=%d\n"
@@ -419,12 +422,147 @@ void Save() {
                  int(v.bridge_fix.load()));
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
-    std::fprintf(file, "lod_bias=%d\naniso=%d\nhalf_scale=%d\nwind_skip=%d\n", v.lod_bias.load(),
-                 v.aniso.load(), v.half_scale.load(), v.wind_skip.load());
+    std::fprintf(file, "fov=%d\n", v.fov.load());
+    const int pack = v.texture_pack;
+    std::fprintf(file, "lod_bias=%d\naniso=%d\ntexture_pack=%s\n", v.lod_bias.load(), v.aniso.load(),
+                 pack > 0 ? TexturePackNames()[pack - 1].c_str() : "off");
     // Read by run.sh at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
     std::fclose(file);
+}
+
+namespace {
+// The game as shipped: none of the port's filters, the game's own shadows, filtering and textures.
+constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nrcas=0\ncas=0\nshadow_scale=1\nfov=70\n"
+                                   "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\n";
+
+void ApplyLines(Values& v, const std::string& lines) {
+    std::istringstream stream{lines};
+    std::string text;
+    while (std::getline(stream, text)) {
+        text.erase(text.find_last_not_of(" \t\r") + 1);
+        const auto eq = text.find('=');
+        if (!text.empty() && text[0] != '#' && eq != std::string::npos) {
+            Set(v, text.substr(0, eq), text.substr(eq + 1));
+        }
+    }
+}
+
+std::string GraphicsText(const Values& v) {
+    std::string text;
+    char line[96];
+    const auto add = [&](const char* key, int value) {
+        std::snprintf(line, sizeof(line), "%s=%d\n", key, value);
+        text += line;
+    };
+    const auto add_float = [&](const char* key, float value) {
+        std::snprintf(line, sizeof(line), "%s=%.2f\n", key, value);
+        text += line;
+    };
+    add("dlaa", v.dlaa);
+    add("smaa", v.smaa);
+    add("fsr1", v.fsr1);
+    add("rcas", v.rcas);
+    add("rcas_strength", v.rcas_strength);
+    add("cas", v.cas);
+    add("cas_strength", v.cas_strength);
+    add("shadow_scale", v.shadow_scale);
+    add("fov", v.fov);
+    for (const auto& [name, member] : EffectKeys)
+        add(name, (v.*member).load());
+    add("color_adjust", v.color_adjust);
+    add_float("color_brightness", v.brightness);
+    add_float("color_contrast", v.contrast);
+    add_float("color_saturation", v.saturation);
+    add_float("color_gamma", v.color_gamma);
+    add("lod_bias", v.lod_bias);
+    add("aniso", v.aniso);
+    const int pack = v.texture_pack;
+    text += "texture_pack=" + (pack > 0 ? TexturePackNames()[pack - 1] : std::string("off")) + "\n";
+    return text;
+}
+
+// The preset's lines on top of the defaults, in GraphicsText form (for matching).
+std::string Normalized(const std::string& lines) {
+    const auto v = std::make_unique<Values>();
+    ApplyLines(*v, lines);
+    return GraphicsText(*v);
+}
+
+std::filesystem::path PresetDir() {
+    return std::filesystem::path(Path()).parent_path() / "presets";
+}
+
+struct GraphicsPreset {
+    std::string name, text;
+};
+
+std::vector<GraphicsPreset> ReadPresets() {
+    std::vector<GraphicsPreset> list{{"Stock", Normalized(StockLines)}, {"Recommended", Normalized("")}};
+    std::vector<std::filesystem::path> files;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator(PresetDir(), error)) {
+        if (entry.path().extension() == ".ini") files.push_back(entry.path());
+    }
+    std::sort(files.begin(), files.end());
+    for (const auto& file : files) {
+        std::ifstream in{file};
+        std::stringstream lines;
+        lines << in.rdbuf();
+        list.push_back({file.stem().string(), Normalized(lines.str())});
+    }
+    return list;
+}
+
+std::vector<GraphicsPreset>& Presets() {
+    static std::vector<GraphicsPreset> list = ReadPresets();
+    return list;
+}
+} // namespace
+
+std::vector<std::string> GraphicsPresetNames() {
+    std::vector<std::string> names;
+    for (const auto& preset : Presets()) names.push_back(preset.name);
+    return names;
+}
+
+void ApplyGraphicsPreset(int index) {
+    if (index >= 0 && index < int(Presets().size())) ApplyLines(Get(), Presets()[index].text);
+}
+
+int MatchingGraphicsPreset() {
+    const std::string now = GraphicsText(Get());
+    for (int i = 0; i < int(Presets().size()); ++i) {
+        if (Presets()[i].text == now) return i;
+    }
+    return -1;
+}
+
+int SaveGraphicsPreset(const std::string& name) {
+    std::string clean;
+    for (const char c : name) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == ' ' || c == '-' || c == '_') clean += c;
+    }
+    clean.erase(0, clean.find_first_not_of(' '));
+    clean.erase(clean.find_last_not_of(' ') + 1);
+    if (clean.empty() || clean == "Stock" || clean == "Recommended") return -1;
+    std::error_code error;
+    std::filesystem::create_directories(PresetDir(), error);
+    std::ofstream out{PresetDir() / (clean + ".ini")};
+    if (!out) return -1;
+    out << "# tlg graphics preset (in-game menu: Image tab; launcher)\n" << GraphicsText(Get());
+    out.close();
+    Presets() = ReadPresets();
+    const auto names = GraphicsPresetNames();
+    return int(std::find(names.begin(), names.end(), clean) - names.begin());
+}
+
+void DeleteGraphicsPreset(int index) {
+    if (index < 2 || index >= int(Presets().size())) return;
+    std::error_code error;
+    std::filesystem::remove(PresetDir() / (Presets()[index].name + ".ini"), error);
+    Presets() = ReadPresets();
 }
 
 float PresetScale(int preset) {

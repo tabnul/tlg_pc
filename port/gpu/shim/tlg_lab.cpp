@@ -68,7 +68,7 @@ local function One(t)
       end
       if on or e.d then
         local n=w
-        if kind=='string' or #w>4 then local p={} for c=1,#w do p[c]=string.format('%g',w[c]) end n=table.concat(p,' ')
+        if kind=='string' or (kind=='userdata' and #w>4) then local p={} for c=1,#w do p[c]=string.format('%g',w[c]) end n=table.concat(p,' ')
         elseif kind=='userdata' then n=Vector(w[1],w[2],w[3],w[4]) end
         if tostring(n)~=s then o[prop]=n end
         e.w=tostring(o[prop])

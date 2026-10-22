@@ -22,6 +22,7 @@ class Runtime;
 
 VK_DEFINE_HANDLE(VmaAllocation)
 VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaPool)
 
 namespace VideoCore {
 
@@ -62,7 +63,7 @@ struct UniqueImage {
         return *this;
     }
 
-    void Create(const vk::ImageCreateInfo& image_ci);
+    void Create(const vk::ImageCreateInfo& image_ci, VmaPool pool = VK_NULL_HANDLE);
 
     void Destroy();
 
@@ -204,6 +205,7 @@ public:
     boost::container::static_vector<u64, 16> mip_hashes{};
     u64 lru_id{};
     u64 hash{};
+    u64 pack_key = ~0ull; ///< tlg: Vulkan::TexturePack::Key, ~0 until computed after an upload
 
 private:
     static Common::IncrementalIdProvider<u64> global_image_uid;

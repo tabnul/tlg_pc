@@ -6,11 +6,10 @@
 #pragma once
 #include "tlg_perf_stats.h"
 
-#include "../../src/cheat_hook.h"
-
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace TlgSettings {
 
@@ -55,31 +54,26 @@ struct Values {
     std::atomic<int> shadow_scale{1};
     /// Game effects (menu, live): percent of the game's own value, written into its
     /// post-process and camera objects through Lua (tlg_lua.cpp). 100 = as shipped.
-    std::atomic<int> bloom{100}, dof{100}, motion_blur{100}, chromatic{0}, vignette{0},
-        ssao{100}, ssr{100}, game_sharpen{100}, shadow_distance{100}, lod{100};
+    std::atomic<int> bloom{100}, dof{100}, motion_blur{100}, vignette{0},
+        ssao{100}, ssr{100}, game_sharpen{100}, shadow_distance{100}, trico_feathers{100},
+        boy_wind{100}, tree_wind{100}, fog_distance{100};
+    /// Grass animated every frame (1, default) or every 4th frame as shipped (0); tlg_lua.cpp.
+    std::atomic<int> grass_smooth{1};
     /// Lab tab (menu, live; tuning tests): texture LOD bias under DLAA in quarter steps (-4 =
     /// -1.0, the DLSS guide value), anisotropic filtering forced on mipmapped textures (0 = the
     /// game's own), the half-resolution effect targets drawn at 2x (fog, particles, AO;
     /// vk_scene_resolution SetHalfScale) and the wind skinning frame skip (-1 = the game's 1).
     std::atomic<int> lod_bias{-4}, aniso{16}, half_scale{1}, wind_skip{-1};
+    /// Texture pack (menu, live): 0 = off (default), n = TexturePackNames()[n - 1].
+    std::atomic<int> texture_pack{0};
+    /// Camera field of view in degrees (menu, live); 70 = as shipped.
+    std::atomic<int> fov{70};
     /// Performance overlay (tlg_perf_stats.h): items shown, font size and background opacity
     /// in percent, corner (0 top left, 1 top right, 2 bottom left, 3 bottom right), layout
     /// (0 one line, 1 one item per line). menu_tab: the menu's last tab.
     std::atomic<unsigned> overlay_items{TlgPerfStats::DefaultItems};
     std::atomic<int> overlay_scale{100}, overlay_corner{1}, overlay_opacity{50}, overlay_layout{0};
     std::atomic<int> menu_tab{0};
-    std::atomic<float> red_orb_multiplier{1.0f};
-    std::atomic<bool> red_orbs_supported{false};
-    /// Damage and orb pickup multipliers (src/damage_hook.h, src/orb_hook.h), 0.1x to 100x.
-    /// The game's code reads these floats directly.
-    std::atomic<float> damage_dealt{1.0f}, damage_taken{1.0f};
-    std::atomic<float> green_orb_multiplier{1.0f}, blue_orb_multiplier{1.0f}, gold_orb_multiplier{1.0f};
-    std::atomic<bool> damage_supported{false}, orb_pickup_supported{false};
-    std::atomic<bool> cheats[TLG_CHEAT_COUNT]{};
-    std::atomic<uint32_t> cheats_supported{0};
-    /// Damage hook (src/actor_hook.h): enemy health bar, off by default.
-    std::atomic<bool> enemy_health_bar{false};
-    std::atomic<bool> actor_watch_supported{false};
     // Graphics (tlg_graphics.h). Live: applied on the next frame.
     std::atomic<int> display_mode{0};
     std::atomic<bool> vsync{true};
@@ -93,8 +87,8 @@ struct Values {
     std::atomic<bool> smaa{false};
     std::atomic<bool> cas{false};
     std::atomic<int> cas_strength{50};
-    std::atomic<bool> color_adjust{false};
-    std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{1.0f};
+    std::atomic<bool> color_adjust{true};
+    std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{0.75f};
     /// Set by the presenter: sharpening ran on the last frame (it needs FSR 1 when the game's
     /// image is smaller than the window).
     std::atomic<bool> rcas_applied{false};
@@ -147,6 +141,24 @@ struct Values {
 };
 
 Values& Get();
+
+/// Pack folders with an index.txt under TLG_TEXPACK_DIR (default "texpack"), sorted; read once.
+const std::vector<std::string>& TexturePackNames();
+/// Folder of pack `index` (1-based, as texture_pack).
+std::string TexturePackDir(int index);
+
+/// Graphics presets: the look settings (Image tab, texture rows of the Lab tab) as one set.
+/// 0 = Stock (the game as shipped), 1 = Recommended (the defaults), then the files
+/// presets/<name>.ini next to tlg.ini, sorted. The launcher uses the same files.
+std::vector<std::string> GraphicsPresetNames();
+/// Sets the preset's values (live; the caller saves tlg.ini).
+void ApplyGraphicsPreset(int index);
+/// The preset the current values match, or -1 (Custom).
+int MatchingGraphicsPreset();
+/// Writes presets/<name>.ini from the current values; returns its index, or -1.
+int SaveGraphicsPreset(const std::string& name);
+/// Removes a saved preset (index 2 and up).
+void DeleteGraphicsPreset(int index);
 
 /// Reads the file, then the environment overrides. Called once at start.
 void Load();

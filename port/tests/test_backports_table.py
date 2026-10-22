@@ -12,7 +12,7 @@ from paths import ROOT
 sys.path.insert(0, str(ROOT / 'launcher'))
 import backports_table as bt  # noqa: E402
 import tlg_run  # noqa: E402
-from qt import gfxlogic  # noqa: E402
+import gfxlogic  # noqa: E402
 
 DEAD = ('TLG_OCCLUSION_MODE', 'TLG_LDS_MULTI', 'TLG_LDS_READLANE', 'TLG_LANE_DIVERGENCE', 'TLG_VERBOSE_LOG',
         'TLG_RENDERER', 'TLG_NATIVE_PASSES', 'TLG_WQM', 'TLG_LDS_SMALL', 'TLG_DYNAMIC_STRIDE', 'TLG_BC_TINY',

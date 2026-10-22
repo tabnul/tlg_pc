@@ -8,26 +8,26 @@
 # stages/common/lights/missiongi_env.lua.
 
 # Fog (DLAA makes it look thinner: try density / height fog up a bit)
-Fog distance (far, near)  | _default_env_pp | fogParam        | %1,2 | 25  | 400 | %.0f%% | Where the fog starts and reaches full strength. Lower brings it closer.
-Fog density               | _default_env_pp | fogParam        | %3   | 0   | 400 | %.0f%% | Maximum fog amount (part 3 of fogParam).
+# moved to the Image tab (fog_distance, presets) 2026-10-22: Fog distance (far, near)  | _default_env_pp | fogParam        | %1,2 | 25  | 400 | %.0f%% | Where the fog starts and reaches full strength. Lower brings it closer.
+# dropped 2026-10-22: Fog density               | _default_env_pp | fogParam        | %3   | 0   | 400 | %.0f%% | Maximum fog amount (part 3 of fogParam).
 Fog curve                 | _default_env_pp | fogParam        | %4   | 0   | 400 | %.0f%% | Part 4 of fogParam: probably the falloff exponent.
 Fog extra                 | _default_env_pp | fogParam2       | =1   | 0   | 1   | %.3f   | fogParam2 part 1 (0.125 in the foggy TC area).
 Fog near intensity        | _default_env_pp | fogNearColor    | %5   | 0   | 400 | %.0f%% | Brightness of the near fog color.
 Fog far intensity         | _default_env_pp | fogFarColor     | %5   | 0   | 400 | %.0f%% | Brightness of the far fog color.
-Height fog amount         | _default_env_pp | heightFogMax    | %    | 0   | 400 | %.0f%% | Maximum amount of the ground fog.
+# dropped 2026-10-22: Height fog amount         | _default_env_pp | heightFogMax    | %    | 0   | 400 | %.0f%% | Maximum amount of the ground fog.
 Height fog intensity      | _default_env_pp | heightFogColor  | %5   | 0   | 400 | %.0f%% | Brightness of the ground fog.
 Height fog top            | _default_env_pp | heightFogTop    | +    | -50 | 50  | %+.1f  | Moves the top of the ground fog (meters).
 Height fog bottom         | _default_env_pp | heightFogBottom | +    | -50 | 50  | %+.1f  | Moves the bottom of the ground fog.
-Fog color table mix       | _default_env_pp | clutAlpha       | %    | 0   | 200 | %.0f%% | How much the area's fog color table tints the fog.
-Sky fog scale             | _default_env_sb | scaleForFog     | %    | 25  | 400 | %.0f%% | How far the sky dome counts for the fog.
+# dropped 2026-10-23: Fog color table mix       | _default_env_pp | clutAlpha       | %    | 0   | 200 | %.0f%% | How much the area's fog color table tints the fog.
+# dropped 2026-10-23: Sky fog scale             | _default_env_sb | scaleForFog     | %    | 25  | 400 | %.0f%% | How far the sky dome counts for the fog.
 Water fog density         | _default_env_pp | waterFogParam   | %3   | 0   | 400 | %.0f%% | Fog amount under water.
 
 # LOD and draw distance
-Mesh LOD limit            | _rcfg           | normalMaxLod    | =    | 0   | 8   | %.0f   | Game 4 in play. Try 0 against pop-in; watch the FPS.
-Material LOD limit        | _rcfg           | materialMaxLod  | =    | 0   | 8   | %.0f   | Game 1 in play, 4 in cutscenes.
-Draw distance (far plane) | _trico_camera   | maxz            | %    | 50  | 400 | %.0f%% | The camera's far clip (game 2000).
-Shadow cascade distances  | _default_env_cs | splitDistances  | %1,2,3 | 50 | 300 | %.0f%% | The sun shadow splits (14 42 210). Higher: shadows further away, less sharp up close.
+# dropped 2026-10-22: Normal map mip limit      | _rcfg           | normalMaxLod    | =    | 0   | 8   | %.0f   | Game 4 in play. Texture streaming limit (probably applied on load, not live); direction unverified.
+# dropped 2026-10-22: Material mip limit        | _rcfg           | materialMaxLod  | =    | 0   | 8   | %.0f   | Game 1 in play, 4 in cutscenes.
+# dropped 2026-10-22: Draw distance (far plane) | _trico_camera   | maxz            | %    | 50  | 400 | %.0f%% | The camera's far clip (game 2000).
+Shadow cascade distances  | _default_env_cs | splitDistances  | %1,2,3 | 50 | 1000 | %.0f%% | The sun shadow splits, relative to the game value (default: game value). Higher: more shadow depth on distant towers and cliffs, but softer and flickering shadows up close.
 Shadow far distance       | _default_env_cs | splitDistances  | %4   | 50  | 300 | %.0f%% | The last split (2000).
 
 # Lighting
-Water roughness           | _default_env_li | waterRoughnessOffset | + | -1 | 1  | %+.2f  | Smoother (below 0) or rougher water.
+# dropped 2026-10-22: Water roughness           | _default_env_li | waterRoughnessOffset | + | -1 | 1  | %+.2f  | Smoother (below 0) or rougher water.

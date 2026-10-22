@@ -52,8 +52,8 @@ int main() {
     _putenv_s("TLG_CONFIG", path);
     _putenv_s("TLG_ASYNC_SHADERS", "");
     auto& v = TlgSettings::Get();
-    // Filters on the final image are off by default.
-    assert(!v.smaa && !v.cas && !v.color_adjust && v.cas_strength == 50 && v.color_gamma == 1.0f);
+    // Filters on the final image are off by default; the SDR color adjustment is on (gamma 0.75).
+    assert(!v.smaa && !v.cas && v.color_adjust && v.cas_strength == 50 && v.color_gamma == 0.75f);
     TlgSettings::Load();
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);
@@ -94,15 +94,6 @@ int main() {
     assert(v.display_mode == G::Windowed && v.fps_limit == 0 && v.render_resolution == 0 && v.engine_fps == 120);
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
     assert(v.async_shaders);
-    {
-        std::ofstream out(path);
-        out << "cheat_double_jumps=1\ncheat_very_hard=1\n";
-    }
-    TlgSettings::Load();
-    TlgSettings::Save();
-    const std::string cheats = Read(path);
-    assert(cheats.find("cheat_double_jumps=1\n") != std::string::npos);
-    assert(cheats.find("cheat_very_hard=1\n") != std::string::npos);
     std::remove(path);
     std::puts("PASS: graphics settings");
 }

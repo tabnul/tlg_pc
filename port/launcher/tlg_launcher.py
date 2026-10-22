@@ -19,6 +19,7 @@ from tkinter import filedialog, messagebox, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import logtail  # noqa: E402
+import preset_share  # noqa: E402
 import tlg_run  # noqa: E402
 
 TEXT = {
@@ -27,11 +28,21 @@ TEXT = {
     'game_dir': ('Game folder', 'Pasta do jogo'),
     'system_lib_dir': ('Console system modules', 'Módulos do sistema do console'),
     'browse': ('Browse…', 'Procurar…'),
+    'texpack_dir': ('Texture packs folder (empty = default)', 'Pasta dos pacotes de texturas (vazio = padrão)'),
+    'texture_pack': ('Texture pack', 'Pacote de texturas'),
+    'texture_pack_off': ('Off (original textures)', 'Desligado (texturas originais)'),
+    'texture_pack_hint': ('Default: off. Packs are folders with an index.txt in the texture packs folder; '
+                          'make one with ps4-texturepack-generator (docs/texture-pack.md). Takes effect at the next start '
+                          '(switch live in the in-game menu, Image tab).',
+                          'Padrão: desligado. Pacotes são pastas com um index.txt na pasta dos pacotes; '
+                          'crie um com ps4-texturepack-generator (docs/texture-pack.md). Vale no próximo início '
+                          '(troque ao vivo no menu do jogo, aba Imagem).'),
     'language': ('Language', 'Idioma'),
     'game_language': ('Game language (voice and text)', 'Idioma do jogo (voz e texto)'),
     'ui_language': ('Interface language', 'Idioma da interface'),
     'auto': ('Automatic (system)', 'Automático (sistema)'),
     'video': ('Video', 'Vídeo'),
+    'image': ('Image', 'Imagem'),
     'display_mode': ('Display mode', 'Modo de exibição'),
     'Windowed': ('Windowed', 'Janela'),
     'Borderless': ('Borderless window', 'Janela sem borda'),
@@ -96,7 +107,34 @@ TEXT = {
     'set': ('Set', 'Definir'),
     'press': ('Press a key…', 'Aperte uma tecla…'),
     'reset': ('Reset all', 'Restaurar tudo'),
+    'textures': ('Textures', 'Texturas'),
+    'lod_bias': ('Texture LOD bias (DLAA)', 'LOD bias das texturas (DLAA)'),
+    'lod_bias_hint': ("Sharper (below 0) or softer (above 0) scene textures under DLAA; no effect without DLAA. "
+                      "-1.00 is NVIDIA's advice for native resolution. Lower brings out fine detail, mostly on "
+                      'grass (-3.00 has 31% more fine detail than +1.00), but can shimmer in motion.',
+                      'Texturas da cena mais nítidas (abaixo de 0) ou mais suaves (acima de 0) com DLAA; sem efeito '
+                      'sem DLAA. -1,00 é o conselho da NVIDIA para resolução nativa. Mais baixo realça detalhes '
+                      'finos, sobretudo na grama (-3,00 tem 31% mais detalhe fino que +1,00), mas pode cintilar em '
+                      'movimento.'),
+    'aniso': ('Anisotropic filtering', 'Filtragem anisotrópica'),
+    'aniso_game': ('Game', 'Jogo'),
+    'aniso_hint': ('Keeps ground and wall textures sharp at shallow angles. The game uses trilinear and 4x. In our '
+                   'tests (a stone path, a pillar hall) 16x looked the same as Game; it stays on because the cost '
+                   'is very small.',
+                   'Mantém nítidas as texturas do chão e das paredes em ângulos rasos. O jogo usa trilinear e 4x. '
+                   'Nos nossos testes (um caminho de pedra, um salão de pilares) 16x ficou igual ao Jogo; fica '
+                   'ligado porque o custo é muito pequeno.'),
+    'texture_pack_dialog_hint': ("AI-upscaled versions of the game's textures, made from your own copy of the game "
+                                 '(ps4-texturepack-generator, docs/texture-pack.md); the game files are not changed. In game it '
+                                 'switches live; textures appear as they load (a second or two).',
+                                 'Versões ampliadas por IA das texturas do jogo, feitas da sua própria cópia do jogo '
+                                 '(ps4-texturepack-generator, docs/texture-pack.md); os arquivos do jogo não são alterados. No jogo '
+                                 'troca ao vivo; as texturas aparecem conforme carregam (um ou dois segundos).'),
     'close': ('Close', 'Fechar'),
+    'mark_default': ('Default: {value}', 'Padrão: {value}'),
+    'mark_default_button': ('Default', 'Padrão'),
+    'mark_on': ('on', 'ligado'),
+    'mark_off': ('off', 'desligado'),
     'play': ('Play', 'Jogar'),
     'saves': ('Saves folder', 'Pasta de saves'),
     'logs': ('Logs folder', 'Pasta de logs'),
@@ -112,23 +150,76 @@ TEXT = {
                            '{size} liberados, mas {count} arquivo(s) não puderam ser apagados (em uso? Feche o '
                            'jogo e tente de novo).'),
     'mods': ('Mods / Cheats…', 'Mods / Cheats…'),
-    'menu_note': ('In game, press Insert for the graphics menu: every setting there applies live.',
-                  'No jogo, aperte Insert para o menu de gráficos: tudo nele vale na hora.'),
+    'menu_note': ("Two menus in game. Insert: the port's graphics menu (every setting applies live). "
+                  "Development menu (the game's own QA menu): turn on 'Level select and QA menu' under Debug, "
+                  'then in game hold L1 and press L3 (keyboard: hold 1, press Z).',
+                  'Dois menus no jogo. Insert: o menu de gráficos do port (tudo vale na hora). '
+                  'Menu de desenvolvimento (o menu de QA do próprio jogo): ligue "Seleção de fases e menu de QA" '
+                  'em Depuração, depois no jogo segure L1 e aperte L3 (teclado: segure 1, aperte Z).'),
     'graphics': ('Graphics…', 'Gráficos…'),
     'graphics_title': ('Graphics', 'Gráficos'),
-    'graphics_hint': ('The same settings are in the in-game graphics menu (press Insert in game), where changes '
-                      'show right away. 100% is the game as shipped.',
-                      'As mesmas configurações estão no menu de gráficos do jogo (aperte Insert no jogo), onde as '
-                      'mudanças aparecem na hora. 100% é o jogo original.'),
+    'graphics_tips': ('Tip: tweak while playing', 'Dica: ajuste jogando'),
+    'graphics_hint': ('Best set in game: the in-game graphics menu has these settings and more (filters, colour, '
+                      'Lab), and every change shows right away on the scene you are looking at. Go somewhere '
+                      'outdoors with Trico in view, open the menu and compare. Changes are saved for the next start. '
+                      '100% is the game as shipped.',
+                      'Melhor ajustar no jogo: o menu de gráficos do jogo tem estas opções e mais (filtros, cor, '
+                      'Lab), e cada mudança aparece na hora na cena que você está vendo. Vá para um lugar aberto com '
+                      'o Trico à vista, abra o menu e compare. As mudanças ficam salvas para o próximo início. '
+                      '100% é o jogo original.'),
+    'graphics_keys': ('Insert          open / close the graphics menu (Esc closes)\n'
+                      'L2 + R3         controller: hold L2, press R3\n'
+                      'Q / E, L1 / R1  previous / next tab\n'
+                      'F8              switch DLAA / SMAA\n'
+                      'F10             show / hide the FPS counter',
+                      'Insert          abre / fecha o menu de gráficos (Esc fecha)\n'
+                      'L2 + R3         controle: segure L2, aperte R3\n'
+                      'Q / E, L1 / R1  aba anterior / próxima\n'
+                      'F8              alterna DLAA / SMAA\n'
+                      'F10             mostra / esconde o contador de FPS'),
     'hdr_hint': ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
                  'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '
                  'Recomendado: ligado.'),
     'shadow_scale': ('Shadow resolution', 'Resolução das sombras'),
     'shadow_game': ('Game (2048)', 'Jogo (2048)'),
-    'shadow_hint': ("Draws the shadow maps at 2x or 4x the game's 2048x2048. Recommended: Game (2048). The sharper "
-                    'edges are hard to see, and 8192 costs about 8 FPS and about 1 GB of video memory.',
-                    'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo. Recomendado: Jogo (2048). As bordas '
-                    'mais nítidas são difíceis de notar, e 8192 custa cerca de 8 FPS e cerca de 1 GB de memória de vídeo.'),
+    'graphics_preset': ('Graphics preset', 'Predefinição gráfica'),
+    'graphics_preset_hint': ('All look settings and the texture pack at once. Stock is the game as shipped; '
+                             'save your own here or in the in-game menu (Insert, Image tab).',
+                             'Todas as opções de imagem e o pacote de texturas de uma vez. Original é o jogo '
+                             'como lançado; salve as suas aqui ou no menu do jogo (Insert, aba Imagem).'),
+    'preset_save': ('Save as preset', 'Salvar como predefinição'),
+    'preset_save_button': ('Save', 'Salvar'),
+    'preset_save_bad': ('Type a name (letters, digits, space, - or _; not Stock or Recommended).',
+                        'Digite um nome (letras, números, espaço, - ou _; não Original nem Recomendado).'),
+    'preset_stock': ('Stock (as shipped)', 'Original (como lançado)'),
+    'preset_recommended': ('Recommended (default)', 'Recomendado (padrão)'),
+    'preset_custom': ('Custom', 'Personalizado'),
+    'shadow_hint': ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much "
+                    'less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about '
+                    '1 GB of video memory; recommended when you have the headroom.',
+                    'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é '
+                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa '
+                    'cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga.'),
+    'grass_smooth': ('Grass animated every frame (default)', 'Grama animada todo quadro (padrão)'),
+    'grass_hint': ('The game moves most grass only every 4th frame, which looks choppy at high frame rates. '
+                   'Off is as shipped.',
+                   'O jogo move a maior parte da grama só a cada 4 quadros, o que fica truncado em taxas altas. '
+                   'Desligado é o original.'),
+    'effect_fog_distance': ('Fog distance', 'Distância da neblina'),
+    'effect_fog_distance_hint': ('Where the fog starts and reaches full strength. Default 100% is as shipped; lower '
+                                 'brings the fog closer.',
+                                 'Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo '
+                                 'traz a neblina mais perto.'),
+    'effect_boy_wind': ('Boy wind (hair + clothing)', 'Vento no menino (cabelo + roupa)'),
+    'effect_boy_wind_hint': ("How strongly the wind moves the boy's hair and clothing. Default 100% is as shipped and "
+                             'can look like a storm; 50% is recommended, 30% is calm.',
+                             'Quanto o vento mexe o cabelo e a roupa do menino. Padrão 100% é o original e pode '
+                             'parecer uma tempestade; 50% é o recomendado, 30% é calmo.'),
+    'effect_tree_wind': ('Tree wind', 'Vento nas árvores'),
+    'effect_tree_wind_hint': ('How strongly the wind moves trees, leaves and ivy. Default 100% is as shipped; 50% '
+                              'looks more natural (recommended), 0% keeps them still.',
+                              'Quanto o vento mexe árvores, folhas e hera. Padrão 100% é o original; 50% parece mais '
+                              'natural (recomendado), 0% as deixa paradas.'),
     'effects': ('Game effects (100% = as shipped)', 'Efeitos do jogo (100% = original)'),
     'effect_ssao': ('Ambient occlusion', 'Oclusão de ambiente'),
     'effect_ssao_hint': ('Strength of the contact shadows in corners and under grass. 0% turns the pass off (saves a '
@@ -142,18 +233,18 @@ TEXT = {
                         'Reflexos e brilho de luz na água e na pedra molhada. 0% desliga o passe.'),
     'effect_motion_blur': ('Motion blur', 'Desfoque de movimento'),
     'effect_motion_blur_hint': ('Camera motion blur. 0% turns the pass off.', 'Desfoque ao mover a câmera. 0% desliga o passe.'),
-    'effect_chromatic_add': ('Chromatic aberration', 'Aberração cromática'),
-    'effect_chromatic_add_hint': ('Color fringes toward the screen edges. The game ships with this off: 0% is as shipped.',
-                                  'Franjas de cor nas bordas da tela. O jogo vem com isto desligado: 0% é o original.'),
     'effect_vignette_add': ('Vignette', 'Vinheta'),
-    'effect_vignette_add_hint': ('Darkened screen corners. The game ships with this off: 0% is as shipped.',
-                                 'Cantos da tela escurecidos. O jogo vem com isto desligado: 0% é o original.'),
+    'effect_vignette_add_hint': ('Darkened screen corners. The game ships with this off: 0% is as shipped and recommended.',
+                                 'Cantos da tela escurecidos. O jogo vem com isto desligado: 0% é o original e o recomendado.'),
     'effect_game_sharpen': ('Game sharpening', 'Nitidez do jogo'),
-    'effect_game_sharpen_hint': ("The game's own sharpening filter. The difference is hard to see: 100% recommended.",
-                                 'O filtro de nitidez do próprio jogo. A diferença é difícil de ver: 100% recomendado.'),
-    'effect_lod': ('Character detail distance', 'Distância de detalhe dos personagens'),
-    'effect_lod_hint': ('How far the boy and Trico keep their detailed models. Higher keeps full detail further away.',
-                        'Até onde o menino e o Trico mantêm os modelos detalhados. Mais alto mantém o detalhe completo mais longe.'),
+    'effect_game_sharpen_hint': ("The game's own sharpening filter. On by default: 100% is the original and the maximum (recommended).",
+                                 'O filtro de nitidez do próprio jogo. Ligado por padrão: 100% é o original e o máximo (recomendado).'),
+    'effect_fov': ('Field of view', 'Campo de visão'),
+    'effect_fov_hint': ('Camera field of view. Default 70° is as shipped; higher shows more around the boy.',
+                        'Campo de visão da câmera. Padrão 70° é o original; mais alto mostra mais em volta do menino.'),
+    'effect_trico_feathers': ('Trico feather wind', 'Vento nas penas do Trico'),
+    'effect_trico_feathers_hint': ("How strongly the wind moves Trico's feathers. Default 100% is as shipped; 0% keeps them still.",
+                                   'Quanto o vento mexe as penas do Trico. Padrão 100% é o original; 0% as deixa paradas.'),
     'mods_title': ('Mods / Cheats', 'Mods / Cheats'),
     'mods_hint': ('Drop shadPS4/GoldHEN cheat XML files in the mods folder, then turn them on here. '
                   'Nothing here changes the game until you enable it.',
@@ -179,14 +270,7 @@ TEXT = {
                 'O jogo fechou com erro (código {code}). Os detalhes estão no log.'),
     'already': ('The game is already running.', 'O jogo já está rodando.'),
     'error': ('Error', 'Erro'),
-    'port_by': ('PC port by HayatoG', 'Port para PC por HayatoG'),
-    'channel': ('YouTube channel: @hayatog-dev', 'Canal no YouTube: @hayatog-dev'),
-    'discord': ('Discord community', 'Comunidade no Discord'),
-    'sponsor': ('♥ Sponsor on GitHub', '♥ Apoie no GitHub'),
 }
-CHANNEL_URL = 'https://www.youtube.com/@hayatog-dev'
-DISCORD_URL = 'https://discord.gg/UMkdMYZh9g'
-SPONSOR_URL = 'https://github.com/sponsors/HayatoG'
 GAME_LANGUAGE_NAMES = {'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
                        'de': 'Deutsch', 'it': 'Italiano', 'nl': 'Nederlands',
                        'pt_PT': 'Português (Portugal)', 'ru': 'Русский', 'fi': 'Suomi',
@@ -235,16 +319,22 @@ def sdl_key_name(keysym):
 SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
-INI_DEFAULTS = {'dlaa': '1', 'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '0', 'color_brightness': '0.00',
-                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '1.00'}
+INI_DEFAULTS = {'dlaa': '1', 'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '1', 'color_brightness': '0.00',
+                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
                 'color_saturation': (0.0, 2.0), 'color_gamma': (0.5, 2.0)}
 # Graphics dialog: the in-game menu's HDR, Enhancements and Game effects, same tlg.ini keys
-# (tlg_settings.cpp). Effects: key -> (default, low, high) in percent, the default as shipped.
+# (tlg_settings.cpp). Effects: key -> (default, low, high[, unit]) in percent unless a unit is
+# given, the default as shipped (so also the PS4 value).
 SHADOW_SCALES = [1, 2, 4]
+# tlg.ini lod_bias is in quarter steps (-12..4 = -3.00..+1.00); default -4 (-1.00), PS4 0.
+LOD_BIAS_DEFAULT = -4
+ANISO_LEVELS = [0, 2, 4, 8, 16]  # 0 = the game's own (PS4); default 16
 EFFECTS = {'ssao': (100, 0, 400), 'bloom': (100, 0, 400), 'ssr': (100, 0, 400), 'motion_blur': (100, 0, 400),
-           'chromatic_add': (0, 0, 100), 'vignette_add': (0, 0, 100), 'game_sharpen': (100, 0, 400),
-           'lod': (100, 25, 400)}
+           'vignette_add': (0, 0, 100), 'game_sharpen': (100, 0, 100),
+           'fog_distance': (100, 25, 400), 'boy_wind': (100, 0, 200),
+           'tree_wind': (100, 0, 200), 'trico_feathers': (100, 0, 400),
+           'fov': (70, 50, 110, '°')}
 
 
 def art_path(settings, name):
@@ -277,7 +367,7 @@ class Launcher:
 
     # -- language ---------------------------------------------------------------------------
     def pt(self):
-        choice = self.settings.get('ui_language', 'auto')
+        choice = self.settings.get('ui_language', 'en_US')
         return system_is_portuguese() if choice == 'auto' else choice == 'pt_BR'
 
     def t(self, key, **fmt):
@@ -295,12 +385,12 @@ class Launcher:
         pad = {'padx': 6, 'pady': 4}
         main = ttk.Frame(root, padding=12)
         main.pack(fill='both', expand=True)
-        for column, weight in enumerate((3, 3, 4)):
-            main.columnconfigure(column, weight=weight, uniform='cols' if column < 2 else '')
+        for column, weight in enumerate((3, 3, 3, 4)):
+            main.columnconfigure(column, weight=weight, uniform='cols' if column < 3 else '')
         main.rowconfigure(2, weight=1)
 
         header = ttk.Frame(main)
-        header.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 8))
+        header.grid(row=0, column=0, columnspan=4, sticky='ew', pady=(0, 8))
         self.load_art()
         if self.banner:
             ttk.Label(header, image=self.banner).pack(side='left', padx=(0, 14))
@@ -308,14 +398,6 @@ class Launcher:
         titles.pack(side='left', fill='y')
         ttk.Label(titles, text='The Last Guardian', font=('TkDefaultFont', 22, 'bold')).pack(anchor='w')
         ttk.Label(titles, text='PC — CUSA03627 v1.03', foreground='#777').pack(anchor='w')
-        credits = ttk.Frame(header)
-        credits.pack(side='right', anchor='ne')
-        ttk.Label(credits, text=self.t('port_by'), foreground='#777').pack(anchor='e')
-        for key, url in (('channel', CHANNEL_URL), ('discord', DISCORD_URL), ('sponsor', SPONSOR_URL)):
-            link = ttk.Label(credits, text=self.t(key), foreground='#2a6fdb', cursor='hand2',
-                             font=('TkDefaultFont', 10, 'underline'))
-            link.pack(anchor='e')
-            link.bind('<Button-1>', lambda _, u=url: tlg_run.open_external(u))
         self.status = ttk.Label(titles, text='', foreground='#555', wraplength=420, justify='left')
         self.status.pack(anchor='w', pady=(10, 0))
 
@@ -326,7 +408,7 @@ class Launcher:
         game = ttk.LabelFrame(left, text=self.t('game'), padding=8)
         game.grid(sticky='ew', pady=(0, 8))
         game.columnconfigure(0, weight=1)
-        for row, key in enumerate(('game_dir', 'system_lib_dir')):
+        for row, key in enumerate(('game_dir', 'system_lib_dir', 'texpack_dir')):
             ttk.Label(game, text=self.t(key)).grid(row=row * 2, column=0, columnspan=2, sticky='w')
             var = tk.StringVar(value=self.settings[key])
             var.trace_add('write', lambda *_: self.changed())
@@ -334,6 +416,7 @@ class Launcher:
             ttk.Entry(game, textvariable=var).grid(row=row * 2 + 1, column=0, sticky='ew', pady=(0, 6))
             ttk.Button(game, text=self.t('browse'), command=lambda k=key: self.browse(k)).grid(
                 row=row * 2 + 1, column=1, padx=(6, 0), pady=(0, 6))
+        self.vars['texpack_dir'].trace_add('write', lambda *_: self.refresh_texture_pack())
         audio = ttk.LabelFrame(left, text=self.t('audio'), padding=8)
         audio.grid(sticky='ew', pady=(0, 8))
         self.check(audio, 0, 'native_audio')
@@ -384,7 +467,11 @@ class Launcher:
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         ttk.Label(video, text=self.t('resolution_hint'), foreground='#777', wraplength=320).grid(
             row=8, column=0, columnspan=2, sticky='w')
-        self.build_filters(video, 9)
+        image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
+        image.grid(row=2, column=2, sticky='new', **pad)
+        image.columnconfigure(1, weight=1)
+        self.build_filters(image, 0)
+        self.build_preset(image, 20)
         debug = ttk.LabelFrame(middle, text=self.t('debug'), padding=8)
         debug.grid(sticky='ew', pady=(8, 0))
         self.check(debug, 0, 'level_select')
@@ -393,15 +480,15 @@ class Launcher:
             row=2, column=0, columnspan=3, sticky='w')
 
         log_frame = ttk.LabelFrame(main, text='Log', padding=4)
-        log_frame.grid(row=2, column=2, sticky='nsew', **pad)
-        self.log = tk.Text(log_frame, wrap='none', font=('TkFixedFont', 9), state='disabled', width=60)
+        log_frame.grid(row=2, column=3, sticky='nsew', **pad)
+        self.log = tk.Text(log_frame, wrap='none', font=('TkFixedFont', 9), state='disabled', width=48)
         scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
         self.log.configure(yscrollcommand=scroll.set)
         self.log.pack(side='left', fill='both', expand=True)
         scroll.pack(side='right', fill='y')
 
         buttons = ttk.Frame(main)
-        buttons.grid(row=3, column=0, columnspan=3, sticky='ew', pady=(10, 0))
+        buttons.grid(row=3, column=0, columnspan=4, sticky='ew', pady=(10, 0))
         ttk.Button(buttons, text=self.t('quit'), command=self.quit).pack(side='left')
         ttk.Label(buttons, text=self.t('menu_note'), foreground='#555', wraplength=300).pack(side='left', padx=12)
         style = ttk.Style()
@@ -440,7 +527,6 @@ class Launcher:
 
     def build_filters(self, parent, row):
         """SMAA, sharpening and color adjustments, read from and written to tlg.ini right away."""
-        ttk.Separator(parent).grid(row=row, column=0, columnspan=2, sticky='ew', pady=(8, 4))
         ttk.Label(parent, text=self.t('filters'), foreground='#555', wraplength=360).grid(
             row=row + 1, column=0, columnspan=2, sticky='w')
         ini = dict(INI_DEFAULTS)
@@ -467,6 +553,121 @@ class Launcher:
             spin.grid(row=row + 5 + index, column=1, sticky='w', padx=6, pady=1)
             spin.bind('<FocusOut>', lambda _: self.filters_changed())
 
+    def build_preset(self, parent, row):
+        """The in-game menu's graphics presets (preset_share.game_presets): every look setting and the
+        texture pack at once, written to tlg.ini."""
+        ttk.Separator(parent).grid(row=row, column=0, columnspan=2, sticky='ew', pady=(8, 4))
+        ttk.Label(parent, text=self.t('graphics_preset')).grid(row=row + 1, column=0, sticky='w')
+        self.preset_box = ttk.Combobox(parent, state='readonly', width=28)
+        self.preset_box.grid(row=row + 1, column=1, sticky='w', padx=6, pady=2)
+        self.preset_box.bind('<<ComboboxSelected>>', lambda _: self.preset_picked())
+        # Save as preset: the current tlg.ini under a name, the same file the in-game menu writes
+        # (an existing preset with the name is replaced).
+        ttk.Label(parent, text=self.t('preset_save')).grid(row=row + 2, column=0, sticky='w')
+        save = ttk.Frame(parent)
+        save.grid(row=row + 2, column=1, sticky='w', padx=6, pady=2)
+        name = tk.StringVar()
+        ttk.Entry(save, textvariable=name, width=20).pack(side='left')
+
+        def save_preset():
+            ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+            saved = preset_share.save_game_preset(tlg_run.USER_DIR / 'presets', name.get(), ini)
+            if saved is None:
+                messagebox.showwarning(self.t('preset_save'), self.t('preset_save_bad'), parent=self.root)
+                return
+            name.set('')
+            self.ini_stamp = self.ini_files_stamp()
+            self.refresh_preset()
+
+        ttk.Button(save, text=self.t('preset_save_button'), command=save_preset).pack(side='left', padx=(6, 0))
+        ttk.Label(parent, text=self.t('graphics_preset_hint'), foreground='#777', wraplength=360,
+                  justify='left').grid(row=row + 3, column=0, columnspan=2, sticky='w')
+        # Texture pack: tlg.ini texture_pack (a pack folder's name or off), the in-game Image row.
+        ttk.Label(parent, text=self.t('texture_pack')).grid(row=row + 4, column=0, sticky='w', pady=(6, 0))
+        self.pack_box = ttk.Combobox(parent, state='readonly', width=24)
+        self.pack_box.grid(row=row + 4, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.pack_box.bind('<<ComboboxSelected>>', lambda _: self.texture_pack_picked())
+        ttk.Label(parent, text=self.t('texture_pack_hint'), foreground='#777', wraplength=360,
+                  justify='left').grid(row=row + 5, column=0, columnspan=2, sticky='w')
+        self.refresh_preset()
+        self.refresh_texture_pack()
+        self.ini_stamp = self.ini_files_stamp()
+        if not getattr(self, 'watching_ini', False):  # build() runs again on a language change
+            self.watching_ini = True
+            self.root.after(1000, self.watch_ini)
+
+    def ini_files_stamp(self):
+        """Changes when tlg.ini or the presets folder changes (the in-game menu saves them)."""
+        paths = [tlg_run.USER_DIR / 'tlg.ini', *sorted((tlg_run.USER_DIR / 'presets').glob('*.ini'))]
+        return tuple((str(path), path.stat().st_mtime_ns) for path in paths if path.is_file())
+
+    def watch_ini(self):
+        """Shows what the game saved in tlg.ini or the presets folder while the launcher is open."""
+        stamp = self.ini_files_stamp()
+        if stamp != self.ini_stamp:
+            self.ini_stamp = stamp
+            self.reload_ini()
+        self.root.after(1000, self.watch_ini)
+
+    def reload_ini(self):
+        """The rows that show tlg.ini values read it again."""
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key, var in self.ini_vars.items():
+            value = ini.get(key, INI_DEFAULTS[key])
+            var.set(value not in ('0', '') if isinstance(var, tk.BooleanVar) else value)
+        self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
+        if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
+            self.graphics_window.destroy()  # its sliders show the old values
+            self.graphics_dialog()
+        self.refresh_preset()
+        self.refresh_texture_pack()
+
+    def refresh_texture_pack(self):
+        """Lists the packs in the texture packs folder and shows the one tlg.ini picks."""
+        if not getattr(self, 'pack_box', None):
+            return  # build() is still making the rows
+        # The folder row's text, not self.settings: this runs from that row's trace too.
+        folder = {**self.settings, 'texpack_dir': self.vars['texpack_dir'].get()}
+        self.texture_packs = tlg_run.texture_packs(tlg_run.texpack_dir(folder))
+        self.pack_box.configure(values=[self.t('texture_pack_off'), *self.texture_packs],
+                                postcommand=self.refresh_texture_pack)
+        current = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_pack', 'off')
+        if current.isdigit():  # older tlg.ini: a 1-based index
+            current = self.texture_packs[int(current) - 1] if 0 < int(current) <= len(self.texture_packs) else 'off'
+        self.pack_box.set(current if current in self.texture_packs else self.t('texture_pack_off'))
+
+    def texture_pack_picked(self):
+        index = self.pack_box.current()
+        if index < 0:
+            return
+        tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+        tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini',
+                           {'texture_pack': self.texture_packs[index - 1] if index else 'off'})
+        self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        self.refresh_preset()
+
+    def preset_label(self, index, name):
+        return self.t('preset_stock') if index == 0 else self.t('preset_recommended') if index == 1 else name
+
+    def refresh_preset(self):
+        """Lists the presets (the folder may have new ones) and shows the one tlg.ini equals."""
+        self.presets = preset_share.game_presets(tlg_run.USER_DIR / 'presets')
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        names = [self.preset_label(i, name) for i, (name, _) in enumerate(self.presets)]
+        self.preset_box.configure(values=names, postcommand=self.refresh_preset)
+        current = next((i for i, (_, values) in enumerate(self.presets)
+                        if preset_share.game_preset_matches(ini, values)), -1)
+        self.preset_box.set(names[current] if current >= 0 else self.t('preset_custom'))
+
+    def preset_picked(self):
+        index = self.preset_box.current()
+        if index < 0:
+            return
+        tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+        tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', self.presets[index][1])
+        self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        self.reload_ini()
+
     def filters_changed(self):
         values = {'dlaa': int(self.ini_vars['dlaa'].get()), 'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
@@ -478,6 +679,8 @@ class Launcher:
             values[key] = f'{value:.2f}'
         tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
         tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', values)
+        self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        self.refresh_preset()
 
     def combo(self, parent, row, key, values, label, on_change=None):
         ttk.Label(parent, text=self.t(key)).grid(row=row, column=0, sticky='w')
@@ -676,7 +879,7 @@ class Launcher:
         win.transient(self.root)
         frame = ttk.Frame(win, padding=12)
         frame.pack(fill='both', expand=True)
-        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure((0, 1, 2), weight=1)
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
 
         def number(key, default):
@@ -688,57 +891,139 @@ class Launcher:
         def write(values):
             tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
             tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', values)
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+            self.refresh_preset()
 
-        def hint(row, key):
-            ttk.Label(frame, text=self.t(key), foreground='#777', wraplength=560, justify='left').grid(
-                row=row, column=0, columnspan=3, sticky='w', pady=(0, 6))
+        # Each hint starts with the row's default and, where known, its value on PS4 (same as the
+        # in-game menu).
+        def hint(parent, row, key, default, ps4=None):
+            marks = self.t('mark_default', value=default) + ('' if ps4 is None else f' · PS4: {ps4}')
+            ttk.Label(parent, text=marks + '\n' + self.t(key), foreground='#777', wraplength=340,
+                      justify='left').grid(row=row, column=0, columnspan=4, sticky='w', pady=(0, 6))
 
-        ttk.Label(frame, text=self.t('graphics_hint'), wraplength=560, justify='left').grid(
-            row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
+        on_off = lambda on: self.t('mark_on' if on else 'mark_off')
+        # Advice: tweak while playing (changes show at once), with the in-game shortcuts.
+        tips = ttk.LabelFrame(frame, text=self.t('graphics_tips'), padding=6)
+        tips.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 8))
+        ttk.Label(tips, text=self.t('graphics_hint'), wraplength=440, justify='left').pack(side='left', anchor='n')
+        ttk.Label(tips, text=self.t('graphics_keys'), justify='left',
+                  font=('TkFixedFont', 9)).pack(side='left', anchor='n', padx=(16, 0))
+        # Three columns: display, shadows, grass and textures on the left; the effects in the other two.
+        left, middle, right = ttk.Frame(frame), ttk.Frame(frame), ttk.Frame(frame)
+        for index, column in enumerate((left, middle, right)):
+            column.grid(row=1, column=index, sticky='nsew', padx=(0 if index == 0 else 10, 0 if index == 2 else 10))
+            column.columnconfigure(1, weight=1)
         hdr = tk.BooleanVar(value=number('hdr', 1) != 0)
-        ttk.Checkbutton(frame, text='HDR', variable=hdr, command=lambda: write({'hdr': int(hdr.get())})).grid(
-            row=1, column=0, columnspan=3, sticky='w')
-        hint(2, 'hdr_hint')
-        ttk.Label(frame, text=self.t('shadow_scale')).grid(row=3, column=0, sticky='w')
-        shadow = ttk.Combobox(frame, values=[self.t('shadow_game'), '4096', '8192'], state='readonly', width=14)
+        ttk.Checkbutton(left, text='HDR', variable=hdr, command=lambda: write({'hdr': int(hdr.get())})).grid(
+            row=1, column=0, columnspan=4, sticky='w')
+        hint(left, 2, 'hdr_hint', on_off(True))
+        ttk.Label(left, text=self.t('shadow_scale')).grid(row=3, column=0, sticky='w')
+        shadow = ttk.Combobox(left, values=[self.t('shadow_game'), '4096', '8192'], state='readonly', width=14)
         scale = number('shadow_scale', 1)
         shadow.current(2 if scale >= 4 else 1 if scale >= 2 else 0)
         shadow.grid(row=3, column=1, sticky='w', padx=6)
         shadow.bind('<<ComboboxSelected>>', lambda _: write({'shadow_scale': SHADOW_SCALES[shadow.current()]}))
-        hint(4, 'shadow_hint')
-        ttk.Separator(frame).grid(row=5, column=0, columnspan=3, sticky='ew', pady=4)
-        ttk.Label(frame, text=self.t('effects'), foreground='#555').grid(row=6, column=0, columnspan=3, sticky='w')
+        hint(left, 4, 'shadow_hint', self.t('shadow_game'), self.t('shadow_game'))
+        grass = tk.BooleanVar(value=number('grass_smooth', 1) != 0)
+        ttk.Checkbutton(left, text=self.t('grass_smooth'), variable=grass,
+                        command=lambda: write({'grass_smooth': int(grass.get())})).grid(
+            row=5, column=0, columnspan=4, sticky='w')
+        hint(left, 6, 'grass_hint', on_off(True), on_off(False))
+        ttk.Label(middle, text=self.t('effects'), foreground='#555').grid(row=0, column=0, columnspan=4, sticky='w')
+        half = (len(EFFECTS) + 1) // 2
 
         sliders = {}
-        for index, (key, (default, low, high)) in enumerate(EFFECTS.items()):
-            row = 7 + index * 2
+        for index, (key, (default, low, high, *unit)) in enumerate(EFFECTS.items()):
+            unit = unit[0] if unit else '%'
+            parent = middle if index < half else right
+            row = 1 + index % half * 2
             value = min(max(number(key, default), low), high)
-            ttk.Label(frame, text=self.t('effect_' + key)).grid(row=row, column=0, sticky='w')
-            shown = ttk.Label(frame, text=f'{value}%', width=5)
+            ttk.Label(parent, text=self.t('effect_' + key)).grid(row=row, column=0, sticky='w')
+            shown = ttk.Label(parent, text=f'{value}{unit}', width=5)
             shown.grid(row=row, column=2, sticky='e')
 
-            def moved(raw, key=key, shown=shown, current={'value': value}):
-                step = int(round(float(raw) / 5) * 5)  # 5% steps
-                shown.configure(text=f'{step}%')
+            def moved(raw, key=key, shown=shown, unit=unit, current={'value': value}):
+                step = int(round(float(raw) / 5) * 5)  # steps of 5
+                shown.configure(text=f'{step}{unit}')
                 if step != current['value']:
                     current['value'] = step
                     write({key: step})
 
-            slider = ttk.Scale(frame, from_=low, to=high, value=value, length=260, command=moved)
+            slider = ttk.Scale(parent, from_=low, to=high, value=value, length=180, command=moved)
             slider.grid(row=row, column=1, sticky='ew', padx=6)
             sliders[key] = (slider, moved)
-            hint(row + 1, 'effect_' + key + '_hint')
+            # Default and PS4 buttons, as in the in-game menu (the effects' defaults are as shipped).
+            buttons = ttk.Frame(parent)
+            buttons.grid(row=row, column=3, sticky='e')
+            for text in (self.t('mark_default_button'), 'PS4'):
+                ttk.Button(buttons, text=text, width=len(text) + 2,
+                           command=lambda slider=slider, moved=moved, default=default: (
+                               slider.set(default), moved(default))).pack(side='left', padx=(2, 0))
+            hint(parent, row + 1, 'effect_' + key + '_hint', f'{default}{unit}', f'{default}{unit}')
+
+        # Textures (the in-game menu's Image tab): LOD bias, anisotropic filtering, texture pack.
+        row = 7
+        ttk.Separator(left).grid(row=row, column=0, columnspan=4, sticky='ew', pady=4)
+        ttk.Label(left, text=self.t('textures'), foreground='#555').grid(row=row + 1, column=0, columnspan=4, sticky='w')
+        bias_text = lambda quarters: f'{quarters * 0.25:+.2f}'
+        ttk.Label(left, text=self.t('lod_bias')).grid(row=row + 2, column=0, sticky='w')
+        bias = min(max(number('lod_bias', LOD_BIAS_DEFAULT), -12), 4)
+        bias_shown = ttk.Label(left, text=bias_text(bias), width=5)
+        bias_shown.grid(row=row + 2, column=2, sticky='e')
+
+        def bias_moved(raw, current={'value': bias}):
+            step = int(round(float(raw)))
+            bias_shown.configure(text=bias_text(step))
+            if step != current['value']:
+                current['value'] = step
+                write({'lod_bias': step})
+
+        bias_slider = ttk.Scale(left, from_=-12, to=4, value=bias, length=260, command=bias_moved)
+        bias_slider.grid(row=row + 2, column=1, sticky='ew', padx=6)
+        buttons = ttk.Frame(left)
+        buttons.grid(row=row + 2, column=3, sticky='e')
+        for text, value in ((self.t('mark_default_button'), LOD_BIAS_DEFAULT), ('PS4', 0)):
+            ttk.Button(buttons, text=text, width=len(text) + 2,
+                       command=lambda value=value: (bias_slider.set(value), bias_moved(value))).pack(side='left', padx=(2, 0))
+        hint(left, row + 3, 'lod_bias_hint', bias_text(LOD_BIAS_DEFAULT), bias_text(0))
+        ttk.Label(left, text=self.t('aniso')).grid(row=row + 4, column=0, sticky='w')
+        aniso_labels = [self.t('aniso_game'), '2x', '4x', '8x', '16x']
+        aniso = ttk.Combobox(left, values=aniso_labels, state='readonly', width=14)
+        level = number('aniso', 16)
+        aniso.current(max(i for i, v in enumerate(ANISO_LEVELS) if v <= level) if level > 0 else 0)
+        aniso.grid(row=row + 4, column=1, sticky='w', padx=6)
+        aniso.bind('<<ComboboxSelected>>', lambda _: write({'aniso': ANISO_LEVELS[aniso.current()]}))
+        hint(left, row + 5, 'aniso_hint', '16x', aniso_labels[0])
+        ttk.Label(left, text=self.t('texture_pack')).grid(row=row + 6, column=0, sticky='w')
+        packs = tlg_run.texture_packs(tlg_run.texpack_dir(self.settings))
+        pack = ttk.Combobox(left, values=[self.t('texture_pack_off'), *packs], state='readonly', width=24)
+        chosen = ini.get('texture_pack', 'off')
+        pack.current(packs.index(chosen) + 1 if chosen in packs else 0)
+        pack.grid(row=row + 6, column=1, sticky='w', padx=6)
+
+        def pack_picked():
+            write({'texture_pack': packs[pack.current() - 1] if pack.current() > 0 else 'off'})
+            self.refresh_texture_pack()
+
+        pack.bind('<<ComboboxSelected>>', lambda _: pack_picked())
+        hint(left, row + 7, 'texture_pack_dialog_hint', self.t('mark_off'), self.t('mark_off'))
 
         def reset():
             hdr.set(True)
             shadow.current(0)
-            write({'hdr': 1, 'shadow_scale': 1})
+            grass.set(True)
+            aniso.current(len(ANISO_LEVELS) - 1)
+            pack.current(0)
+            write({'hdr': 1, 'shadow_scale': 1, 'grass_smooth': 1, 'aniso': 16, 'texture_pack': 'off'})
+            self.refresh_texture_pack()
+            bias_slider.set(LOD_BIAS_DEFAULT)
+            bias_moved(LOD_BIAS_DEFAULT)
             for key, (slider, moved) in sliders.items():
                 slider.set(EFFECTS[key][0])
                 moved(EFFECTS[key][0])
 
         bottom = ttk.Frame(frame)
-        bottom.grid(row=7 + len(EFFECTS) * 2, column=0, columnspan=3, sticky='ew', pady=(10, 0))
+        bottom.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=reset).pack(side='left')
         ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
 

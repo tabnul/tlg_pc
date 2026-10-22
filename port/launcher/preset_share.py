@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Export and import of configuration presets: a .json file players can share (issues, Discord...).
+"""Export and import of configuration presets: a .json file players can share (issues, forums...).
 
 No Qt and no tkinter here: both launchers use it. The file has the layout of a full preset
 (presets_current.py) plus a header:
@@ -14,7 +14,7 @@ Never exported, because they depend on the machine or are personal: the VRAM bud
 languages, game folder, paths, saves, and the AMD workarounds (BLOCK1D, BC_TINY, NO_MSAA) left on
 "Automatic" (any item without a default is only written when the player chose a value for it).
 
-Applying goes through the same code as the built-in presets (qt/gfxlogic.py: custom_targets and
+Applying goes through the same code as the built-in presets (gfxlogic.py: custom_targets and
 apply_targets), so an imported file behaves like a full preset.
 """
 import json
@@ -24,7 +24,7 @@ from collections import namedtuple
 from pathlib import Path
 
 import backports_table
-from qt import gfxlogic
+import gfxlogic
 
 FORMAT = 'tlg-preset'
 VERSION = 1
@@ -36,6 +36,69 @@ MAX_BYTES = 1 << 20
 EXPORT_SETTINGS = {'vsync': 'bool', 'show_fps': 'bool', 'gpu_readbacks': ('0', '1', '2'),
                    'frame_rate': ('30', '60', 'unlocked')}
 SETTING_DEFAULTS = {'show_fps': False, **gfxlogic.SETTING_DEFAULTS}
+
+# ------------------------------------------------------------------ in-game graphics presets
+# The in-game menu's presets (gpu/shim/tlg_settings.cpp GraphicsText): the look settings and the
+# texture pack as tlg.ini keys. Stock is the game as shipped, Recommended the defaults; the
+# player's own are presets/<name>.ini next to tlg.ini ("Save as preset" in the Image tab).
+GAME_RECOMMENDED = {'dlaa': '1', 'smaa': '0', 'fsr1': '0', 'rcas': '1', 'rcas_strength': '75', 'cas': '0',
+                    'cas_strength': '50', 'shadow_scale': '1', 'fov': '70', 'bloom': '100', 'dof': '100',
+                    'motion_blur': '100', 'vignette_add': '0', 'ssao': '100', 'ssr': '100',
+                    'game_sharpen': '100', 'shadow_distance': '100', 'trico_feathers': '100',
+                    'boy_wind': '100', 'tree_wind': '100', 'fog_distance': '100', 'grass_smooth': '1',
+                    'color_adjust': '1', 'color_brightness': '0.00', 'color_contrast': '1.00',
+                    'color_saturation': '1.00', 'color_gamma': '0.75', 'lod_bias': '-4', 'aniso': '16',
+                    'texture_pack': 'off'}
+GAME_STOCK = {**GAME_RECOMMENDED, 'dlaa': '0', 'rcas': '0', 'lod_bias': '0', 'aniso': '0', 'grass_smooth': '0',
+              'color_adjust': '0', 'color_gamma': '1.00'}
+
+
+def game_presets(folder):
+    """[(name, {tlg.ini key: value})]: Stock, Recommended, then the files in `folder` by name."""
+    result = [('Stock', GAME_STOCK), ('Recommended', GAME_RECOMMENDED)]
+    for path in sorted(Path(folder).glob('*.ini')):
+        values = {}
+        try:
+            for line in path.read_text(encoding='utf-8').splitlines():
+                if '=' in line and not line.lstrip().startswith('#'):
+                    key, value = line.split('=', 1)
+                    values[key.strip()] = value.strip()
+        except OSError:
+            continue
+        result.append((path.stem, values))
+    return result
+
+
+def save_game_preset(folder, name, ini):
+    """Writes `folder`/<name>.ini from tlg.ini (`ini`, a read_ini dict; missing keys are the
+    defaults), as the in-game menu's "Save as preset" does (tlg_settings.cpp SaveGraphicsPreset).
+    Returns the name as saved, or None when nothing is left of it or it is a built-in preset."""
+    clean = ''.join(c for c in name if c.isascii() and (c.isalnum() or c in ' -_')).strip()
+    if not clean or clean in ('Stock', 'Recommended'):
+        return None
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    lines = [f'{key}={ini.get(key, value)}' for key, value in GAME_RECOMMENDED.items()]
+    (folder / f'{clean}.ini').write_text('# tlg graphics preset (in-game menu: Image tab; launcher)\n'
+                                         + '\n'.join(lines) + '\n', encoding='utf-8')
+    return clean
+
+
+def _same_ini_value(key, current, wanted):
+    if current is None:
+        current = GAME_RECOMMENDED.get(key)
+    if current is None:
+        return False
+    try:
+        return math.isclose(float(current), float(wanted), abs_tol=0.005)
+    except ValueError:
+        return current == wanted
+
+
+def game_preset_matches(ini, values):
+    """True when tlg.ini (`ini`, a read_ini dict; missing keys are the defaults) holds every value."""
+    return all(_same_ini_value(k, ini.get(k), v) for k, v in values.items())
+
 
 # A problem found while reading a file. fatal: nothing can be applied.
 Problem = namedtuple('Problem', 'code detail fatal')

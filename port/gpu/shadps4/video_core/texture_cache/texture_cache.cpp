@@ -1237,6 +1237,7 @@ void TextureCache::RefreshImage(Image& image) {
     }
 
     runtime.UploadImage(&image, buffer, image_copies);
+    image.pack_key = ~0ull; // tlg: the texture pack hashes it again on the next sample
 }
 
 vk::Sampler TextureCache::GetSampler(const AmdGpu::Sampler& sampler,

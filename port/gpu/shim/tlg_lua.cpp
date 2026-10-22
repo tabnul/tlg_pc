@@ -6,6 +6,7 @@
 // (data out of Lua); "--TLGVAL <row> <value>" chunks report a Lab row's game value.
 #include "tlg_lab.h"
 #include "tlg_settings.h"
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -37,6 +38,7 @@ local ls=loadstring or load
 local function L(s) local f=ls('--TLGLOG '..s) if f then f() end end
 _TLGB=_TLGB or {}
 local B=_TLGB
+B.run=(B.run or 0)+1
 local function Parts(v) local t={} for n in tostring(v):gmatch('%S+') do t[#t+1]=tonumber(n) or 0 end return t end
 local function Scale(o,key,prop,pct,parts,add)
   if not o then return end
@@ -67,8 +69,97 @@ end
 local pp=FindObject('_default_env_pp')
 local cam=FindObject('_trico_camera')
 local cs=FindObject('_default_env_cs')
-local sk=FindObject('_default_env_sk')
 local XY,XZ,ALL,XYZ={1,2},{1,3},{1,2,3,4},{1,2,3}
+-- Area loads add objects, so the lists below are made again when the game finishes a load
+-- (RegionController.IsLoading goes back to false). Listing every object stalls the game, which
+-- re-listing every 20 ticks did every few seconds with any wind setting off its default. Without
+-- the loading state the lists are made again every 240 ticks.
+local okl,ld=pcall(function() return RegionController.IsLoading() end)
+B.gen=B.gen or 0
+if not okl then if B.run%240==0 then B.gen=B.gen+1 end
+elseif ld then B.ld=true elseif B.ld then B.ld=nil B.gen=B.gen+1 end
+-- Names of the objects of one class whose name contains match; one enumeration serves every
+-- caller and the class of each name is looked up once.
+local function Each(key,class,match)
+  local l=B[key] or {c={}}
+  B[key]=l
+  if not l.n or l.gen~=B.gen then
+    l.n={} l.gen=B.gen
+    if B.allgen~=B.gen then B.all=EnumerateObjectList() or {} B.allgen=B.gen end
+    for _,n in ipairs(B.all) do
+      if n:find(match,1,true) then
+        local c=l.c[n]
+        if c==nil then
+          local o=FindObject(n)
+          if o then c=tostring(o._class_name)==class l.c[n]=c end
+        end
+        if c then l.n[#l.n+1]=n end
+      end
+    end
+  end
+  return l.n
+end
+-- The wind settings write once per area load and when the user changes them, not every run (a
+-- value the game resets in between returns at the next load).
+local function Due(key,v)
+  local s=B.gen..'|'..tostring(v)
+  if B[key]==s then return false end
+  B[key]=s return true
+end
+-- Trico's feathers and hair sway by the wind Influence of his SwingTypes (one per model part).
+-- At the default nothing runs once restored.
+local INF={'InfluencePlusMin','InfluencePlusMax','InfluenceMinusMin','InfluenceMinusMax'}
+local function Feathers(pct)
+  if pct==100 and not B.swd or not Due('swa',pct) then return end
+  for _,n in ipairs(Each('swl','SwingType','chara/skin/condor')) do
+    local o=FindObject(n)
+    for _,k in ipairs(INF) do Scale(o,'sw|'..n..'|'..k,k,pct,XYZ) end
+  end
+  B.swd=pct~=100
+end
+-- Field of view: every camera mode has its own GameCameraParam (Base_FovDeg 70 as shipped).
+local function Fov(deg)
+  if deg==70 and not B.fovd then return end
+  for _,n in ipairs(Each('fovl','GameCameraParam','gamecamera_param')) do
+    Scale(FindObject(n),'fov|'..n,'Base_FovDeg',deg*100/70)
+  end
+  B.fovd=deg~=70
+end
+-- Grass: the instanced grass ships with skipFrame/slowFrame 4 (animates every 4th frame); on
+-- sets 1 on every GrassType, off restores the game's values.
+local GRF={'skipFrame','slowFrame'}
+local function Grass(on)
+  if not on and not B.grd or not Due('gra',on) then return end
+  for _,n in ipairs(Each('grl','GrassType','grass')) do
+    local o=FindObject(n)
+    for _,k in ipairs(GRF) do
+      local key='gr|'..n..'|'..k
+      if o and type(o[k])=='number' then
+        if B[key]==nil then B[key]=o[k] end
+        local w=on and 1 or B[key]
+        if o[k]~=w then o[k]=w end
+      end
+    end
+  end
+  B.grd=on
+end
+-- Wind: the boy's receiver (WindRecvExt2311_SNt001*, hair and clothing) caps the scene wind by
+-- MaxStrength; tree and leaf motion is VertexClusterParam.windIntensity (the boy's hair param
+-- SNt006 excluded). Percent of the game's value.
+local function BoyWind(pct)
+  if pct==100 and not B.bwd or not Due('bwa',pct) then return end
+  for _,n in ipairs(Each('bwl','WindRecvExt','2311_SNt001')) do
+    Scale(FindObject(n),'bw|'..n,'MaxStrength',pct)
+  end
+  B.bwd=pct~=100
+end
+local function TreeWind(pct)
+  if pct==100 and not B.twd or not Due('twa',pct) then return end
+  for _,n in ipairs(Each('twl','VertexClusterParam','VertexClusterParam')) do
+    if not n:find('SNt006',1,true) then Scale(FindObject(n),'tw|'..n,'windIntensity',pct) end
+  end
+  B.twd=pct~=100
+end
 )";
 
 // Development: the file named by TLG_LUA_EXEC runs once each time it changes (live console).
@@ -109,14 +200,15 @@ std::string SetChunk() {
                   "Scale(pp,'ao','saoIntensity',%d,XY) Feature(pp,'SSAO',%d)\n"
                   "Scale(pp,'ssr','ssrStrength',%d) Feature(pp,'SSR',%d)\n"
                   "Scale(pp,'blur','cameraBlurScale',%d) Feature(pp,'CameraBlur',%d)\n"
-                  "Scale(pp,'ca','chromaticAberrationAmount',100,nil,%.4f)\n"
                   "Scale(pp,'vig','vignetteParams',100,XZ,%.4f)\n"
                   "Scale(pp,'sharp','sharpenScale',%d)\n"
-                  "Scale(sk,'lod','viewDistanceScale',%d,XYZ)\n",
+                  "Scale(pp,'fogd','fogParam',%d,XY)\n"
+                  "Feathers(%d) Fov(%d) Grass(%s) BoyWind(%d) TreeWind(%d)\n",
                   s.bloom.load(), s.bloom.load(), s.ssao.load(), s.ssao.load(), s.ssr.load(),
                   s.ssr.load(), s.motion_blur.load(), s.motion_blur.load(),
-                  s.chromatic.load() * 0.002, s.vignette.load() * 0.01, s.game_sharpen.load(),
-                  s.lod.load());
+                  s.vignette.load() * 0.01, std::min(s.game_sharpen.load(), 100),
+                  s.fog_distance.load(), s.trico_feathers.load(), s.fov.load(),
+                  s.grass_smooth.load() ? "true" : "false", s.boy_wind.load(), s.tree_wind.load());
     code += line;
     if (subtitle_shift) {
         // Re-applied every tick: SubtitleSystem:Initialize resets it to (0, -OFFSET_Y).

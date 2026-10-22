@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """The game runs detached from the launcher and writes its own log file: the log reader
-(launcher/logtail.py), launch() without a pipe, closing the launcher with the game open, and the
-'Close the launcher when the game starts' option."""
+(launcher/logtail.py), launch() without a pipe, and the classic launcher path."""
 import os
 import sys
 import tempfile
@@ -14,15 +13,6 @@ sys.path.insert(0, str(ROOT / 'launcher'))
 import tlg_run  # noqa: E402
 import logtail  # noqa: E402
 import userdata  # noqa: E402
-
-try:
-    from PySide6.QtCore import QCoreApplication
-    from qt import backend as backend_module
-    from qt.backend import Backend
-    HAVE_QT = True
-except ImportError:
-    HAVE_QT = False
-
 
 class LogTailTests(unittest.TestCase):
     def setUp(self):
@@ -163,160 +153,6 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual({'out', 'err'}, set(log.read_text().split()))
 
 
-@unittest.skipUnless(HAVE_QT, 'PySide6 not installed')
-class BackendTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QCoreApplication.instance() or QCoreApplication([])
-
-    def make(self, **settings):
-        probes = {'gpu': lambda: ('GPU', '1.4'), 'pad': lambda: None, 'problems': lambda: [], 'cache': lambda: 0,
-                  'save': lambda: None, 'news': lambda: [], 'version': lambda: 'v1',
-                  'saves': {'running': lambda: False, 'scan': lambda: [], 'open': lambda p: None}}
-        data = {**tlg_run.DEFAULT_SETTINGS, 'ui_language': 'en_US', **settings}
-        return Backend(settings=data, probes=probes)
-
-    def test_shutdown_leaves_the_running_game_alone(self):
-        backend = self.make()
-        backend.process = mock.Mock()
-        backend.shutdown()
-        backend.process.terminate.assert_not_called()
-        backend.process.kill.assert_not_called()
-
-    def test_panel_is_rebuilt_once_per_tick(self):
-        backend = self.make()
-        with tempfile.TemporaryDirectory() as tmp:
-            log = Path(tmp) / 'run.log'
-            log.write_bytes(b'')
-            backend._on_game_started(str(log))
-            backend._tail_timer.stop()
-            changes = []
-            backend.logChanged.connect(lambda: changes.append(1))
-            log.write_bytes(''.join(f'line {i}\n' for i in range(2000)).encode() + b'partial')
-            backend._poll_log()
-            self.assertEqual(1, len(changes))
-            self.assertEqual(backend_module.LOG_LINES, len(backend._log))
-            self.assertEqual('line 1999', backend.logText.splitlines()[-1])
-            backend._poll_log()
-            self.assertEqual(1, len(changes))     # nothing new: no rebuild
-            backend._on_finished(0)               # the last, unfinished line is kept at the end
-            self.assertIn('partial', backend._log)
-
-    def test_option_is_on_by_default(self):
-        self.assertIs(True, tlg_run.DEFAULT_SETTINGS['close_on_play'])
-        self.assertEqual('Close the launcher when the game starts', self.make().t_('close_on_play'))
-        self.assertEqual('Fechar o launcher ao abrir o jogo', self.make(ui_language='pt_BR').t_('close_on_play'))
-
-    def started(self, **settings):
-        backend = self.make(**settings)
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(backend_module, 'QTimer') as timer:
-            backend._on_game_started(str(Path(tmp) / 'run.log'))
-            backend._tail_timer.stop()
-        return backend, timer
-
-    def test_option_off_keeps_the_launcher_open(self):
-        _, timer = self.started(close_on_play=False)
-        timer.singleShot.assert_not_called()
-
-    def test_option_on_closes_the_launcher_after_about_two_seconds(self):
-        backend, timer = self.started(close_on_play=True)
-        delay, callback = timer.singleShot.call_args.args
-        self.assertEqual(2000, delay)
-        with mock.patch.object(self.app, 'quit') as quit_:
-            callback()
-        quit_.assert_called_once()
-
-
-@unittest.skipUnless(HAVE_QT, 'PySide6 not installed')
-class CacheSizeTests(unittest.TestCase):
-    """The shader cache holds tens of thousands of files after the first start: its size is measured
-    off the UI thread, never by a QML property (the window froze on Windows, close-on-play included)."""
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QCoreApplication.instance() or QCoreApplication([])
-
-    def make(self, measure):
-        probes = {'gpu': lambda: ('GPU', '1.4'), 'pad': lambda: None, 'problems': lambda: [],
-                  'save': lambda: None, 'news': lambda: [], 'version': lambda: 'v1',
-                  'saves': {'running': lambda: False, 'scan': lambda: [], 'open': lambda p: None}}
-        data = {**tlg_run.DEFAULT_SETTINGS, 'ui_language': 'en_US', 'backports_notice_seen': True}
-        with mock.patch.object(backend_module.tlg_run, 'shader_cache_size', measure):
-            backend = Backend(settings=data, probes=probes)
-            return backend, self.wait(backend)
-
-    def wait(self, backend):
-        import time
-        deadline = time.monotonic() + 10
-        while backend._measuring and time.monotonic() < deadline:
-            self.app.processEvents()
-            time.sleep(0.01)
-        self.assertFalse(backend._measuring)
-        return backend
-
-    def test_measured_off_the_ui_thread(self):
-        import threading
-        threads = []
-
-        def measure(_settings):
-            threads.append(threading.current_thread())
-            return 5 * 2 ** 20
-        backend, _ = self.make(measure)
-        self.assertTrue(threads)
-        self.assertNotIn(threading.main_thread(), threads)
-        self.assertEqual(5 * 2 ** 20, backend.cache_bytes())
-        self.assertIn('Shader cache: 5', ' '.join(chip['text'] for chip in backend.chips))
-        self.assertFalse(backend.showFirstRun)
-
-    def test_properties_never_walk_the_folder(self):
-        backend, _ = self.make(lambda _settings: 0)
-        with mock.patch.object(backend_module.tlg_run, 'shader_cache_size', side_effect=AssertionError):
-            for _ in range(50):              # each progress line of the shader list re-reads them
-                backend._on_jobs_progress('index', 1, 2)
-                backend.showFirstRun
-                backend.playSubtitle
-        self.assertTrue(backend.showFirstRun)   # measured empty: first start
-
-    def test_unknown_size_is_not_a_first_start(self):
-        import threading
-        release = threading.Event()
-
-        def slow(_settings):
-            release.wait(10)
-            return 0
-        data = {**tlg_run.DEFAULT_SETTINGS, 'ui_language': 'en_US', 'backports_notice_seen': True}
-        probes = {'gpu': lambda: None, 'pad': lambda: None, 'problems': lambda: [], 'save': lambda: None,
-                  'news': lambda: [], 'version': lambda: 'v1',
-                  'saves': {'running': lambda: False, 'scan': lambda: [], 'open': lambda p: None}}
-        with mock.patch.object(backend_module.tlg_run, 'shader_cache_size', slow):
-            backend = Backend(settings=data, probes=probes)
-            self.assertIsNone(backend._cache_bytes)
-            self.assertIn('Shader cache: measuring', ' '.join(chip['text'] for chip in backend.chips))
-            backend.refresh()                 # a second request while measuring runs once more after
-            release.set()
-            self.wait(backend)
-            self.wait(backend)
-        self.assertEqual(0, backend.cache_bytes())
-
-    def test_quit_hides_the_window_first(self):
-        backend, _ = self.make(lambda _settings: 0)
-        window = mock.Mock()
-        with mock.patch.object(self.app, 'quit') as quit_, \
-                mock.patch.object(type(self.app), 'topLevelWindows', create=True, new=lambda _self: [window]):
-            backend._quit_app()
-        window.hide.assert_called_once()
-        quit_.assert_called_once()
-
-
-class OptionTextTests(unittest.TestCase):
-    def test_qt_options_have_both_languages(self):
-        import json
-        strings = json.loads((ROOT / 'launcher' / 'qt' / 'i18n' / 'strings.json').read_text(encoding='utf-8'))
-        self.assertEqual({'en': 'Close the launcher when the game starts', 'pt': 'Fechar o launcher ao abrir o jogo'},
-                         strings['close_on_play'])
-        self.assertTrue(strings['reopen_launcher']['en'] and strings['reopen_launcher']['pt'])
-        self.assertIs(True, tlg_run.DEFAULT_SETTINGS['reopen_launcher'])
-
-
 class TkPathTests(unittest.TestCase):
     """The classic Tk launcher and `--play` stay attached, but the game writes its own log file:
     a pipe stalls the game once nothing reads it (a closed or crashed launcher)."""
@@ -337,18 +173,7 @@ class TkPathTests(unittest.TestCase):
             self.assertEqual('Frame rate: test\n', log.read_text(encoding='utf-8'))
 
 
-class ReopenTests(unittest.TestCase):
-    def test_watcher_command_and_exit_wait(self):
-        with mock.patch.object(tlg_run.subprocess, 'Popen') as popen:
-            self.assertTrue(tlg_run.reopen_after(4321))
-        cmd = popen.call_args.args[0]
-        self.assertEqual(['--reopen-after', '4321'], cmd[-2:])
-        self.assertTrue(cmd[1].endswith('tlg_launcher_qt.py'))
-        self.assertIs(True, popen.call_args.kwargs['start_new_session'])
-        child = tlg_run.subprocess.Popen([sys.executable, '-c', 'pass'])
-        child.wait()
-        tlg_run.wait_for_exit(child.pid)          # returns at once for a finished process
-
+class FileLimitTests(unittest.TestCase):
     def test_open_file_limit_goes_to_the_hard_maximum(self):
         import resource
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)

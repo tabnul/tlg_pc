@@ -15,6 +15,7 @@
 #include "video_core/renderer_vulkan/vk_draw_pipe.h"
 #include "video_core/renderer_vulkan/vk_draw_prep.h"
 #include "video_core/renderer_vulkan/vk_temporal_upscaler.h"
+#include "video_core/renderer_vulkan/vk_texture_pack.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture_cache/texture_cache.h"
@@ -268,12 +269,14 @@ private:
         const void* backing = nullptr;
         VideoCore::SubresourceRange range;
         bool proxy = false; ///< sampled from the scene proxy (view: SampleProxy on each use)
+        bool pack = false;  ///< sampled from the texture pack (view: TexturePack::Sample)
     };
     struct TextureSet {
         u64 key = 0;
         const Shader::Info* stage = nullptr;
         u64 generation = ~0ull;
         u64 scene_generation = 0; ///< SceneTargets::Generation of the proxy views
+        u64 pack_generation = 0;  ///< TexturePack::Generation of the pack views
         u32 count = 0;
         static constexpr u32 MaxImages = 16; ///< larger sets are not memoized
         std::array<u64, MaxImages> hashes{};
@@ -333,6 +336,7 @@ private:
     std::unique_ptr<DrawPreparation> draw_prep;
     std::unique_ptr<CameraMotion> camera_motion; // tlg: motion vectors (docs/upscaler.md)
     std::unique_ptr<SceneTargets> scene_targets;
+    std::unique_ptr<TexturePack> texture_pack;
     bool scene_started = false;
     std::unique_ptr<ObjectMotion> object_motion;
     bool motion_draw = false;

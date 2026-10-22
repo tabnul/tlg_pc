@@ -61,6 +61,7 @@ Rasterizer::Rasterizer(const Instance& instance_, Scheduler& scheduler_, Runtime
     // Before the rasterizer is bound: Liverpool enqueues buffers only once it sees it.
     draw_prep = std::make_unique<DrawPreparation>(pipeline_cache);
     scene_targets = std::make_unique<SceneTargets>(instance, scheduler, runtime, texture_cache);
+    texture_pack = std::make_unique<TexturePack>(instance, scheduler, runtime.GetStagingPool());
     // Object motion first: it fixes the buffer addresses the motion shader variants embed.
     object_motion = std::make_unique<ObjectMotion>(instance, scheduler);
     camera_motion = std::make_unique<CameraMotion>(instance, scheduler, texture_cache, runtime);
@@ -1214,6 +1215,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         scene_targets->SetShadowScale(u32(std::clamp(TlgSettings::Get().shadow_scale.load(), 1, 4)));
         scene_targets->SetHalfScale(TlgSettings::Get().half_scale.load() >= 2 ? 2u : 1u);
         scene_targets->ShadowReport();
+        texture_pack->Tick();
     }
     bind_prepared = used_prepared;
     motion_draw = pipeline->GetGraphicsKey().motion_vectors;
@@ -1805,6 +1807,10 @@ bool Rasterizer::HelperEligible(const Pipeline* pipeline) const {
 
 bool Rasterizer::TexturesBindableOnHelper(const Shader::Info& stage,
                                           const PreparedStage* prepared) {
+    // tlg: the texture pack is applied on the render thread only.
+    if (TlgSettings::Get().texture_pack.load() != 0) {
+        return false;
+    }
     const u64 generation = texture_cache.RegistryGeneration();
     for (u32 image_index = 0; image_index < stage.images.size(); ++image_index) {
         const auto& image_desc = stage.images[image_index];
@@ -2725,6 +2731,20 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
                 image_id, desc, memo_entry ? &memo_entry->view_memo : nullptr, !on_helper);
             const auto binding = image.binding;
 
+            // tlg: texture pack: sampled-only bindings of an image with a pack entry read it.
+            if (!on_helper && !is_storage && !binding.force_general && !binding.is_target) {
+                if (const auto pack_view = texture_pack->Sample(image, desc.view_info)) {
+                    image.usage.texture = 1u;
+                    image_infos.emplace_back(VK_NULL_HANDLE, pack_view,
+                                             vk::ImageLayout::eShaderReadOnlyOptimal);
+                    if (set_ok && binding_index < resolved.size()) {
+                        resolved[binding_index] = {image_id, pack_view, image.backing,
+                                                   desc.view_info.range, false, true};
+                    }
+                    continue;
+                }
+            }
+
             // tlg: a proxied scene image sampled with normalized coordinates reads the proxy:
             // no resample to the native size (the native image is not touched).
             if (binding_proxy_ok[binding_index] && !is_storage && !binding.force_general &&
@@ -2793,6 +2813,7 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
         // Remember the set: the same T#s resolve the same way while no image is (un)registered.
         set_slot->generation = texture_cache.RegistryGeneration();
         set_slot->scene_generation = scene_targets->Generation();
+        set_slot->pack_generation = texture_pack->Generation();
         set_slot->count = static_cast<u32>(stage.images.size());
         std::copy_n(resolved.begin(), set_slot->count, set_slot->entries.begin());
     } else if (set_slot) {
@@ -2890,6 +2911,7 @@ bool Rasterizer::BindTexturesFromSet(const Shader::Info& stage, const PreparedSt
     const bool match = set.key == key && set.stage == &stage && set.count == count &&
                        set.generation == generation &&
                        set.scene_generation == scene_targets->Generation() &&
+                       set.pack_generation == texture_pack->Generation() &&
                        std::equal(set.hashes.begin(), set.hashes.begin() + count,
                                   prepared->image_hashes);
     if (!match) {
@@ -2938,6 +2960,12 @@ bool Rasterizer::BindTexturesFromSet(const Shader::Info& stage, const PreparedSt
         image.binding.is_bound = 1u;
         bound_images.emplace_back(entry.id);
         image.usage.texture = 1u;
+        if (entry.pack) {
+            texture_pack->Touch(image);
+            image_infos.emplace_back(VK_NULL_HANDLE, entry.view,
+                                     vk::ImageLayout::eShaderReadOnlyOptimal);
+            continue;
+        }
         if (entry.proxy) {
             image_infos.emplace_back(VK_NULL_HANDLE, entry.view,
                                      scene_targets->PrepareSample(image, entry.range.base.level));

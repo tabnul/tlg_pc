@@ -99,7 +99,7 @@ void UniqueImage::Destroy() {
     }
 }
 
-void UniqueImage::Create(const vk::ImageCreateInfo& image_ci) {
+void UniqueImage::Create(const vk::ImageCreateInfo& image_ci, VmaPool pool) {
     this->image_ci = image_ci;
     ASSERT(!image);
     const VmaAllocationCreateInfo alloc_ci = {
@@ -107,7 +107,7 @@ void UniqueImage::Create(const vk::ImageCreateInfo& image_ci) {
         .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         .requiredFlags = 0,
         .preferredFlags = 0,
-        .pool = VK_NULL_HANDLE,
+        .pool = pool,
         .pUserData = nullptr,
     };
 
