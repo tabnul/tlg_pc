@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Links and folders the launcher opens (tlg_run.open_external): on Linux the frozen launcher
 must not pass PyInstaller's LD_LIBRARY_PATH to the browser or file manager (the Linux package's
-YouTube, Discord and sponsor links did nothing: the browser loaded the launcher's libraries)."""
+web links did nothing: the browser loaded the launcher's libraries)."""
 import os
 import sys
 import unittest
@@ -22,12 +22,12 @@ class OpenExternalTests(unittest.TestCase):
             for key in ('LD_LIBRARY_PATH', 'LD_LIBRARY_PATH_ORIG'):
                 if key not in env:
                     os.environ.pop(key, None)
-            self.assertTrue(tlg_run.open_external('https://discord.gg/UMkdMYZh9g'))
+            self.assertTrue(tlg_run.open_external('https://github.com/tabnul/tlg_pc'))
         return calls[0]
 
     def test_frozen_restores_the_original_library_path(self):
         (argv,), kw = self.opened(True, {'LD_LIBRARY_PATH': '/pkg/_internal', 'LD_LIBRARY_PATH_ORIG': '/usr/local/lib'})
-        self.assertEqual(['xdg-open' if sys.platform != 'darwin' else 'open', 'https://discord.gg/UMkdMYZh9g'], argv)
+        self.assertEqual(['xdg-open' if sys.platform != 'darwin' else 'open', 'https://github.com/tabnul/tlg_pc'], argv)
         self.assertEqual('/usr/local/lib', kw['env']['LD_LIBRARY_PATH'])
         self.assertNotIn('LD_LIBRARY_PATH_ORIG', kw['env'])
         self.assertTrue(kw['start_new_session'])

@@ -1,6 +1,6 @@
 # The Last Guardian — port para PC / PC port
 
-Por HayatoG · YouTube: [@hayatog-dev](https://www.youtube.com/@hayatog-dev) · Discord: [discord.gg/UMkdMYZh9g](https://discord.gg/UMkdMYZh9g) · Código: [github.com/HayatoG/tlg_pc](https://github.com/HayatoG/tlg_pc)
+Código / Code: [github.com/tabnul/tlg_pc](https://github.com/tabnul/tlg_pc) · Baseado no port de / Based on the port by [HayatoG](https://github.com/HayatoG/tlg_pc)
 
 **Nenhum arquivo do jogo vem neste pacote.** Você precisa da sua própria cópia de The Last Guardian para PS4. / **No game files are included.** You need your own copy of The Last Guardian for PS4.
 
@@ -37,7 +37,7 @@ Tudo vem do **seu** PS4 (GoldHEN + Itemzflow). Nada disso vai no download. Use *
 
 1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
 2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher clássico, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos). O launcher novo (Qt), com telas de Gráficos, Controles, Correções, Saves, Mods, Suporte e Atualizações, fica ao lado como **The Last Guardian (Qt)**; ele ainda não tem as opções de widescreen/DLAA/efeitos. Por padrão o launcher Qt fecha quando o jogo abre e volta quando o jogo fecha (dá para mudar em Gráficos → Áudio e launcher).
+3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
 5. Escolha o idioma do jogo (inglês, português, espanhol ou francês) e clique em **Jogar**. A primeira partida demora um pouco mais.
@@ -82,7 +82,7 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 ### Problemas
 
 - **Som incompleto ou estranho**: sem o `libSceNgs2.sprx` em `system_lib/`, o port usa o seu próprio mixer, ainda experimental (sem reverb e sem filtros). Com o arquivo, o áudio é o nativo.
-- **Não abre ou fecha sozinho**: veja a caixa de log no launcher e mande o `out/last_run.log` no [Discord](https://discord.gg/UMkdMYZh9g) ou numa [issue](https://github.com/HayatoG/tlg_pc/issues).
+- **Não abre ou fecha sozinho**: veja a caixa de log no launcher e mande o `out/last_run.log` numa [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use um driver recente.
 
 ---
@@ -116,7 +116,7 @@ Everything comes from **your own** PS4 (GoldHEN + Itemzflow). None of it is in t
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
-3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the classic launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects). The new (Qt) launcher, with Graphics, Controls, Fixes, Saves, Mods, Support and Updates screens, is next to it as **The Last Guardian (Qt)**; it does not have the widescreen/DLAA/effects options yet. By default the Qt launcher closes when the game starts and comes back when the game closes (change it in Graphics → Audio and launcher).
+3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick the game language (English, Portuguese, Spanish or French) and click **Play**. The first start takes a little longer.
@@ -161,7 +161,7 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 ### Problems
 
 - **Incomplete or odd sound**: without `libSceNgs2.sprx` in `system_lib/`, the port uses its own mixer, still experimental (no reverb or filters yet). With the file, audio is native.
-- **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` on [Discord](https://discord.gg/UMkdMYZh9g) or in an [issue](https://github.com/HayatoG/tlg_pc/issues).
+- **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use a recent driver.
 
 ---
