@@ -1,3 +1,4 @@
+# (Linux is disabled for now: see the commented-out job.)
 # Builds the Linux and Windows packages on every push to master and publishes them as a new
 # release tagged vYYYY.MM.DD-<commit>, marked latest. Every release is kept as version history
 # (the old "nightly" release is removed). A pushed tag v* publishes that tag the same way.
@@ -21,51 +22,53 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: port
-    env:
-      CC: gcc-14
-      CXX: g++-14
-      PKG_CONFIG_PATH: /opt/tlgdeps/lib/pkgconfig:/opt/tlgdeps/lib64/pkgconfig:/opt/tlgdeps/lib/x86_64-linux-gnu/pkgconfig
-      CMAKE_PREFIX_PATH: /opt/tlgdeps
-      LD_LIBRARY_PATH: /opt/tlgdeps/lib:/opt/tlgdeps/lib64:/opt/tlgdeps/lib/x86_64-linux-gnu
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: System packages
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
-            curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \
-            libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
-            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
-            libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
-            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
-      - name: Cache built libraries
-        id: deps
-        uses: actions/cache@v4
-        with:
-          path: /opt/tlgdeps
-          key: tlgdeps-ubuntu2404-${{ hashFiles('port/packaging/linux/build_deps.sh') }}
-      - name: Build libraries (SDL3, Zydis, fmt, FFmpeg)
-        if: steps.deps.outputs.cache-hit != 'true'
-        run: |
-          sudo mkdir -p /opt/tlgdeps && sudo chown "$USER" /opt/tlgdeps
-          bash packaging/linux/build_deps.sh
-      - name: Build
-        run: TLG_LTO=OFF TLG_PGO=off bash build.sh
-      - name: Package
-        run: bash packaging/linux/package.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tlg-linux-x86_64
-          path: port/dist/tlg-linux-x86_64.tar.gz
-          if-no-files-found: error
-          retention-days: 3
+  # Linux build disabled for now (Windows only); uncomment this job and the lines marked
+  # "Linux" in the release job to bring it back.
+  #linux:
+  #  runs-on: ubuntu-24.04
+  #  defaults:
+  #    run:
+  #      working-directory: port
+  #  env:
+  #    CC: gcc-14
+  #    CXX: g++-14
+  #    PKG_CONFIG_PATH: /opt/tlgdeps/lib/pkgconfig:/opt/tlgdeps/lib64/pkgconfig:/opt/tlgdeps/lib/x86_64-linux-gnu/pkgconfig
+  #    CMAKE_PREFIX_PATH: /opt/tlgdeps
+  #    LD_LIBRARY_PATH: /opt/tlgdeps/lib:/opt/tlgdeps/lib64:/opt/tlgdeps/lib/x86_64-linux-gnu
+  #  steps:
+  #    - uses: actions/checkout@v4
+  #      with:
+  #        submodules: recursive
+  #    - name: System packages
+  #      run: |
+  #        sudo apt-get update -q
+  #        sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
+  #          curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \
+  #          libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
+  #          libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+  #          libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
+  #          libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
+  #    - name: Cache built libraries
+  #      id: deps
+  #      uses: actions/cache@v4
+  #      with:
+  #        path: /opt/tlgdeps
+  #        key: tlgdeps-ubuntu2404-${{ hashFiles('port/packaging/linux/build_deps.sh') }}
+  #    - name: Build libraries (SDL3, Zydis, fmt, FFmpeg)
+  #      if: steps.deps.outputs.cache-hit != 'true'
+  #      run: |
+  #        sudo mkdir -p /opt/tlgdeps && sudo chown "$USER" /opt/tlgdeps
+  #        bash packaging/linux/build_deps.sh
+  #    - name: Build
+  #      run: TLG_LTO=OFF TLG_PGO=off bash build.sh
+  #    - name: Package
+  #      run: bash packaging/linux/package.sh
+  #    - uses: actions/upload-artifact@v4
+  #      with:
+  #        name: tlg-linux-x86_64
+  #        path: port/dist/tlg-linux-x86_64.tar.gz
+  #        if-no-files-found: error
+  #        retention-days: 3
 
   windows:
     runs-on: windows-latest
@@ -132,7 +135,8 @@ jobs:
           retention-days: 3
 
   release:
-    needs: [linux, windows]
+    # Linux: needs: [linux, windows]
+    needs: [windows]
     # Only pushes publish (master -> vYYYY.MM.DD-<commit>, v* tags -> that tag); pull requests stop at the artifacts.
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -158,13 +162,14 @@ jobs:
         run: |
           set -euo pipefail
           ls -la dist
-          test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
+          # Linux: test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
+          test -f dist/tlg-windows-x86_64.zip
           short=${GITHUB_SHA::7}
+          # Linux: the notes list "- Linux x86-64 (glibc 2.39+): \`tlg-linux-x86_64.tar.gz\`" above Windows.
           cat > notes.md <<NOTES
           Build automático do commit ${short}. **Nenhum arquivo do jogo incluído**: veja o README-player.md dentro do pacote para o que copiar do seu PS4.
           Automatic build of commit ${short}. **No game files included**: see README-player.md inside the package for what to copy from your PS4.
 
-          - Linux x86-64 (glibc 2.39+): \`tlg-linux-x86_64.tar.gz\`
           - Windows 10/11 64-bit: \`tlg-windows-x86_64.zip\` (ainda não testado em jogo / not yet tested in game)
 
           NOTES
@@ -182,13 +187,15 @@ jobs:
             echo "tag=$tag" >> "$GITHUB_OUTPUT"; exit 0
           fi
           # SHA256SUMS: the launcher's updater checks the downloaded package against it.
-          (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
+          # Linux: (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
+          (cd dist && sha256sum tlg-windows-x86_64.zip > SHA256SUMS)
           # Upload into a draft first, so a failed upload never leaves a half-published release.
           # Releases are kept forever as version history; nothing here deletes one.
           gh release create "$tag" dist/* --draft --target "$GITHUB_SHA" \
             --title "$tag ($(date -u +%Y-%m-%d) · ${short})" --notes-file notes.md
           n=$(gh release view "$tag" --json assets --jq '.assets | length')
-          [[ $n -ge 3 ]] || { echo "draft release has $n assets"; exit 1; }
+          # Linux: [[ $n -ge 3 ]]
+          [[ $n -ge 2 ]] || { echo "draft release has $n assets"; exit 1; }
           for try in 1 2 3; do
             gh release edit "$tag" --draft=false --latest && break
             sleep 10
