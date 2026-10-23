@@ -30,18 +30,58 @@ normal maps). The game loads them while it runs and frees them again when they
 are no longer drawn. Runs on NVIDIA, AMD/Intel or, slowly, on the CPU. Entirely optional. See
 [docs/texture-pack.md](docs/texture-pack.md).
 
-**Graphics settings.** In the in-game menu (Insert) and in the launcher:
+**Realistic wind, less flicker.** The stock wind can make the boy's hair and clothing, the trees
+and Trico's feathers thrash as if in a storm. The game also moves most grass only every 4th frame,
+which looks choppy and flickers at PC frame rates. Here the grass moves every frame, and you set
+the wind strength separately for the boy, for trees and ivy, and for Trico's feathers. The
+recommended 50% looks like a breeze instead of a gale. You can also go calmer, or back to the
+original.
 
-- presets: *Stock* (the game as shipped), *Recommended* (the default) and your own
-- shadow resolution 2048, 4096 or 8192; the higher ones mostly fix shimmering shadows under trees
-- field of view, 50 to 110 degrees
-- the game's own effects as sliders: bloom, depth of field, motion blur, ambient occlusion, screen
-  space reflections, sharpening, vignette, chromatic aberration, character detail distance
-- HDR10 output, using the game's own HDR path
+**Advanced graphics tweaking, live in game.** Press Insert and change the picture while you play.
+Nearly every setting applies on the spot, with no restart and no trip back to the launcher. The
+launcher has the same settings, so you can set things up before starting.
 
-Every setting shows which value the game originally used, and the help text says what we would pick
-and why. Settings that turned out to make no visible difference were tested and left out; the
-evidence is in [docs/graphics-investigation.md](docs/graphics-investigation.md).
+- **Presets:** *Stock* (the game exactly as shipped), *Recommended* (the default) and your own.
+  Export a preset to a `.json` file and share it; anything specific to your machine is left out.
+- **Shadows:** 2048, 4096 or 8192 shadow maps. The higher ones remove most of the shimmer in tree
+  and leaf shadows.
+- **Camera:** field of view from 50 to 110 degrees.
+- **The game's own effects as sliders:** 100% is as shipped and 0% switches the pass off. This
+  covers ambient occlusion, bloom, screen space reflections, motion blur, vignette, the game's
+  sharpening and fog distance.
+- **Wind and foliage:** grass animation (every frame or as shipped), and wind strength for the
+  boy, for trees and ivy, and for Trico's feathers.
+- **Textures:**
+  - texture LOD bias under DLAA, for finer detail on grass and stone;
+  - anisotropic filtering up to 16x;
+  - live switching between AI-upscaled texture packs.
+- **Scaling and sharpening:** FSR 1, plus AMD CAS or RCAS sharpening with adjustable strength.
+- **Colour:** brightness, contrast, saturation and gamma of the final image.
+- **Output:** HDR10 output through the game's own HDR path.
+- **Performance:** frame rate limit, frame queue depth and background shader compilation.
+- **Lab tab:** for people who want to go further. It edits the game's own render objects live
+  (fog, height fog, LOD distances, far plane, shadow cascades) and shows the game's original value
+  next to yours.
+
+Every setting shows the value the game originally used. Its help text says what we would pick and
+why, and what it costs where we measured it. We tested every candidate setting. The ones that made
+no visible difference were left out, and the evidence is in
+[docs/graphics-investigation.md](docs/graphics-investigation.md).
+
+**Level select and the game's own QA menu.** The PS4 game still contains the developers' level
+select and QA menu. This port can switch both on: tick *Level select and QA menu* under Debug in the
+launcher.
+
+- **Level select:** hold L1 while the title menu closes (Continue or New Game) and pick any chapter.
+- **QA menu:** in game, hold L1 and press L3 (keyboard: hold 1, press Z). It is the developers' own
+  menu, and from there you can jump to any stage.
+
+The idea comes from the GoldHEN "Level Select + QA Menu" patch by illusiony and DanielSvoboda. On
+its own, that patch's stage switch leaves a black screen and runs the game out of video memory
+after a few jumps. This port fixes both, so you can jump from stage to stage at will, which is
+handy for revisiting a favourite area or comparing graphics settings across the game. The same
+Debug box has the GoldHEN *collapsing bridge freeze fix* for players whose game freezes when the
+bridge in the pit collapses. Both are off by default.
 
 ## Download
 
@@ -87,6 +127,7 @@ well (`build_dlss.sh`).
 - [HayatoG/tlg_pc](https://github.com/HayatoG/tlg_pc) by HayatoG: the port this fork is based on.
 - [gow3_pc](https://github.com/FelipePrado0/gow3_pc), [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
   and the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which the port builds on.
+- illusiony and DanielSvoboda for the GoldHEN level select, QA menu and bridge fix patches.
 - [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) for audio.
 - [4x-UltraSharp](https://huggingface.co/Kim2091/UltraSharp) by Kim2091, the default texture
   upscale model (CC BY-NC-SA 4.0), and Microsoft's
