@@ -76,6 +76,27 @@ PATCHES = {
         (0x24f17fc, f32(1 / 30), f32(1 / 60), 'dt snap target 1/30 -> 1/60'),
         (0x24f1800, f32(0.0316666663), f32(0.0158333331), 'dt snap lower bound 0.031667 -> 0.015833'),
     ],
+    # Material/cloth update null pointer guard (0x128c100, loop header at 0x128c161..0x128c1a4):
+    # At 60+ FPS on fast multi-core CPUs, worker threads can run 0x128c100 before streaming
+    # populates the pointer table at [r12 + 0x28] (fault at 0x28c193) or an element entry at
+    # [rcx + rax*8] (fault at 0x28c197 reading [rax + 0x28] right before test r15, r15).
+    # A null element leaves r15 = 0 (mov r15, rax before the test), as an element without a
+    # [rax + 0x28] does: the loop tests r15 again at 0x28c3aa and reads [r15 + 0x210] otherwise.
+    'cloth_null_guard': [
+        (0x128c161,
+         bytes.fromhex(
+             '6666666666662e0f1f840000000000'
+             '4d8b7424484863c7498b4c242841bb00000000488d1c4048c1e306'
+             '4963841ea0000000488b04c14c8b7828488945904d85ff7479'
+         ),
+         bytes.fromhex(
+             '49837c2428000f84f90400000f1f00'
+             '4d8b742448498b4c24284531db69dfc0000000'
+             '4963841ea0000000488b04c148894590'
+             '4989c74885c074074c8b78284d85ff7479'
+         ),
+         'cloth update null table/element guard at 0x28c161..0x28c1a4'),
+    ],
 }
 
 MODES = {
@@ -83,8 +104,8 @@ MODES = {
     # max_fps_double/max_fps_off are left out: 60 and unlocked were reached without them
     # (game+0x180 is no frame limiter in the tested scenes; its reader is not found yet).
     # TLG_FPS_PATCHES=flip_rate_60,max_fps_off tries them.
-    '60': ['flip_rate_60', 'dt_snap_60'],
-    'unlocked': ['flip_rate_60'],
+    '60': ['flip_rate_60', 'dt_snap_60', 'cloth_null_guard'],
+    'unlocked': ['flip_rate_60', 'cloth_null_guard'],
 }
 # The engine rate each mode presents at most (TLG_ENGINE_FPS: the overlay's frame limiter and
 # tlg_graphics.h PresentLimit). Unlocked is paced by the present thread (TLG_VBLANK_HZ=0).
