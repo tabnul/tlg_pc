@@ -96,7 +96,7 @@ drive; GoldHEN's FTP truncates files over 4 GB.
 For audio, also copy `libSceNgs2.sprx` from `/system/common/lib/` on your PS4 into `system_lib/`
 next to the executable.
 
-The full file list is in [docs/ARQUIVOS_NECESSARIOS.md](docs/ARQUIVOS_NECESSARIOS.md).
+The full file list is in [docs/game-files.md](docs/game-files.md).
 
 **PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX card.
 

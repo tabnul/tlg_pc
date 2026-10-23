@@ -8,7 +8,6 @@ Each built-in frame rate patch is a list of {image offset, expected bytes, new b
 before anything is written, so another build never gets byte writes in the wrong place. The
 loader (probe.c apply_patches) applies the file after relocation. Image offsets are eboot
 virtual addresses; the Ghidra addresses in the comments (base 0x1000000) are offset + 0x1000000.
-Research: docs/60fps.md.
 
 30 with no mods enabled writes an empty patch file: the game runs exactly as on PS4.
 

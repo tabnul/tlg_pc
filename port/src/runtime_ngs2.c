@@ -1,7 +1,7 @@
 /* libSceNgs2 reimplemented from scratch: the software mixer Sony's "sndx" middleware drives.
  *
  * Written against the API surface traced from the console module in The Last Guardian and
- * Gravity Rush 2 (docs/NGS2_LEVANTAMENTO.md): ten functions, five rack types, and the
+ * Gravity Rush 2: ten functions, five rack types, and the
  * VoiceControl parameter blocks those games send. Nothing here is specific to one game; the
  * selection between this mixer and the firmware module is TLG_NGS2 (native = the console's
  * libSceNgs2.sprx linked as a module; anything else = this file).

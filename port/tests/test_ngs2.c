@@ -1,7 +1,7 @@
 /* Offline tests for the built-in NGS2 mixer (src/runtime_ngs2.c), driven through the same
  * exports the game imports, with synthetic waveforms: PCM sine at odd rates, hand-built
  * VAG/HEVAG frames, envelopes, loops, kick events, user FX, render order and two outputs.
- * Parameter blocks copied from the native trace (docs/NGS2_LEVANTAMENTO.md) check parsing. */
+ * Parameter blocks copied from the native trace check parsing. */
 #define _GNU_SOURCE
 #include <math.h>
 #include <stdint.h>

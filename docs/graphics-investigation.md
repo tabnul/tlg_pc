@@ -134,7 +134,7 @@ Earlier tests: no visible effect in gameplay. That fits: gameplay DOF looks disa
 
 - **Non-RTX users:** set `aaType` to `SMAA_T2X` with `smaaQuality` Ultra instead of the default SMAA 1x. Pure property writes; good value for AMD/Intel users at almost no work.
 - Eboot strings list internal modes "1920x1080(scale)", "1680x1890(cb)", "3840x2160(native)". Worth checking we never land in a checkerboard mode at our resolutions (verify with one capture).
-- **60 FPS** (`docs/60fps.md`, experimental) is the biggest single "graphics" improvement for motion clarity, and DLAA looks better at 60. Finishing it outranks most items here.
+- **60 FPS** (experimental) is the biggest single "graphics" improvement for motion clarity, and DLAA looks better at 60. Finishing it outranks most items here.
 - **DLSS Frame Generation:** we already feed DLSS the game's motion vectors and depth. FG on top of 30 FPS gives 60/120 presentation. Concerns: 30 FPS base latency and UI/HUD artifacts (needs a HUD-less input, which we have via the sky pass hook point). Medium to large effort. Parked by the user (2026-10-22): only an in-game implementation counts, no driver-level FG.
 
 ## 10b. PS4 Pro mode (new, possibly the biggest lever)
