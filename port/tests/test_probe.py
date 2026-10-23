@@ -2,6 +2,7 @@
 from paths import ROOT
 from pathlib import Path
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -120,6 +121,20 @@ class LoaderTests(unittest.TestCase):
         r = self.run_image(package(b'\x0f\x0b'))
         self.assertEqual(r.returncode, 132)
         self.assertIn('at guest offset 0x0,', r.stderr)
+
+    def test_null_deref_dumps_instruction_and_object_words(self):
+        # lea rsi,[rip+0] then mov rax,[0]: the shape of the in-game crash (a NULL table lookup).
+        # The guest picks its own readable pointer, so the test does not depend on what the entry
+        # trampoline happens to leave in a register, and the mem line is cross-checked against the
+        # value dump so a swapped row in the handler's register table cannot pass unnoticed.
+        r = self.run_image(package(b'\x48\x8d\x35\x00\x00\x00\x00\x48\x8b\x04\x25\x00\x00\x00\x00'))
+        self.assertEqual(r.returncode, 139, r.stdout + r.stderr)
+        self.assertIn('Guest fault (signal 11) at guest offset 0x7, address (nil)', r.stderr)
+        self.assertIn('insn @0x7: 488b0425000000000000000000000000', r.stderr)
+        m = re.search(r'  rsi=([0-9a-f]{16}) ', r.stderr)
+        self.assertIsNotNone(m, r.stderr)
+        addr = format(int(m.group(1), 16), 'x')
+        self.assertRegex(r.stderr, rf'mem rsi=0x{addr}: ' + r'(?:[0-9a-f]{16} ){12}\n')
 
     def test_runtime_returns_from_verified_init_env(self):
         # Align stack, call _init_env through +32, then tail-jump to unknown +40.
