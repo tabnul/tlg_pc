@@ -1740,17 +1740,19 @@ void Rasterizer::Finish() {
     scheduler.Finish();
 }
 
-void Rasterizer::FlushForFence() {
+void Rasterizer::FlushForFence(TlgStats::FenceSite site) {
     // The guest sees the fence as soon as it is written, long before the GPU has run the work:
     // a read of its results faulted into a readback that first had to submit the open command
     // buffer and then wait for all of it (~4.5 ms, ~65/s in TLG). Submitted here, the GPU is
     // already running it by then. Runs in order with the draws (stage B or stage A).
+    // EOS, label WRITE_DATA and compute RELEASE_MEM signal the guest the same way.
     if (TlgToggle::Disabled2(TlgToggle::FenceFlush) ||
+        (site != TlgStats::FenceEop && TlgToggle::Disabled2(TlgToggle::FenceFlushMore)) ||
         runtime.LastArenaWriteTick() != scheduler.CurrentTick()) {
         return;
     }
     scheduler.Flush();
-    TlgStats::fence_flushes.fetch_add(1, std::memory_order_relaxed);
+    TlgStats::fence_flushes[site].fetch_add(1, std::memory_order_relaxed);
 }
 
 void Rasterizer::OnSubmit() {

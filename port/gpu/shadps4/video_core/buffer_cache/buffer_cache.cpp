@@ -453,8 +453,9 @@ void BufferCache::ReportReadbackStats() {
                 static_cast<unsigned long long>(ranges), copy_bytes / 1048576.0,
                 staging_bytes / 1048576.0);
     std::printf("Buffer readback waits (5 s): %.1f ms in Finish, %.1f ms in %llu side copies; "
-                "last GPU write done %llu, submitted %llu, still recording %llu, unknown %llu; "
-                "%llu fence flushes\n",
+                "last GPU write done %llu, submitted %llu, still "
+                "recording %llu, unknown %llu; fence flushes EOP %llu, EOS %llu, WRITE_DATA %llu, "
+                "RELEASE_MEM %llu, compute WRITE_DATA %llu\n",
                 readback_finish_ns.exchange(0, std::memory_order_relaxed) / 1e6,
                 readback_side_ns.exchange(0, std::memory_order_relaxed) / 1e6,
                 static_cast<unsigned long long>(readback_side_copies.exchange(0)),
@@ -462,7 +463,16 @@ void BufferCache::ReportReadbackStats() {
                 static_cast<unsigned long long>(readback_writes_submitted.exchange(0)),
                 static_cast<unsigned long long>(readback_writes_recording.exchange(0)),
                 static_cast<unsigned long long>(readback_writes_unknown.exchange(0)),
-                static_cast<unsigned long long>(TlgStats::fence_flushes.exchange(0)));
+                static_cast<unsigned long long>(
+                    TlgStats::fence_flushes[TlgStats::FenceEop].exchange(0)),
+                static_cast<unsigned long long>(
+                    TlgStats::fence_flushes[TlgStats::FenceEos].exchange(0)),
+                static_cast<unsigned long long>(
+                    TlgStats::fence_flushes[TlgStats::FenceWriteData].exchange(0)),
+                static_cast<unsigned long long>(
+                    TlgStats::fence_flushes[TlgStats::FenceReleaseMem].exchange(0)),
+                static_cast<unsigned long long>(
+                    TlgStats::fence_flushes[TlgStats::FenceComputeWriteData].exchange(0)));
     std::fflush(stdout);
 }
 
