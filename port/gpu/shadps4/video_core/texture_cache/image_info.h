@@ -93,4 +93,9 @@ struct ImageInfo {
     u32 stencil_size{};
 };
 
+/// Bytes a GPU→CPU readback of `info` copies. The caller must still check it against
+/// `guest_size`: a color buffer whose slice registers describe less than one row yields an
+/// extent larger than the allocation it would be written back into.
+u64 ReadbackSize(const ImageInfo& info);
+
 } // namespace VideoCore
