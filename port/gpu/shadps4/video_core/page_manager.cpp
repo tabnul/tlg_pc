@@ -8,7 +8,11 @@
 #include <chrono>
 #include <algorithm>
 #include <unordered_map>
+#include <cstring>
+#include <string>
 #include <boost/container/small_vector.hpp>
+#include <fmt/format.h>
+#include "tlg_freeze.h"
 #include "tlg_toggles.h"
 #include "common/assert.h"
 #include "common/debug.h"
@@ -76,8 +80,33 @@ struct PageManager::Impl {
     // tlg: TLG_FAULT_PROFILE=1 prints, every 5 s, the guest instructions whose faults on GPU
     // tracked pages cost the most time (which game code waits on the GPU, and for what).
     struct FaultSite { u64 count = 0, ns = 0; VAddr last = 0; u64 caller = 0; bool write = false; };
+    // Where an address lies: guest+offset in the game executable, module+offset in a host module
+    // (Windows; emulator-internal faults such as texture hashing), else the raw address.
+    static std::string DescribeCode(u64 at) {
+        const u64 base = TlgFreeze::guest_base.load(std::memory_order_relaxed);
+        if (base && at - base < TlgFreeze::guest_size.load(std::memory_order_relaxed)) {
+            return fmt::format("guest+{:#x}", at - base);
+        }
+        if (!base && at >= 0x800000000ull && at < 0x810000000ull) {
+            return fmt::format("{:#x}", at - 0x800000000ull);
+        }
+#ifdef _WIN64
+        HMODULE module = nullptr;
+        char name[MAX_PATH];
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                   GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCSTR>(at), &module) &&
+            module && GetModuleFileNameA(module, name, sizeof(name))) {
+            const char* file = std::strrchr(name, '\\');
+            return fmt::format("{}+{:#x}", file ? file + 1 : name,
+                               at - reinterpret_cast<u64>(module));
+        }
+#endif
+        return fmt::format("{:#x}", at);
+    }
+
     static void ProfileFault(void* context, VAddr addr, bool write, u64 ns) {
-#ifdef __linux__
+#if defined(__linux__) || defined(_WIN64)
         static const bool enabled = [] { const char* e = std::getenv("TLG_FAULT_PROFILE"); return e && *e == '1'; }();
         if (!enabled) {
             return;
@@ -85,10 +114,17 @@ struct PageManager::Impl {
         static std::mutex mutex;
         static std::unordered_map<u64, FaultSite> sites;
         static auto window = std::chrono::steady_clock::now();
+#ifdef _WIN64
+        const CONTEXT* cpu = static_cast<EXCEPTION_POINTERS*>(context)->ContextRecord;
+        const u64 rip = cpu->Rip;
+        const u64 rsp = cpu->Rsp;
+#else
         const auto* uc = static_cast<ucontext_t*>(context);
         const u64 rip = static_cast<u64>(uc->uc_mcontext.gregs[REG_RIP]);
+        const u64 rsp = static_cast<u64>(uc->uc_mcontext.gregs[REG_RSP]);
+#endif
         // The return address at the top of the stack (right for leaf routines such as memcpy).
-        const u64 caller = *reinterpret_cast<const u64*>(uc->uc_mcontext.gregs[REG_RSP]);
+        const u64 caller = *reinterpret_cast<const u64*>(rsp);
         std::scoped_lock lock{mutex};
         auto& site = sites[rip];
         ++site.count;
@@ -103,17 +139,21 @@ struct PageManager::Impl {
         window = now;
         std::vector<std::pair<u64, FaultSite>> top(sites.begin(), sites.end());
         std::sort(top.begin(), top.end(), [](const auto& a, const auto& b) { return a.second.ns > b.second.ns; });
-        std::printf("Fault profile (5 s):");
-        for (size_t i = 0; i < top.size() && i < 8; ++i) {
-            const u64 at = top[i].first;
-            const u64 from = top[i].second.caller;
-            std::printf(" [%s %#llx<-%#llx x%llu %.1f ms @%#llx]", top[i].second.write ? "W" : "R",
-                        static_cast<unsigned long long>(at >= 0x800000000ull && at < 0x810000000ull ? at - 0x800000000ull : at),
-                        static_cast<unsigned long long>(from >= 0x800000000ull && from < 0x810000000ull ? from - 0x800000000ull : from),
-                        static_cast<unsigned long long>(top[i].second.count), top[i].second.ns / 1e6,
-                        static_cast<unsigned long long>(top[i].second.last));
+        u64 total_count = 0, total_ns = 0;
+        for (const auto& [at, site] : sites) {
+            total_count += site.count;
+            total_ns += site.ns;
         }
-        std::printf("\n");
+        // One site per line: on Windows the module names make a single line unreadable.
+        std::printf("Fault profile (5 s): %llu faults at %zu sites, %.1f ms in handlers\n",
+                    static_cast<unsigned long long>(total_count), sites.size(), total_ns / 1e6);
+        for (size_t i = 0; i < top.size() && i < 12; ++i) {
+            const auto& site = top[i].second;
+            std::printf("  %s %s <- %s x%llu %.1f ms @%#llx\n", site.write ? "W" : "R",
+                        DescribeCode(top[i].first).c_str(), DescribeCode(site.caller).c_str(),
+                        static_cast<unsigned long long>(site.count), site.ns / 1e6,
+                        static_cast<unsigned long long>(site.last));
+        }
         std::fflush(stdout);
         sites.clear();
 #else

@@ -294,6 +294,11 @@ extern "C" int tlggpu_handle_fault(void* ucontext, void* address) {
     return handled;
 }
 
+extern "C" void tlggpu_set_guest_image(std::uintptr_t base, std::uint64_t size) {
+    TlgFreeze::guest_size.store(size);
+    TlgFreeze::guest_base.store(base);
+}
+
 extern "C" void tlggpu_set_wait_hooks(TlgGpuWaitBegin begin, TlgGpuWaitEnd end) {
     TlgFreeze::end_hook.store(end);
     TlgFreeze::begin_hook.store(begin);
