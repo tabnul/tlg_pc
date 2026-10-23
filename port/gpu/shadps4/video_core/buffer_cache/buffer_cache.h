@@ -173,6 +173,7 @@ private:
     // Disabled unless a launch profile opts in. When enabled, exact GPU-dirty islands in the
     // current sparse arena share one completion if their combined staging footprint fits.
     u64 readback_batch_limit{};
+    bool readback_batch_forced{}; ///< TLG_BUFFER_READBACK_BATCH_MB overrides the setting
     bool readback_stats_enabled{};
     std::atomic<u64> readback_report_ns{};
     std::atomic<u64> readback_requests{};
@@ -183,6 +184,23 @@ private:
     std::atomic<u64> readback_copy_ranges{};
     std::atomic<u64> readback_copy_bytes{};
     std::atomic<u64> readback_staging_bytes{};
+    // Readback waits (stats only): per completion whether the last GPU write to its data had
+    // finished, was submitted or still recording, and the time spent waiting.
+    std::atomic<u64> readback_writes_done{};
+    std::atomic<u64> readback_writes_submitted{};
+    std::atomic<u64> readback_writes_recording{};
+    std::atomic<u64> readback_writes_unknown{};
+    std::atomic<u64> readback_finish_ns{};
+    std::atomic<u64> readback_side_copies{};
+    std::atomic<u64> readback_side_ns{};
+
+    /// tlg: copies GPU data whose last write has finished on the second queue, without
+    /// submitting or waiting for the open GPU queue. False when there is no second queue.
+    bool CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
+                             std::span<const vk::BufferCopy> copies, u64 last_write);
+    vk::UniqueCommandPool readback_pool;
+    vk::CommandBuffer readback_cmdbuf;
+    vk::UniqueFence readback_fence;
 
     std::unique_ptr<FaultManager> fault_manager;
     std::unique_ptr<Buffer> bda_pagetable_buffer;

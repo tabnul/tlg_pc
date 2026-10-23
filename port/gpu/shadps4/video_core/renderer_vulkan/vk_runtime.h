@@ -39,6 +39,11 @@ public:
         return staging_pool;
     }
 
+    /// tlg: scheduler tick of the last recorded GPU write to a buffer cache arena.
+    u64 LastArenaWriteTick() const noexcept {
+        return last_arena_write_tick;
+    }
+
     void TickFrame();
     SceneTargets* scene_targets = nullptr;
 
@@ -132,6 +137,7 @@ private:
     };
     std::array<AccessMemo, 512> access_memo{};
     u32 access_epoch = 1;
+    u64 last_arena_write_tick{};
 };
 
 } // namespace Vulkan

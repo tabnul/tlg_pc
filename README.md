@@ -59,6 +59,9 @@ launcher has the same settings, so you can set things up before starting.
 - **Colour:** brightness, contrast, saturation and gamma of the final image.
 - **Output:** HDR10 output through the game's own HDR path.
 - **Performance:** frame rate limit, frame queue depth and background shader compilation.
+- **Frame rate:** 30 (as on PS4), 60 or unlocked. Unlocked lowers the base frame rate by about
+  10 FPS against 60 at the same spot (about 57 vs 48 FPS in our test), so pick 60 unless your PC
+  runs well above 60.
 
 Every setting shows the value the game originally used. Its help text says what we would pick and
 why, and what it costs where we measured it. We tested every candidate setting. The ones that made

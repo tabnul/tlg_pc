@@ -677,11 +677,10 @@ def build_env(settings, extra=None):
     # Start-up switches the player changed in the Qt launcher (TLG_<name>=0/1); untouched ones add
     # nothing, and TLG_* set outside the launcher win.
     env.update(backports_table.environment(experimental_states(settings), os.environ))
-    # TLG's open scenes can queue thousands of draws before a precise CPU buffer fault. The
-    # first fault at 60 FPS or unlocked downloads the arena's exact GPU-dirty islands with one
-    # completion; the default/30-FPS path deliberately retains its established readback behavior.
+    # The readback batch (@b3ndoi) is the graphics setting readback_batch now (default off,
+    # 2026-10-23); TLG_BUFFER_READBACK_BATCH_MB still forces a size. Its statistics stay on at
+    # 60 FPS and unlocked.
     if applied_frame_rate in ('60', 'unlocked'):
-        env.setdefault('TLG_BUFFER_READBACK_BATCH_MB', '64')
         env.setdefault('TLG_BUFFER_READBACK_STATS', '1')
     if extra:
         env.update(extra)

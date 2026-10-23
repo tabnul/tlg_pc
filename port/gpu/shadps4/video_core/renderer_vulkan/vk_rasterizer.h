@@ -13,6 +13,7 @@
 #include "video_core/renderer_vulkan/vk_scene_resolution.h"
 #include "video_core/renderer_vulkan/vk_object_motion.h"
 #include "video_core/renderer_vulkan/vk_draw_pipe.h"
+#include "tlg_toggles.h"
 #include "video_core/renderer_vulkan/vk_draw_prep.h"
 #include "video_core/renderer_vulkan/vk_temporal_upscaler.h"
 #include "video_core/renderer_vulkan/vk_texture_pack.h"
@@ -144,6 +145,9 @@ public:
 
     u64 Flush();
     void Finish();
+    /// tlg: submits the open command buffer at an end-of-pipe fence when it writes guest
+    /// memory, so the GPU is running that work when the guest reads its results.
+    void FlushForFence(TlgStats::FenceSite site);
     void OnSubmit();
 
     PipelineCache& GetPipelineCache() {

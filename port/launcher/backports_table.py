@@ -138,6 +138,13 @@ MENU = [
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
           choices=(('1', '1 (lowest latency)', '1 (menor atraso)'), ('2', '2', '2'),
                    ('0', 'Unlimited', 'Sem limite'))),
+    _menu('Performance', 'readback_batch', 'choice', '0', ('GPU readback batch', 'Lote de leituras da GPU'),
+          ('When the game reads GPU-written memory, also copy back the other GPU-written data around it. '
+           'Off is fastest (2-5 FPS more in tests); 64 MB is not recommended.',
+           'Quando o jogo lê memória escrita pela GPU, copia também os outros dados escritos pela GPU ao redor. '
+           'Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado.'),
+          choices=(('0', 'Off (recommended)', 'Desligado (recomendado)'), ('16', '16 MB', '16 MB'),
+                   ('64', '64 MB (not recommended)', '64 MB (não recomendado)'))),
     _menu('Performance', 'async_shaders', 'bool', '1',
           ('Compile new shaders in the background', 'Compilar shaders novos em segundo plano'),
           ('Fewer hitches when a new effect appears; an object whose shader is not ready yet may be missing for a frame.',

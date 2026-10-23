@@ -410,6 +410,7 @@ static void gpu_wait_begin(const char *kind, const void *object, const char *nam
 }
 void runtime_freeze_start(uintptr_t image, uint64_t image_size, unsigned seconds) {
     image_base = image; image_bytes = image_size;
+    tlggpu_set_guest_image(image, image_size);
     tlggpu_set_wait_hooks(gpu_wait_begin, runtime_wait_end);
 #ifndef _WIN32
     struct sigaction action = {0};

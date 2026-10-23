@@ -55,8 +55,10 @@ TEXT = {
     'fps_30': ('30 FPS (as on PS4)', '30 FPS (como no PS4)'),
     'fps_60': ('60 FPS', '60 FPS'),
     'fps_unlocked': ('Unlocked (up to the display)', 'Livre (até a taxa do monitor)'),
-    'fps_hint': ('60/unlocked patch eboot 1.03 in memory',
-                 '60/livre alteram o eboot 1.03 na memória'),
+    'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
+                 '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60',
+                 '60/livre alteram o eboot 1.03 na memória. Livre reduz a taxa base em cerca de 10 FPS '
+                 'em relação a 60 no mesmo lugar; escolha 60, a não ser que seu PC rode bem acima de 60'),
     'skip_logos': ('Skip the boot logos', 'Pular os logotipos de abertura'),
     'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
     'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),

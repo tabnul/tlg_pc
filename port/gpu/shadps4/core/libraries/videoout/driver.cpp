@@ -517,6 +517,26 @@ void VideoOutDriver::Flip(const Request& req) {
                         TlgStats::tick_wait_ns.exchange(0) / (window * 1e7),
                         frames ? double(TlgStats::reduced_draws.exchange(0)) / frames : 0.0,
                         frames ? double(TlgStats::scene_draws.exchange(0)) / frames : 0.0);
+            // Readback cost per second, comparable between builds: faults on GPU-tracked pages and
+            // their handler time, waits for image readbacks, protection changes and their time.
+            {
+                static u64 prev[7];
+                const u64 cur[7] = {TlgStats::read_faults.load(), TlgStats::t_read_faults.load(),
+                                    TlgStats::t_write_faults.load(), TlgStats::t_readback_wait.load(),
+                                    TlgStats::protect_calls.load(), TlgStats::protect_pages.load(),
+                                    TlgStats::t_protect.load()};
+                double rate[7];
+                for (int i = 0; i < 7; ++i) {
+                    // A counter reset elsewhere counts from zero again.
+                    rate[i] = (cur[i] >= prev[i] ? cur[i] - prev[i] : cur[i]) / window;
+                    prev[i] = cur[i];
+                }
+                std::printf("Readback stats (per s): %.0f read faults %.1f ms, %.0f write faults "
+                            "%.1f ms, image readback wait %.1f ms; %.0f protect calls (%.0f pages) "
+                            "%.1f ms\n",
+                            rate[0], rate[1] / 1e6, faults / window, rate[2] / 1e6, rate[3] / 1e6,
+                            rate[4], rate[5], rate[6] / 1e6);
+            }
             presenter->GetRasterizer().GetPipelineCache().ReportCompilerStats();
             Vulkan::WaitDiagnostics::Report();
             // Frame pacing: spread of the guest flip intervals (judder that the mean hides).

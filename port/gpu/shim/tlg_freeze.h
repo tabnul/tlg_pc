@@ -19,6 +19,9 @@ inline std::atomic<std::uint64_t> flips_submitted{0}, flips_shown{0}, presents{0
 /// Page-protection faults being handled right now (any thread), and handled so far.
 inline std::atomic<std::uint32_t> faults_in_progress{0};
 inline std::atomic<std::uint64_t> faults_handled{0};
+/// The game executable's address range (tlggpu_set_guest_image; 0 until the loader sets it).
+inline std::atomic<std::uintptr_t> guest_base{0};
+inline std::atomic<std::uint64_t> guest_size{0};
 
 /// Marks the calling thread as blocked in `kind` until the scope ends.
 class WaitScope {

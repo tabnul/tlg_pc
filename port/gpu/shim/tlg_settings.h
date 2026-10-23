@@ -95,6 +95,9 @@ struct Values {
     /// Set by the presenter: the game's image and the window it is shown in, in pixels.
     std::atomic<int> image_width{0}, image_height{0}, window_width{0}, window_height{0};
     std::atomic<int> frames_queued{1};
+    /// A guest fault on GPU-written memory also downloads the arena's other GPU-written data, up
+    /// to this many MiB (0: off). Live; TLG_BUFFER_READBACK_BATCH_MB overrides it.
+    std::atomic<int> readback_batch{0};
     // Startup: run.py turns them into patches and environment variables; "Apply and restart".
     std::atomic<int> render_resolution{0};
     std::atomic<int> engine_fps{120};
