@@ -9,6 +9,7 @@
 #include "cpu_check.h"
 #include "isa_rewrite.h"
 #include "gpu/tlggpu.h"
+#include "input_timing.h"
 #if !defined(__x86_64__) || !defined(__GNUC__)
 #error This prototype requires x86-64 GCC or Clang (including MinGW).
 #endif
@@ -590,6 +591,38 @@ mismatch:
     printf("Lua hook: unavailable (code signature mismatch)\n");
 }
 
+#ifdef _WIN32
+/* Button and stick hold counts at any frame rate (input_timing.h); TLG_INPUT_TIMING=0 is off. */
+static void install_input_timing(Segment *segments, uint64_t count) {
+    const char *enabled = getenv("TLG_INPUT_TIMING");
+    if (enabled && !strcmp(enabled, "0")) return;
+    for (size_t i = 0; i < sizeof(tlg_input_code) / sizeof(tlg_input_code[0]); ++i) {
+        const TlgInputCode *code = &tlg_input_code[i];
+        if (!mapped(segments, count, code->address, code->size) ||
+            tlg_input_fnv(image + code->address, code->size) != code->fnv) {
+            printf("Input timing: unavailable (code signature mismatch at 0x%x)\n", code->address);
+            return;
+        }
+    }
+    unsigned char *stubs = allocate(page_size);
+    unsigned char entry[TLG_INPUT_ENTRY_SIZE], copy[TLG_INPUT_COPY_SIZE];
+    if (!tlg_input_rel_branch(entry, (uintptr_t)(image + TLG_INPUT_UPDATE),
+            (uintptr_t)(stubs + TLG_INPUT_ENTRY_RELAY), sizeof(entry), 0) ||
+        !tlg_input_rel_branch(copy, (uintptr_t)(image + TLG_INPUT_COPY),
+            (uintptr_t)(stubs + TLG_INPUT_COPY_RELAY), sizeof(copy), 1)) {
+        printf("Input timing: unavailable (outside relative-jump range)\n");
+        return;
+    }
+    tlg_input_build_stubs(stubs, image + TLG_INPUT_UPDATE,
+                          (uintptr_t)tlg_input_update, (uintptr_t)tlg_input_copy);
+    protect(stubs, page_size, 5);
+    tlg_input_configure((TlgInputUpdate)(stubs + TLG_INPUT_TRAMPOLINE));
+    memcpy(image + TLG_INPUT_UPDATE, entry, sizeof(entry));
+    memcpy(image + TLG_INPUT_COPY, copy, sizeof(copy));
+    printf("Input timing: ready (button and stick hold counts at the 30 FPS pace)\n");
+}
+#endif
+
 /* G3PATCH2 (patches.py): the patches' image base, then byte writes at image offsets, applied
  * after relocation. A write may replace a whole base-relative pointer slot (60/90 FPS++ swap
  * function pointers): the patch holds the address at the patches' base, rebased here. */
@@ -1011,6 +1044,9 @@ int main(int argc, char **argv) {
     }
     if (patch_file) apply_patches(patch_file, segments, ns, relocs, nr);
     if (gpu_enabled) install_lua_hook(segments, ns);
+#ifdef _WIN32
+    if (gpu_enabled) install_input_timing(segments, ns);
+#endif
 #ifdef _WIN32
     printf("Guest TCB loads redirected to the TEB TLS slot: %" PRIu64 "\n", patch_tcb_loads(segments, ns));
 #endif
