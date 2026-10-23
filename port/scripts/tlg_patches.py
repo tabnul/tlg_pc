@@ -77,6 +77,8 @@ PATCHES = {
     # At 60+ FPS on fast multi-core CPUs, worker threads can run 0x128c100 before streaming
     # populates the pointer table at [r12 + 0x28] (fault at 0x28c193) or an element entry at
     # [rcx + rax*8] (fault at 0x28c197 reading [rax + 0x28] right before test r15, r15).
+    # A null element leaves r15 = 0 (mov r15, rax before the test), as an element without a
+    # [rax + 0x28] does: the loop tests r15 again at 0x28c3aa and reads [r15 + 0x210] otherwise.
     'cloth_null_guard': [
         (0x128c161,
          bytes.fromhex(
@@ -86,8 +88,9 @@ PATCHES = {
          ),
          bytes.fromhex(
              '49837c2428000f84f90400000f1f00'
-             '4d8b74244889f8498b4c24284531db8d1c4048c1e306'
-             '4963841ea0000000488b04c1488945904885c074074c8b78284d85ff7479'
+             '4d8b742448498b4c24284531db69dfc0000000'
+             '4963841ea0000000488b04c148894590'
+             '4989c74885c074074c8b78284d85ff7479'
          ),
          'cloth update null table/element guard at 0x28c161..0x28c1a4'),
     ],
