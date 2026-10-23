@@ -196,6 +196,12 @@ DIAGNOSTICS = [
         ('Load pipelines while playing', 'Carregar pipelines durante o jogo'),
         ('The cached pipelines load in the background (a corner note shows progress); off blocks until all are loaded.',
          'Os pipelines em cache carregam em segundo plano (uma nota no canto mostra o progresso); desligado espera carregar tudo.')),
+    _ab('input_timing', 'TLG_INPUT_TIMING', True, False,
+        ('Button hold timing at any frame rate', 'Tempo de botão segurado em qualquer taxa de quadros'),
+        ('The game counts how long a button is held in frames, made for 30 FPS: at 60 FPS a tap counts '
+         'as a long press twice as fast (cancel, letting go, calling Trico). On keeps the 30 FPS timing.',
+         'O jogo conta em quadros quanto tempo um botão fica segurado, feito para 30 FPS: a 60 FPS um toque '
+         'vira toque longo duas vezes mais rápido (cancelar, soltar, chamar o Trico). Ligado mantém o tempo de 30 FPS.')),
     _ab('block1d', 'TLG_BLOCK1D', False, False, ('BC 1D textures as 2D', 'Texturas BC 1D como 2D'),
         ('Block-compressed 1D textures as 2D images, for drivers that refuse BC 1D.',
          'Texturas 1D comprimidas como imagens 2D, para drivers que recusam BC 1D.')),
