@@ -845,6 +845,10 @@ void Runtime::AccessBuffer(const VideoCore::Buffer* handle, u64 offset, u64 size
     };
     if (src_access & WRITE_MASK) {
         insert(Access::Write);
+        // tlg: AccessBuffer follows the recording, so the write is in the current tick.
+        if (handle->mem_type == VideoCore::MemoryType::Sparse) {
+            handle->NoteWrite(offset, size, scheduler.CurrentTick());
+        }
     }
     if (src_access & READ_MASK) {
         insert(Access::Read);

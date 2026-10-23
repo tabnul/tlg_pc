@@ -295,8 +295,41 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     for (auto& copy : copies) {
         copy.dstOffset += download.offset;
     }
-    runtime.CopyBuffer(arena, download.buffer, copies);
-    scheduler.Finish();
+    // tlg: when the last GPU write to this data has finished, the copy runs on the second
+    // queue and waits only for itself. The open command buffer and every submission still in
+    // flight are left alone; upstream finishes the whole GPU queue for each readback.
+    u64 last_write = 0;
+    for (const auto& copy : copies) {
+        last_write = std::max(last_write, arena->LastWrite(copy.srcOffset, copy.size));
+    }
+    const bool write_done = last_write != 0 && scheduler.IsFree(last_write);
+    if (readback_stats_enabled) {
+        if (last_write == 0) {
+            readback_writes_unknown.fetch_add(1, std::memory_order_relaxed);
+        } else if (write_done) {
+            readback_writes_done.fetch_add(1, std::memory_order_relaxed);
+        } else if (last_write < scheduler.CurrentTick()) {
+            readback_writes_submitted.fetch_add(1, std::memory_order_relaxed);
+        } else {
+            readback_writes_recording.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
+    const auto wait_start = std::chrono::steady_clock::now();
+    const bool side = write_done && !TlgToggle::Disabled2(TlgToggle::ReadbackSideQueue) &&
+                      CopyOnReadbackQueue(arena, download.buffer, copies, last_write);
+    if (!side) {
+        runtime.CopyBuffer(arena, download.buffer, copies);
+        scheduler.Finish();
+    }
+    if (readback_stats_enabled) {
+        const u64 ns = static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                            std::chrono::steady_clock::now() - wait_start)
+                                            .count());
+        (side ? readback_side_ns : readback_finish_ns).fetch_add(ns, std::memory_order_relaxed);
+        if (side) {
+            readback_side_copies.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
 
     download.buffer->Invalidate(download.offset, download.size);
     for (const auto& copy : copies) {
@@ -306,6 +339,86 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     }
     memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
     ReportReadbackStats();
+}
+
+bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
+                                      std::span<const vk::BufferCopy> copies, u64 last_write) {
+    const vk::Queue queue = instance.GetReadbackQueue();
+    if (!queue) {
+        return false;
+    }
+    const vk::Device device = instance.GetDevice();
+    if (!readback_pool) {
+        auto [pool_result, pool] = device.createCommandPoolUnique({
+            .flags = vk::CommandPoolCreateFlagBits::eTransient |
+                     vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+            .queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex(),
+        });
+        auto [fence_result, fence] = device.createFenceUnique({});
+        if (pool_result != vk::Result::eSuccess || fence_result != vk::Result::eSuccess) {
+            return false;
+        }
+        auto [alloc_result, cmdbufs] = device.allocateCommandBuffers({
+            .commandPool = *pool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1,
+        });
+        if (alloc_result != vk::Result::eSuccess) {
+            return false;
+        }
+        readback_pool = std::move(pool);
+        readback_fence = std::move(fence);
+        readback_cmdbuf = cmdbufs.front();
+    }
+
+    const vk::CommandBufferBeginInfo begin_info{
+        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+    };
+    if (readback_cmdbuf.begin(begin_info) != vk::Result::eSuccess) {
+        return false;
+    }
+    readback_cmdbuf.copyBuffer(arena->Handle(), dst->Handle(), static_cast<u32>(copies.size()),
+                               copies.data());
+    const vk::MemoryBarrier2 host_barrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eCopy,
+        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eHost,
+        .dstAccessMask = vk::AccessFlagBits2::eHostRead,
+    };
+    readback_cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &host_barrier,
+    });
+    if (readback_cmdbuf.end() != vk::Result::eSuccess) {
+        return false;
+    }
+
+    // The wait on the main timeline is already satisfied; it makes the writes visible here.
+    const vk::Semaphore timeline = scheduler.GetWorkSemaphore()->Handle();
+    const vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eTransfer;
+    const vk::TimelineSemaphoreSubmitInfo timeline_si{
+        .waitSemaphoreValueCount = 1,
+        .pWaitSemaphoreValues = &last_write,
+    };
+    const vk::SubmitInfo submit_info{
+        .pNext = &timeline_si,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &timeline,
+        .pWaitDstStageMask = &wait_stage,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &readback_cmdbuf,
+    };
+    const vk::Result submit_result = queue.submit(submit_info, *readback_fence);
+    ASSERT_MSG(submit_result == vk::Result::eSuccess, "Readback submit failed: {}",
+               vk::to_string(submit_result));
+    const vk::Result wait_result =
+        device.waitForFences(*readback_fence, true, std::numeric_limits<u64>::max());
+    ASSERT_MSG(wait_result == vk::Result::eSuccess, "Readback fence wait failed: {}",
+               vk::to_string(wait_result));
+    const vk::Result reset_result = device.resetFences(*readback_fence);
+    ASSERT_MSG(reset_result == vk::Result::eSuccess, "Readback fence reset failed: {}",
+               vk::to_string(reset_result));
+    return true;
 }
 
 void BufferCache::ReportReadbackStats() {
@@ -339,6 +452,15 @@ void BufferCache::ReportReadbackStats() {
                 static_cast<unsigned long long>(completions),
                 static_cast<unsigned long long>(ranges), copy_bytes / 1048576.0,
                 staging_bytes / 1048576.0);
+    std::printf("Buffer readback waits (5 s): %.1f ms in Finish, %.1f ms in %llu side copies; "
+                "last GPU write done %llu, submitted %llu, still recording %llu, unknown %llu\n",
+                readback_finish_ns.exchange(0, std::memory_order_relaxed) / 1e6,
+                readback_side_ns.exchange(0, std::memory_order_relaxed) / 1e6,
+                static_cast<unsigned long long>(readback_side_copies.exchange(0)),
+                static_cast<unsigned long long>(readback_writes_done.exchange(0)),
+                static_cast<unsigned long long>(readback_writes_submitted.exchange(0)),
+                static_cast<unsigned long long>(readback_writes_recording.exchange(0)),
+                static_cast<unsigned long long>(readback_writes_unknown.exchange(0)));
     std::fflush(stdout);
 }
 
@@ -475,6 +597,9 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
     }
     if (is_written) {
         gpu_modified_ranges.Add(device_addr, size);
+        // tlg: Runtime::AccessBuffer notes the tick the write is recorded in; this covers a
+        // write that does not pass through it.
+        arena->NoteWrite(arena->Offset(device_addr), size, scheduler.CurrentTick());
     }
     return {arena, arena->Offset(device_addr)};
 }
