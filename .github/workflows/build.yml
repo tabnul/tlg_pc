@@ -1,14 +1,13 @@
 # (Linux is disabled for now: see the commented-out job.)
-# Every push to master builds the Windows package, kept as a run artifact for 3 days. Only a pushed
-# tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest. Every release is
-# kept as version history. No game or console file is ever built in or uploaded.
+# Pull requests to master (from integration) build the Windows package, kept as a run artifact for 3
+# days. Only a pushed tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest.
+# Every release is kept as version history. No game or console file is ever built in or uploaded.
 name: Build
 
 on:
   push:
-    branches: [master]
     tags: ['v*']
-  # Pull requests to master build both packages (artifacts only): the Release is left untouched.
+  # Pull requests to master build the package (artifact only): the Release is left untouched.
   pull_request:
     branches: [master]
   workflow_dispatch:
