@@ -18,10 +18,9 @@ HARNESS = r'''
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "compat_win.h"
+#include "fault_dispatch_win.h"
 
-typedef tlg_jmp_buf sigjmp_buf;
-static __thread sigjmp_buf *runtime_fault_recover;
+__thread sigjmp_buf *runtime_fault_recover;
 typedef struct { int unused; } IsaRegs;
 static void *isa_table;
 static unsigned char *image;

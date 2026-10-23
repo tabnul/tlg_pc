@@ -205,7 +205,11 @@ struct ColorBuffer {
     }
 
     u32 Height() const {
-        return (slice.tile_max + 1) * 64 / Pitch();
+        // Slice size over pitch, rounded down: a slice smaller than one row (an unset
+        // slice_max, or an MSAA target shorter than its sample count) deduces 0 rows, and
+        // a zero-row image is created as-is and reads back 0 bytes.
+        const u32 rows = (slice.tile_max + 1) * 64 / Pitch();
+        return rows ? rows : 1u;
     }
 
     u64 Address() const {

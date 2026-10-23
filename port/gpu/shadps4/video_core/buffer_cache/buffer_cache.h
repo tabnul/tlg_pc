@@ -135,6 +135,9 @@ private:
 
     void DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size);
 
+    /// Opt-in telemetry for coherent buffer readback batching.
+    void ReportReadbackStats();
+
     bool SynchronizeMemory(const Buffer* arena, VAddr device_addr, u32 size, bool is_written,
                            bool is_texel_buffer);
 
@@ -166,6 +169,20 @@ private:
     StreamBuffer stream_buffer;
     Buffer gds_buffer;
     RangeSet gpu_modified_ranges;
+
+    // Disabled unless a launch profile opts in. When enabled, exact GPU-dirty islands in the
+    // current sparse arena share one completion if their combined staging footprint fits.
+    u64 readback_batch_limit{};
+    bool readback_stats_enabled{};
+    std::atomic<u64> readback_report_ns{};
+    std::atomic<u64> readback_requests{};
+    std::atomic<u64> readback_empty_requests{};
+    std::atomic<u64> readback_full_arena_batches{};
+    std::atomic<u64> readback_limit_fallbacks{};
+    std::atomic<u64> readback_gpu_completions{};
+    std::atomic<u64> readback_copy_ranges{};
+    std::atomic<u64> readback_copy_bytes{};
+    std::atomic<u64> readback_staging_bytes{};
 
     std::unique_ptr<FaultManager> fault_manager;
     std::unique_ptr<Buffer> bda_pagetable_buffer;

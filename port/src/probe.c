@@ -9,11 +9,13 @@
 #include "cpu_check.h"
 #include "isa_rewrite.h"
 #include "gpu/tlggpu.h"
+#include "input_timing.h"
 #if !defined(__x86_64__) || !defined(__GNUC__)
 #error This prototype requires x86-64 GCC or Clang (including MinGW).
 #endif
 #ifdef _WIN32
 #include <windows.h>
+#include "fault_dispatch_win.h"
 #else
 #include <sys/mman.h>
 #include <malloc.h>
@@ -216,23 +218,8 @@ static LONG CALLBACK vectored_fault(EXCEPTION_POINTERS *info) {
         }
     }
     if (code==EXCEPTION_ACCESS_VIOLATION && record->NumberParameters>=2) {
-        /* Speculative reads must recover before GPU readback, as in the POSIX handler below.
-         * Draw-preparation workers may hold the pipeline cache's shared lock here. A readback
-         * waits for the GPU thread, which may need that same cache exclusively: deadlock. */
-        if (runtime_fault_recover) {
-            /* A speculative guest memory read (GPU draw preparation) faulted: the thread resumes
-             * in tlg_longjmp, outside the exception dispatcher, back at its recovery point. */
-            unsigned long long *buffer=*runtime_fault_recover;
-            runtime_fault_recover=NULL;
-            CONTEXT *c=info->ContextRecord;
-            c->Rsp=((c->Rsp-128)&~(DWORD64)15)-40;
-            c->Rcx=(DWORD64)(uintptr_t)buffer;
-            c->Rdx=1;
-            c->Rip=(DWORD64)(uintptr_t)tlg_longjmp;
+        if (tlg_dispatch_gpu_fault(info,gpu_enabled,tlggpu_handle_fault)==EXCEPTION_CONTINUE_EXECUTION)
             return EXCEPTION_CONTINUE_EXECUTION;
-        }
-        /* Only non-speculative accesses may wait for GPU page tracking/readback. */
-        if (gpu_enabled && tlggpu_handle_fault(info,(void *)record->ExceptionInformation[1])) return EXCEPTION_CONTINUE_EXECUTION;
     }
     if (code==EXCEPTION_ACCESS_VIOLATION || code==EXCEPTION_ILLEGAL_INSTRUCTION || code==EXCEPTION_PRIV_INSTRUCTION ||
         code==EXCEPTION_STACK_OVERFLOW || code==EXCEPTION_INT_DIVIDE_BY_ZERO || code==EXCEPTION_DATATYPE_MISALIGNMENT) {
@@ -404,6 +391,39 @@ static void fault(int sig, siginfo_t *info, void *context) {
             snprintf(line, sizeof(line), "  %s=%016llx%s", regs[r], (unsigned long long)uc->uc_mcontext.gregs[ids[r]], r == 3 || r == 7 ? "\n" : " ");
             ssize_t written_=write(2, line, strlen(line)); (void)written_;
         }
+        {   /* The faulting bytes, so the log names the instruction without the eboot at hand.
+             * A short read means the mapping ends inside the window: print what arrived. */
+            unsigned char op[16];
+            struct iovec lo = {op, sizeof(op)}, ro = {(void *)rip, sizeof(op)};
+            ssize_t got = process_vm_readv(getpid(), &lo, 1, &ro, 1, 0);
+            if (got > 0) {
+                char hex[33];
+                for (ssize_t i = 0; i < got && i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", op[i]);
+                snprintf(line, sizeof(line), "  insn @0x%lx: %s\n", (unsigned long)(rip - (uintptr_t)image), hex);
+                ssize_t written_=write(2, line, strlen(line)); (void)written_;
+            }
+        }
+        {   /* The words each register points at: a NULL field is the usual culprit, and the
+             * object is gone once the process dies. Twelve qwords reach the fields a lookup
+             * table, a count and a flag sit at. A window that runs off the end of a mapping
+             * comes back short rather than failing, so print however many words arrived. */
+            static const char *mregs[] = {"rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","r8","r9","r10","r11","r12","r13","r14","r15"};
+            static const int mids[] = {REG_RAX,REG_RBX,REG_RCX,REG_RDX,REG_RSI,REG_RDI,REG_RBP,REG_RSP,
+                                       REG_R8,REG_R9,REG_R10,REG_R11,REG_R12,REG_R13,REG_R14,REG_R15};
+            for (int r = 0; r < 16; ++r) {
+                uintptr_t at = (uintptr_t)uc->uc_mcontext.gregs[mids[r]];
+                if (at < 0x10000) continue;
+                uint64_t word[12];
+                struct iovec lo = {word, sizeof(word)}, ro = {(void *)at, sizeof(word)};
+                ssize_t got = process_vm_readv(getpid(), &lo, 1, &ro, 1, 0);
+                if (got < 8) continue;   /* unmapped, or less than one whole word to show */
+                int nq = (int)got / 8;
+                char hex[208];
+                for (int i = 0; i < nq; ++i) snprintf(hex + i * 17, 18, "%016llx ", (unsigned long long)word[i]);
+                snprintf(line, sizeof(line), "  mem %s=0x%lx: %s\n", mregs[r], (unsigned long)at, hex);
+                ssize_t written_=write(2, line, strlen(line)); (void)written_;
+            }
+        }
         for (int depth = 0; depth < 24 && rbp; ++depth) {
             uintptr_t frame[2];
             struct iovec local = {frame, sizeof(frame)}, remote = {(void *)rbp, sizeof(frame)};
@@ -570,6 +590,38 @@ static void install_lua_hook(Segment *segments, uint64_t count) {
 mismatch:
     printf("Lua hook: unavailable (code signature mismatch)\n");
 }
+
+#ifdef _WIN32
+/* Button and stick hold counts at any frame rate (input_timing.h); TLG_INPUT_TIMING=0 is off. */
+static void install_input_timing(Segment *segments, uint64_t count) {
+    const char *enabled = getenv("TLG_INPUT_TIMING");
+    if (enabled && !strcmp(enabled, "0")) return;
+    for (size_t i = 0; i < sizeof(tlg_input_code) / sizeof(tlg_input_code[0]); ++i) {
+        const TlgInputCode *code = &tlg_input_code[i];
+        if (!mapped(segments, count, code->address, code->size) ||
+            tlg_input_fnv(image + code->address, code->size) != code->fnv) {
+            printf("Input timing: unavailable (code signature mismatch at 0x%x)\n", code->address);
+            return;
+        }
+    }
+    unsigned char *stubs = allocate(page_size);
+    unsigned char entry[TLG_INPUT_ENTRY_SIZE], copy[TLG_INPUT_COPY_SIZE];
+    if (!tlg_input_rel_branch(entry, (uintptr_t)(image + TLG_INPUT_UPDATE),
+            (uintptr_t)(stubs + TLG_INPUT_ENTRY_RELAY), sizeof(entry), 0) ||
+        !tlg_input_rel_branch(copy, (uintptr_t)(image + TLG_INPUT_COPY),
+            (uintptr_t)(stubs + TLG_INPUT_COPY_RELAY), sizeof(copy), 1)) {
+        printf("Input timing: unavailable (outside relative-jump range)\n");
+        return;
+    }
+    tlg_input_build_stubs(stubs, image + TLG_INPUT_UPDATE,
+                          (uintptr_t)tlg_input_update, (uintptr_t)tlg_input_copy);
+    protect(stubs, page_size, 5);
+    tlg_input_configure((TlgInputUpdate)(stubs + TLG_INPUT_TRAMPOLINE));
+    memcpy(image + TLG_INPUT_UPDATE, entry, sizeof(entry));
+    memcpy(image + TLG_INPUT_COPY, copy, sizeof(copy));
+    printf("Input timing: ready (button and stick hold counts at the 30 FPS pace)\n");
+}
+#endif
 
 /* G3PATCH2 (patches.py): the patches' image base, then byte writes at image offsets, applied
  * after relocation. A write may replace a whole base-relative pointer slot (60/90 FPS++ swap
@@ -992,6 +1044,9 @@ int main(int argc, char **argv) {
     }
     if (patch_file) apply_patches(patch_file, segments, ns, relocs, nr);
     if (gpu_enabled) install_lua_hook(segments, ns);
+#ifdef _WIN32
+    if (gpu_enabled) install_input_timing(segments, ns);
+#endif
 #ifdef _WIN32
     printf("Guest TCB loads redirected to the TEB TLS slot: %" PRIu64 "\n", patch_tcb_loads(segments, ns));
 #endif

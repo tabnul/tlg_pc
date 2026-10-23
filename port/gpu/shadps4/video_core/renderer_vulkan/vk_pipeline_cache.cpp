@@ -381,8 +381,17 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
             return !instance.IsFragmentShaderBarycentricSupported() &&
                    instance.GetDriverID() == vk::DriverId::eNvidiaProprietary;
         }(),
-        .needs_lds_barriers = instance.GetDriverID() == vk::DriverId::eNvidiaProprietary ||
-                              instance.GetDriverID() == vk::DriverId::eMesaKosmickrisp,
+        // tlg: the AMD proprietary driver (RX 9060 XT, Windows, 26.8.1) also reorders shared
+        // memory accesses in 64-thread compute shaders without barriers: lighting came out in
+        // 16x16 blocks. TLG_LDS_BARRIERS=0/1 overrides.
+        .needs_lds_barriers = [&] {
+            if (const char* env = std::getenv("TLG_LDS_BARRIERS")) {
+                return env[0] == '1';
+            }
+            return instance.GetDriverID() == vk::DriverId::eNvidiaProprietary ||
+                   instance.GetDriverID() == vk::DriverId::eAmdProprietary ||
+                   instance.GetDriverID() == vk::DriverId::eMesaKosmickrisp;
+        }(),
         .needs_buffer_offsets = instance.StorageMinAlignment() > 4,
         .needs_unorm_fixup = instance.GetDriverID() == vk::DriverId::eMesaKosmickrisp,
         .needs_clip_distance_emulation = instance.GetDriverID() == vk::DriverId::eNvidiaProprietary,
@@ -661,7 +670,8 @@ void PipelineCache::FinishCompilations() {
 }
 
 bool PipelineCache::AsyncCompilation() const {
-    return compiler && TlgSettings::Get().async_shaders.load(std::memory_order_relaxed);
+    return compiler && !cold_cache_sync.load(std::memory_order_relaxed) &&
+           TlgSettings::Get().async_shaders.load(std::memory_order_relaxed);
 }
 
 void PipelineCache::SeedWorkerCaches() {
@@ -1274,15 +1284,21 @@ PipelineCache::Result PipelineCache::GetProgram(PipelineSelection& sel, HwStage 
         // pointers in the registers; ahead of the GPU thread that memory may already be
         // reused. A fault returns here (runtime_fault_recover) and the draw is left to the GPU
         // thread. A jump out of the specialization leaks its partial allocations (rare).
+        // A draw-preparation worker also keeps an outer recovery point around the whole draw.
+        // Restore it after this narrower resource-table walk so later speculative reads in the
+        // same worker can fall back too. Clearing the pointer here made those faults enter the
+        // normal GPU readback path while the GPU thread was waiting for this worker.
+        sigjmp_buf* outer_recover = runtime_fault_recover;
         sigjmp_buf recover;
         if (sigsetjmp(recover, 0)) {
+            runtime_fault_recover = outer_recover;
             worker.failed = true;
             return {};
         }
         runtime_fault_recover = &recover;
         info.RefreshFlatBuf();
         auto spec = Shader::StageSpecialization(info, runtime_info, profile, binding);
-        runtime_fault_recover = nullptr;
+        runtime_fault_recover = outer_recover;
         const auto it = std::ranges::find(program->modules, spec, &Program::Module::spec);
         if (it == program->modules.end()) {
             worker.failed = true;

@@ -185,8 +185,7 @@ void TextureCache::ProcessDownloadImages() {
         for (const ImageId image_id : download_images) {
             const auto& image = slot_images[image_id];
             if (False(image.flags & ImageFlagBits::GpuModified)) continue;
-            const u64 size = u64{image.info.pitch} * image.info.size.height *
-                image.info.size.depth * image.info.resources.layers * (image.info.num_bits / 8);
+            const u64 size = ReadbackSize(image.info);
             if (!pending_readbacks.CanFit(size)) {
                 ++readbacks_waited;
                 scheduler.Finish();
@@ -276,14 +275,32 @@ void TextureCache::ProcessDownloadImages() {
     }
 }
 
+// A readback that copies nothing, or more than the guest allocation holds, cannot run: the
+// staging pool would build a 0-size Vulkan buffer (the driver refuses it and the assert turns
+// into a dead game) or the write-back would run past the image's memory. Both mean an image
+// was created degenerate upstream, so the first few are logged with the numbers that disagree.
+static void LogSkippedReadback(const Image& image) {
+    static std::atomic<unsigned> logged{0};
+    if (logged.fetch_add(1, std::memory_order_relaxed) >= 8) {
+        return;
+    }
+    const auto& info = image.info;
+    LOG_WARNING(Render_Vulkan,
+                "Skipping readback of image {:#x}: {}x{}x{} pitch {} x {} bits = {} bytes, guest {} bytes",
+                info.guest_address, info.size.width, info.size.height, info.size.depth, info.pitch,
+                info.num_bits, ReadbackSize(info), info.guest_size);
+}
+
 std::optional<TextureCache::PendingDownload> TextureCache::RecordImageDownload(ImageId image_id) {
     Image& image = slot_images[image_id];
     if (False(image.flags & ImageFlagBits::GpuModified)) {
         return std::nullopt;
     }
-    const u32 download_size = image.info.pitch * image.info.size.height * image.info.size.depth *
-                              image.info.resources.layers * (image.info.num_bits / 8);
-    ASSERT(download_size <= image.info.guest_size);
+    const u64 download_size = ReadbackSize(image.info);
+    if (download_size == 0 || download_size > image.info.guest_size) {
+        LogSkippedReadback(image);
+        return std::nullopt;
+    }
     const auto download =
         runtime.GetStagingPool().Request(download_size, MemoryType::HostCached, 16, true);
     const vk::BufferImageCopy image_download = {
@@ -302,7 +319,8 @@ std::optional<TextureCache::PendingDownload> TextureCache::RecordImageDownload(I
         .imageExtent = {image.info.size.width, image.info.size.height, image.info.size.depth},
     };
     runtime.DownloadImage(&image, download.buffer, std::span{&image_download, 1});
-    return PendingDownload{image.info.guest_address, download_size, download};
+    // The guard above leaves download_size <= guest_size, which is a u32.
+    return PendingDownload{image.info.guest_address, u32(download_size), download};
 }
 
 void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
@@ -312,9 +330,11 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
     if (False(image.flags & ImageFlagBits::GpuModified)) {
         return;
     }
-    const u32 download_size = image.info.pitch * image.info.size.height * image.info.size.depth *
-                              image.info.resources.layers * (image.info.num_bits / 8);
-    ASSERT(download_size <= image.info.guest_size);
+    const u64 download_size = ReadbackSize(image.info);
+    if (download_size == 0 || download_size > image.info.guest_size) {
+        LogSkippedReadback(image);
+        return;
+    }
     const auto download =
         runtime.GetStagingPool().Request(download_size, MemoryType::HostCached, 16, !sync);
     const vk::BufferImageCopy image_download = {
@@ -700,122 +720,51 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
             return {merged_image_id, -1, -1};
         }
 
-        // Enhanced debug logging for unreachable case
-        // Calculate expected size based on format and dimensions
-        u64 expected_size =
-            (static_cast<u64>(image_info.size.width) * static_cast<u64>(image_info.size.height) *
-             static_cast<u64>(image_info.size.depth) * static_cast<u64>(image_info.num_bits) / 8);
-        LOG_ERROR(Render_Vulkan,
-                  "Unresolvable image overlap with equal memory address:\n"
-                  "=== OLD IMAGE (cached) ===\n"
-                  "  Address:        {:#x}\n"
-                  "  Size:           {:#x} bytes\n"
-                  "  Format:         {}\n"
-                  "  Type:           {}\n"
-                  "  Width:          {}\n"
-                  "  Height:         {}\n"
-                  "  Depth:          {}\n"
-                  "  Pitch:          {}\n"
-                  "  Mip levels:     {}\n"
-                  "  Array layers:   {}\n"
-                  "  Samples:        {}\n"
-                  "  Tile mode:      {:#x}\n"
-                  "  Block size:     {} bits\n"
-                  "  Is block-comp:  {}\n"
-                  "  Guest size:     {:#x}\n"
-                  "  Last accessed:  tick {}\n"
-                  "  Safe to delete: {}\n"
-                  "  isPow2:         {}\n"
-                  "  Alt tile:       {}\n"
-                  "\n"
-                  "=== NEW IMAGE (requested) ===\n"
-                  "  Address:        {:#x}\n"
-                  "  Size:           {:#x} bytes\n"
-                  "  Format:         {}\n"
-                  "  Type:           {}\n"
-                  "  Width:          {}\n"
-                  "  Height:         {}\n"
-                  "  Depth:          {}\n"
-                  "  Pitch:          {}\n"
-                  "  Mip levels:     {}\n"
-                  "  Array layers:   {}\n"
-                  "  Samples:        {}\n"
-                  "  Tile mode:      {:#x}\n"
-                  "  Block size:     {} bits\n"
-                  "  Is block-comp:  {}\n"
-                  "  Guest size:     {:#x}\n"
-                  "  isPow2:         {}\n"
-                  "  Alt tile:       {}\n"
-                  "\n"
-                  "=== COMPARISON ===\n"
-                  "  Same format:           {}\n"
-                  "  Same type:             {}\n"
-                  "  Same tile mode:        {}\n"
-                  "  Same block size:       {}\n"
-                  "  Same BlockDim:         {}\n"
-                  "  Same pitch:            {}\n"
-                  "  Same pow2:             {}\n"
-                  "  Same alt tile:         {}\n"
-                  "  Old resources <= new:  {} (old: {}, new: {})\n"
-                  "  Old size <= new size:  {}\n"
-                  "  Expected size (calc):  {} bytes\n"
-                  "  Size ratio (new/expected): {:.2f}x\n"
-                  "  Size ratio (new/old):  {:.2f}x\n"
-                  "  Old vs expected diff:  {} bytes ({:+.2f}%)\n"
-                  "  New vs expected diff:  {} bytes ({:+.2f}%)\n"
-                  "  Merged image ID:       {}\n"
-                  "  Binding type:          {}\n"
-                  "  Current tick:          {}\n"
-                  "  Age (ticks since last access): {}",
+        // Size is greater with same format and tile mode, but mip levels are not greater.
+        // This occurs when the guest reuses an address with a different depth/array layout,
+        // giving a different memory footprint despite identical dimensions. The cached image
+        // is superseded and must be replaced. (upstream shadPS4 PR #4135; tlg: only freed when safe, as above)
+        if (image_info.guest_size > cache_image.info.guest_size) {
+            LOG_WARNING(Render_Vulkan,
+                        "Image overlap at {:#x}: replacing cached image "
+                        "(size={:#x}, fmt={}, type={}, {}x{}x{}, {} layers, {} mips, tile={:#x}) "
+                        "with new image "
+                        "(size={:#x}, fmt={}, type={}, {}x{}x{}, {} layers, {} mips, tile={:#x})",
+                        image_info.guest_address,
 
-                  // Old image details
-                  cache_image.info.guest_address, cache_image.info.guest_size,
-                  vk::to_string(cache_image.info.pixel_format),
-                  static_cast<int>(cache_image.info.type), cache_image.info.size.width,
-                  cache_image.info.size.height, cache_image.info.size.depth, cache_image.info.pitch,
-                  cache_image.info.resources.levels, cache_image.info.resources.layers,
-                  cache_image.info.num_samples, static_cast<u32>(cache_image.info.tile_mode),
-                  cache_image.info.num_bits, +cache_image.info.props.is_block,
-                  cache_image.info.guest_size, cache_image.tick_accessed_last, safe_to_delete,
-                  bool(cache_image.info.props.is_pow2), cache_image.info.alt_tile,
+                        // Cached image
+                        cache_image.info.guest_size, vk::to_string(cache_image.info.pixel_format),
+                        static_cast<int>(cache_image.info.type), cache_image.info.size.width,
+                        cache_image.info.size.height, cache_image.info.size.depth,
+                        cache_image.info.resources.layers, cache_image.info.resources.levels,
+                        static_cast<u32>(cache_image.info.tile_mode),
 
-                  // New image details
-                  image_info.guest_address, image_info.guest_size,
-                  vk::to_string(image_info.pixel_format), static_cast<int>(image_info.type),
-                  image_info.size.width, image_info.size.height, image_info.size.depth,
-                  image_info.pitch, image_info.resources.levels, image_info.resources.layers,
-                  image_info.num_samples, static_cast<u32>(image_info.tile_mode),
-                  image_info.num_bits, image_info.props.is_block, image_info.guest_size,
-                  bool(image_info.props.is_pow2), image_info.alt_tile,
+                        // New image
+                        image_info.guest_size, vk::to_string(image_info.pixel_format),
+                        static_cast<int>(image_info.type), image_info.size.width,
+                        image_info.size.height, image_info.size.depth, image_info.resources.layers,
+                        image_info.resources.levels, static_cast<u32>(image_info.tile_mode));
+            if (safe_to_delete) {
+                FreeImage(cache_image_id);
+            }
+            return {merged_image_id, -1, -1};
+        }
 
-                  // Comparison
-                  (image_info.pixel_format == cache_image.info.pixel_format),
-                  (image_info.type == cache_image.info.type),
-                  (image_info.tile_mode == cache_image.info.tile_mode),
-                  (image_info.num_bits == cache_image.info.num_bits),
-                  (image_info.BlockDim() == cache_image.info.BlockDim()),
-                  (image_info.pitch == cache_image.info.pitch),
-                  (image_info.props.is_pow2 == cache_image.info.props.is_pow2),
-                  (image_info.alt_tile == cache_image.info.alt_tile),
-                  (cache_image.info.resources <= image_info.resources),
-                  cache_image.info.resources.levels, image_info.resources.levels,
-                  (cache_image.info.guest_size <= image_info.guest_size), expected_size,
-
-                  // Size ratios
-                  static_cast<double>(image_info.guest_size) / expected_size,
-                  static_cast<double>(image_info.guest_size) / cache_image.info.guest_size,
-
-                  // Difference between actual and expected sizes with percentages
-                  static_cast<s64>(cache_image.info.guest_size) - static_cast<s64>(expected_size),
-                  (static_cast<double>(cache_image.info.guest_size) / expected_size - 1.0) * 100.0,
-
-                  static_cast<s64>(image_info.guest_size) - static_cast<s64>(expected_size),
-                  (static_cast<double>(image_info.guest_size) / expected_size - 1.0) * 100.0,
-
-                  merged_image_id.index, static_cast<int>(binding), scheduler.CurrentTick(),
-                  scheduler.CurrentTick() - cache_image.tick_accessed_last);
-
-        UNREACHABLE_MSG("Encountered unresolvable image overlap with equal memory address.");
+        // The cached image is larger or equal with the same format and tile mode.
+        // Treat it as a compatible view source.
+        LOG_DEBUG(Render_Vulkan,
+                  "Image overlap at {:#x}: using cached image as view source "
+                  "(cached size={:#x}, {} layers vs requested size={:#x}, {} layers)",
+                  image_info.guest_address, cache_image.info.guest_size,
+                  cache_image.info.resources.layers, image_info.guest_size,
+                  image_info.resources.layers);
+        {
+            auto result_id = merged_image_id ? merged_image_id : cache_image_id;
+            const auto& result_image = slot_images[result_id];
+            const bool is_compatible =
+                IsVulkanFormatCompatible(result_image.info.pixel_format, image_info.pixel_format);
+            return {is_compatible ? result_id : ImageId{}, -1, -1};
+        }
     }
 
     // Right overlap, the image requested is a possible subresource of the image from cache.

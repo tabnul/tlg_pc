@@ -126,7 +126,8 @@ void TexturePack::Switch(int pack) {
         done.clear();
     }
     resident_bytes = 0;
-    hits = misses = refused = last_report = 0;
+    hits = misses = refused = 0;
+    last_report = now;
     active = pack;
     ++generation;
     const std::string dir = TlgSettings::TexturePackDir(pack);
@@ -217,8 +218,9 @@ void TexturePack::Tick() {
     if (!ready.empty()) {
         ++generation;
     }
-    if (active && hits + misses >= last_report + 20000) {
-        last_report = hits + misses;
+    // Once a minute: the counts are for comparing packs, not for following every frame.
+    if (active && now >= last_report + 60) {
+        last_report = now;
         std::printf("Texture pack: %llu sampled from the pack, %llu without entry, %llu refused, "
                     "%llu MB resident\n",
                     (unsigned long long)hits, (unsigned long long)misses,
