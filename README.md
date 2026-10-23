@@ -59,9 +59,6 @@ launcher has the same settings, so you can set things up before starting.
 - **Colour:** brightness, contrast, saturation and gamma of the final image.
 - **Output:** HDR10 output through the game's own HDR path.
 - **Performance:** frame rate limit, frame queue depth and background shader compilation.
-- **Lab tab:** for people who want to go further. It edits the game's own render objects live
-  (fog, height fog, LOD distances, far plane, shadow cascades) and shows the game's original value
-  next to yours.
 
 Every setting shows the value the game originally used. Its help text says what we would pick and
 why, and what it costs where we measured it. We tested every candidate setting. The ones that made
@@ -96,7 +93,7 @@ drive; GoldHEN's FTP truncates files over 4 GB.
 For audio, also copy `libSceNgs2.sprx` from `/system/common/lib/` on your PS4 into `system_lib/`
 next to the executable.
 
-The full file list is in [docs/ARQUIVOS_NECESSARIOS.md](docs/ARQUIVOS_NECESSARIOS.md).
+The full file list is in [docs/game-files.md](docs/game-files.md).
 
 **PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX card.
 
