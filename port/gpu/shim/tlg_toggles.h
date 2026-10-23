@@ -15,6 +15,7 @@ extern "C" __attribute__((returns_twice)) int tlg_setjmp(sigjmp_buf buffer);
 #endif
 
 extern "C" std::uint64_t runtime_disabled_optimizations;
+extern "C" std::uint64_t runtime_disabled_optimizations2;
 /// Recovery point for speculative guest memory reads on this thread (runtime_memory.c).
 extern "C" __thread sigjmp_buf* runtime_fault_recover;
 
@@ -80,6 +81,13 @@ enum : std::uint64_t {
 };
 inline bool Disabled(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations, __ATOMIC_RELAXED) & bit) != 0;
+}
+/// The second mask (second number in TLG_TOGGLE_FILE): the first one has no free bits left.
+enum : std::uint64_t {
+    ShaderCodeBacking = 1, ///< per-draw shader code reads through the backing view
+};
+inline bool Disabled2(std::uint64_t bit) {
+    return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;
 }
 } // namespace TlgToggle
 

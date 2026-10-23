@@ -3,11 +3,28 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cstring>
 #include "common/assert.h"
 #include "common/types.h"
 #include "shader_recompiler/params.h"
+#include "tlg_toggles.h"
+
+// runtime_memory.c
+extern "C" int runtime_memory_read_backing(uintptr_t address, void* data, uint64_t size);
 
 namespace AmdGpu {
+
+/// tlg: reads shader code through the unprotected backing view. Shader code shares pages with
+/// GPU-written data, so with Precise readbacks every per-draw read of a shader header faulted
+/// into a readback (TLG_FAULT_PROFILE: a third of all fault time). The GPU never writes shader
+/// code, so the backing is current; direct read when the range has no backing.
+inline void ReadShaderCode(const void* code, void* dest, u64 size) {
+    if (TlgToggle::Disabled2(TlgToggle::ShaderCodeBacking) ||
+        !runtime_memory_read_backing(reinterpret_cast<uintptr_t>(code), dest, size)) {
+        std::memcpy(dest, code, size);
+    }
+}
 
 static constexpr u32 NUM_USER_DATA = 16;
 
@@ -221,12 +238,15 @@ struct ComputeProgram {
     }
 };
 
-static constexpr const BinaryInfo& SearchBinaryInfo(const u32* code) {
+static BinaryInfo SearchBinaryInfo(const u32* code) {
     constexpr u32 token_mov_vcchi = 0xBEEB03FF;
-    if (code[0] == token_mov_vcchi) {
-        const auto* info = std::bit_cast<const BinaryInfo*>(code + (code[1] + 1) * 2);
-        if (info->Valid()) {
-            return *info;
+    u32 head[2];
+    ReadShaderCode(code, head, sizeof(head));
+    if (head[0] == token_mov_vcchi) {
+        BinaryInfo info;
+        ReadShaderCode(code + (head[1] + 1) * 2, &info, sizeof(info));
+        if (info.Valid()) {
+            return info;
         }
     }
     constexpr u32 signature_size = sizeof(BinaryInfo::signature_ref) / sizeof(u8);
@@ -240,9 +260,9 @@ static constexpr const BinaryInfo& SearchBinaryInfo(const u32* code) {
     UNREACHABLE_MSG("Shader binary info not found.");
 }
 
-static constexpr Shader::ShaderParams GetParams(const auto& sh) {
+static Shader::ShaderParams GetParams(const auto& sh) {
     const auto* code = sh.template Address<u32*>();
-    const auto& bininfo = SearchBinaryInfo(code);
+    const auto bininfo = SearchBinaryInfo(code);
     return {
         .user_data = sh.user_data,
         .code = std::span{code, bininfo.length / sizeof(u32)},

@@ -8,6 +8,7 @@
 #include "common/assert.h"
 #include "shader_recompiler/frontend/decode.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
+#include "video_core/amdgpu/regs_shader.h"
 
 namespace Shader::Gcn {
 
@@ -110,10 +111,17 @@ std::optional<FetchShaderData> ParseFetchShader(const Shader::Info& info) {
         FetchShaderData data;
     };
     thread_local std::unordered_map<const u32*, CachedParse> cache;
+    thread_local std::vector<u32> current;
     if (const auto it = cache.find(code);
-        !TlgToggle::Disabled(TlgToggle::FetchShaderCache) && it != cache.end() &&
-        std::memcmp(code, it->second.code.data(), it->second.code.size() * sizeof(u32)) == 0) {
-        return it->second.data;
+        !TlgToggle::Disabled(TlgToggle::FetchShaderCache) && it != cache.end()) {
+        // Read through the backing view: a direct read faults into a readback when the code
+        // shares a page with GPU-written data (see AmdGpu::ReadShaderCode).
+        const u64 bytes = it->second.code.size() * sizeof(u32);
+        current.resize(it->second.code.size());
+        AmdGpu::ReadShaderCode(code, current.data(), bytes);
+        if (std::memcmp(current.data(), it->second.code.data(), bytes) == 0) {
+            return it->second.data;
+        }
     }
 
     FetchShaderData data{};
