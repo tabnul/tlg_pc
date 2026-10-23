@@ -173,6 +173,7 @@ private:
     // Disabled unless a launch profile opts in. When enabled, exact GPU-dirty islands in the
     // current sparse arena share one completion if their combined staging footprint fits.
     u64 readback_batch_limit{};
+    bool readback_batch_forced{}; ///< TLG_BUFFER_READBACK_BATCH_MB overrides the setting
     bool readback_stats_enabled{};
     std::atomic<u64> readback_report_ns{};
     std::atomic<u64> readback_requests{};

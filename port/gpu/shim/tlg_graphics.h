@@ -70,6 +70,11 @@ inline constexpr std::array<int, 3> FramesQueued = {1, 2, 0};
 inline int ParseFramesQueued(int value) {
     return IndexOf(FramesQueued, value, -1) >= 0 ? value : 1;
 }
+/// Readback batch limit in MiB (buffer_cache.cpp): 0 = off, only the window around a fault.
+inline constexpr std::array<int, 3> ReadbackBatchMb = {0, 16, 64};
+inline int ParseReadbackBatch(int value) {
+    return IndexOf(ReadbackBatchMb, value, -1) >= 0 ? value : 0;
+}
 /// RCAS / CAS strength in percent; invalid values fall back to `fallback` (RCAS 75, CAS 50).
 inline int ParseRcasStrength(int value, int fallback = 75) {
     return value >= 0 && value <= 100 ? value : fallback;

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <magic_enum/magic_enum.hpp>
 #include "tlg_copy.h"
+#include "tlg_settings.h"
 #include "tlg_toggles.h"
 #include "common/alignment.h"
 #include "core/memory.h"
@@ -61,14 +62,15 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
       stream_buffer{instance, scheduler, MemoryType::Stream, STREAM_BUFFER_SIZE},
       gds_buffer{instance, 0, GDS_BUFFER_SIZE, MemoryType::Stream, "GDS Buffer"},
       memory_semaphore{instance} {
-    // Opt-in only: the launcher's 60-FPS and unlocked profiles enable this while the default/30-FPS path
-    // retains the established 512 KiB fault window and one-range download behavior.
+    // tlg: the batch limit is the graphics setting readback_batch (default off: since the fence
+    // flushes and the side queue, batching costs 2-5 FPS, 2026-10-23); this variable forces a size.
     if (const char* forced = std::getenv("TLG_BUFFER_READBACK_BATCH_MB")) {
         char* end{};
         const u64 mib = std::strtoull(forced, &end, 10);
         if (end != forced && *end == '\0' && mib != 0) {
             readback_batch_limit = std::clamp<u64>(mib, 1, 256) * 1_MB;
         }
+        readback_batch_forced = true;
     }
     if (const char* diag = std::getenv("TLG_BUFFER_READBACK_STATS")) {
         readback_stats_enabled = *diag == '1';
@@ -232,7 +234,11 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     // The cap is based on exact copied bytes, not the arena's virtual size. If a title really
     // dirties more than the configured limit, retain the conservative request window rather
     // than allocate an unexpectedly large staging buffer. No dirty data is ever discarded.
-    if (readback_batch_limit) {
+    const u64 batch_limit =
+        readback_batch_forced
+            ? readback_batch_limit
+            : u64(TlgSettings::Get().readback_batch.load(std::memory_order_relaxed)) * 1_MB;
+    if (batch_limit) {
         u64 candidate_bytes = 0;
         bool over_limit = false;
         gpu_modified_ranges.ForEachInRange(arena_base, arena->size_bytes,
@@ -242,7 +248,7 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
             }
             constexpr u64 align = 64;
             const u64 range_bytes = Common::AlignUp(end - start, align);
-            if (range_bytes > readback_batch_limit - candidate_bytes) {
+            if (range_bytes > batch_limit - candidate_bytes) {
                 over_limit = true;
                 return;
             }
