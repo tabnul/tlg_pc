@@ -1,8 +1,7 @@
 # (Linux is disabled for now: see the commented-out job.)
-# Builds the Linux and Windows packages on every push to master and publishes them as a new
-# release tagged vYYYY.MM.DD-<commit>, marked latest. Every release is kept as version history
-# (the old "nightly" release is removed). A pushed tag v* publishes that tag the same way.
-# No game or console file is ever built in or uploaded.
+# Every push to master builds the Windows package, kept as a run artifact for 3 days. Only a pushed
+# tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest. Every release is
+# kept as version history. No game or console file is ever built in or uploaded.
 name: Build
 
 on:
@@ -137,8 +136,8 @@ jobs:
   release:
     # Linux: needs: [linux, windows]
     needs: [windows]
-    # Only pushes publish (master -> vYYYY.MM.DD-<commit>, v* tags -> that tag); pull requests stop at the artifacts.
-    if: github.event_name == 'push'
+    # Only a pushed v* tag publishes; master pushes and pull requests stop at the artifacts.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -150,8 +149,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            docs/game-files.md
-            .github/scripts/release_notes.sh
+            .github/release-template.md
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
@@ -165,23 +163,24 @@ jobs:
           # Linux: test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
           test -f dist/tlg-windows-x86_64.zip
           short=${GITHUB_SHA::7}
-          # Linux: the notes list "- Linux x86-64 (glibc 2.39+): \`tlg-linux-x86_64.tar.gz\`" above Windows.
-          cat > notes.md <<NOTES
-          Build automático do commit ${short}. **Nenhum arquivo do jogo incluído**: veja o README-player.md dentro do pacote para o que copiar do seu PS4.
-          Automatic build of commit ${short}. **No game files included**: see README-player.md inside the package for what to copy from your PS4.
-
-          - Windows 10/11 64-bit: \`tlg-windows-x86_64.zip\` (ainda não testado em jogo / not yet tested in game)
-
-          NOTES
-          # What changed since the previous release (pt-BR + en-US, from the PRs' notes blocks).
-          bash .github/scripts/release_notes.sh "$GITHUB_SHA" >> notes.md || echo "release notes: generation failed"
-          # The list of game files the player needs (docs/game-files.md), before the download.
-          sed '1d' docs/game-files.md >> notes.md
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            tag=$GITHUB_REF_NAME
-          else
-            tag="v$(date -u +%Y.%m.%d)-${short}"
+          # Linux: the template's Download list gets "- Linux x86-64 (glibc 2.39+): `tlg-linux-x86_64.tar.gz`" above Windows.
+          tag=$GITHUB_REF_NAME
+          # The notes are .github/release-template.md, with {{CHANGES}} taken from the annotated
+          # tag's message (git tag -a v0.2 -m "..."). A lightweight tag leaves that part out.
+          git fetch -q --depth=1 origin "+refs/tags/$tag:refs/tags/$tag"
+          : > changes.md
+          if [[ $(git cat-file -t "$tag") == tag ]]; then
+            git tag -l --format='%(contents:subject)%0a%0a%(contents:body)' "$tag" > changes.md
           fi
+          python3 - "$tag" "$short" "$GH_REPO" <<'PY'
+          import sys
+          tag, commit, repo = sys.argv[1:]
+          notes = open('.github/release-template.md', encoding='utf-8').read()
+          changes = open('changes.md', encoding='utf-8').read().strip()
+          for key, value in (('CHANGES', changes), ('TAG', tag), ('COMMIT', commit), ('REPO', repo)):
+              notes = notes.replace('{{' + key + '}}', value)
+          open('notes.md', 'w', encoding='utf-8').write(notes.lstrip())
+          PY
           # A re-run of the same commit finds its release already published: keep it.
           if gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null | grep -qx false; then
             echo "tag=$tag" >> "$GITHUB_OUTPUT"; exit 0
@@ -208,7 +207,7 @@ jobs:
         # Only after the new release is live: the previous runs and their artifacts go, the
         # current run (the one that produced this release) stays. Releases are not touched,
         # apart from leftover nightly-staging drafts of failed runs.
-        if: github.ref == 'refs/heads/master'
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -uo pipefail
           gh release list --limit 100 --json tagName,isDraft \
