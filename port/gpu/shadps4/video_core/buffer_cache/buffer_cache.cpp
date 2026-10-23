@@ -61,7 +61,7 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
       stream_buffer{instance, scheduler, MemoryType::Stream, STREAM_BUFFER_SIZE},
       gds_buffer{instance, 0, GDS_BUFFER_SIZE, MemoryType::Stream, "GDS Buffer"},
       memory_semaphore{instance} {
-    // Opt-in only: the launcher's 60-FPS profile enables this while the default/30-FPS path
+    // Opt-in only: the launcher's 60-FPS and unlocked profiles enable this while the default/30-FPS path
     // retains the established 512 KiB fault window and one-range download behavior.
     if (const char* forced = std::getenv("TLG_BUFFER_READBACK_BATCH_MB")) {
         char* end{};

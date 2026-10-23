@@ -678,9 +678,9 @@ def build_env(settings, extra=None):
     # nothing, and TLG_* set outside the launcher win.
     env.update(backports_table.environment(experimental_states(settings), os.environ))
     # TLG's open scenes can queue thousands of draws before a precise CPU buffer fault. The
-    # first fault at 60 FPS downloads the arena's exact GPU-dirty islands with one completion;
-    # the default/30-FPS path deliberately retains its established readback behavior.
-    if applied_frame_rate == '60':
+    # first fault at 60 FPS or unlocked downloads the arena's exact GPU-dirty islands with one
+    # completion; the default/30-FPS path deliberately retains its established readback behavior.
+    if applied_frame_rate in ('60', 'unlocked'):
         env.setdefault('TLG_BUFFER_READBACK_BATCH_MB', '64')
         env.setdefault('TLG_BUFFER_READBACK_STATS', '1')
     if extra:
