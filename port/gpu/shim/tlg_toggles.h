@@ -86,6 +86,7 @@ inline bool Disabled(std::uint64_t bit) {
 enum : std::uint64_t {
     ShaderCodeBacking = 1, ///< per-draw shader code reads through the backing view
     ReadbackSideQueue = 2, ///< readbacks of finished GPU writes copy on the second queue
+    FenceFlush = 4,        ///< submit GPU writes to guest memory at an end-of-pipe fence
 };
 inline bool Disabled2(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;
@@ -95,6 +96,8 @@ inline bool Disabled2(std::uint64_t bit) {
 namespace TlgStats {
 /// Guest writes caught by page protection, and pages currently left unprotected as hot.
 inline std::atomic<std::uint64_t> tracker_faults{0};
+/// Submissions made at end-of-pipe fences (Rasterizer::FlushForFence).
+inline std::atomic<std::uint64_t> fence_flushes{0};
 inline std::atomic<std::int64_t> hot_pages{0};
 /// Stall diagnostics (TLG_FRAME_STATS): per-frame deltas printed for frames over 40 ms.
 inline std::atomic<std::uint64_t> images_registered{0};

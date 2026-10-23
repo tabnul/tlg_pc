@@ -144,6 +144,9 @@ public:
 
     u64 Flush();
     void Finish();
+    /// tlg: submits the open command buffer at an end-of-pipe fence when it writes guest
+    /// memory, so the GPU is running that work when the guest reads its results.
+    void FlushForFence();
     void OnSubmit();
 
     PipelineCache& GetPipelineCache() {
