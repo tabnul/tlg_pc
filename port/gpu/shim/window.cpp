@@ -344,14 +344,21 @@ bool WindowSDL::PollEvents() {
             UpdateTextTitle();
             continue;
         }
-        // tlg: F11 switches between windowed and fullscreen (the desktop mode: the monitor keeps its resolution and Alt+Tab works). The next loop applies
-        // the setting; the menu's display mode follows it. TLG_FRAME_CAPTURE_KEY=1 gives F11 to the frame capture instead.
+        // tlg: F11 switches between windowed and the last full-screen mode (borderless unless exclusive fullscreen was picked). The next loop
+        // applies the setting; the menu's display mode follows it. TLG_FRAME_CAPTURE_KEY=1 gives F11 to the frame capture instead.
         static const bool capture_key = [] {
             const char* env = std::getenv("TLG_FRAME_CAPTURE_KEY");
             return env && *env == '1';
         }();
         if (!capture_key && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F11 && !event.key.repeat) {
-            TlgSettings::Get().display_mode = TlgSettings::Get().display_mode == TlgGraphics::Windowed ? TlgGraphics::Fullscreen : TlgGraphics::Windowed;
+            static int full_mode = TlgGraphics::Borderless;
+            auto& mode = TlgSettings::Get().display_mode;
+            if (mode == TlgGraphics::Windowed) {
+                mode = full_mode;
+            } else {
+                full_mode = mode;
+                mode = TlgGraphics::Windowed;
+            }
             continue;
         }
         if (TlgOverlay::HandleEvent(event) || HandleMouse(event)) {
