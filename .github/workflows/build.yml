@@ -189,7 +189,9 @@ jobs:
           (cd dist && sha256sum tlg-windows-x86_64.zip > SHA256SUMS)
           # Upload into a draft first, so a failed upload never leaves a half-published release.
           # Releases are kept forever as version history; nothing here deletes one.
-          gh release create "$tag" dist/* --draft --target "$GITHUB_SHA" \
+          # --verify-tag: the pushed tag is used as is. With --target the API may create a tag,
+          # which the workflow token is refused for commits that change workflow files (HTTP 403).
+          gh release create "$tag" dist/* --draft --verify-tag \
             --title "$tag ($(date -u +%Y-%m-%d) · ${short})" --notes-file notes.md
           n=$(gh release view "$tag" --json assets --jq '.assets | length')
           # Linux: [[ $n -ge 3 ]]
