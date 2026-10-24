@@ -58,8 +58,13 @@ KEEP_LOGS = 30
 LANGUAGES_US = {'en': 1, 'pt_BR': 17, 'es_LA': 20, 'fr_CA': 22}
 LANGUAGES_EU = {'en': 1, 'fr': 2, 'es_ES': 3, 'de': 4, 'it': 5, 'nl': 6, 'pt_PT': 7, 'ru': 8,
                 'fi': 12, 'sv': 13, 'da': 14, 'no': 15, 'pl': 16, 'tr': 19, 'ar': 21}
-LANGUAGES_BY_TITLE = {'CUSA03627': LANGUAGES_US, 'CUSA03745': LANGUAGES_EU}
-DEFAULT_LANGUAGE_BY_TITLE = {'CUSA03627': 'es_LA', 'CUSA03745': 'es_ES'}
+# Asian discs (CUSA04936 Korean, #46; CUSA04943 Chinese, #101): the PS4 system ids, which the
+# engine ids follow (ko 9, zh_TW 10, zh_CN 11); one the disc lacks falls back to English.
+LANGUAGES_ASIA = {'en': 1, 'ko': 9, 'zh_TW': 10, 'zh_CN': 11}
+LANGUAGES_BY_TITLE = {'CUSA03627': LANGUAGES_US, 'CUSA03745': LANGUAGES_EU,
+                      'CUSA04936': LANGUAGES_ASIA, 'CUSA04943': LANGUAGES_ASIA}
+DEFAULT_LANGUAGE_BY_TITLE = {'CUSA03627': 'es_LA', 'CUSA03745': 'es_ES',
+                             'CUSA04936': 'ko', 'CUSA04943': 'zh_CN'}
 
 
 def game_languages(game_dir=''):
@@ -75,13 +80,13 @@ def default_language(game_dir=''):
 
 
 # Every language key either disc has (the Qt launcher's names table covers them all).
-GAME_LANGUAGES = {**LANGUAGES_US, **LANGUAGES_EU}
+GAME_LANGUAGES = {**LANGUAGES_US, **LANGUAGES_EU, **LANGUAGES_ASIA}
 # The closest choice when the system's language is missing from the disc.
 _LANGUAGE_SIBLING = {'pt_BR': 'pt_PT', 'pt_PT': 'pt_BR', 'es_LA': 'es_ES', 'es_ES': 'es_LA',
                      'fr_CA': 'fr', 'fr': 'fr_CA'}
 _LANGUAGE_PREFIX = {'en': 'en', 'pt': 'pt_BR', 'es': 'es_LA', 'fr': 'fr', 'de': 'de', 'it': 'it', 'nl': 'nl',
                     'pl': 'pl', 'tr': 'tr', 'ru': 'ru', 'fi': 'fi', 'sv': 'sv', 'da': 'da', 'no': 'no', 'nb': 'no',
-                    'nn': 'no', 'ar': 'ar'}
+                    'nn': 'no', 'ar': 'ar', 'ko': 'ko'}
 
 
 def system_game_language(environ=None):
@@ -97,7 +102,8 @@ def system_game_language(environ=None):
             code = ''
     parts = re.split(r'[_\-.@]', code.strip().lower())
     windows = {'english': 'en', 'portuguese': 'pt', 'spanish': 'es', 'french': 'fr', 'german': 'de',
-               'italian': 'it', 'dutch': 'nl', 'polish': 'pl', 'turkish': 'tr', 'russian': 'ru'}
+               'italian': 'it', 'dutch': 'nl', 'polish': 'pl', 'turkish': 'tr', 'russian': 'ru',
+               'korean': 'ko', 'chinese': 'zh'}
     language = windows.get(parts[0], parts[0])
     region = parts[1] if len(parts) > 1 else ''
     if language == 'pt':
@@ -106,6 +112,8 @@ def system_game_language(environ=None):
         return 'es_ES' if region in ('es', 'spain') else 'es_LA'
     if language == 'fr':
         return 'fr_CA' if region in ('ca', 'canada') else 'fr'
+    if language == 'zh':
+        return 'zh_TW' if region in ('tw', 'hk', 'mo', 'hant') else 'zh_CN'
     return _LANGUAGE_PREFIX.get(language, 'en')
 
 

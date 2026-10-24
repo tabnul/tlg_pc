@@ -328,8 +328,14 @@ void Runtime::CopyImage(VideoCore::Image* src, VideoCore::Image* dst) {
 
     const u32 base_width = src->info.size.width;
     const u32 base_height = src->info.size.height;
+    // tlg: 3D to 3D copies the depth both images have (an expanded volume is deeper than its
+    // source: copying the destination's depth read past the source image).
     const u32 base_depth =
-        dst->info.type == AmdGpu::ImageType::Color3D ? dst->info.size.depth : src->info.size.depth;
+        dst->info.type == AmdGpu::ImageType::Color3D
+            ? (src->info.type == AmdGpu::ImageType::Color3D
+                   ? std::min(src->info.size.depth, dst->info.size.depth)
+                   : dst->info.size.depth)
+            : src->info.size.depth;
 
     // Match sample count before copying
     SetBackingSamples(dst, dst->info.num_samples, false);
