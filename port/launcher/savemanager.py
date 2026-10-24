@@ -40,7 +40,8 @@ PROBE_NAMES = ('tlg-probe', 'tlg-probe.exe')
 STAMP_RE = re.compile(r'^\d{8}-\d{6}(-\d+)?$')
 UID_RE = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
 SLOT_RE = re.compile(r'^(' + SLOT_PREFIX + r'[A-Za-z0-9_]{1,40}|CUSA\d{5}\.memory)$')
-TITLES = {'CUSA03627': 'The Last Guardian', 'CUSA03745': 'The Last Guardian (EU)'}
+TITLES = {'CUSA03627': 'The Last Guardian', 'CUSA03745': 'The Last Guardian (EU)',
+          'CUSA04936': 'The Last Guardian (KR)', 'CUSA04943': 'The Last Guardian (CN)'}
 
 
 def is_memory(name):

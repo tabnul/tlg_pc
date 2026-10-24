@@ -19,7 +19,7 @@ import shutil
 import time
 
 SERIAL = 'CUSA03627'                     # US disc; the EU one is CUSA03745
-SERIALS = ('CUSA03627', 'CUSA03745')
+SERIALS = ('CUSA03627', 'CUSA03745', 'CUSA04936', 'CUSA04943')  # US, EU, Korea, China
 SLOT_PREFIX = ''                         # the game's own save folders have no common prefix
 MEMORY_SUFFIX = '.memory'                # <user>/<serial>.memory/memory.dat: SaveDataMemory, TLG's only save
 ENV_NAMES = ('TLG_USER_DIR',)

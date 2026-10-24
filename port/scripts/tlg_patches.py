@@ -28,7 +28,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mod_patches
 
-TITLE_IDS = {'CUSA03627', 'CUSA03745'}   # US, EU (tlg_run.py LANGUAGES_BY_TITLE)
+TITLE_IDS = {'CUSA03627', 'CUSA03745', 'CUSA04936', 'CUSA04943'}   # US, EU, KR, CN (tlg_run.py LANGUAGES_BY_TITLE)
 EBOOT_103_SHA256 = '91dce685be81f8f6bc88097d4fc7a62e97ca08d109621c57fe9371ae125feb3c'
 SELF_MAGIC = b'O\x15=\x1d'
 TEXT_FILE_OFFSET = 0x4000      # PT_LOAD 0 (R E): file offset of vaddr 0

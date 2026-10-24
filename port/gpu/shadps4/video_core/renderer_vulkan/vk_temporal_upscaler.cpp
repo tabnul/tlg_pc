@@ -155,6 +155,19 @@ void PrintIssues(const char* what, u64 issues) {
     std::printf("\n");
 }
 
+// Without a captured camera (a zero projection; CameraMotion::OnConstants finds none in TLG)
+// the near plane is not finite and the field of view is pi: FSR rejects those, use stand-ins.
+float CameraValue(float value, float fallback, float limit = 1e30f) {
+    if (std::isfinite(value) && value > 0.0f && value < limit) {
+        return value;
+    }
+    static u32 printed = 0;
+    if (printed++ < 4) {
+        std::printf("Upscaler: no game camera, default %.2f\n", fallback);
+    }
+    return fallback;
+}
+
 } // namespace
 
 TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& scheduler_,
@@ -298,9 +311,10 @@ bool TemporalUpscaler::OnFrameStart() {
     // natively at that size. The scene targets only know the 1920x1080 buffers (reduced presets
     // misplace the half-resolution layers), so the upscaler stays off; at 1920x1080 it works.
     static const char* resolution_patch = std::getenv("TLG_RESOLUTION_PATCH");
-    // DLAA works on the game's own targets at any size (RunGameMotion), so DLSS stays.
+    // DLAA and FSR 3.1 native AA work on the game's own targets at any size (RunGameMotion).
     if (resolution_patch && TlgSettings::Get().upscaler != TlgSettings::UpscalerOff &&
-        TlgSettings::Get().upscaler != TlgSettings::UpscalerDlss) {
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerDlss &&
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr3) {
         TlgSettings::Get().upscaler.store(TlgSettings::UpscalerOff);
         static bool logged = false;
         if (!std::exchange(logged, true)) {
@@ -372,8 +386,9 @@ bool TemporalUpscaler::OnFrameStart() {
     snapshot_taken = false;
     opaque_valid = false;
     mask_ready = false;
-    // tlg: game-motion DLAA jitters only frames DLSS resolves (unresolved jitter shimmers).
-    jitter_active = jitter_on && UseDlss() && !Scaled();
+    // tlg: game-motion DLAA jitters only frames DLSS resolves (unresolved jitter shimmers);
+    // FSR 3.1 native AA resolves them the same way.
+    jitter_active = jitter_on && (UseDlss() || FsrNativeAa()) && !Scaled();
     // Halton(2, 3); the menu or toggle 1 << 25 disables it.
     if (!jitter_on) {
         jitter = {};
@@ -426,7 +441,8 @@ void TemporalUpscaler::OnDispatch(u64 cs_hash) {
         return;
     }
     // tlg: DLSS only runs as DLAA on the game's motion (above); the GoW3 scene path made it shake.
-    if (cs_hash != trigger_hash || done_this_frame || failed || Scaled() ||
+    // FSR 3.1 native AA runs there too.
+    if (cs_hash != trigger_hash || done_this_frame || failed || Scaled() || GameMotion() ||
         TlgSettings::Get().upscaler == TlgSettings::UpscalerDlss) {
         return;
     }
@@ -673,7 +689,7 @@ void TemporalUpscaler::CreatePipelines() {
     merge_pipeline = compute(UPSCALE_MERGE_COMP, *merge_pipeline_layout);
     storage_layout(3, reactive_desc_layout, reactive_pipeline_layout, 3 * sizeof(float));
     reactive_pipeline = compute(UPSCALE_REACTIVE_COMP, *reactive_pipeline_layout);
-    storage_layout(2, taa_sharpen_desc_layout, taa_sharpen_pipeline_layout, sizeof(float));
+    storage_layout(2, taa_sharpen_desc_layout, taa_sharpen_pipeline_layout, 2 * sizeof(float));
     taa_sharpen_pipeline = compute(TAA_SHARPEN_COMP, *taa_sharpen_pipeline_layout);
     taa_sharpen_ldr_pipeline = compute(TAA_SHARPEN_LDR_COMP, *taa_sharpen_pipeline_layout);
     {
@@ -772,6 +788,7 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
     cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
     const auto& settings = TlgSettings::Get();
     const float strength = std::clamp(settings.sharpness.load(), 0.0f, 2.0f);
+    const std::array<float, 2> sharpen_params{strength, strength};
     if (settings.sharpen && strength > 0.0f && !(params.pad & 0xffu)) {
         const vk::MemoryBarrier2 resolved{
             .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
@@ -791,7 +808,7 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
         cmdbuf.pushDescriptorSetKHR(vk::PipelineBindPoint::eCompute,
                                     *taa_sharpen_pipeline_layout, 0, sharpen_writes);
         cmdbuf.pushConstants(*taa_sharpen_pipeline_layout, vk::ShaderStageFlagBits::eCompute,
-                             0, sizeof(strength), &strength);
+                             0, sizeof(sharpen_params), sharpen_params.data());
         cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
     }
     taa_next = 1 - taa_next;
@@ -801,9 +818,23 @@ void TemporalUpscaler::ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, 
                                     u32 h) {
     const auto& settings = TlgSettings::Get();
     const float extra = std::clamp(settings.sharpness.load(), 0.0f, 2.0f) - 1.0f;
-    if (!settings.sharpen || extra <= 0.0f) {
-        return;
+    if (settings.sharpen && extra > 0.0f) {
+        RcasPass(cmdbuf, target, ldr, w, h, extra, extra);
     }
+}
+
+void TemporalUpscaler::DlssSharpen(vk::CommandBuffer cmdbuf, u32 w, u32 h) {
+    // The menu's 0..1 matches FSR 3's RCAS (fully applied); above 1 extrapolated.
+    const auto& settings = TlgSettings::Get();
+    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 2.0f);
+    if (settings.sharpen && strength > 0.0f) {
+        RcasPass(cmdbuf, vk::Image(output_image), false, w, h, strength,
+                 std::max(strength, 1.0f));
+    }
+}
+
+void TemporalUpscaler::RcasPass(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w,
+                                u32 h, float strength, float blend) {
     const auto device = instance.GetDevice();
     if (extra_sharpen_width != w || extra_sharpen_height != h) {
         // Retired command buffers may still read the old copy. `cmdbuf` stays open.
@@ -880,8 +911,9 @@ void TemporalUpscaler::ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, 
                         ldr ? *taa_sharpen_ldr_pipeline : *taa_sharpen_pipeline);
     cmdbuf.pushDescriptorSetKHR(vk::PipelineBindPoint::eCompute, *taa_sharpen_pipeline_layout, 0,
                                 writes);
+    const std::array<float, 2> params{strength, blend};
     cmdbuf.pushConstants(*taa_sharpen_pipeline_layout, vk::ShaderStageFlagBits::eCompute, 0,
-                         sizeof(extra), &extra);
+                         sizeof(params), params.data());
     cmdbuf.dispatch((w + 7) / 8, (h + 7) / 8, 1);
     image_barrier(target, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits2::eComputeShader,
                   vk::AccessFlagBits2::eShaderStorageWrite, all, rw);
@@ -1086,9 +1118,10 @@ void TemporalUpscaler::RunGameMotion() {
         failed = true;
         return;
     }
-    static bool logged = false;
-    if (!std::exchange(logged, true)) {
-        std::printf("Upscaler: DLAA on game motion vectors %ux%u\n", w, h);
+    const char* provider = UseDlss() ? "DLAA" : "FSR 3.1 native AA";
+    static const char* logged = nullptr;
+    if (std::exchange(logged, provider) != provider) {
+        std::printf("Upscaler: %s on game motion vectors %ux%u\n", provider, w, h);
     }
     const auto color_view = CachedView(color, color.info.pixel_format, vk::ImageAspectFlagBits::eColor);
     const auto motion_src_view =
@@ -1136,13 +1169,24 @@ void TemporalUpscaler::RunGameMotion() {
     last_frame = now;
     // Fresh history after a settings change, a skipped frame, or a menu or loading screen.
     reset = game_reset || now - last_game_motion > std::chrono::milliseconds(100);
-    if (!RecordDlss(cmdbuf,
-                    {color.GetImage(), color_view, color.info.pixel_format,
-                     vk::ImageAspectFlagBits::eColor, w, h},
-                    {depth.GetImage(), depth_view, depth_format, vk::ImageAspectFlagBits::eDepth,
-                     w, h},
-                    w, h, w, h, frame_ms, true, game_frame.jitter)) {
+    const bool ok = UseDlss()
+        ? RecordDlss(cmdbuf,
+                     {color.GetImage(), color_view, color.info.pixel_format,
+                      vk::ImageAspectFlagBits::eColor, w, h},
+                     {depth.GetImage(), depth_view, depth_format, vk::ImageAspectFlagBits::eDepth,
+                      w, h},
+                     w, h, w, h, frame_ms, true, game_frame.jitter)
+        : FsrNativeAa() &&
+          RecordFsr3(cmdbuf, color.GetImage(), color.info.pixel_format, color.usage_flags,
+                     depth.GetImage(), depth_format, depth.usage_flags, w, h, w, h, frame_ms,
+                     false, game_frame.jitter);
+    if (!ok) {
         return;
+    }
+    if (UseDlss()) {
+        DlssSharpen(cmdbuf, w, h);
+    } else {
+        ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
     }
     reset = false;
     game_reset = false;
@@ -1300,78 +1344,16 @@ void TemporalUpscaler::Run() {
             {input_depth, input_depth_view, depth_format, vk::ImageAspectFlagBits::eDepth, w, h}, w, h,
             ow, oh, frame_ms, true, jitter);
     } else {
-        FfxVkPortableUpscaleDispatchInfo info{};
-        info.structSize = sizeof(info);
-        info.commandBuffer = cmdbuf;
-        info.color = Describe(input_color, color.info.pixel_format, w, h,
-                              color.usage_flags, vk::ImageAspectFlagBits::eColor,
-                              FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
-        info.depth = Describe(input_depth, depth_format, w, h, depth.usage_flags,
-                              vk::ImageAspectFlagBits::eDepth,
-                              FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
-        info.motionVectors = Describe(vk::Image(motion_image), vk::Format::eR16G16Sfloat, w, h,
-                                      vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
-                                      vk::ImageAspectFlagBits::eColor,
-                                      FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
-        info.output = Describe(vk::Image(output_image), vk::Format::eR16G16B16A16Sfloat, ow, oh,
-                               vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-                                   vk::ImageUsageFlagBits::eTransferSrc,
-                               vk::ImageAspectFlagBits::eColor,
-                               FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS);
-        // Optional inputs, absent: a described but null image.
-        info.exposure.structSize = sizeof(info.exposure);
-        info.reactiveMask.structSize = sizeof(info.reactiveMask);
-        if (has_reactive) {
-            info.reactiveMask = Describe(vk::Image(reactive_image), vk::Format::eR8Unorm, w, h,
-                                         vk::ImageUsageFlagBits::eStorage |
-                                             vk::ImageUsageFlagBits::eSampled,
-                                         vk::ImageAspectFlagBits::eColor,
-                                         FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
-        }
-        info.transparencyAndCompositionMask.structSize = sizeof(info.transparencyAndCompositionMask);
-        // Toggle 1 << 26 (tests): the opposite sign convention for FSR.
-        const float sign = TlgToggle::Disabled(1u << 26) ? -1.0f : 1.0f;
-        info.jitterOffset = {sign * jitter[0], sign * jitter[1]};
-        info.motionVectorScale = {1.0f, 1.0f};
-        info.renderSize = {w, h};
-        info.outputSize = {ow, oh};
-        info.frameTimeMilliseconds = frame_ms;
-        info.preExposure = 1.0f;
-        info.cameraNear = camera_motion.Near();
-        info.cameraFar = 3000.0f;
-        info.cameraVerticalFovRadians = camera_motion.VerticalFov();
-        info.viewSpaceToMeters = 1.0f;
-        // RCAS strength 0..1 (menu, TLG_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
-        // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the menu's 0..2.
-        info.sharpness = std::min(TlgSettings::Get().sharpness.load(), 1.0f);
-        info.enableSharpening = TlgSettings::Get().sharpen ? VK_TRUE : VK_FALSE;
-        info.reset = reset ? VK_TRUE : VK_FALSE;
-        info.frameId = frame_id++;
-    
-        FfxVkPortableUpscaleCreateInfo create_info{};
-        create_info.structSize = sizeof(create_info);
-        create_info.flags = FFX_VK_PORTABLE_CONTEXT_HDR_COLOR_INPUT | FFX_VK_PORTABLE_CONTEXT_AUTO_EXPOSURE;
-        create_info.maxRenderSize = {w, h};
-        create_info.maxOutputSize = {ow, oh};
-        if (const u64 issues = ffxVkPortableValidateUpscaleDispatchInfo(&create_info, &info)) {
-            static bool printed = false;
-            if (!printed) {
-                printed = true;
-                PrintIssues("dispatch", issues);
-            }
-            failed = true;
-        } else if (ffxVkPortableUpscaleContextRecordDispatch(context, &info) !=
-                   FFX_VK_PORTABLE_OK) {
-            std::printf("Upscaler: FSR 3 dispatch failed\n");
-            failed = true;
-        } else {
-            dispatched = true;
-        }
+        dispatched = RecordFsr3(cmdbuf, input_color, color.info.pixel_format, color.usage_flags,
+                                input_depth, depth_format, depth.usage_flags, w, h, ow, oh,
+                                frame_ms, has_reactive, jitter);
     }
     if (dispatched) {
         reset = false;
         dispatched_last_frame = true;
-        if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
+        if (UseDlss()) {
+            DlssSharpen(cmdbuf, ow, oh);
+        } else if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
             ExtraSharpen(cmdbuf, vk::Image(output_image), false, ow, oh);
         }
         // The result replaces the scene color's RGB (its alpha carries data for the post).
@@ -1486,9 +1468,11 @@ float TemporalUpscaler::SceneMipBias() const {
     const float render = float(TlgSettings::Get().active_render_width.load());
     const float output = float(Scaled() ? target_width : 1920u);
     float bias = render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
-    // DLSS guide: log2(render / output) - 1; the resolve keeps the extra detail stable.
+    // DLSS and FSR guides: log2(render / output) - 1; the resolve keeps the extra detail stable.
     // tlg: Lab tab lod_bias, in quarter steps (default -4: the guide's -1).
-    if (UseDlss() && TlgSettings::Get().dlaa) bias += TlgSettings::Get().lod_bias.load() * 0.25f;
+    if ((UseDlss() || FsrNativeAa()) && TlgSettings::Get().dlaa) {
+        bias += TlgSettings::Get().lod_bias.load() * 0.25f;
+    }
     return bias;
 }
 
@@ -1843,7 +1827,9 @@ void TemporalUpscaler::RunScaled() {
                             oh, frame_ms);
         }
         if (ok4) {
-            if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
+            if (UseDlss()) {
+                DlssSharpen(cmdbuf, ow, oh);
+            } else if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
                 ExtraSharpen(cmdbuf, vk::Image(output_image), false, ow, oh);
             }
             barrier(vk::Image(output_image), vk::ImageAspectFlagBits::eColor,
@@ -2132,6 +2118,84 @@ bool TemporalUpscaler::DisplayOverride(VAddr address, Display& display) {
 
 namespace Vulkan {
 
+bool TemporalUpscaler::RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk::Format color_format,
+                                  vk::ImageUsageFlags color_usage, vk::Image depth,
+                                  vk::Format depth_format, vk::ImageUsageFlags depth_usage,
+                                  u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
+                                  bool has_reactive, std::array<float, 2> frame_jitter) {
+    FfxVkPortableUpscaleDispatchInfo info{};
+    info.structSize = sizeof(info);
+    info.commandBuffer = cmdbuf;
+    info.color = Describe(color, color_format, w, h,
+                          color_usage, vk::ImageAspectFlagBits::eColor,
+                          FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    info.depth = Describe(depth, depth_format, w, h, depth_usage,
+                          vk::ImageAspectFlagBits::eDepth,
+                          FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    info.motionVectors = Describe(vk::Image(motion_image), vk::Format::eR16G16Sfloat, w, h,
+                                  vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+                                  vk::ImageAspectFlagBits::eColor,
+                                  FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    info.output = Describe(vk::Image(output_image), vk::Format::eR16G16B16A16Sfloat, ow, oh,
+                           vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+                               vk::ImageUsageFlagBits::eTransferSrc,
+                           vk::ImageAspectFlagBits::eColor,
+                           FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS);
+    // Optional inputs, absent: a described but null image.
+    info.exposure.structSize = sizeof(info.exposure);
+    info.reactiveMask.structSize = sizeof(info.reactiveMask);
+    if (has_reactive) {
+        info.reactiveMask = Describe(vk::Image(reactive_image), vk::Format::eR8Unorm, w, h,
+                                     vk::ImageUsageFlagBits::eStorage |
+                                         vk::ImageUsageFlagBits::eSampled,
+                                     vk::ImageAspectFlagBits::eColor,
+                                     FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    }
+    info.transparencyAndCompositionMask.structSize = sizeof(info.transparencyAndCompositionMask);
+    // Toggle 1 << 26 (tests): the opposite sign convention for FSR.
+    const float sign = TlgToggle::Disabled(1u << 26) ? -1.0f : 1.0f;
+    info.jitterOffset = {sign * frame_jitter[0], sign * frame_jitter[1]};
+    info.motionVectorScale = {1.0f, 1.0f};
+    info.renderSize = {w, h};
+    info.outputSize = {ow, oh};
+    info.frameTimeMilliseconds = frame_ms;
+    info.preExposure = 1.0f;
+    info.cameraNear = CameraValue(camera_motion.Near(), 0.1f);
+    info.cameraFar = 3000.0f;
+    info.cameraVerticalFovRadians = CameraValue(camera_motion.VerticalFov(), 1.0f, 3.0f);
+    info.viewSpaceToMeters = 1.0f;
+    // RCAS strength 0..1 (menu, TLG_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
+    // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the menu's 0..2.
+    info.sharpness = std::min(TlgSettings::Get().sharpness.load(), 1.0f);
+    info.enableSharpening = TlgSettings::Get().sharpen ? VK_TRUE : VK_FALSE;
+    info.reset = reset ? VK_TRUE : VK_FALSE;
+    info.frameId = frame_id++;
+
+    FfxVkPortableUpscaleCreateInfo create_info{};
+    create_info.structSize = sizeof(create_info);
+    create_info.flags = FFX_VK_PORTABLE_CONTEXT_HDR_COLOR_INPUT | FFX_VK_PORTABLE_CONTEXT_AUTO_EXPOSURE;
+    create_info.maxRenderSize = {w, h};
+    create_info.maxOutputSize = {ow, oh};
+    // Motion cuts FSR 3's history (AMD default 1): at 1 a running boy shows the raw frame, with
+    // the dither holes of the hair and a soft image.
+    ffxVkPortableUpscaleContextSetVelocityFactor(context, TlgSettings::Get().fsr_velocity.load());
+    if (const u64 issues = ffxVkPortableValidateUpscaleDispatchInfo(&create_info, &info)) {
+        static bool printed = false;
+        if (!printed) {
+            printed = true;
+            PrintIssues("dispatch", issues);
+        }
+        failed = true;
+    } else if (ffxVkPortableUpscaleContextRecordDispatch(context, &info) !=
+               FFX_VK_PORTABLE_OK) {
+        std::printf("Upscaler: FSR 3 dispatch failed\n");
+        failed = true;
+    } else {
+        return true;
+    }
+    return false;
+}
+
 bool TemporalUpscaler::UseFsr4() const {
     const int selected = TlgSettings::Get().upscaler;
     const bool supported = selected == TlgSettings::UpscalerFsr411
@@ -2181,7 +2245,7 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
     }
     if (!ok && fsr4->Fatal()) {
         std::printf("Upscaler: falling back to FSR 3.1\n");
-        TlgSettings::Get().upscaler = TlgSettings::UpscalerFsr3;
+        TlgSettings::FallBackToFsr3();
         fsr4_failed = true; // EnsureResources creates the FSR 3 context next frame
         reset = true;
     }
@@ -2191,6 +2255,12 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
 bool TemporalUpscaler::SkipGameSmaa(u64 vs_hash) const {
     return vs_hash == 0x0a449aef && GameMotion() &&
            !TlgToggle::Disabled(TlgToggle::DlaaSkipGameSmaa);
+}
+
+bool TemporalUpscaler::FsrNativeAa() const {
+    // FSR 3.1 at native size is its anti-aliasing mode, on the game's motion like DLAA.
+    const auto& settings = TlgSettings::Get();
+    return settings.upscaler == TlgSettings::UpscalerFsr3 && settings.dlaa && settings.jitter;
 }
 
 bool TemporalUpscaler::UseDlss() const {
@@ -2205,7 +2275,7 @@ bool TemporalUpscaler::RecordDlss(vk::CommandBuffer cmdbuf, const Dlss::Resource
     Dlss* dlss = Dlss::Get();
     const u64 tests = __atomic_load_n(&runtime_disabled_optimizations, __ATOMIC_RELAXED);
     const Dlss::FeatureDesc desc{w, h, ow, oh, Dlss::QualityForScale(float(ow) / float(w)), hdr,
-                                 u32(tests >> 60),
+                                 tests >> 60 ? u32(tests >> 60) : u32(TlgSettings::Get().dlss_preset.load()),
                                  !TlgToggle::Disabled(TlgToggle::DlssAutoExposure)};
     bool ok = true;
     if (!dlss->HasFeature(desc)) {
@@ -2235,7 +2305,7 @@ bool TemporalUpscaler::RecordDlss(vk::CommandBuffer cmdbuf, const Dlss::Resource
     }
     if (!ok) {
         std::printf("Upscaler: DLSS failed; falling back to FSR 3.1\n");
-        TlgSettings::Get().upscaler = TlgSettings::UpscalerFsr3;
+        TlgSettings::FallBackToFsr3();
         dlss_failed = true; // EnsureResources creates the FSR 3 context next frame
         reset = true;
     }

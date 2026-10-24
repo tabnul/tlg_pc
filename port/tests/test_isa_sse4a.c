@@ -225,6 +225,7 @@ __asm__(".text\n"
         "mov %r14, 112(%rsi)\n mov %r15, 120(%rsi)\n"
         "mov 16(%rsp), %rax\n mov %rax, 48(%rsi)\n"
         "pop %rax\n mov %rax, 128(%rsi)\n"
+        "cld\n"  /* guest DF is captured above; the C caller requires DF clear */
         RS_IRP16 "vmovdqu %ymm\\i, 144+32*\\i(%rsi)\n .endr\n"
         RS_IRP16 "mov -16-8*\\i(%rsp), %rax\n mov %rax, 656+8*\\i(%rsi)\n .endr\n"
         "vzeroupper\n"

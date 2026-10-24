@@ -41,6 +41,12 @@ struct Values {
     std::atomic<float> reactive_scale{1.0f};
     std::atomic<float> reactive_threshold{0.2f};
     std::atomic<float> reactive_max{0.9f};
+    /// FSR 3 fVelocityFactor 0..1: how much motion cuts the history (1 = AMD's default, the
+    /// history drops to 15% from half a 4K pixel per frame; 0 keeps it while moving).
+    std::atomic<float> fsr_velocity{1.0f};
+    /// NVSDK_NGX_DLSS_Hint_Render_Preset for every DLSS mode (0 = the driver's default,
+    /// 1..15 = presets A..O, e.g. 11 = K).
+    std::atomic<int> dlss_preset{0};
     std::atomic<int> debug_view{DebugNone};
     std::atomic<bool> show_fps{false};
     /// DLAA (NVIDIA DLSS at native size on the game's motion vectors, vk_temporal_upscaler);
@@ -85,8 +91,8 @@ struct Values {
     /// Filters on the final image (postfx_pass.h, post_process.frag), all off by default:
     /// SMAA 1x, AMD CAS (replaces RCAS while on) and the color adjustments.
     std::atomic<bool> smaa{false};
-    std::atomic<bool> cas{false};
-    std::atomic<int> cas_strength{50};
+    std::atomic<bool> cas{true};
+    std::atomic<int> cas_strength{100};
     std::atomic<bool> color_adjust{true};
     std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{0.75f};
     /// Set by the presenter: sharpening ran on the last frame (it needs FSR 1 when the game's
@@ -169,6 +175,8 @@ void Load();
 void ConfigureUpscalerSupport(bool fsr4, bool fsr411);
 /// After device creation: DLSS availability; a DLSS setting falls back to FSR 3.1 without it.
 void ConfigureDlssSupport(bool available, const char* problem);
+/// The selected upscaler does not work here: runs FSR 3.1, while Save keeps the selection.
+void FallBackToFsr3();
 /// Startup-patched scene dimensions cannot change until run.sh prepares a new image.
 bool FixedRenderSession();
 int RenderPreset();
@@ -185,5 +193,13 @@ void Save();
 float PresetScale(int preset);
 const char* PresetName(int preset);
 const char* UpscalerName(int upscaler);
+
+/// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler (native size).
+enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaModeCount };
+int AaModeOf();
+/// Sets dlaa and the upscaler for a mode.
+void SetAaMode(int mode);
+bool AaModeSupported(int mode);
+const char* AaModeName(int mode);
 
 } // namespace TlgSettings
