@@ -76,8 +76,12 @@ TEXT = {
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
-    'dlaa': ('DLAA anti-aliasing (NVIDIA RTX: stable foliage edges; F8 in game)',
-             'Anti-aliasing DLAA (NVIDIA RTX: bordas estáveis na folhagem; F8 no jogo)'),
+    'aa_mode': ('Anti-aliasing / upscaling (F8 in game)', 'Anti-aliasing / upscaling (F8 no jogo)'),
+    'aa_off': ('Off', 'Desligado'),
+    'aa_native': ('Native AA', 'AA nativo'),
+    'aa_quality': ('Quality', 'Qualidade'),
+    'aa_balanced': ('Balanced', 'Equilibrado'),
+    'aa_performance': ('Performance', 'Desempenho'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -172,12 +176,12 @@ TEXT = {
     'graphics_keys': ('Insert          open / close the graphics menu (Esc closes)\n'
                       'L2 + R3         controller: hold L2, press R3\n'
                       'Q / E, L1 / R1  previous / next tab\n'
-                      'F8              switch DLAA / SMAA\n'
+                      'F8              switch anti-aliasing (DLAA, DLSS, FSR) / SMAA\n'
                       'F10             show / hide the FPS counter',
                       'Insert          abre / fecha o menu de gráficos (Esc fecha)\n'
                       'L2 + R3         controle: segure L2, aperte R3\n'
                       'Q / E, L1 / R1  aba anterior / próxima\n'
-                      'F8              alterna DLAA / SMAA\n'
+                      'F8              alterna anti-aliasing (DLAA, DLSS, FSR) / SMAA\n'
                       'F10             mostra / esconde o contador de FPS'),
     'hdr_hint': ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
                  'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '
@@ -321,8 +325,37 @@ def sdl_key_name(keysym):
 SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
-INI_DEFAULTS = {'dlaa': '1', 'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '1', 'color_brightness': '0.00',
+INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '1', 'color_brightness': '0.00',
                 'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
+# The anti-aliasing row (TlgSettings::AaMode): (label, tlg.ini dlaa / upscaler / preset). DLSS needs
+# an NVIDIA RTX card, FSR 4 an AMD RDNA 4 card (the game picks 4.1.1 when it can).
+AA_LEVELS = (('1', 'aa_quality'), ('2', 'aa_balanced'), ('3', 'aa_performance'))
+AA_MODES = [('', 'aa_off', None), ('DLAA', '', ('1', 'dlss', '0')),
+            *[(name, level, ('1', upscaler, preset))
+              for name, upscaler in (('DLSS', 'dlss'), ('FSR 3.1', 'fsr3'), ('FSR 4', 'fsr4'))
+              for preset, level in ((('0', 'aa_native'),) if upscaler == 'fsr3' else ()) + AA_LEVELS]]
+
+
+def aa_mode_of(ini):
+    """The AA_MODES index tlg.ini picks (TlgSettings::AaModeOf; at native size the game loads
+    every upscaler but TAA and FSR 3.1 as DLAA)."""
+    if ini.get('dlaa', '1') in ('0', ''):
+        return 0
+    try:
+        preset = min(max(int(ini.get('preset', '0')), 0), 3)
+    except ValueError:
+        preset = 0
+    upscaler = ini.get('upscaler', 'dlss')
+    if upscaler == 'taa':
+        return 0
+    if upscaler == 'fsr3':
+        return 5 + preset
+    if preset == 0 or upscaler == 'dlss':
+        return 1 + preset
+    first = {'fsr4': 9, 'fsr411': 9}.get(upscaler)
+    return first - 1 + preset if first else 0
+
+
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
                 'color_saturation': (0.0, 2.0), 'color_gamma': (0.5, 2.0)}
 # Graphics dialog: the in-game menu's HDR, Enhancements and Game effects, same tlg.ini keys
@@ -469,6 +502,12 @@ class Launcher:
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         ttk.Label(video, text=self.t('resolution_hint'), foreground='#777', wraplength=320).grid(
             row=8, column=0, columnspan=2, sticky='w')
+        ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))
+        self.aa_box = ttk.Combobox(video, values=[' '.join(filter(None, (name, level and self.t(level))))
+                                                  for name, level, _ in AA_MODES], state='readonly', width=20)
+        self.aa_box.current(aa_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
+        self.aa_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
         image.grid(row=2, column=2, sticky='new', **pad)
         image.columnconfigure(1, weight=1)
@@ -534,7 +573,7 @@ class Launcher:
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
         self.ini_vars = {}
-        for offset, key in ((2, 'smaa'), (4, 'color_adjust'), (9, 'dlaa')):
+        for offset, key in ((2, 'smaa'), (4, 'color_adjust')):
             var = tk.BooleanVar(value=ini[key] not in ('0', ''))
             self.ini_vars[key] = var
             ttk.Checkbutton(parent, text=self.t(key), variable=var, command=self.filters_changed).grid(
@@ -618,6 +657,7 @@ class Launcher:
             value = ini.get(key, INI_DEFAULTS[key])
             var.set(value not in ('0', '') if isinstance(var, tk.BooleanVar) else value)
         self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
+        self.aa_box.current(aa_mode_of(ini))
         if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
             self.graphics_window.destroy()  # its sliders show the old values
             self.graphics_dialog()
@@ -671,8 +711,17 @@ class Launcher:
         self.reload_ini()
 
     def filters_changed(self):
-        values = {'dlaa': int(self.ini_vars['dlaa'].get()), 'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
+        values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        aa = self.aa_box.current()
+        if aa >= 0 and aa != aa_mode_of(ini):
+            picked = AA_MODES[aa][2]
+            if picked is None:
+                values['dlaa'] = 0  # F8 or the row brings the upscaler choice back
+            else:
+                upscaler = 'fsr411' if picked[1] == 'fsr4' and ini.get('upscaler') == 'fsr411' else picked[1]
+                values.update(dlaa=picked[0], upscaler=upscaler, preset=picked[2])
         for key, (low, high) in COLOR_RANGES.items():
             try:
                 value = min(max(float(self.ini_vars[key].get().replace(',', '.')), low), high)

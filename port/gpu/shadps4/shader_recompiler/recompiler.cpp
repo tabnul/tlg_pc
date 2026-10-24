@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <cstdlib>
 #include "common/logging/classes.h"
 #include "shader_recompiler/frontend/control_flow_graph.h"
 #include "shader_recompiler/frontend/decode.h"
@@ -140,6 +141,11 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::Optimization::LowerWave64BallotPass(program, runtime_info, profile);
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
     Shader::Optimization::DeadCodeEliminationPass(program);
+    static const bool noise_pass = !std::getenv("TLG_NOISE_PASS") ||
+                                   std::getenv("TLG_NOISE_PASS")[0] != '0'; // tlg: A/B switch
+    if (info.sw_stage == SwStage::Fragment && noise_pass) {
+        Shader::Optimization::FragCoordNoisePass(program);
+    }
     if (info.sw_stage == SwStage::Fragment && profile.needs_integer_interpolation_fix) {
         Shader::Optimization::InterpolatedIntegerPass(program);
     }

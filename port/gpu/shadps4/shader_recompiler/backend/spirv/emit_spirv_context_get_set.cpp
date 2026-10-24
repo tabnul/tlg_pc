@@ -121,19 +121,28 @@ Id EmitGetAttribute(EmitContext& ctx, IR::Attribute attr, u32 comp, u32 index) {
     case IR::Attribute::FragCoord: {
         const Id value = ctx.OpLoad(ctx.F32[1],
             ctx.OpAccessChain(ctx.input_f32, ctx.frag_coord, ctx.ConstU32(comp)));
-        if (comp >= 2) return value;
+        // Index 1: a screen-space noise input stays on the grid the pass renders at
+        // (FragCoordNoisePass).
+        if (comp >= 2 || index == 1) return value;
         // Guest shaders still address native-sized textures and constants. Convert the
         // reduced framebuffer's pixel coordinates back to that logical coordinate space.
         const Id packed = ctx.OpLoad(ctx.U32[1], ctx.OpAccessChain(
             ctx.TypePointer(spv::StorageClass::PushConstant, ctx.U32[1]),
             ctx.push_data_block, ctx.ConstU32(PushData::SceneSizeIndex)));
-        const Id dimension = comp == 0
-            ? ctx.OpBitwiseAnd(ctx.U32[1], packed, ctx.ConstU32(65535u))
-            : ctx.OpShiftRightLogical(ctx.U32[1], packed, ctx.ConstU32(16u));
+        // Per axis a 13-bit size and a 3-bit sample phase (SceneResolution::Pack): the pixel's
+        // point is floor + phase / 8, so jittered draws sample their dither at the jittered spot.
+        const Id half = comp == 0 ? packed
+                                  : ctx.OpShiftRightLogical(ctx.U32[1], packed, ctx.ConstU32(16u));
+        const Id dimension = ctx.OpBitwiseAnd(ctx.U32[1], half, ctx.ConstU32(0x1fffu));
+        const Id phase = ctx.OpBitFieldUExtract(ctx.U32[1], half, ctx.ConstU32(13u),
+                                                ctx.ConstU32(3u));
         const Id native = ctx.ConstU32(comp == 0 ? 1920u : 1080u);
-        const Id safe = ctx.OpSelect(ctx.U32[1],
-            ctx.OpIEqual(ctx.U1[1], dimension, ctx.u32_zero_value), native, dimension);
-        return ctx.OpFMul(ctx.F32[1], value, ctx.OpFDiv(ctx.F32[1],
+        const Id is_native = ctx.OpIEqual(ctx.U1[1], dimension, ctx.u32_zero_value);
+        const Id safe = ctx.OpSelect(ctx.U32[1], is_native, native, dimension);
+        const Id point = ctx.OpFAdd(ctx.F32[1], ctx.OpFloor(ctx.F32[1], value),
+            ctx.OpFMul(ctx.F32[1], ctx.OpConvertUToF(ctx.F32[1], phase), ctx.ConstF32(0.125f)));
+        const Id sample = ctx.OpSelect(ctx.F32[1], is_native, value, point);
+        return ctx.OpFMul(ctx.F32[1], sample, ctx.OpFDiv(ctx.F32[1],
             ctx.OpConvertUToF(ctx.F32[1], native), ctx.OpConvertUToF(ctx.F32[1], safe)));
     }
     case IR::Attribute::TessellationEvaluationPointU:

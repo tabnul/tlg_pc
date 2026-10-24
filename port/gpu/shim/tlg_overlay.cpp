@@ -511,13 +511,32 @@ void ImageTab() {
     }
     ImGui::SeparatorText(TL("Anti-aliasing", "Anti-aliasing"));
     if (BeginRows("##antialiasing")) {
-        // tlg: DLAA needs DLSS (tlg_dlss.dll, an NVIDIA RTX card); the game's own SMAA runs either way.
-        ImGui::BeginDisabled(!s.dlss_supported);
-        CheckRow("DLAA (NVIDIA DLSS)", s.dlaa,
-                 !s.dlss_supported ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("Needs an NVIDIA RTX card and tlg_dlss.dll.", "Precisa de uma placa NVIDIA RTX e do tlg_dlss.dll."))
-                 : TL("Stable, smooth edges on foliage, feathers and railings: DLSS at native resolution on the game's own motion vectors. Off: the game's own anti-aliasing only. F8 switches it in game.",
-                      "Bordas estáveis e suaves em folhagem, penas e grades: DLSS na resolução nativa com os vetores de movimento do próprio jogo. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo."), d.dlaa, false);
-        ImGui::EndDisabled();
+        // tlg: one row for DLAA and the upscalers (TlgSettings::AaMode). DLSS needs tlg_dlss.dll and
+        // an NVIDIA RTX card, FSR 4 an AMD RDNA 4 card; the game's own SMAA runs either way.
+        static const char* const aa_labels[TlgSettings::AaModeCount] = {
+            TL("Off", "Desligado"), "DLAA",
+            TL("DLSS Quality", "DLSS Qualidade"), TL("DLSS Balanced", "DLSS Equilibrado"), TL("DLSS Performance", "DLSS Desempenho"),
+            TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo"), TL("FSR 3.1 Quality", "FSR 3.1 Qualidade"), TL("FSR 3.1 Balanced", "FSR 3.1 Equilibrado"), TL("FSR 3.1 Performance", "FSR 3.1 Desempenho"),
+            TL("FSR 4 Quality", "FSR 4 Qualidade"), TL("FSR 4 Balanced", "FSR 4 Equilibrado"), TL("FSR 4 Performance", "FSR 4 Desempenho")};
+        Row(TL("Anti-aliasing / upscaling", "Anti-aliasing / upscaling"));
+        const int aa_mode = TlgSettings::AaModeOf();
+        if (ImGui::BeginCombo("##value", aa_labels[aa_mode])) {
+            for (int i = 0; i < TlgSettings::AaModeCount; ++i) {
+                ImGui::BeginDisabled(!TlgSettings::AaModeSupported(i));
+                if (ImGui::Selectable(aa_labels[i], i == aa_mode) && i != aa_mode) {
+                    TlgSettings::SetAaMode(i);
+                    dirty = true;
+                }
+                ImGui::EndDisabled();
+            }
+            ImGui::EndCombo();
+        }
+        Help(!s.dlss_supported && aa_mode == TlgSettings::AaOff
+                 ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("DLAA and DLSS need an NVIDIA RTX card and tlg_dlss.dll.", "DLAA e DLSS precisam de uma placa NVIDIA RTX e do tlg_dlss.dll."))
+                 : TL("DLAA: stable, smooth edges on foliage, feathers and railings, DLSS at native resolution on the game's own motion vectors. DLSS and FSR Quality / Balanced / Performance: the game renders smaller (1/1.5, 1/1.7, 1/2 per side) and is upscaled to the output, for more frames. FSR 4 needs an AMD RDNA 4 card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
+                      "DLAA: bordas estáveis e suaves em folhagem, penas e grades, DLSS na resolução nativa com os vetores de movimento do próprio jogo. DLSS e FSR Qualidade / Equilibrado / Desempenho: o jogo renderiza menor (1/1,5, 1/1,7, 1/2 por lado) e é ampliado para a saída, para mais quadros. O FSR 4 precisa de uma placa AMD RDNA 4. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
+             {"DLAA", ""});
+        ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",
                     "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."), d.smaa, false);
@@ -1760,12 +1779,13 @@ bool HandleEvent(const SDL_Event& event) {
             Vulkan::FrameCapture::Request();
             return true;
         }
-        // tlg: F8 switches between DLAA and the game's own SMAA (saved; the label shows briefly).
+        // tlg: F8 switches between the anti-aliasing choice and the game's own SMAA (saved; the
+        // label shows briefly).
         if (down && !event.key.repeat && event.key.key == SDLK_F8) {
             auto& settings = TlgSettings::Get();
             settings.dlaa = !settings.dlaa;
             aa_label_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-            std::printf("AA: %s (F8)\n", settings.dlaa ? "DLAA" : "game SMAA");
+            std::printf("AA: %s (F8)\n", settings.dlaa ? TlgSettings::AaModeName(TlgSettings::AaModeOf()) : "game SMAA");
             TlgSettings::Save();
             return true;
         }
@@ -2100,7 +2120,8 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
     if (AaLabelOn() && !menu_open) {
         const auto& s = TlgSettings::Get();
-        const bool dlaa = s.dlaa && s.jitter && s.dlss_supported;
+        const int aa_mode = TlgSettings::AaModeOf();
+        const int mode = s.jitter && TlgSettings::AaModeSupported(aa_mode) ? aa_mode : TlgSettings::AaOff;
         const ImVec2 size = ImGui::GetIO().DisplaySize;
         ImGui::SetNextWindowPos({size.x - 8.0f, 8.0f}, ImGuiCond_Always, {1.0f, 0.0f});
         ImGui::SetNextWindowBgAlpha(0.6f);
@@ -2108,7 +2129,7 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                          ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
-        ImGui::TextUnformatted(dlaa ? "AA: DLAA  (F8)" : "AA: game SMAA  (F8)");
+        ImGui::Text("AA: %s  (F8)", mode == TlgSettings::AaOff ? "game SMAA" : TlgSettings::AaModeName(mode));
         ImGui::End();
     }
     ImGui::Render();

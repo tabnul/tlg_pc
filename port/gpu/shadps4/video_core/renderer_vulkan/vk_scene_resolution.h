@@ -25,7 +25,7 @@ public:
     ~SceneTargets();
     bool SetSize(SceneResolution::Size);
     SceneResolution::Size Size() const { return size; }
-    bool Reduced() const { return size != SceneResolution::Size{}; }
+    bool Reduced() const { return size != SceneResolution::Native(); }
     /// tlg: shadow maps (2048x2048 depth) get proxies `scale` times their size: the shadow
     /// passes draw into them and shaders sample them (Settings shadow_scale; 1 = native).
     bool SetShadowScale(u32 scale);
@@ -39,10 +39,11 @@ public:
     bool SetHalfScale(u32 scale);
     bool HalfUpscaled() const { return half_scale > 1 && !Reduced(); }
     void ShadowReport(); ///< once per frame: prints proxy use every 120 frames
-    /// A reduced proxy can stand in for the image: a 1920x1080 scene target or, scaled by
-    /// the same factor, a half-resolution (960x540) one (toggle SceneHalfRes).
+    /// A reduced proxy can stand in for the image: a scene target of the game's frame size
+    /// (SceneResolution::Native) or, scaled by the same factor, a half-resolution one (toggle
+    /// SceneHalfRes).
     bool Eligible(const VideoCore::Image&) const;
-    /// Eligible at the full scene size (1920x1080): the upscaler's inputs, the scene start.
+    /// Eligible at the full scene size (Native): the upscaler's inputs, the scene start.
     bool EligibleScene(const VideoCore::Image&) const;
     /// The proxy size of an eligible image: the scene size divided like the native size.
     SceneResolution::Size ProxySize(const VideoCore::Image&, u32 level = 0) const;
@@ -65,6 +66,9 @@ public:
     /// Whether SampleProxy would return the proxy of `image` for these levels.
     [[nodiscard]] bool ProxyCurrent(const VideoCore::Image& image, u32 level = 0,
                                     u32 levels = 1) const;
+    /// The reduced proxy of `image` (level 0) holds its current content, depth included: the
+    /// upscaler's inputs (Read).
+    [[nodiscard]] bool ProxyHolds(const VideoCore::Image& image) const;
     /// SampleProxy for a view obtained before (valid while Generation() is unchanged): the
     /// layout to sample it in.
     vk::ImageLayout PrepareSample(const VideoCore::Image& image, u32 level = 0);

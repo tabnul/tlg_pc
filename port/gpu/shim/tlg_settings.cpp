@@ -103,6 +103,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.reactive_threshold = Clamp(f, 0.0f, 1.0f);
     } else if (key == "reactive_max") {
         v.reactive_max = Clamp(f, 0.0f, 1.0f);
+    } else if (key == "fsr_velocity") {
+        v.fsr_velocity = Clamp(f, 0.0f, 1.0f);
     } else if (key == "debug_view") {
         v.debug_view = std::clamp(i, 0, DebugViewCount - 1);
     } else if (key == "show_fps") {
@@ -269,6 +271,11 @@ void Load() {
     if (ReadFile(v)) {
         std::printf("Settings: %s\n", Path());
     }
+    // tlg: at native size the anti-aliasing upscalers are DLAA and FSR 3.1 (AaMode); files from before the
+    // anti-aliasing row kept the FSR default there while the launcher chose DLSS.
+    if (v.preset == NativeAA && v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3) {
+        v.upscaler = UpscalerDlss;
+    }
     // Environment overrides (scripts, A/B tests).
     if (const char* env = std::getenv("TLG_UPSCALER")) {
         v.upscaler = UpscalerOff;
@@ -284,7 +291,7 @@ void Load() {
         {"TLG_ASYNC_SHADERS", "async_shaders"},      {"TLG_DEFERRED_READBACK", "deferred_readback"},
         {"TLG_STALE_READBACK", "stale_readback"},     {"TLG_FSR1", "fsr1"},
         {"TLG_RCAS", "rcas"},                        {"TLG_FRAMES_AHEAD", "frames_queued"},
-        {"TLG_SHOW_FPS", "show_fps"},
+        {"TLG_SHOW_FPS", "show_fps"},                {"TLG_FSR_VELOCITY", "fsr_velocity"},
         {"TLG_MOUSE", "mouse_enabled"},              {"TLG_MOUSE_SENS", "mouse_sensitivity"},
         {"TLG_MOUSE_INVERT_Y", "mouse_invert_y"},    {"TLG_MOUSE_SMOOTHING", "mouse_smoothing"},
         {"TLG_MOUSE_ACCEL", "mouse_accel"},          {"TLG_MOUSE_DEADZONE", "mouse_deadzone"},
@@ -354,10 +361,10 @@ bool FixedRenderSession() {
 }
 
 int RenderPreset() {
-    // The resolution patch (TLG_RESOLUTION_PATCH, run.py) renders natively: no reduced presets.
-    static const bool resolution_patch = std::getenv("TLG_RESOLUTION_PATCH") != nullptr;
-    if (resolution_patch) return NativeAA;
+    // tlg: the reduced presets need the upscaler on the game's motion (dlaa, jittered); with
+    // anti-aliasing off the game renders at its full size.
     const auto& v = Get();
+    if (!v.dlaa || !v.jitter) return NativeAA;
     return FixedRenderSession() ? v.startup_preset :
         v.upscaler == UpscalerTaa ? NativeAA : v.preset.load();
 }
@@ -389,7 +396,8 @@ void Save() {
                  v.reactive_scale.load(), v.reactive_threshold.load(), v.reactive_max.load(),
                  v.debug_view.load(), int(v.show_fps.load()),
                  int(v.fsr4_auto_exposure.load()), int(v.fsr4_invert_jitter.load()));
-    std::fprintf(file, "output_res=%dx%d\n", OutputWidths[v.output_res], OutputHeights[v.output_res]);
+    std::fprintf(file, "fsr_velocity=%.2f\n", v.fsr_velocity.load());
+    std::fprintf(file, "output_res=%dx%d\n",OutputWidths[v.output_res], OutputHeights[v.output_res]);
     std::fprintf(file,
                  "overlay_fps=%d\noverlay_frametime=%d\noverlay_upscaler=%d\noverlay_gpu=%d\n"
                  "overlay_cpu=%d\noverlay_ram=%d\noverlay_vram=%d\noverlay_scale=%d\noverlay_corner=%d\n"
@@ -581,6 +589,49 @@ const char* PresetName(int preset) {
 const char* UpscalerName(int upscaler) {
     static constexpr const char* names[UpscalerCount] = {"off", "fsr3", "fsr4", "fsr411", "taa", "dlss"};
     return names[std::clamp(upscaler, 0, UpscalerCount - 1)];
+}
+
+int AaModeOf() {
+    const auto& v = Get();
+    if (!v.dlaa) return AaOff;
+    const int preset = std::clamp(v.preset.load(), int(NativeAA), int(Performance));
+    if (v.upscaler == UpscalerDlss) return preset == NativeAA ? AaDlaa : AaDlaa + preset;
+    if (v.upscaler == UpscalerFsr3) return AaFsr3Native + preset;
+    if (preset == NativeAA) return AaOff;
+    if (IsFsr4(v.upscaler)) return AaFsr4Quality + preset - Quality;
+    return AaOff;
+}
+
+void SetAaMode(int mode) {
+    auto& v = Get();
+    mode = std::clamp(mode, 0, AaModeCount - 1);
+    v.dlaa = mode != AaOff;
+    if (mode == AaOff) return;
+    if (mode <= AaDlssPerformance) {
+        v.upscaler = UpscalerDlss;
+        v.preset = mode - AaDlaa;
+    } else if (mode <= AaFsr3Performance) {
+        v.upscaler = UpscalerFsr3;
+        v.preset = mode - AaFsr3Native;
+    } else {
+        v.upscaler = v.fsr411_supported ? UpscalerFsr411 : UpscalerFsr4;
+        v.preset = Quality + mode - AaFsr4Quality;
+    }
+}
+
+bool AaModeSupported(int mode) {
+    const auto& v = Get();
+    if (mode >= AaDlaa && mode <= AaDlssPerformance) return v.dlss_supported;
+    if (mode >= AaFsr4Quality) return v.fsr4_supported;
+    return true;
+}
+
+const char* AaModeName(int mode) {
+    static constexpr const char* names[AaModeCount] = {
+        "Off", "DLAA", "DLSS Quality", "DLSS Balanced", "DLSS Performance", "FSR 3.1 Native AA", "FSR 3.1 Quality",
+        "FSR 3.1 Balanced", "FSR 3.1 Performance", "FSR 4 Quality", "FSR 4 Balanced",
+        "FSR 4 Performance"};
+    return names[std::clamp(mode, 0, AaModeCount - 1)];
 }
 
 } // namespace TlgSettings

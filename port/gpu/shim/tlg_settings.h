@@ -41,6 +41,9 @@ struct Values {
     std::atomic<float> reactive_scale{1.0f};
     std::atomic<float> reactive_threshold{0.2f};
     std::atomic<float> reactive_max{0.9f};
+    /// FSR 3 fVelocityFactor 0..1: how much motion cuts the history (1 = AMD's default, the
+    /// history drops to 15% from half a 4K pixel per frame; 0 keeps it while moving).
+    std::atomic<float> fsr_velocity{1.0f};
     std::atomic<int> debug_view{DebugNone};
     std::atomic<bool> show_fps{false};
     /// DLAA (NVIDIA DLSS at native size on the game's motion vectors, vk_temporal_upscaler);
@@ -185,5 +188,15 @@ void Save();
 float PresetScale(int preset);
 const char* PresetName(int preset);
 const char* UpscalerName(int upscaler);
+
+/// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler + preset.
+enum AaMode : int { AaOff = 0, AaDlaa, AaDlssQuality, AaDlssBalanced, AaDlssPerformance,
+                    AaFsr3Native, AaFsr3Quality, AaFsr3Balanced, AaFsr3Performance, AaFsr4Quality,
+                    AaFsr4Balanced, AaFsr4Performance, AaModeCount };
+int AaModeOf();
+/// Sets dlaa, upscaler and preset for a mode (FSR 4 uses 4.1.1 when supported).
+void SetAaMode(int mode);
+bool AaModeSupported(int mode);
+const char* AaModeName(int mode);
 
 } // namespace TlgSettings
