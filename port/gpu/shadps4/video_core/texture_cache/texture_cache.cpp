@@ -700,6 +700,19 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
             return {ExpandImage(image_info, cache_image_id), -1, -1};
         }
 
+        // tlg: a 3D texture at the same address that grew only in depth (TLG's 36x36xN RGBA16F
+        // volume grows 441 -> 819 -> 1143 -> 1512 slices): same type, tiling and resources, so
+        // none of the cases above apply. Expand it (the copy keeps the old slices) instead of
+        // stopping the game on the unreachable below (#47, #60, #72, #81, #99, #100, #114).
+        if (image_info.type == AmdGpu::ImageType::Color3D &&
+            image_info.type == cache_image.info.type &&
+            image_info.tile_mode == cache_image.info.tile_mode &&
+            image_info.size.width == cache_image.info.size.width &&
+            image_info.size.height == cache_image.info.size.height &&
+            image_info.size.depth > cache_image.info.size.depth) {
+            return {ExpandImage(image_info, cache_image_id), -1, -1};
+        }
+
         // Size is greater but resources are not, because the tiling mode is different.
         // Likely the address is reused for a image with a different tiling mode.
         if (image_info.tile_mode != cache_image.info.tile_mode) {
