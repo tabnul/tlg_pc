@@ -187,6 +187,7 @@ private:
         bool motion = false;
         bool scene_started = false;
         bool raster_scaling = false;
+        bool post_chain = false;
         u64 upscaler_state = 0;
         u64 generation = 0;
         u32 depth_control = 0;
@@ -195,6 +196,8 @@ private:
         bool operator==(const BeginSignature&) const = default;
     };
     BeginSignature MakeBeginSignature(const GraphicsPipeline* pipeline) const;
+    /// tlg: the draw samples or writes an image of the upscaler's post chain (InPostChain).
+    bool PostChainPass(u32 mrt_mask) const;
     struct BeginMemo {
         bool valid = false;
         BeginSignature signature;
@@ -342,6 +345,8 @@ private:
     std::unique_ptr<SceneTargets> scene_targets;
     std::unique_ptr<TexturePack> texture_pack;
     bool scene_started = false;
+    /// tlg: this draw samples an image of the upscaler's post chain (InPostChain).
+    bool samples_post_chain = false;
     std::unique_ptr<ObjectMotion> object_motion;
     bool motion_draw = false;
     u64 motion_geometry{};    ///< vertex-stream identity of the current direct draw

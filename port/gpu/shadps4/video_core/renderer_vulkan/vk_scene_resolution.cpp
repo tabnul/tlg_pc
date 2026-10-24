@@ -69,10 +69,12 @@ bool SceneTargets::ShaderResampled(const VideoCore::Image& image) const {
 }
 // 1 for the scene size, 2 for half resolution (the game's post-processing chain), else 0.
 // Half resolution needs a scene size that halves exactly: the proxy keeps the scene's factor,
-// so the shaders' FragCoord conversion (1920 / scene width) stays correct for it.
+// so the shaders' FragCoord conversion (1920 / logical scene width) stays correct for it.
 static u32 SizeDivisor(const VideoCore::ImageInfo& i, SceneResolution::Size scene) {
-    if (i.size.width == 1920 && i.size.height == 1080) return 1;
-    if (i.size.width == 960 && i.size.height == 540 && scene.width % 2 == 0 &&
+    const auto native = SceneResolution::Native();
+    if (i.size.width == native.width && i.size.height == native.height) return 1;
+    if (i.size.width == native.width / 2 && i.size.height == native.height / 2 &&
+        native.width % 2 == 0 && native.height % 2 == 0 && scene.width % 2 == 0 &&
         scene.height % 2 == 0 && !TlgToggle::Disabled(TlgToggle::SceneHalfRes)) {
         return 2;
     }
@@ -111,7 +113,9 @@ bool SceneTargets::Eligible(const VideoCore::Image& image) const {
     return Blittable(image.backing->image.image_ci.format) || ShaderResampled(image);
 }
 bool SceneTargets::EligibleScene(const VideoCore::Image& image) const {
-    return image.info.size.width == 1920 && image.info.size.height == 1080 && Eligible(image);
+    const auto native = SceneResolution::Native();
+    return image.info.size.width == native.width && image.info.size.height == native.height &&
+           Eligible(image);
 }
 SceneResolution::Size SceneTargets::ProxySize(const VideoCore::Image& image, u32 level) const {
     if (const u32 k = Upscale(image)) {
@@ -139,14 +143,8 @@ bool SceneTargets::SetShadowScale(u32 scale) {
 bool SceneTargets::SetHalfScale(u32 scale) {
     if (scale == half_scale) return false;
     if (!half_size.width) {
-        u32 width = 1920, height = 1080;
-        if (const char* patch = std::getenv("TLG_RESOLUTION_PATCH")) {
-            if (std::sscanf(patch, "%ux%u", &width, &height) != 2 || !width || !height) {
-                width = 1920;
-                height = 1080;
-            }
-        }
-        half_size = {width / 2, height / 2};
+        const auto native = SceneResolution::Native();
+        half_size = {native.width / 2, native.height / 2};
     }
     Reset();
     half_scale = scale;
@@ -166,8 +164,10 @@ bool SceneTargets::SetSize(SceneResolution::Size next) {
     if (next == size) return false;
     Reset();
     size = next;
-    std::printf("Scene resolution: raster %ux%u, half-resolution targets %ux%u, UI 1920x1080 "
-                "(live)\n", size.width, size.height, size.width / 2, size.height / 2);
+    const auto native = SceneResolution::Native();
+    std::printf("Scene resolution: raster %ux%u, half-resolution targets %ux%u, game %ux%u "
+                "(live)\n", size.width, size.height, size.width / 2, size.height / 2,
+                native.width, native.height);
     return true;
 }
 void SceneTargets::ResolveAll() {
@@ -520,6 +520,13 @@ bool SceneTargets::ProxyCurrent(const VideoCore::Image& image, u32 level, u32 le
         return false;
     }
     const auto it = entries.find(Key(image.image_uid, level));
+    return it != entries.end() && it->second->state.valid;
+}
+bool SceneTargets::ProxyHolds(const VideoCore::Image& image) const {
+    if (copying || !image.scene_proxy) {
+        return false;
+    }
+    const auto it = entries.find(Key(image.image_uid, 0));
     return it != entries.end() && it->second->state.valid;
 }
 vk::ImageLayout SceneTargets::PrepareSample(const VideoCore::Image& image, u32 level) {

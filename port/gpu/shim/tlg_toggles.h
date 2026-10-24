@@ -88,8 +88,10 @@ enum : std::uint64_t {
     ReadbackSideQueue = 2, ///< readbacks of finished GPU writes copy on the second queue
     FenceFlush = 4,        ///< submit GPU writes to guest memory at an end-of-pipe fence
     FenceFlushMore = 8,    ///< the same at EOS, label WRITE_DATA and compute RELEASE_MEM
+    SceneDepthSlack = 16,  ///< reduced-pass LessEqual draws (no depth write, or color) get a tolerance
     ImageHashBacking = 32, ///< texture change hashes read through the backing view
     Frame10Bit = 64,       ///< the 10-bit frame image (bit set: 8-bit, as before; live A/B)
+    PostReduced = 128,     ///< test: post passes after the upscale stay on the reduced proxies
 };
 inline bool Disabled2(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;

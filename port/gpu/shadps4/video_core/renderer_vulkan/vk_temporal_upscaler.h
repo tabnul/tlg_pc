@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <memory>
@@ -67,6 +68,15 @@ public:
     /// Start of a frame in the command stream (display pass).
     bool OnFrameStart();
     bool RasterScaling() const;
+    /// tlg: the post chain: the upscaled scene (RunGameMotion) and the targets of passes that
+    /// sample a chain image. Those passes draw at the native size: drawing them into the
+    /// reduced proxies (resolved with nearest blits) would throw the upscaled detail away.
+    [[nodiscard]] bool InPostChain(VideoCore::ImageId id) const noexcept {
+        return std::find(post_chain.begin(), post_chain.end(), id) != post_chain.end();
+    }
+    void AddPostChain(VideoCore::ImageId id) {
+        if (id && !InPostChain(id)) post_chain.push_back(id);
+    }
     /// tlg: LOD bias for scene materials, log2(render / output) while a reduced scene is
     /// upscaled (0 at native size, for TAA and without an upscaler).
     [[nodiscard]] float SceneMipBias() const;
@@ -74,7 +84,7 @@ public:
     /// draw's render state (Rasterizer::BeginRendering).
     [[nodiscard]] u64 RedirectState() const noexcept {
         return u64(ui_phase) | u64(display_redirect) << 1 | u64(done_this_frame) << 2 |
-               u64(ui_color.index) << 8 | u64(ui_depth.index) << 36;
+               u64(RasterScaling()) << 3 | u64(ui_color.index) << 8 | u64(ui_depth.index) << 36;
     }
 
 
@@ -85,7 +95,8 @@ public:
         return done_this_frame ? std::array<float, 2>{} : jitter;
     }
 
-    /// tlg: DLAA or FSR 3.1 native AA on the game's own motion target (RunGameMotion).
+    /// tlg: DLAA, or DLSS / FSR upscaling from the reduced scene targets, on the game's own
+    /// motion target (RunGameMotion), at the game's frame size (SceneResolution::Native).
     [[nodiscard]] bool GameMotion() const noexcept {
         return game_motion_on && game_motion_ok && jitter_active;
     }
@@ -192,14 +203,15 @@ private:
                     bool hdr, std::array<float, 2> frame_jitter);
     /// Records FSR 4 into output_image; on a permanent failure FSR 3 takes over.
     bool RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color, Fsr4Upscaler::Image depth,
-                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms);
+                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
+                    std::array<float, 2> frame_jitter);
     /// Records the portable FSR 3.1 context into output_image (HDR color, General layouts).
     bool RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk::Format color_format,
                     vk::ImageUsageFlags color_usage, vk::Image depth, vk::Format depth_format,
                     vk::ImageUsageFlags depth_usage, u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
                     bool has_reactive, std::array<float, 2> frame_jitter);
-    /// tlg: FSR 3.1 at native size on the game's motion (the anti-aliasing row).
-    [[nodiscard]] bool FsrNativeAa() const;
+    /// tlg: an upscaling preset with FSR 3.1 or FSR 4 on the game's motion (no FSR native AA).
+    [[nodiscard]] bool FsrGameUpscale() const;
     void RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color, vk::ImageView depth);
     /// Sharpness above 1 for FSR 3/4 (their RCAS stops at 1): one more RCAS pass over the target
     /// (output_image, or the 8-bit UI image with ldr) in General layout after the upscaler.
@@ -226,6 +238,7 @@ private:
     u64 trigger_hash = 0x9a9cf8a9;
     VideoCore::ImageId scene_color{};
     bool done_this_frame = false;
+    std::vector<VideoCore::ImageId> post_chain; ///< see InPostChain; cleared per frame
     u32 preset_file_frames = 0; ///< TLG_PRESET_FILE polling
     int applied_output = -1;
     bool snapshot_taken = false;

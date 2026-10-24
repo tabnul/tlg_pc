@@ -512,11 +512,14 @@ void ImageTab() {
     }
     ImGui::SeparatorText(TL("Anti-aliasing", "Anti-aliasing"));
     if (BeginRows("##antialiasing")) {
-        // tlg: one row for DLAA and FSR 3.1 native AA (TlgSettings::AaMode). DLAA needs DLSS
-        // (tlg_dlss.dll, an NVIDIA RTX card); the game's own SMAA runs either way.
+        // tlg: one row for DLAA and the upscalers (TlgSettings::AaMode). DLSS needs tlg_dlss.dll and
+        // an NVIDIA RTX card, FSR 4 an AMD RDNA 4 card; the game's own SMAA runs either way.
         static const char* const aa_labels[TlgSettings::AaModeCount] = {
-            TL("Off", "Desligado"), "DLAA (NVIDIA DLSS)", TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo")};
-        Row(TL("Anti-aliasing", "Anti-aliasing"));
+            TL("Off", "Desligado"), "DLAA",
+            TL("DLSS Quality", "DLSS Qualidade"), TL("DLSS Balanced", "DLSS Equilibrado"), TL("DLSS Performance", "DLSS Desempenho"),
+            TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo"), TL("FSR 3.1 Quality", "FSR 3.1 Qualidade"), TL("FSR 3.1 Balanced", "FSR 3.1 Equilibrado"), TL("FSR 3.1 Performance", "FSR 3.1 Desempenho"),
+            TL("FSR 4 Quality", "FSR 4 Qualidade"), TL("FSR 4 Balanced", "FSR 4 Equilibrado"), TL("FSR 4 Performance", "FSR 4 Desempenho")};
+        Row(TL("Anti-aliasing / upscaling", "Anti-aliasing / upscaling"));
         const int aa_mode = TlgSettings::AaModeOf();
         if (ImGui::BeginCombo("##value", aa_labels[aa_mode])) {
             for (int i = 0; i < TlgSettings::AaModeCount; ++i) {
@@ -530,9 +533,9 @@ void ImageTab() {
             ImGui::EndCombo();
         }
         Help(!s.dlss_supported && aa_mode == TlgSettings::AaOff
-                 ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("DLAA needs an NVIDIA RTX card and tlg_dlss.dll; FSR 3.1 native AA runs on any card.", "O DLAA precisa de uma placa NVIDIA RTX e do tlg_dlss.dll; o FSR 3.1 AA nativo roda em qualquer placa."))
-                 : TL("Stable, smooth edges on foliage, feathers and railings, at native resolution on the game's own motion vectors. DLAA: NVIDIA DLSS (RTX cards). FSR 3.1 native AA: AMD FSR, on any card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
-                      "Bordas estáveis e suaves em folhagem, penas e grades, na resolução nativa com os vetores de movimento do próprio jogo. DLAA: NVIDIA DLSS (placas RTX). FSR 3.1 AA nativo: AMD FSR, em qualquer placa. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
+                 ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("DLAA and DLSS need an NVIDIA RTX card and tlg_dlss.dll; FSR 3.1 runs on any card.", "DLAA e DLSS precisam de uma placa NVIDIA RTX e do tlg_dlss.dll; o FSR 3.1 roda em qualquer placa."))
+                 : TL("DLAA: stable, smooth edges on foliage, feathers and railings, DLSS at native resolution on the game's own motion vectors. DLSS and FSR Quality / Balanced / Performance: the game renders smaller (1/1.5, 1/1.7, 1/2 per side) and is upscaled to the output, for more frames. FSR 4 needs an AMD RDNA 4 card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
+                      "DLAA: bordas estáveis e suaves em folhagem, penas e grades, DLSS na resolução nativa com os vetores de movimento do próprio jogo. DLSS e FSR Qualidade / Equilibrado / Desempenho: o jogo renderiza menor (1/1,5, 1/1,7, 1/2 por lado) e é ampliado para a saída, para mais quadros. O FSR 4 precisa de uma placa AMD RDNA 4. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
              {s.dlss_supported ? "DLAA" : aa_labels[TlgSettings::AaFsr3Native], ""});
         ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,

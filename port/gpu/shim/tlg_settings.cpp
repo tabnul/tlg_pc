@@ -291,13 +291,15 @@ void Load() {
     if (ReadFile(v)) {
         std::printf("Settings: %s\n", Path());
     }
-    // tlg: the anti-aliasing row runs DLAA or FSR 3.1 at native size (AaMode); files from before
-    // it, and other upscalers, load as DLAA.
-    if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3)) {
+    // tlg: the anti-aliasing row (AaMode) runs DLSS, FSR 3.1 or FSR 4; files from before it kept
+    // the FSR 3.1 default while the launcher chose DLSS, so they load as DLAA.
+    if (!aa_row_file) {
+        v.upscaler = UpscalerDlss;
+        v.preset = NativeAA;
+    } else if (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3 && !IsFsr4(v.upscaler)) {
         v.upscaler = UpscalerDlss;
     }
     DlssFallback(v);
-    if (v.upscaler != UpscalerTaa) v.preset = NativeAA;
     // Environment overrides (scripts, A/B tests).
     if (const char* env = std::getenv("TLG_UPSCALER")) {
         v.upscaler = UpscalerOff;
@@ -410,10 +412,10 @@ bool FixedRenderSession() {
 }
 
 int RenderPreset() {
-    // The resolution patch (TLG_RESOLUTION_PATCH, run.py) renders natively: no reduced presets.
-    static const bool resolution_patch = std::getenv("TLG_RESOLUTION_PATCH") != nullptr;
-    if (resolution_patch) return NativeAA;
+    // tlg: the reduced presets need the upscaler on the game's motion (dlaa, jittered); with
+    // anti-aliasing off the game renders at its full size.
     const auto& v = Get();
+    if (!v.dlaa || !v.jitter) return NativeAA;
     return FixedRenderSession() ? v.startup_preset :
         v.upscaler == UpscalerTaa ? NativeAA : v.preset.load();
 }
@@ -647,8 +649,13 @@ const char* UpscalerName(int upscaler) {
 
 int AaModeOf() {
     const auto& v = Get();
-    if (!v.dlaa || v.upscaler == UpscalerTaa) return AaOff;
-    return v.upscaler == UpscalerFsr3 ? AaFsr3Native : AaDlaa;
+    if (!v.dlaa) return AaOff;
+    const int preset = std::clamp(v.preset.load(), int(NativeAA), int(Performance));
+    if (v.upscaler == UpscalerDlss) return preset == NativeAA ? AaDlaa : AaDlaa + preset;
+    if (v.upscaler == UpscalerFsr3) return AaFsr3Native + preset;
+    if (preset == NativeAA) return AaOff;
+    if (IsFsr4(v.upscaler)) return AaFsr4Quality + preset - Quality;
+    return AaOff;
 }
 
 void SetAaMode(int mode) {
@@ -656,17 +663,31 @@ void SetAaMode(int mode) {
     mode = std::clamp(mode, 0, AaModeCount - 1);
     v.dlaa = mode != AaOff;
     if (mode == AaOff) return;
-    v.upscaler = mode == AaDlaa ? UpscalerDlss : UpscalerFsr3;
     selected_upscaler = -1;
-    v.preset = NativeAA;
+    if (mode <= AaDlssPerformance) {
+        v.upscaler = UpscalerDlss;
+        v.preset = mode - AaDlaa;
+    } else if (mode <= AaFsr3Performance) {
+        v.upscaler = UpscalerFsr3;
+        v.preset = mode - AaFsr3Native;
+    } else {
+        v.upscaler = v.fsr411_supported ? UpscalerFsr411 : UpscalerFsr4;
+        v.preset = Quality + mode - AaFsr4Quality;
+    }
 }
 
 bool AaModeSupported(int mode) {
-    return mode != AaDlaa || Get().dlss_supported;
+    const auto& v = Get();
+    if (mode >= AaDlaa && mode <= AaDlssPerformance) return v.dlss_supported;
+    if (mode >= AaFsr4Quality) return v.fsr4_supported;
+    return true;
 }
 
 const char* AaModeName(int mode) {
-    static constexpr const char* names[AaModeCount] = {"Off", "DLAA", "FSR 3.1 Native AA"};
+    static constexpr const char* names[AaModeCount] = {
+        "Off", "DLAA", "DLSS Quality", "DLSS Balanced", "DLSS Performance", "FSR 3.1 Native AA", "FSR 3.1 Quality",
+        "FSR 3.1 Balanced", "FSR 3.1 Performance", "FSR 4 Quality", "FSR 4 Balanced",
+        "FSR 4 Performance"};
     return names[std::clamp(mode, 0, AaModeCount - 1)];
 }
 

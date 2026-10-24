@@ -195,10 +195,12 @@ float PresetScale(int preset);
 const char* PresetName(int preset);
 const char* UpscalerName(int upscaler);
 
-/// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler (native size).
-enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaModeCount };
+/// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler + preset.
+enum AaMode : int { AaOff = 0, AaDlaa, AaDlssQuality, AaDlssBalanced, AaDlssPerformance,
+                    AaFsr3Native, AaFsr3Quality, AaFsr3Balanced, AaFsr3Performance, AaFsr4Quality,
+                    AaFsr4Balanced, AaFsr4Performance, AaModeCount };
 int AaModeOf();
-/// Sets dlaa and the upscaler for a mode.
+/// Sets dlaa, upscaler and preset for a mode (FSR 4 uses 4.1.1 when supported).
 void SetAaMode(int mode);
 bool AaModeSupported(int mode);
 const char* AaModeName(int mode);

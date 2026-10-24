@@ -180,8 +180,8 @@ DEFAULT_ENV = {
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
     'TLG_GC_BUDGET_MB': '5600',    # texture cache budget for 6 GB of VRAM
-    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
-    'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
+    # The upscaler comes from tlg.ini (dlaa, upscaler, preset: the anti-aliasing row).
+    'TLG_JITTER': '1',             # jitter only while DLAA, DLSS or FSR runs on the game's motion
     'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
 }
@@ -715,7 +715,8 @@ def build_env(settings, extra=None):
     # (bench 2026-10-25: frames over 1.5x median 360 -> 13 in the garden); the limiter keeps the
     # flips at the engine rate (driver.cpp PresentThread).
     env.setdefault('TLG_VBLANK_HZ', '0' if applied_frame_rate == 'unlocked' else '240')
-    # The game renders natively at the patched size: the upscaler stays off (vk_temporal_upscaler).
+    # The patched size is the output: DLAA renders at it, DLSS / FSR Quality to Performance render
+    # smaller and upscale to it (vk_temporal_upscaler, tlg.ini dlaa / upscaler / preset).
     if applied_resolution:
         env['TLG_RESOLUTION_PATCH'] = applied_resolution
     # The larger Garlic heap comes out of direct memory (runtime_memory.c: 5056 MiB retail).
