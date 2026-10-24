@@ -18,25 +18,53 @@ English). Bug fixes made here go back upstream as pull requests.
 
 ## Stock vs modded
 
-Left: the game's own settings. Right: this fork's defaults (DLAA, sharpening, color, shadows,
-effects). Both run in widescreen at 3840x1600, so even the left side is already beyond the PS4.
-Click an image for the full resolution.
+Each pair shows the same spot: first the game's own settings, then this fork's defaults (DLAA,
+sharpening, color, shadows, effects). Both run in widescreen at 3840x1600, so even the stock
+shot is already beyond the PS4. Click an image for the full resolution.
 
 > These are still images. The biggest changes are in motion: stable edges on foliage, feathers and
 > fences, no shimmer, clearer distance. They are transformative, and can only be properly seen in
 > game.
 
-| Stock | Modded |
-|---|---|
-| [<img src="docs/screenshots/preview/TRICO_STOCK.jpg" alt="Trico, stock">](docs/screenshots/TRICO_STOCK.jpg) | [<img src="docs/screenshots/preview/TRICO_AFTER.jpg" alt="Trico, modded">](docs/screenshots/TRICO_AFTER.jpg) |
-| [<img src="docs/screenshots/preview/CAVE_STOCK.jpg" alt="Cave, stock">](docs/screenshots/CAVE_STOCK.jpg) | [<img src="docs/screenshots/preview/CAVE_AFTER.jpg" alt="Cave, modded">](docs/screenshots/CAVE_AFTER.jpg) |
-| [<img src="docs/screenshots/preview/CAVE2_STOCK.jpg" alt="Cave courtyard, stock">](docs/screenshots/CAVE2_STOCK.jpg) | [<img src="docs/screenshots/preview/CAVE2_AFTER.jpg" alt="Cave courtyard, modded">](docs/screenshots/CAVE2_AFTER.jpg) |
+### Trico
 
-**Texture pack.** The same spot without and with the upscaled texture pack:
+**Stock**
 
-| Without | With texture pack |
-|---|---|
-| [<img src="docs/screenshots/preview/TEXTURE_STOCK.jpg" alt="Ruins, original textures">](docs/screenshots/TEXTURE_STOCK.jpg) | [<img src="docs/screenshots/preview/TEXTURE_AFTER.jpg" alt="Ruins, texture pack">](docs/screenshots/TEXTURE_AFTER.jpg) |
+[<img src="docs/screenshots/preview/TRICO_STOCK.jpg" width="100%" alt="Trico, stock">](docs/screenshots/TRICO_STOCK.jpg)
+
+**Modded**
+
+[<img src="docs/screenshots/preview/TRICO_AFTER.jpg" width="100%" alt="Trico, modded">](docs/screenshots/TRICO_AFTER.jpg)
+
+### Cave
+
+**Stock**
+
+[<img src="docs/screenshots/preview/CAVE_STOCK.jpg" width="100%" alt="Cave, stock">](docs/screenshots/CAVE_STOCK.jpg)
+
+**Modded**
+
+[<img src="docs/screenshots/preview/CAVE_AFTER.jpg" width="100%" alt="Cave, modded">](docs/screenshots/CAVE_AFTER.jpg)
+
+### Cave courtyard
+
+**Stock**
+
+[<img src="docs/screenshots/preview/CAVE2_STOCK.jpg" width="100%" alt="Cave courtyard, stock">](docs/screenshots/CAVE2_STOCK.jpg)
+
+**Modded**
+
+[<img src="docs/screenshots/preview/CAVE2_AFTER.jpg" width="100%" alt="Cave courtyard, modded">](docs/screenshots/CAVE2_AFTER.jpg)
+
+### Texture pack
+
+**Original textures**
+
+[<img src="docs/screenshots/preview/TEXTURE_STOCK.jpg" width="100%" alt="Ruins, original textures">](docs/screenshots/TEXTURE_STOCK.jpg)
+
+**With the upscaled texture pack**
+
+[<img src="docs/screenshots/preview/TEXTURE_AFTER.jpg" width="100%" alt="Ruins, texture pack">](docs/screenshots/TEXTURE_AFTER.jpg)
 
 ## What this fork adds
 
