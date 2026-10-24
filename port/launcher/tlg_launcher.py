@@ -80,6 +80,8 @@ TEXT = {
     'aa_off': ('Off', 'Desligado'),
     'aa_dlaa': ('DLAA (NVIDIA RTX)', 'DLAA (NVIDIA RTX)'),
     'aa_fsr3': ('FSR 3.1 Native AA', 'FSR 3.1 AA nativo'),
+    'aa_no_dlss': ('No DLSS on this GPU: DLAA runs as FSR 3.1 Native AA',
+                   'Sem DLSS nesta GPU: o DLAA roda como FSR 3.1 AA nativo'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -330,6 +332,11 @@ INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '1', 'colo
 AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3'))]
 
 
+def dlss_unsupported(ini):
+    # The game writes its DLSS check (dlss_supported); without DLSS, DLAA runs as FSR 3.1.
+    return ini.get('dlss_supported') == '0'
+
+
 def aa_mode_of(ini):
     # The AA_MODES index tlg.ini picks (TlgSettings::AaModeOf: every upscaler but TAA and FSR 3.1
     # loads as DLAA).
@@ -394,6 +401,13 @@ class Launcher:
     def t(self, key, **fmt):
         en, pt = TEXT[key]
         return (pt if self.pt() else en).format(**fmt)
+
+    def update_aa_note(self, ini):
+        # DLAA stays the choice in tlg.ini; the game runs FSR 3.1 while DLSS is missing.
+        if self.aa_box.current() == 1 and dlss_unsupported(ini):
+            self.aa_note.grid()
+        else:
+            self.aa_note.grid_remove()
 
     # -- window -----------------------------------------------------------------------------
     def build(self):
@@ -494,6 +508,9 @@ class Launcher:
         self.aa_box.current(aa_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
         self.aa_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
         self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground='#777', wraplength=320)
+        self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
+        self.update_aa_note(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini'))
         image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
         image.grid(row=2, column=2, sticky='new', **pad)
         image.columnconfigure(1, weight=1)
@@ -644,6 +661,7 @@ class Launcher:
             var.set(value not in ('0', '') if isinstance(var, tk.BooleanVar) else value)
         self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
         self.aa_box.current(aa_mode_of(ini))
+        self.update_aa_note(ini)
         if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
             self.graphics_window.destroy()  # its sliders show the old values
             self.graphics_dialog()
@@ -700,7 +718,9 @@ class Launcher:
         values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
         aa = self.aa_box.current()
-        if aa >= 0 and aa != aa_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')):
+        current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        self.update_aa_note(current_ini)
+        if aa >= 0 and aa != aa_mode_of(current_ini):
             picked = AA_MODES[aa][1]
             if picked is None:
                 values['dlaa'] = 0  # F8 or the row brings the upscaler choice back

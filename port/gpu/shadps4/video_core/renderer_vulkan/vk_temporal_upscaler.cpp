@@ -2245,7 +2245,7 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
     }
     if (!ok && fsr4->Fatal()) {
         std::printf("Upscaler: falling back to FSR 3.1\n");
-        TlgSettings::Get().upscaler = TlgSettings::UpscalerFsr3;
+        TlgSettings::FallBackToFsr3();
         fsr4_failed = true; // EnsureResources creates the FSR 3 context next frame
         reset = true;
     }
@@ -2305,7 +2305,7 @@ bool TemporalUpscaler::RecordDlss(vk::CommandBuffer cmdbuf, const Dlss::Resource
     }
     if (!ok) {
         std::printf("Upscaler: DLSS failed; falling back to FSR 3.1\n");
-        TlgSettings::Get().upscaler = TlgSettings::UpscalerFsr3;
+        TlgSettings::FallBackToFsr3();
         dlss_failed = true; // EnsureResources creates the FSR 3 context next frame
         reset = true;
     }
