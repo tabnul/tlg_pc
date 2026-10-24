@@ -18,7 +18,8 @@ English). Bug fixes made here go back upstream as pull requests.
 
 **DLAA.** NVIDIA's DLSS anti-aliasing at native resolution, fed with the game's own motion vectors.
 It replaces the game's SMAA and removes most of the shimmer on foliage, feathers and fences. On by
-default on RTX cards; F8 switches between DLAA and the original SMAA. Other cards keep SMAA.
+default on RTX cards. **FSR 3.1 Native AA** does the same with AMD FSR on any card. F8 switches
+between the chosen anti-aliasing and the original SMAA. See [docs/dlaa.md](docs/dlaa.md).
 
 **Any resolution and aspect ratio.** The game renders at the window's resolution, including 21:9
 and 32:9. The menus, hints and subtitles are laid out for the wider screen instead of being
@@ -98,14 +99,14 @@ next to the executable.
 
 The full file list is in [docs/game-files.md](docs/game-files.md).
 
-**PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX card.
+**PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX card; FSR 3.1 Native AA runs on any card.
 
 ## Playing
 
 1. Extract the release and put `libSceNgs2.sprx` in `system_lib/`.
 2. Start the launcher, pick the game folder and language, and press **Play**.
 3. In game: **Insert** (or R3 + L2) opens the port's menu, **F10** shows the frame rate, **F8**
-   switches DLAA/SMAA, **Esc** releases the mouse.
+   switches the anti-aliasing (DLAA or FSR 3.1) / SMAA, **Esc** releases the mouse.
 
 Controllers (DualSense, DualShock 4, Xbox) work through SDL3, motion sensor included. Mouse and
 keyboard work too and can be remapped. More in
@@ -133,6 +134,8 @@ well (`build_dlss.sh`).
   upscale model (CC BY-NC-SA 4.0), and Microsoft's
   [DirectXTex](https://github.com/microsoft/DirectXTex) for texture compression.
 - NVIDIA DLSS, under the NVIDIA DLSS license.
+- [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
+  FSR 4 on Vulkan, which FSR 3.1 Native AA runs on. Thank you!
 
 GPL-2.0, see [port/LICENSE](port/LICENSE).
 

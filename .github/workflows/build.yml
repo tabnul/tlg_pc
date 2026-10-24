@@ -101,6 +101,13 @@ jobs:
           MSYS2_ROOT: ${{ runner.temp }}/msys64
         run: |
           export MSYS2_ROOT=$(cygpath -u "$MSYS2_ROOT")
+          # Keep compilation progress visible while build.sh captures Ninja's full log.
+          (while sleep 30; do
+            echo "Build running: $(date -u +%H:%M:%S) UTC"
+            tail -n 2 out/gpu-build.log 2>/dev/null || true
+          done) &
+          progress_pid=$!
+          trap 'kill "$progress_pid" 2>/dev/null || true' EXIT
           TLG_LTO=OFF bash build.sh
       - name: Regression - speculative fault recovery
         run: python -m unittest discover -s tests -p test_windows_fault_recovery.py -v
