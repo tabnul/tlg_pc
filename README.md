@@ -12,7 +12,31 @@ English). Bug fixes made here go back upstream as pull requests.
 
 > No game files are included. You need your own copy, dumped from your own PS4.
 
-<!-- Before/after screenshots go here. -->
+## See it in motion
+
+[![The Last Guardian on PC: stock vs modded (YouTube)](https://img.youtube.com/vi/16rYLJlGy6A/maxresdefault.jpg)](https://www.youtube.com/watch?v=16rYLJlGy6A)
+
+## Stock vs modded
+
+Left: the game's own settings. Right: this fork's defaults (DLAA, sharpening, color, shadows,
+effects). Both run in widescreen at 3840x1600, so even the left side is already beyond the PS4.
+Click an image for the full resolution.
+
+> These are still images. The biggest changes are in motion: stable edges on foliage, feathers and
+> fences, no shimmer, clearer distance. They are transformative, and can only be properly seen in
+> game.
+
+| Stock | Modded |
+|---|---|
+| [<img src="docs/screenshots/preview/TRICO_STOCK.jpg" alt="Trico, stock">](docs/screenshots/TRICO_STOCK.jpg) | [<img src="docs/screenshots/preview/TRICO_AFTER.jpg" alt="Trico, modded">](docs/screenshots/TRICO_AFTER.jpg) |
+| [<img src="docs/screenshots/preview/CAVE_STOCK.jpg" alt="Cave, stock">](docs/screenshots/CAVE_STOCK.jpg) | [<img src="docs/screenshots/preview/CAVE_AFTER.jpg" alt="Cave, modded">](docs/screenshots/CAVE_AFTER.jpg) |
+| [<img src="docs/screenshots/preview/CAVE2_STOCK.jpg" alt="Cave courtyard, stock">](docs/screenshots/CAVE2_STOCK.jpg) | [<img src="docs/screenshots/preview/CAVE2_AFTER.jpg" alt="Cave courtyard, modded">](docs/screenshots/CAVE2_AFTER.jpg) |
+
+**Texture pack.** The same spot without and with the upscaled texture pack:
+
+| Without | With texture pack |
+|---|---|
+| [<img src="docs/screenshots/preview/TEXTURE_STOCK.jpg" alt="Ruins, original textures">](docs/screenshots/TEXTURE_STOCK.jpg) | [<img src="docs/screenshots/preview/TEXTURE_AFTER.jpg" alt="Ruins, texture pack">](docs/screenshots/TEXTURE_AFTER.jpg) |
 
 ## What this fork adds
 
