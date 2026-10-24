@@ -85,9 +85,9 @@ public:
         return done_this_frame ? std::array<float, 2>{} : jitter;
     }
 
-    /// tlg: DLAA on the game's own motion target (DLSS at 1920x1080, no resolution patch).
+    /// tlg: DLAA or FSR 3.1 native AA on the game's own motion target (RunGameMotion).
     [[nodiscard]] bool GameMotion() const noexcept {
-        return game_motion_on && game_motion_ok && jitter_active && !dlss_failed;
+        return game_motion_on && game_motion_ok && jitter_active;
     }
     [[nodiscard]] u64 SkyMotionPs() const noexcept { return sky_motion_ps; }
     /// The game's SMAA blending-weight pass (vertex shader; edges 0ea3ec8b, blend 0811cca2).
@@ -193,10 +193,21 @@ private:
     /// Records FSR 4 into output_image; on a permanent failure FSR 3 takes over.
     bool RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color, Fsr4Upscaler::Image depth,
                     u32 w, u32 h, u32 ow, u32 oh, float frame_ms);
+    /// Records the portable FSR 3.1 context into output_image (HDR color, General layouts).
+    bool RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk::Format color_format,
+                    vk::ImageUsageFlags color_usage, vk::Image depth, vk::Format depth_format,
+                    vk::ImageUsageFlags depth_usage, u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
+                    bool has_reactive, std::array<float, 2> frame_jitter);
+    /// tlg: FSR 3.1 at native size on the game's motion (the anti-aliasing row).
+    [[nodiscard]] bool FsrNativeAa() const;
     void RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color, vk::ImageView depth);
     /// Sharpness above 1 for FSR 3/4 (their RCAS stops at 1): one more RCAS pass over the target
     /// (output_image, or the 8-bit UI image with ldr) in General layout after the upscaler.
     void ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w, u32 h);
+    /// DLSS ignores its sharpness input (since 2.5.1): RCAS on its output, like FSR 3's own.
+    void DlssSharpen(vk::CommandBuffer cmdbuf, u32 w, u32 h);
+    void RcasPass(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w, u32 h,
+                  float strength, float blend);
 
     const Instance& instance;
     Scheduler& scheduler;

@@ -75,13 +75,13 @@ inline constexpr std::array<int, 3> ReadbackBatchMb = {0, 16, 64};
 inline int ParseReadbackBatch(int value) {
     return IndexOf(ReadbackBatchMb, value, -1) >= 0 ? value : 0;
 }
-/// RCAS / CAS strength in percent; invalid values fall back to `fallback` (RCAS 75, CAS 50).
+/// RCAS / CAS strength in percent; invalid values fall back to `fallback` (RCAS 75, CAS 100).
 inline int ParseRcasStrength(int value, int fallback = 75) {
     return value >= 0 && value <= 100 ? value : fallback;
 }
 /// CAS sharpness (0 to 1) for a strength in percent.
 inline float CasSharpness(int strength) {
-    return float(ParseRcasStrength(strength, 50)) / 100.0f;
+    return float(ParseRcasStrength(strength, 100)) / 100.0f;
 }
 
 /// Color adjustments (post_process.frag): range and neutral value of each slider.

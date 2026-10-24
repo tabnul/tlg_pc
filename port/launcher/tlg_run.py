@@ -137,8 +137,8 @@ DEFAULT_ENV = {
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
     'TLG_GC_BUDGET_MB': '5600',    # texture cache budget for 6 GB of VRAM
-    'TLG_UPSCALER': 'dlss',        # only as DLAA on the game's motion vectors (tlg.ini dlaa=1)
-    'TLG_JITTER': '1',             # jitter only while DLAA runs (needs tlg_dlss.dll + NVIDIA RTX)
+    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
+    'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
     'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
 }
