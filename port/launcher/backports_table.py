@@ -50,7 +50,7 @@ MENU = [
            'Deixa a imagem final mais nítida. Precisa do FSR 1 quando a imagem do jogo é menor que a janela.')),
     _menu('Image', 'rcas_strength', 'int', '75', ('Sharpening strength', 'Intensidade da nitidez'),
           ('How strong the RCAS sharpening is.', 'Quão forte é a nitidez do RCAS.'), lo=0, hi=100, unit='%'),
-    _menu('Image', 'cas', 'bool', '0', ('AMD CAS sharpening', 'Nitidez AMD CAS'),
+    _menu('Image', 'cas', 'bool', '1', ('AMD CAS sharpening', 'Nitidez AMD CAS'),
           ('Contrast-adaptive sharpening at any image size; replaces RCAS while on.',
            'Nitidez adaptativa ao contraste em qualquer tamanho de imagem; substitui o RCAS enquanto ligada.')),
     _menu('Image', 'cas_strength', 'int', '100', ('CAS strength', 'Intensidade do CAS'),

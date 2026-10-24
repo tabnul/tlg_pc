@@ -41,7 +41,7 @@ SETTING_DEFAULTS = {'show_fps': False, **gfxlogic.SETTING_DEFAULTS}
 # The in-game menu's presets (gpu/shim/tlg_settings.cpp GraphicsText): the look settings and the
 # texture pack as tlg.ini keys. Stock is the game as shipped, Recommended the defaults; the
 # player's own are presets/<name>.ini next to tlg.ini ("Save as preset" in the Image tab).
-GAME_RECOMMENDED = {'dlaa': '1', 'smaa': '0', 'fsr1': '0', 'rcas': '1', 'rcas_strength': '75', 'cas': '0',
+GAME_RECOMMENDED = {'dlaa': '1', 'smaa': '0', 'fsr1': '0', 'rcas': '1', 'rcas_strength': '75', 'cas': '1',
                     'cas_strength': '100', 'shadow_scale': '1', 'fov': '70', 'bloom': '100', 'dof': '100',
                     'motion_blur': '100', 'vignette_add': '0', 'ssao': '100', 'ssr': '100',
                     'game_sharpen': '100', 'shadow_distance': '100', 'trico_feathers': '100',

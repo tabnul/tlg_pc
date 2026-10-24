@@ -91,7 +91,7 @@ struct Values {
     /// Filters on the final image (postfx_pass.h, post_process.frag), all off by default:
     /// SMAA 1x, AMD CAS (replaces RCAS while on) and the color adjustments.
     std::atomic<bool> smaa{false};
-    std::atomic<bool> cas{false};
+    std::atomic<bool> cas{true};
     std::atomic<int> cas_strength{100};
     std::atomic<bool> color_adjust{true};
     std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{0.75f};

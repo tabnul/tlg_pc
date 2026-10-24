@@ -82,6 +82,8 @@ TEXT = {
     'aa_fsr3': ('FSR 3.1 Native AA', 'FSR 3.1 AA nativo'),
     'aa_no_dlss': ('No DLSS on this GPU: DLAA runs as FSR 3.1 Native AA',
                    'Sem DLSS nesta GPU: o DLAA roda como FSR 3.1 AA nativo'),
+    'smaa_hint': ('Not recommended: DLAA and FSR 3.1 already smooth the edges; SMAA on top blurs the image and the HUD.',
+                  'Não recomendado: o DLAA e o FSR 3.1 já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -326,7 +328,7 @@ def sdl_key_name(keysym):
 SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
-INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '0', 'color_adjust': '1', 'color_brightness': '0.00',
+INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '1', 'rcas_strength': '75', 'cas_strength': '100', 'color_adjust': '1', 'color_brightness': '0.00',
                 'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
 # The anti-aliasing row (TlgSettings::AaMode): (label, tlg.ini dlaa / upscaler). DLAA needs an
 # NVIDIA RTX card; FSR 3.1 native AA runs on any card.
@@ -402,6 +404,38 @@ class Launcher:
     def t(self, key, **fmt):
         en, pt = TEXT[key]
         return (pt if self.pt() else en).format(**fmt)
+
+    def strength_key(self):
+        return {1: 'rcas_strength', 2: 'cas_strength'}.get(self.sharpener.current())
+
+    def update_strength(self, ini):
+        key = self.strength_key()
+        if key is None:
+            self.sharpen_strength.state(['disabled'])
+            self.sharpen_shown.configure(text='')
+            return
+        try:
+            value = min(max(int(float(ini.get(key, INI_DEFAULTS[key]))), 0), 100)
+        except ValueError:
+            value = int(INI_DEFAULTS[key])
+        self.sharpen_strength.state(['!disabled'])
+        self.sharpen_value = None  # set() calls strength_moved: no write while it shows the file
+        self.sharpen_strength.set(value)
+        self.sharpen_value = value
+        self.sharpen_shown.configure(text=f'{value}%')
+
+    def strength_moved(self, raw):
+        key = self.strength_key()
+        if key is None or self.sharpen_value is None:
+            return
+        step = int(round(float(raw) / 5) * 5)
+        self.sharpen_shown.configure(text=f'{step}%')
+        if step != getattr(self, 'sharpen_value', None):
+            self.sharpen_value = step
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: step})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+            self.refresh_preset()
 
     def update_aa_note(self, ini):
         # DLAA stays the choice in tlg.ini; the game runs FSR 3.1 while DLSS is missing.
@@ -580,14 +614,25 @@ class Launcher:
         for offset, key in ((2, 'smaa'), (4, 'color_adjust')):
             var = tk.BooleanVar(value=ini[key] not in ('0', ''))
             self.ini_vars[key] = var
-            ttk.Checkbutton(parent, text=self.t(key), variable=var, command=self.filters_changed).grid(
-                row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
+            cell = ttk.Frame(parent)
+            cell.grid(row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
+            ttk.Checkbutton(cell, text=self.t(key), variable=var, command=self.filters_changed).pack(anchor='w')
+            if key == 'smaa':
+                ttk.Label(cell, text=self.t('smaa_hint'), foreground='#777', wraplength=360).pack(anchor='w', padx=(20, 0))
         ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 3, column=0, sticky='w')
-        self.sharpener = ttk.Combobox(parent, values=[self.t('sharpen_' + k) for k in SHARPENERS],
+        cell = ttk.Frame(parent)
+        cell.grid(row=row + 3, column=1, sticky='w', padx=6, pady=2)
+        self.sharpener = ttk.Combobox(cell, values=[self.t('sharpen_' + k) for k in SHARPENERS],
                                       state='readonly', width=16)
         self.sharpener.current(2 if ini['cas'] not in ('0', '') else 1 if ini['rcas'] not in ('0', '') else 0)
-        self.sharpener.grid(row=row + 3, column=1, sticky='w', padx=6, pady=2)
+        self.sharpener.pack(side='left')
         self.sharpener.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        # Strength of the picked sharpener (rcas_strength or cas_strength), steps of 5.
+        self.sharpen_shown = ttk.Label(cell, width=5)
+        self.sharpen_strength = ttk.Scale(cell, from_=0, to=100, length=110, command=self.strength_moved)
+        self.sharpen_strength.pack(side='left', padx=(8, 4))
+        self.sharpen_shown.pack(side='left')
+        self.update_strength(ini)
         for index, key in enumerate(COLOR_RANGES):
             low, high = COLOR_RANGES[key]
             ttk.Label(parent, text=self.t(key)).grid(row=row + 5 + index, column=0, sticky='w', padx=(16, 0))
@@ -661,6 +706,7 @@ class Launcher:
             value = ini.get(key, INI_DEFAULTS[key])
             var.set(value not in ('0', '') if isinstance(var, tk.BooleanVar) else value)
         self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
+        self.update_strength(ini)
         self.aa_box.current(aa_mode_of(ini))
         self.update_aa_note(ini)
         if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
@@ -721,6 +767,7 @@ class Launcher:
         aa = self.aa_box.current()
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         self.update_aa_note(current_ini)
+        self.update_strength(current_ini)
         if aa >= 0 and aa != aa_mode_of(current_ini):
             picked = AA_MODES[aa][1]
             if picked is None:
