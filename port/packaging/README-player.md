@@ -12,7 +12,7 @@ Versão experimental: o jogo roda do início ao gameplay, mas ainda pode travar 
 
 ### Arquivos do jogo necessários
 
-Tudo vem do **seu** PS4 (GoldHEN + Itemzflow). Nada disso vai no download. Use **The Last Guardian CUSA03627 (EUA) com o update 01.03**, montado numa pasta só, com o jogo base e o update por cima. São ~25 GB.
+Nada disso vai no download; você precisa da sua própria cópia. Use **The Last Guardian CUSA03627 (EUA) com o update 01.03**, montado numa pasta só, com o jogo base e o update por cima. São ~25 GB.
 
 | Arquivo | Vem de | Tamanho | Para quê |
 |---|---|---|---|
@@ -24,12 +24,7 @@ Tudo vem do **seu** PS4 (GoldHEN + Itemzflow). Nada disso vai no download. Use *
 | `trico_enu.psarc` / `trico_ptb.psarc` / `trico_esl.psarc` / `trico_frc.psarc` (+ os `…p.psarc` do update) | base + update | ~280 MB cada | vozes e textos: inglês, português, espanhol, francês |
 | `sce_discmap.plt`, `sce_discmap_patch.plt` | base, update | pequenos | mapa de arquivos (recomendado) |
 
-**Do firmware do console (opcional, para o áudio nativo):** `libSceNgs2.sprx` (372 KB), de `/system/common/lib/` do seu PS4. Ele vai na pasta `system_lib/` ao lado do executável.
-
-**Como montar a pasta:**
-1. No Itemzflow, faça o dump do jogo (`CUSA03627`) e do update (`CUSA03627-patch`) para um pendrive exFAT.
-2. No PC, copie a pasta do jogo base e depois copie o conteúdo do update **por cima**, substituindo os arquivos (`eboot.bin`, `sce_module/`, `sce_sys/`).
-3. Confira os tamanhos. Arquivos acima de 4 GB vindos pelo FTP do GoldHEN 2.2 chegam cortados, então use o pendrive.
+**Do firmware do console (opcional, para o áudio nativo):** `libSceNgs2.sprx` (372 KB). Ele vai na pasta `system_lib/` ao lado do executável.
 
 **PC:** Windows 10 (1903+)/11 64 bits ou Linux x86-64 (glibc 2.39+), placa de vídeo com Vulkan 1.3 (6 GB de VRAM recomendados).
 
@@ -91,7 +86,7 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 
 ### Required game files
 
-Everything comes from **your own** PS4 (GoldHEN + Itemzflow). None of it is in the download. Use **The Last Guardian CUSA03627 (US) with update 01.03**, merged into one folder, with the base game and the update on top. About 25 GB.
+None of it is in the download; you need your own copy. Use **The Last Guardian CUSA03627 (US) with update 01.03**, merged into one folder, with the base game and the update on top. About 25 GB.
 
 | File | From | Size | Purpose |
 |---|---|---|---|
@@ -103,12 +98,7 @@ Everything comes from **your own** PS4 (GoldHEN + Itemzflow). None of it is in t
 | `trico_enu.psarc` / `trico_ptb.psarc` / `trico_esl.psarc` / `trico_frc.psarc` (+ the update's `…p.psarc`) | base + update | ~280 MB each | voices and text: English, Portuguese, Spanish, French |
 | `sce_discmap.plt`, `sce_discmap_patch.plt` | base, update | small | file map (recommended) |
 
-**From the console firmware (optional, for native audio):** `libSceNgs2.sprx` (372 KB), from `/system/common/lib/` on your PS4. It goes in the `system_lib/` folder next to the executable.
-
-**How to build the folder:**
-1. In Itemzflow, dump the game (`CUSA03627`) and the update (`CUSA03627-patch`) to an exFAT USB drive.
-2. On the PC, copy the base game folder, then copy the update's contents **over it**, replacing files (`eboot.bin`, `sce_module/`, `sce_sys/`).
-3. Check the sizes. Files over 4 GB sent through GoldHEN 2.2's FTP arrive truncated, so use the USB drive.
+**From the console firmware (optional, for native audio):** `libSceNgs2.sprx` (372 KB). It goes in the `system_lib/` folder next to the executable.
 
 **PC:** 64-bit Windows 10 (1903+)/11 or x86-64 Linux (glibc 2.39+), a graphics card with Vulkan 1.3 (6 GB of VRAM recommended).
 

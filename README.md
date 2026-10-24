@@ -143,11 +143,10 @@ Builds of this fork are under [Releases](https://github.com/tabnul/tlg_pc/releas
 
 ## Game files
 
-Use **CUSA03627 (US) or CUSA03745 (EU) with update 01.03**: dump the base game and the update with
-Itemzflow, then copy the update over the base game folder. About 25 GB.
+The port needs **CUSA03627 (US) or CUSA03745 (EU) with update 01.03**: one folder with the base
+game and the update's files on top. About 25 GB.
 
-For audio, also copy `libSceNgs2.sprx` from `/system/common/lib/` on your PS4 into `system_lib/`
-next to the executable.
+For audio, the PS4 firmware's `libSceNgs2.sprx` goes in `system_lib/` next to the executable.
 
 The full file list is in [docs/game-files.md](docs/game-files.md).
 
