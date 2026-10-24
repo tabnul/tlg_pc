@@ -20,7 +20,8 @@ English). Bug fixes made here go back upstream as pull requests.
 
 Each pair shows the same spot: first the game's own settings, then this fork's defaults (DLAA,
 sharpening, color, shadows, effects). Both run in widescreen at 3840x1600, so even the stock
-shot is already beyond the PS4. Click an image for the full resolution.
+shot is already beyond the PS4. Below each pair, a detail at 100% shows what the page size
+hides. Click any image for the full-resolution PNG.
 
 > These are still images. The biggest changes are in motion: stable edges on foliage, feathers and
 > fences, no shimmer, clearer distance. They are transformative, and can only be properly seen in
@@ -30,41 +31,73 @@ shot is already beyond the PS4. Click an image for the full resolution.
 
 **Stock**
 
-[<img src="docs/screenshots/preview/TRICO_STOCK.jpg" width="100%" alt="Trico, stock">](docs/screenshots/TRICO_STOCK.jpg)
+[<img src="docs/screenshots/preview/TRICO_STOCK.jpg" width="100%" alt="Trico, stock">](docs/screenshots/TRICO_STOCK.png)
 
 **Modded**
 
-[<img src="docs/screenshots/preview/TRICO_AFTER.jpg" width="100%" alt="Trico, modded">](docs/screenshots/TRICO_AFTER.jpg)
+[<img src="docs/screenshots/preview/TRICO_AFTER.jpg" width="100%" alt="Trico, modded">](docs/screenshots/TRICO_AFTER.png)
+
+Full resolution (PNG): [stock](docs/screenshots/TRICO_STOCK.png) · [modded](docs/screenshots/TRICO_AFTER.png)
+
+*Detail at 100%: Trico's face. Stock first, then modded.*
+
+[<img src="docs/screenshots/crops/TRICO_FACE_STOCK.jpg" alt="Trico's face, stock">](docs/screenshots/TRICO_STOCK.png)
+
+[<img src="docs/screenshots/crops/TRICO_FACE_AFTER.jpg" alt="Trico's face, modded">](docs/screenshots/TRICO_AFTER.png)
 
 ### Cave
 
 **Stock**
 
-[<img src="docs/screenshots/preview/CAVE_STOCK.jpg" width="100%" alt="Cave, stock">](docs/screenshots/CAVE_STOCK.jpg)
+[<img src="docs/screenshots/preview/CAVE_STOCK.jpg" width="100%" alt="Cave, stock">](docs/screenshots/CAVE_STOCK.png)
 
 **Modded**
 
-[<img src="docs/screenshots/preview/CAVE_AFTER.jpg" width="100%" alt="Cave, modded">](docs/screenshots/CAVE_AFTER.jpg)
+[<img src="docs/screenshots/preview/CAVE_AFTER.jpg" width="100%" alt="Cave, modded">](docs/screenshots/CAVE_AFTER.png)
+
+Full resolution (PNG): [stock](docs/screenshots/CAVE_STOCK.png) · [modded](docs/screenshots/CAVE_AFTER.png)
 
 ### Cave courtyard
 
 **Stock**
 
-[<img src="docs/screenshots/preview/CAVE2_STOCK.jpg" width="100%" alt="Cave courtyard, stock">](docs/screenshots/CAVE2_STOCK.jpg)
+[<img src="docs/screenshots/preview/CAVE2_STOCK.jpg" width="100%" alt="Cave courtyard, stock">](docs/screenshots/CAVE2_STOCK.png)
 
 **Modded**
 
-[<img src="docs/screenshots/preview/CAVE2_AFTER.jpg" width="100%" alt="Cave courtyard, modded">](docs/screenshots/CAVE2_AFTER.jpg)
+[<img src="docs/screenshots/preview/CAVE2_AFTER.jpg" width="100%" alt="Cave courtyard, modded">](docs/screenshots/CAVE2_AFTER.png)
+
+Full resolution (PNG): [stock](docs/screenshots/CAVE2_STOCK.png) · [modded](docs/screenshots/CAVE2_AFTER.png)
+
+*Detail at 100%: grass and the boy. Stock first, then modded.*
+
+[<img src="docs/screenshots/crops/CAVE2_GRASS_STOCK.jpg" alt="grass and the boy, stock">](docs/screenshots/CAVE2_STOCK.png)
+
+[<img src="docs/screenshots/crops/CAVE2_GRASS_AFTER.jpg" alt="grass and the boy, modded">](docs/screenshots/CAVE2_AFTER.png)
 
 ### Texture pack
 
 **Original textures**
 
-[<img src="docs/screenshots/preview/TEXTURE_STOCK.jpg" width="100%" alt="Ruins, original textures">](docs/screenshots/TEXTURE_STOCK.jpg)
+[<img src="docs/screenshots/preview/TEXTURE_STOCK.jpg" width="100%" alt="Ruins, original textures">](docs/screenshots/TEXTURE_STOCK.png)
 
-**With the upscaled texture pack**
+**With the texture pack**
 
-[<img src="docs/screenshots/preview/TEXTURE_AFTER.jpg" width="100%" alt="Ruins, texture pack">](docs/screenshots/TEXTURE_AFTER.jpg)
+[<img src="docs/screenshots/preview/TEXTURE_AFTER.jpg" width="100%" alt="Ruins, texture pack">](docs/screenshots/TEXTURE_AFTER.png)
+
+Full resolution (PNG): [original textures](docs/screenshots/TEXTURE_STOCK.png) · [with the texture pack](docs/screenshots/TEXTURE_AFTER.png)
+
+*Detail at 100%: stone slab. Original textures first, then with the texture pack.*
+
+[<img src="docs/screenshots/crops/TEXTURE_CLIFF_STOCK.jpg" alt="stone slab, original textures">](docs/screenshots/TEXTURE_STOCK.png)
+
+[<img src="docs/screenshots/crops/TEXTURE_CLIFF_AFTER.jpg" alt="stone slab, with the texture pack">](docs/screenshots/TEXTURE_AFTER.png)
+
+*Detail at 100%: moss and rock. Original textures first, then with the texture pack.*
+
+[<img src="docs/screenshots/crops/TEXTURE_ROCK_STOCK.jpg" alt="moss and rock, original textures">](docs/screenshots/TEXTURE_STOCK.png)
+
+[<img src="docs/screenshots/crops/TEXTURE_ROCK_AFTER.jpg" alt="moss and rock, with the texture pack">](docs/screenshots/TEXTURE_AFTER.png)
 
 ## What this fork adds
 
