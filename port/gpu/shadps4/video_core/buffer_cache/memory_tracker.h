@@ -140,6 +140,35 @@ public:
                             });
     }
 
+    /// tlg (from SotC opt11, @Oussama268): calls write(addr, size) for the runs of pages the CPU
+    /// has not modified, under the region lock, so a guest write fault in between waits instead
+    /// of being overwritten. Returns the bytes skipped.
+    u64 WriteUnlessCpuModified(VAddr cpu_addr, u64 size, auto&& write) {
+        u64 skipped = 0;
+        IteratePages<false>(cpu_addr, size, [&](RegionManager* manager, u64 offset, size_t len) {
+            const VAddr base = manager->GetCpuAddr();
+            std::scoped_lock lk{manager->lock};
+            const u64 end = offset + len;
+            u64 run = offset;
+            for (u64 page = offset; page < end;) {
+                const u64 next = std::min<u64>(
+                    (page & ~(TRACKER_BYTES_PER_PAGE - 1)) + TRACKER_BYTES_PER_PAGE, end);
+                if (manager->template IsRegionModified<Type::CPU>(page, next - page)) {
+                    if (page > run) {
+                        write(base + run, page - run);
+                    }
+                    run = next;
+                    skipped += next - page;
+                }
+                page = next;
+            }
+            if (end > run) {
+                write(base + run, end - run);
+            }
+        });
+        return skipped;
+    }
+
 private:
     /**
      * @brief IteratePages Iterates L2 word manager page table.

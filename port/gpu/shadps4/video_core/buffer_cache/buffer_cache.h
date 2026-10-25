@@ -5,6 +5,7 @@
 
 #include "tlg_copy.h"
 
+#include <chrono>
 #include <deque>
 #include <boost/container/small_vector.hpp>
 
@@ -193,6 +194,23 @@ private:
     std::atomic<u64> readback_finish_ns{};
     std::atomic<u64> readback_side_copies{};
     std::atomic<u64> readback_side_ns{};
+
+    // tlg: hot readbacks (from SotC opt11 by @Oussama268; TLG_RB_HOT=0 turns them off): the
+    // windows read back in the last 2 s. A readback that syncs anyway brings along their GPU
+    // data in the same arena, so the reads that follow find it on the CPU.
+    struct HotReadback {
+        VAddr addr;
+        u64 size;
+        std::chrono::steady_clock::time_point last_request;
+    };
+    static constexpr size_t MaxHotReadbacks = 64;
+    static constexpr u64 MaxHotBytes = 64_KB; ///< larger regions wait for their own readback
+    static constexpr auto HotReadbackLifetime = std::chrono::seconds{2};
+    bool hot_readbacks_enabled{true};
+    boost::container::small_vector<HotReadback, MaxHotReadbacks> hot_readbacks;
+    std::atomic<u64> readback_hot_regions{};
+    std::atomic<u64> readback_hot_bytes{};
+    std::atomic<u64> readback_hot_skipped{};
 
     /// tlg: copies GPU data whose last write has finished on the second queue, without
     /// submitting or waiting for the open GPU queue. False when there is no second queue.
