@@ -29,7 +29,8 @@ __pycache__/
 
 # Saídas de build do port e dados locais do jogo preparados
 port/out/
-port/pgo/
+port/pgo/*
+!port/pgo/tlggpu.profdata
 port/user
 /game
 port/dist/

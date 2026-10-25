@@ -4,7 +4,8 @@ user/
 *.mp4
 tlg.ini
 fsr4_shaders/
-pgo/
+pgo/*
+!pgo/tlggpu.profdata
 *.png
 !packaging/icon/*.png
 last_run.log
