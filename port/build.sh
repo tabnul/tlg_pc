@@ -3,7 +3,10 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")"
 mkdir -p out
 # Windows: MSYS2 CLANG64 (packages in packaging/windows/README.md). The GPU library is static
-# there and CMake links tlg-probe.exe as well; no PGO (GCC-only flags), LTO off by default.
+# there and CMake links tlg-probe.exe as well; LTO off by default.
+# TLG_PGO (Clang): generate = instrumented build in out/gpu-pgogen, copied to
+# out/tlg-probe-pgogen.exe (play it, then TLG_PGO=merge); merge = pgo/*.profraw into
+# pgo/tlggpu.profdata; use, off. Default: use when pgo/tlggpu.profdata exists.
 case $(uname -s) in
 MINGW*|MSYS*)
     # shellcheck source=msys2-env.sh
@@ -20,9 +23,30 @@ MINGW*|MSYS*)
             git -C gpu/third_party/fsr-vulkan apply "$PWD/$patch"
         fi
     done
-    cmake -S gpu -B out/gpu -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTLG_PGO=off \
+    pgo=${TLG_PGO:-}
+    if [[ -z $pgo ]]; then
+        if [[ -f pgo/tlggpu.profdata ]]; then pgo=use; else pgo=off; fi
+    fi
+    mkdir -p pgo
+    if [[ $pgo == merge ]]; then
+        llvm-profdata merge -o pgo/tlggpu.profdata pgo/*.profraw
+        echo "Merged into $PWD/pgo/tlggpu.profdata"
+        exit 0
+    fi
+    dir=out/gpu
+    if [[ $pgo == generate ]]; then dir=out/gpu-pgogen; fi
+    cmake -S gpu -B "$dir" -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTLG_PGO="$pgo" -DTLG_PGO_DIR="$PWD/pgo" \
         -DTLG_LTO="${TLG_LTO:-OFF}" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ >/dev/null
-    echo "GPU library and loader: LTO ${TLG_LTO:-OFF}"
+    echo "GPU library and loader: PGO $pgo, LTO ${TLG_LTO:-OFF}"
+    if [[ $pgo == generate ]]; then
+        if ! ninja -C "$dir" tlg-probe > out/gpu-build.log 2>&1; then
+            grep -v '^\[' out/gpu-build.log | tail -40 >&2
+            echo 'Build failed (full log: out/gpu-build.log)' >&2; exit 1
+        fi
+        cp "$dir/tlg-probe.exe" out/tlg-probe-pgogen.exe
+        echo "Built $PWD/out/tlg-probe-pgogen.exe (instrumented)"
+        exit 0
+    fi
     if ! ninja -C out/gpu tlg-probe tlg-gpu-capabilities tlg-play > out/gpu-build.log 2>&1; then
         grep -v '^\[' out/gpu-build.log | tail -40 >&2
         echo 'Build failed (full log: out/gpu-build.log)' >&2; exit 1
