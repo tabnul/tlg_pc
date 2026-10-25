@@ -75,6 +75,9 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
     if (const char* diag = std::getenv("TLG_BUFFER_READBACK_STATS")) {
         readback_stats_enabled = *diag == '1';
     }
+    if (const char* hot = std::getenv("TLG_RB_HOT")) {
+        hot_readbacks_enabled = *hot != '0';
+    }
     if (readback_batch_limit || readback_stats_enabled) {
         const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                 std::chrono::steady_clock::now().time_since_epoch())
@@ -265,25 +268,105 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
 
+    const auto add_download = [&](VAddr start, VAddr end) {
+        const u64 new_offset = start - arena_base;
+        const u64 new_size = end - start;
+        copies.push_back(vk::BufferCopy{
+            .srcOffset = new_offset,
+            .dstOffset = total_size_bytes,
+            .size = new_size,
+        });
+        // Align up to avoid cache conflicts
+        constexpr u64 align = 64ULL;
+        constexpr u64 mask = ~(align - 1ULL);
+        total_size_bytes += (new_size + align - 1) & mask;
+        copy_size_bytes += new_size;
+    };
     memory_tracker->ForEachDownloadRange<false>(download_addr, download_size,
                                                  [&](u64 address, u64 size) {
-        const auto add_download = [&](VAddr start, VAddr end) {
-            const u64 new_offset = start - arena_base;
-            const u64 new_size = end - start;
-            copies.push_back(vk::BufferCopy{
-                .srcOffset = new_offset,
-                .dstOffset = total_size_bytes,
-                .size = new_size,
-            });
-            // Align up to avoid cache conflicts
-            constexpr u64 align = 64ULL;
-            constexpr u64 mask = ~(align - 1ULL);
-            total_size_bytes += (new_size + align - 1) & mask;
-            copy_size_bytes += new_size;
-        };
         gpu_modified_ranges.ForEachInRange(address, size, add_download);
         gpu_modified_ranges.Subtract(address, size);
     });
+
+    // tlg: hot readbacks (see buffer_cache.h). A hot region skips the pages whose CPU bit is
+    // set: the guest may have written them since, and its bytes are the right ones.
+    const size_t requested_copies = copies.size();
+    boost::container::small_vector<std::pair<VAddr, u64>, 16> hot_runs;
+    if (hot_readbacks_enabled) {
+        const auto now = std::chrono::steady_clock::now();
+        const VAddr arena_end = arena_base + arena->size_bytes;
+        boost::container::small_vector<std::pair<VAddr, u64>, MaxHotReadbacks> regions;
+        bool known = false;
+        for (auto& hot : hot_readbacks) {
+            if (hot.addr == device_addr && hot.size == size) {
+                hot.last_request = now;
+                known = true;
+            } else if (now - hot.last_request <= HotReadbackLifetime && hot.addr >= arena_base &&
+                       hot.addr + hot.size <= arena_end) {
+                regions.emplace_back(hot.addr, hot.size);
+            }
+        }
+        if (!known) {
+            if (hot_readbacks.size() < MaxHotReadbacks) {
+                hot_readbacks.push_back({device_addr, size, now});
+            } else {
+                *std::ranges::min_element(hot_readbacks, {}, &HotReadback::last_request) = {
+                    device_addr, size, now};
+            }
+        }
+        // Only when this readback copies anyway: an empty one costs no sync to share.
+        if (total_size_bytes == 0) {
+            regions.clear();
+        }
+        for (const auto& [region_addr, region_size] : regions) {
+            const size_t first_copy = copies.size();
+            const u64 total_before = total_size_bytes;
+            const u64 copy_before = copy_size_bytes;
+            const size_t runs_before = hot_runs.size();
+            u64 skipped = 0;
+            memory_tracker->ForEachDownloadRange<false>(region_addr, region_size,
+                                                         [&](u64 address, u64 range_size) {
+                VAddr run_start = address;
+                const VAddr range_end = address + range_size;
+                const auto flush_run = [&](VAddr end) {
+                    if (end > run_start) {
+                        gpu_modified_ranges.ForEachInRange(run_start, end - run_start, add_download);
+                        hot_runs.emplace_back(run_start, end - run_start);
+                    }
+                };
+                for (VAddr page = address; page < range_end;) {
+                    const VAddr next = std::min<VAddr>(
+                        Common::AlignDown(page, TRACKER_BYTES_PER_PAGE) + TRACKER_BYTES_PER_PAGE,
+                        range_end);
+                    if (memory_tracker->IsRegionCpuModified(page, next - page)) {
+                        flush_run(page);
+                        run_start = next;
+                        skipped += next - page;
+                    }
+                    page = next;
+                }
+                flush_run(range_end);
+            });
+            if (copy_size_bytes - copy_before > MaxHotBytes) {
+                // Not downloaded now: its ranges stay in the modified set.
+                copies.resize(first_copy);
+                total_size_bytes = total_before;
+                copy_size_bytes = copy_before;
+                hot_runs.resize(runs_before);
+                continue;
+            }
+            for (size_t i = runs_before; i < hot_runs.size(); ++i) {
+                gpu_modified_ranges.Subtract(hot_runs[i].first, hot_runs[i].second);
+            }
+            if (readback_stats_enabled) {
+                readback_hot_regions.fetch_add(copies.size() != first_copy,
+                                               std::memory_order_relaxed);
+                readback_hot_bytes.fetch_add(copy_size_bytes - copy_before,
+                                             std::memory_order_relaxed);
+                readback_hot_skipped.fetch_add(skipped, std::memory_order_relaxed);
+            }
+        }
+    }
     if (total_size_bytes == 0) {
         if (readback_stats_enabled) {
             readback_empty_requests.fetch_add(1, std::memory_order_relaxed);
@@ -338,12 +421,30 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     }
 
     download.buffer->Invalidate(download.offset, download.size);
-    for (const auto& copy : copies) {
-        auto* dst_addr = std::bit_cast<u8*>(arena_base + copy.srcOffset);
-        memory->TryWriteBacking(dst_addr, download.mapped + (copy.dstOffset - download.offset),
-                                copy.size);
+    for (size_t i = 0; i < copies.size(); ++i) {
+        const auto& copy = copies[i];
+        const VAddr dst_addr = arena_base + copy.srcOffset;
+        const u8* src = download.mapped + (copy.dstOffset - download.offset);
+        if (i < requested_copies) {
+            memory->TryWriteBacking(std::bit_cast<u8*>(dst_addr), src, copy.size);
+            continue;
+        }
+        // Hot data: checked again page by page under the region lock, so a guest write since
+        // the gather is neither overwritten nor raced (SotC: a size the game had just read from
+        // a file, replaced by stale GPU bytes, asked for a 59 GiB allocation).
+        const u64 skipped = memory_tracker->WriteUnlessCpuModified(
+            dst_addr, copy.size, [&](VAddr part_addr, u64 part_size) {
+                memory->TryWriteBacking(std::bit_cast<u8*>(part_addr), src + (part_addr - dst_addr),
+                                        part_size);
+            });
+        if (skipped && readback_stats_enabled) {
+            readback_hot_skipped.fetch_add(skipped, std::memory_order_relaxed);
+        }
     }
     memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
+    for (const auto& [run_addr, run_size] : hot_runs) {
+        memory_tracker->UnmarkRegionAsGpuModified(run_addr, run_size);
+    }
     ReportReadbackStats();
 }
 
@@ -450,14 +551,17 @@ void BufferCache::ReportReadbackStats() {
     const u64 staging_bytes = readback_staging_bytes.exchange(0, std::memory_order_relaxed);
     std::printf("Buffer readbacks (5 s): requests %llu (%llu empty), full-arena batches %llu, "
                 "limit fallbacks %llu, GPU completions %llu, ranges %llu, copied %.2f MiB, "
-                "staging %.2f MiB\n",
+                "staging %.2f MiB; hot regions %llu (%.2f MiB, %.2f MiB CPU-written skipped)\n",
                 static_cast<unsigned long long>(requests),
                 static_cast<unsigned long long>(empty_requests),
                 static_cast<unsigned long long>(full_batches),
                 static_cast<unsigned long long>(fallbacks),
                 static_cast<unsigned long long>(completions),
                 static_cast<unsigned long long>(ranges), copy_bytes / 1048576.0,
-                staging_bytes / 1048576.0);
+                staging_bytes / 1048576.0,
+                static_cast<unsigned long long>(readback_hot_regions.exchange(0)),
+                readback_hot_bytes.exchange(0) / 1048576.0,
+                readback_hot_skipped.exchange(0) / 1048576.0);
     std::printf("Buffer readback waits (5 s): %.1f ms in Finish, %.1f ms in %llu side copies; "
                 "last GPU write done %llu, submitted %llu, still "
                 "recording %llu, unknown %llu; fence flushes EOP %llu, EOS %llu, WRITE_DATA %llu, "

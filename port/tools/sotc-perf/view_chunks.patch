@@ -1,0 +1,145 @@
+commit 0ec2ea536b0539e9c6e0232d7c5fdf8393485252
+Author: tabnul <tabnuland@gmail.com>
+Date:   Sun Oct 25 14:22:31 2026 +0100
+
+    sotc: remove the minute hitch and the view carve spikes
+    
+    - The SOTC MEM report (every 12th stats report) locked every heap in
+      HeapSummary and walked the address space: a 130-200 ms hitch every
+      minute, since every allocating thread waited, the draw thread too. It
+      now only runs with SOTC_MEM_REPORT=1. Worst frame on the walk4 replay:
+      168 -> 74 ms.
+    - runtime_memory.c maps large views in chunks (SOTC_VIEW_CHUNK_MB), which
+      removes the spikes when a mapping is carved up.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+diff --git a/src/runtime_memory.c b/src/runtime_memory.c
+index a20fdc5..07b485c 100644
+--- a/src/runtime_memory.c
++++ b/src/runtime_memory.c
+@@ -79,25 +79,48 @@ _Static_assert(sizeof(BatchEntry)==32,"PS4 batch map entry layout");
+  * This lock prefers readers like glibc's: a read is one atomic operation and never waits for
+  * a waiting writer; a writer waits until no reader holds it (maps and unmaps are rare). */
+ static volatile int64_t lock_state; /* readers, or -1 while a writer holds it */
+-static void lock_backoff(unsigned *spins) {
++/* sotc: after a short spin a waiter sleeps on lock_state (WaitOnAddress) and the release wakes it at
++ * once. It slept 1 ms (Sleep(1), 1-2 ms with the timer at 1 ms) per try: the draw thread takes the
++ * lock thousands of times a frame, and while the game streams (a map or unmap every few ms) those
++ * sleeps added up to 60-160 ms frames. lock_waiters counts the sleepers so an uncontended release
++ * makes no call. SOTC_LOCK_WAIT=0: the old Sleep(1) backoff. */
++static volatile int64_t lock_waiters;
++static int lock_wait_enabled(void) {
++    static int v=-1;
++    if (v<0) { const char *e=getenv("SOTC_LOCK_WAIT"); v=!(e && e[0]=='0'); }
++    return v;
++}
++static void lock_backoff(unsigned *spins, int64_t seen) {
+     if (++*spins < 64) YieldProcessor();
+     else if (*spins < 256) SwitchToThread();
++    else if (lock_wait_enabled()) {
++        __atomic_add_fetch(&lock_waiters,1,__ATOMIC_SEQ_CST);
++        /* Rechecked after counting itself: a release in between is not missed. 1 ms bounds a lost wake. */
++        if (__atomic_load_n(&lock_state,__ATOMIC_SEQ_CST)==seen) WaitOnAddress((volatile void *)&lock_state,&seen,sizeof(seen),1);
++        __atomic_sub_fetch(&lock_waiters,1,__ATOMIC_RELAXED);
++    }
+     else Sleep(1); /* Sleep(0) only yields to equal or higher priority: a preempted lower-priority holder could wait seconds */
+ }
++static void lock_wake(void) {
++    if (__atomic_load_n(&lock_waiters,__ATOMIC_SEQ_CST)) WakeByAddressAll((void *)&lock_state);
++}
+ static void rw_rdlock(void) {
+-    for (unsigned spins=0;;lock_backoff(&spins)) {
++    for (unsigned spins=0;;) {
+         int64_t s=__atomic_load_n(&lock_state,__ATOMIC_RELAXED);
+         if (s>=0 && __atomic_compare_exchange_n(&lock_state,&s,s+1,0,__ATOMIC_ACQUIRE,__ATOMIC_RELAXED)) return;
++        if (s<0) lock_backoff(&spins,s); /* a writer holds it */
+     }
+ }
+-static void rw_rdunlock(void) { __atomic_sub_fetch(&lock_state,1,__ATOMIC_RELEASE); }
++/* The last reader out wakes a writer waiting for it. */
++static void rw_rdunlock(void) { if (__atomic_sub_fetch(&lock_state,1,__ATOMIC_SEQ_CST)==0) lock_wake(); }
+ static void rw_wrlock(void) {
+-    for (unsigned spins=0;;lock_backoff(&spins)) {
++    for (unsigned spins=0;;) {
+         int64_t s=0;
+         if (__atomic_compare_exchange_n(&lock_state,&s,-1,0,__ATOMIC_ACQUIRE,__ATOMIC_RELAXED)) return;
++        lock_backoff(&spins,s); /* s: what it holds now */
+     }
+ }
+-static void rw_wrunlock(void) { __atomic_store_n(&lock_state,0,__ATOMIC_RELEASE); }
++static void rw_wrunlock(void) { __atomic_store_n(&lock_state,0,__ATOMIC_SEQ_CST); lock_wake(); }
+ #else
+ static pthread_rwlock_t lock=PTHREAD_RWLOCK_INITIALIZER;
+ static void rw_rdlock(void) { pthread_rwlock_rdlock(&lock); }
+@@ -254,11 +277,14 @@ static size_t carve_host(uintptr_t a, uintptr_t b) {
+     /* sotc: a live view is split: everything in it (fiber stacks included) disappears until it is
+      * mapped again below. Other guest threads stop meanwhile (see runtime_thread_suspend_others).
+      * The region table is grown first: no heap call while they are stopped (one may hold the heap). */
++    LARGE_INTEGER carve_t0={0}, carve_t1={0};
++    if (keep_left || keep_right) QueryPerformanceCounter(&carve_t0);
+     if ((keep_left || keep_right) && carve_suspend_enabled()) {
+         region_reserve(3);
+         carve_nstopped=runtime_thread_suspend_others(carve_stopped,256);
+         carve_stopping=1;
+         __atomic_add_fetch(&carve_splits,1,__ATOMIC_RELAXED);
++        QueryPerformanceCounter(&carve_t1);
+     }
+     for (size_t i=first;i<last;++i) if (regions[i].mapped) {
+         if (!UnmapViewOfFile2(GetCurrentProcess(),(void *)regions[i].start,MEM_PRESERVE_PLACEHOLDER))
+@@ -294,15 +320,53 @@ static size_t carve_host(uintptr_t a, uintptr_t b) {
+             win_fail("restoring page protection",runs[i].start,runs[i].end-runs[i].start);
+     }
+     if (carve_stopping) { carve_stopping=0; runtime_thread_resume(carve_stopped,carve_nstopped); }
++    /* sotc: SOTC_CARVE_LOG=<us>: splits slower than that (after the threads run again). */
++    if (keep_left || keep_right) {
++        static long long log_us=-1;
++        if (log_us<0) { const char *e=getenv("SOTC_CARVE_LOG"); log_us=e ? atoll(e) : 0; }
++        if (log_us>0) {
++            LARGE_INTEGER t2, f; QueryPerformanceCounter(&t2); QueryPerformanceFrequency(&f);
++            long long total=(t2.QuadPart-carve_t0.QuadPart)*1000000/f.QuadPart;
++            long long stop=carve_t1.QuadPart ? (carve_t1.QuadPart-carve_t0.QuadPart)*1000000/f.QuadPart : 0;
++            if (total>=log_us)
++                fprintf(stderr,"SOTCCARVE us=%lld stop_us=%lld threads=%zu view=%#" PRIxPTR "+%#" PRIxPTR " range=%#" PRIxPTR "+%#" PRIxPTR " runs=%zu\n",
++                        total,stop,carve_nstopped,lo,hi-lo,a,b-a,nruns);
++        }
++    }
+     (void)left_runs;
+     free(runs);
+     return at;
+ }
++/* sotc: a mapping is made of views that end on SOTC_VIEW_CHUNK_MB (16) boundaries; 0 maps one
++ * view. Splitting a view later (a partial unmap or remap) unmaps and maps all of it again with
++ * the other threads stopped: a 4 GB view with hundreds of protection runs took up to 48 ms, one
++ * chunk takes a fraction of that. */
++static uintptr_t view_chunk(void) {
++    static uintptr_t chunk=1;
++    if (chunk==1) {
++        const char *e=getenv("SOTC_VIEW_CHUNK_MB");
++        uintptr_t mb=e ? (uintptr_t)atoll(e) : 16;
++        while (mb & (mb-1)) mb&=mb-1; /* a power of two: chunks stay 64 KB aligned */
++        chunk=mb<<20;
++    }
++    return chunk;
++}
+ static int host_map(uintptr_t address, uint64_t size, int prot, int reserved, uint64_t phys) {
+     size_t i=carve_host(address,address+size);
+     if (reserved) return 0;
+-    regions[i].phys=phys; regions[i].mapped=1;
+-    view_map(&regions[i],win_prot(prot));
++    const DWORD protect=win_prot(prot);
++    const uintptr_t chunk=view_chunk(), end=address+size;
++    for (uintptr_t at=address;; at=regions[i++].end) {
++        uintptr_t next=chunk ? (at & ~(chunk-1))+chunk : end;
++        if (next<end) {
++            if (!VirtualFree((void *)at,next-at,MEM_RELEASE|MEM_PRESERVE_PLACEHOLDER)) win_fail("splitting a placeholder",at,next-at);
++            regions[i].end=next;
++            region_insert(i+1,(HostRegion){next,end,0,0});
++        }
++        regions[i].phys=phys+(at-address); regions[i].mapped=1;
++        view_map(&regions[i],protect);
++        if (regions[i].end==end) break;
++    }
+     return 0;
+ }
+ static int host_unmap(uintptr_t address, uint64_t size) { carve_host(address,address+size); return 0; }
