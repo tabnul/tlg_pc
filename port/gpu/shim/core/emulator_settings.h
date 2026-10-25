@@ -33,7 +33,8 @@ public:
     // shown within ~2 ms instead of waiting for the next display-rate vblank (below the display
     // rate frames alternated 10/20 ms at 100 Hz: judder), and GetFrameLimit() caps the rate at
     // the display refresh, at most 120 (above ~120 FPS movement timing breaks: running slows).
-    // An explicit TLG_VBLANK_HZ is used as given, without a limit (measurements).
+    // An explicit TLG_VBLANK_HZ is used as given; above the engine rate (240 Hz, the launcher's
+    // 30/60 FPS default) the present thread limits to TLG_ENGINE_FPS (driver.cpp).
     u32 GetVblankFrequency() {
         static const u32 value = [] {
             const long hz = Number("TLG_VBLANK_HZ", 60);

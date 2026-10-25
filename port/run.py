@@ -187,8 +187,8 @@ def main():
         run_script('patches.py', '--out', out, '--extra', env.get('TLG_PATCHES', ''), '--game-dir', game,
                    '--patches-dir', env.get('TLG_PATCHES_DIR', data / 'patches'),
                    '--patches-config', env.get('TLG_PATCHES_CONFIG', data / 'patches.json'))
-        if 'TLG_VBLANK_HZ' not in env:
-            env['TLG_VBLANK_HZ'] = '60'
+        if 'TLG_VBLANK_HZ' not in env:  # 240: the present limiter keeps the flips at TLG_ENGINE_FPS
+            env['TLG_VBLANK_HZ'] = '240'
             derived.append('TLG_VBLANK_HZ')
         # Without the frame rate patch the engine steps 1/60 s per frame: the present thread must
         # not flip faster (tlg_graphics.h PresentLimit), or the game speeds up.
