@@ -176,6 +176,19 @@ whose last GPU write is still in flight). Same exe, unlocked, on against off: pu
 so it stays on. One crash during a garden load with it on (guest read of `ffffffff00000030` at
 0x1488a22, "CopyResource ByteWidth" error just before), not seen again: watch for it.
 
+## 3c. Query results one frame late: dead end (changes gameplay)
+
+The game's JsComputeContext (anzu) runs ~2 compute queries per frame and the CPU waits for each
+(~2.3 ms, mostly GPU queue time: ACB compute shares the graphics queue). A patch
+(`TLG_QUERY_PREV_FRAME=1`, parked in a git stash, not on any branch) read the previous frame's
+results instead of waiting. Its load crash was fixed: stale records indexed the new world's
+smaller pool tables (null pool at 0x12719aa), so a key of those tables dropped results across a
+load. FPS, unlocked, 2 runs each: pulse 60.9 -> 66.4, garden 44.6 -> 48.0, bench 64.5 -> 62.9.
+Not usable: the queries drive gameplay. In pulse the boy failed to grab Trico and fell off twice,
+so the replay also took another path (the gain is not comparable). Do not retry one-frame-late
+query results; a gain here has to come from the emulator side (a separate compute queue, the
+label written when the GPU is done instead of at parse time).
+
 ## 5. The bench suite (2026-10-25)
 
 `bench.py run LABEL --route all --runs 1` (skill bench): bench (condor clash, 30 s), garden
