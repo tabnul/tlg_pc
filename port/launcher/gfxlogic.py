@@ -21,7 +21,7 @@ PRESET_ITEMS = ('menu:fps_limit', 'menu:frames_queued', 'menu:fsr1', 'menu:rcas'
 # Imported files (preset_share.py) are applied as "full" presets: they may also set these.
 FULL_PRESETS = {}
 # Defaults of the launcher settings a preset may set (tlg_run.DEFAULT_SETTINGS; a test keeps them equal).
-SETTING_DEFAULTS = {'vsync': True, 'gpu_readbacks': '2', 'show_fps': False, 'frame_rate': '30'}
+SETTING_DEFAULTS = {'vsync': True, 'show_fps': False, 'frame_rate': '30'}
 # id, settings overrides, item overrides (values as strings; unlisted = default)
 PRESETS = (
     ('performance', {'vsync': False}, {'menu:frames_queued': '2', 'menu:fsr1': '1'}),
@@ -44,7 +44,7 @@ def _full_targets(overrides, items):
     settings.update(overrides)
     known = {i.id for i in backports_table.ITEMS}
     for item_id, value in items.items():
-        if item_id in known:
+        if item_id in known and item_id not in backports_table.NOT_IN_PRESETS:
             stored[item_id] = backports_table.normalize(item_by_id(item_id), value)
     return settings, stored
 

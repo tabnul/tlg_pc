@@ -446,9 +446,10 @@ private:
     Common::LeastRecentlyUsedCache<ImageId, u64> lru_cache;
     Common::LeastRecentlyUsedCache<u64, u64> sampler_lru_cache;
     const bool readback_linear_images;
+    /// tlg: on unless TLG_DEFERRED_READBACK=0 (2026-10-26: +3-6% FPS on condor, garden, fb-a).
     const bool deferred_readbacks = [] {
         const char* value = std::getenv("TLG_DEFERRED_READBACK");
-        return value && value[0] == '1';
+        return !(value && value[0] == '0');
     }();
     /// tlg: TLG_GC_BATCH_DOWNLOAD=1: the collector records the copies of all GPU-written images
     /// it evicts and waits for the GPU once, instead of once per image (GarbageCollectImages).

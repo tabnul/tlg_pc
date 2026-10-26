@@ -186,8 +186,40 @@ smaller pool tables (null pool at 0x12719aa), so a key of those tables dropped r
 load. FPS, unlocked, 2 runs each: pulse 60.9 -> 66.4, garden 44.6 -> 48.0, bench 64.5 -> 62.9.
 Not usable: the queries drive gameplay. In pulse the boy failed to grab Trico and fell off twice,
 so the replay also took another path (the gain is not comparable). Do not retry one-frame-late
-query results; a gain here has to come from the emulator side (a separate compute queue, the
-label written when the GPU is done instead of at parse time).
+query results; a gain here has to come from the emulator side (the label written when the GPU is
+done instead of at parse time; a separate compute queue does not help, see 3d).
+
+## 3d. Two readback ideas we measured and dropped (2026-10-26)
+
+**Wait for the writing submit only (toggle bit 16, `ReadbackWaitSubmitted`).** A readback whose
+data is still being written waits for the submission that wrote it instead of `Finish()` (submit
+and wait for the GPU to idle). FPS was within noise: bench 62.2 / 68.7 on against 66.6 / 68.5 off,
+garden 53.8 / 53.8 against 52.8 / 52.1. Upstream shadPS4 uses Finish for sync readbacks
+(DeferOperation only for async ones), as do SotC and HayatoG; a narrower wait risks reading data
+another queued write still changes. No measured gain, so it stays out.
+
+**A second compute queue for the async compute (ACB) rings.** Ring dispatches share the graphics
+queue, so the idea was to run them in parallel and shorten the readback waits. Prior art:
+@rayhlancaner-png's shadPS4-Infamous-FixBuild (262af3e16e, b9756b9ff4) added one behind a setting,
+off by default: no FPS gain in inFAMOUS, 2/3 of its dispatches waited for graphics work anyway;
+HayatoG/iss_pc skipped it. We first measured whether it could help TLG (pulse, diagnostic run,
+per 5 s): ~100k ring dispatches, 85% independent of graphics work, but the data behind the Finish
+readbacks is written by graphics work. Of ~1000 readbacks and ~1.1 s of waits, under 15 readbacks
+and 6 ms had a ring dispatch as a pending writer, even when any ring write in the same 64 KiB
+granule counted. The query site (guest+0xc4c630, ~140 waits, ~190 ms) had none. A second queue
+cannot shorten these waits, so it was not built. More time goes to the fault handlers
+(~2.6 s per 5 s; write faults at guest+0xeeb6c4 ~1 s and guest+0xc459ed ~0.6 s), but that is
+not an FPS lever either: discarding the eeb6c4 write faults (W 4.5 s -> 0.13 s per 5 s) left
+FPS unchanged.
+
+## 3e. WaitRegMem drains and the compute queue: dead end (2026-10-26)
+
+- Fix A (compute WAIT_REG_MEM without a draw-pipe drain): condor 65.6 off vs 67.6/65.4 on. No gain, reverted.
+- Option B (compute queue pipelined onto the draw recording thread: dispatches, WRITE_DATA and RELEASE_MEM in order, graphics waits on compute labels yield). Compute drains fell from 21.7k/s to ~450/s, and WaitRegMem drains to ~1%. FPS: condor 70.2 vs 72.3/71.3 off, garden 56.9/57.5 vs 56.1/54.1 (noise level, more spike frames), water no gain. One intermittent hang while loading. The time moves elsewhere: the GPU command thread is not the limit. Patch kept outside the repo (devkit `patches/compute-pipe-b/`).
+
+## 3f. Lock-free backing writes: dead end (2026-10-26)
+
+`runtime_memory_write_backing` from the region cache without the table lock, like the read fast path in 3b's round. Garden, same exe toggled: 57.5/58.0 on vs 60.2/59.0 off, then 58.0/58.6 on vs 55.0/57.7 off with the order reversed: run order, no effect. Condor one run 67.0 (in the 65-74 range of the day). Writes through the backing view are not hot; a write racing an unmap could also land in freed memory. GPU protect calls (21k/s, 49 ms/s on garden) are the `VirtualProtect` cost itself, not the lock. The big garden cost stays the write faults (~430 ms/s). Diff in devkit `patches/write-backing-c/`.
 
 ## 5. The bench suite (2026-10-25)
 

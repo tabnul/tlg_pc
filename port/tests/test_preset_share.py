@@ -64,14 +64,15 @@ class ExportTests(Base):
             self.assertIn(key, preset)
         self.assertEqual((preset['format'], preset['version'], preset['game'], preset['name']),
                          ('tlg-preset', 1, 'CUSA03627', 'My setup'))
-        self.assertEqual(preset['settings'], {'vsync': False, 'show_fps': True, 'gpu_readbacks': '1', 'frame_rate': '60'})
+        self.assertEqual(preset['settings'], {'vsync': False, 'show_fps': True, 'frame_rate': '60'})
         text = json.dumps(preset)
-        for secret in ('vram_budget_mb', 'display_mode', 'game_dir', 'ui_language', '/secret/path', 'savedata'):
+        for secret in ('vram_budget_mb', 'display_mode', 'game_dir', 'ui_language', '/secret/path', 'savedata',
+                       'gpu_readbacks', *backports_table.NOT_IN_PRESETS):
             self.assertNotIn(secret, text)
         self.assertEqual(preset['items']['menu:color_contrast'], '1.2')
         self.assertEqual(preset['items']['TLG_BACKGROUND_WARMUP'], '0')
-        self.assertEqual(preset['items']['TLG_READBACK_LINEAR'],
-                         backports_table.effective(gfxlogic.item_by_id('TLG_READBACK_LINEAR'), {}))
+        self.assertEqual(preset['items']['TLG_INPUT_TIMING'],
+                         backports_table.effective(gfxlogic.item_by_id('TLG_INPUT_TIMING'), {}))
         self.assertIn('menu:overlay_corner', preset['items'])
 
     def test_an_amd_workaround_the_player_chose_is_exported(self):
@@ -132,11 +133,10 @@ class RoundTripTests(Base):
                                                          settings={'vsync': False, 'gpu_readbacks': '0'}))
         changes = preset_share.diff(preset, dict(DEFAULTS), {i.id: None for i in backports_table.ITEMS})
         self.assertEqual(sorted((k, i) for k, i, _, _ in changes),
-                         [('item', 'menu:color_contrast'), ('item', 'menu:fsr1'), ('setting', 'gpu_readbacks'),
-                          ('setting', 'vsync')])
+                         [('item', 'menu:color_contrast'), ('item', 'menu:fsr1'), ('setting', 'vsync')])
         body, lines = preset_share.summary_lines(preset, [], changes, t, False)
-        self.assertIn('4', body)
-        self.assertEqual(len(lines), 4)
+        self.assertIn('3', body)
+        self.assertEqual(len(lines), 3)
         self.assertTrue(any('Contrast' in line and '1.3' in line for line in lines))
 
 
@@ -197,14 +197,14 @@ class ValidationTests(Base):
                'menu:fsr1': '2',                    # bool
                'menu:fps_limit': '45',              # choice
                'menu:cas_strength': 80.5,           # int, not whole
-               'TLG_BLOCK1D': None, 'TLG_BACKGROUND_WARMUP': [1], 'TLG_STALE_READBACK': {'a': 1},
+               'TLG_BLOCK1D': None, 'TLG_BACKGROUND_WARMUP': [1],
                'menu:overlay_scale': float('inf')}
         preset, problems = self.read(self.valid(items=dict(bad, **{'menu:rcas': '1'}),
                                                 settings={'vsync': 'yes', 'gpu_readbacks': '7', 'frame_rate': 2}))
         self.assertEqual(preset['items'], {'menu:rcas': '1'})
         self.assertEqual(preset['settings'], {})
         refused = {p.detail.split(' = ')[0] for p in problems if p.code in ('bad_item', 'bad_setting')}
-        self.assertEqual(refused, set(bad) | {'vsync', 'gpu_readbacks', 'frame_rate'})
+        self.assertEqual(refused, set(bad) | {'vsync', 'frame_rate'})
         self.assertFalse(any(p.fatal for p in problems))
 
     def test_valid_values_of_every_type_are_accepted_and_normalised(self):
@@ -215,7 +215,17 @@ class ValidationTests(Base):
         self.assertEqual(problems, [])
         self.assertEqual(preset['items'], {'menu:rcas_strength': '70', 'menu:color_contrast': '1.5', 'menu:fps_limit': '120',
                                            'TLG_BLOCK1D': '1', 'menu:overlay_scale': '100', 'menu:color_saturation': '2'})
-        self.assertEqual(preset['settings'], {'vsync': False, 'gpu_readbacks': '2', 'frame_rate': 'unlocked'})
+        self.assertEqual(preset['settings'], {'vsync': False, 'frame_rate': 'unlocked'})
+
+    def test_readback_rows_in_old_files_are_skipped_quietly(self):
+        items = {item_id: '0' for item_id in backports_table.NOT_IN_PRESETS if item_id.startswith('TLG_')}
+        preset, problems = self.read(self.valid(items=dict(items, **{'menu:readback_batch': '64', 'menu:rcas': '1'}),
+                                                settings={'vsync': False, 'gpu_readbacks': '0'}))
+        self.assertEqual(problems, [])
+        self.assertEqual(preset['items'], {'menu:rcas': '1'})
+        self.assertEqual(preset['settings'], {'vsync': False})
+        _, stored = gfxlogic.custom_targets({'items': items})
+        self.assertFalse(set(stored) & backports_table.NOT_IN_PRESETS)
 
     def test_every_problem_code_has_a_text_in_both_languages(self):
         for code in ('unreadable', 'too_big', 'not_json', 'format', 'version', 'newer', 'empty', 'game',
