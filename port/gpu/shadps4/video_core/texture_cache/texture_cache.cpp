@@ -25,6 +25,9 @@
 #include "video_core/texture_cache/texture_cache.h"
 #include "video_core/texture_cache/tile_manager.h"
 
+// runtime_memory.c
+extern "C" int runtime_memory_read_backing(uintptr_t address, void* data, uint64_t size);
+
 namespace VideoCore {
 
 static constexpr u64 PageShift = 12;
@@ -1135,7 +1138,18 @@ void TextureCache::RefreshImage(Image& image) {
         const u32 s_w = image.info.props.is_block ? Common::DivCeil(w, 4u) : w;
         const u32 s_h = image.info.props.is_block ? Common::DivCeil(h, 4u) : h;
         const u32 size = s_w * s_h * (image.info.num_bits / 8);
-        const u64 hash = XXH3_64bits(addr, size);
+        // tlg: these images share a page with GPU-written buffer bytes (garden: next to the
+        // light constant ring), so reading the page faulted into a full GPU readback, ~5 ms
+        // each (TLG_FAULT_PROFILE: the top fault site). When the hashed bytes themselves have
+        // no pending GPU write, the unprotected backing view holds them.
+        std::array<u8, 8 * 8 * 16> bytes;
+        const u8* src = addr;
+        if (size <= bytes.size() && !TlgToggle::Disabled2(TlgToggle::ImageHashBacking) &&
+            !buffer_cache.HasPendingGpuWrite(image.info.guest_address, size) &&
+            runtime_memory_read_backing(image.info.guest_address, bytes.data(), size)) {
+            src = bytes.data();
+        }
+        const u64 hash = XXH3_64bits(src, size);
         if (image.hash == hash) {
             image.flags &= ~ImageFlagBits::MaybeCpuDirty;
             return;
@@ -1159,8 +1173,19 @@ void TextureCache::RefreshImage(Image& image) {
 
         // Protect GPU modified resources from accidental CPU reuploads.
         if (is_gpu_modified && !is_gpu_dirty) {
-            const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
-            const u64 hash = XXH3_64bits(addr + mip_offset, mip_size);
+            // Same as the MaybeCpuDirty hash: read through the backing view when no GPU write
+            // is pending, so the hash does not fault into a full GPU readback.
+            const u8* src = std::bit_cast<u8*>(image.info.guest_address) + mip_offset;
+            thread_local std::vector<u8> mip_bytes;
+            const VAddr mip_addr = image.info.guest_address + mip_offset;
+            if (mip_size <= 4_MB && !TlgToggle::Disabled2(TlgToggle::ImageHashBacking) &&
+                !buffer_cache.HasPendingGpuWrite(mip_addr, mip_size)) {
+                mip_bytes.resize(mip_size);
+                if (runtime_memory_read_backing(mip_addr, mip_bytes.data(), mip_size)) {
+                    src = mip_bytes.data();
+                }
+            }
+            const u64 hash = XXH3_64bits(src, mip_size);
             if (image.mip_hashes[m] == hash) {
                 continue;
             }
