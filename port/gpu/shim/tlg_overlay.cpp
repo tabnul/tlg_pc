@@ -754,8 +754,6 @@ void PerformanceTab() {
                      "Quando o jogo lê memória escrita pela GPU, copia também os outros dados escritos pela GPU ao redor. "
                      "Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado."),
                   d.readback_batch);
-        CheckRow(TL("Compile new shaders in the background", "Compilar shaders novos em segundo plano"), s.async_shaders,
-                 TL("Fewer stutters in new areas; an object or effect may appear a moment later.", "Menos engasgos em áreas novas; um objeto ou efeito pode aparecer um instante depois."), d.async_shaders);
         ImGui::EndTable();
     }
 }

@@ -137,8 +137,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.vsync = i != 0;
     } else if (key == "fps_limit") {
         v.fps_limit = TlgGraphics::ParseFpsLimit(i);
-    } else if (key == "async_shaders") {
-        v.async_shaders = i != 0;
     } else if (key == "fsr1") {
         v.fsr1 = i != 0;
     } else if (key == "rcas") {
@@ -314,7 +312,7 @@ void Load() {
         {"TLG_REACTIVE", "reactive"},              {"TLG_REACTIVE_SCALE", "reactive_scale"},
         {"TLG_REACTIVE_THRESHOLD", "reactive_threshold"}, {"TLG_REACTIVE_MAX", "reactive_max"},
         {"TLG_UPSCALE_PRESET", "preset"},            {"TLG_OBJECT_MOTION", "object_motion"},
-        {"TLG_ASYNC_SHADERS", "async_shaders"},      {"TLG_DEFERRED_READBACK", "deferred_readback"},
+        {"TLG_DEFERRED_READBACK", "deferred_readback"},
         {"TLG_STALE_READBACK", "stale_readback"},     {"TLG_FSR1", "fsr1"},
         {"TLG_RCAS", "rcas"},                        {"TLG_FRAMES_AHEAD", "frames_queued"},
         {"TLG_SHOW_FPS", "show_fps"},                {"TLG_FSR_VELOCITY", "fsr_velocity"},
@@ -331,6 +329,10 @@ void Load() {
         if (const char* value = std::getenv(env); value && value[0]) {
             Set(v, key, value);
         }
+    }
+    // Async shader compilation: environment only (tests), a stored async_shaders=1 is ignored.
+    if (const char* value = std::getenv("TLG_ASYNC_SHADERS"); value && value[0]) {
+        v.async_shaders = std::atoi(value) != 0;
     }
     v.startup_preset = v.preset;
     v.startup_upscaler = v.upscaler;
@@ -460,12 +462,12 @@ void Save() {
                  int(v.overlay_items >> 6 & 1), v.overlay_scale.load(), v.overlay_corner.load(),
                  v.overlay_opacity.load(), v.overlay_layout.load(), v.menu_tab.load());
     std::fprintf(file,
-                 "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
+                 "display_mode=%s\nvsync=%d\nfps_limit=%d\n"
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
                  "readback_batch=%d\nrender_resolution=%s\nengine_fps=%d\nhdr=%d\ndeferred_readback=%d\n"
                  "stale_readback=%d\nrestart_unconfirmed=%d\n",
                  TlgGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
-                 int(v.vsync.load()), v.fps_limit.load(), int(v.async_shaders.load()),
+                 int(v.vsync.load()), v.fps_limit.load(),
                  int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
                  v.readback_batch.load(), TlgGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
