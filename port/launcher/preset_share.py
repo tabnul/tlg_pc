@@ -32,9 +32,11 @@ GAME = 'CUSA03627'
 SUFFIX = '.tlg-preset.json'
 MAX_BYTES = 1 << 20
 
-# launcher settings a preset may carry: key -> 'bool' or the allowed values
-EXPORT_SETTINGS = {'vsync': 'bool', 'show_fps': 'bool', 'gpu_readbacks': ('0', '1', '2'),
-                   'frame_rate': ('30', '60', 'unlocked')}
+# launcher settings a preset may carry: key -> 'bool' or the allowed values. The GPU readback mode
+# (gpu_readbacks) and the readback rows (backports_table.NOT_IN_PRESETS) are Advanced settings:
+# never exported, and skipped without a warning in files that still carry them.
+EXPORT_SETTINGS = {'vsync': 'bool', 'show_fps': 'bool', 'frame_rate': ('30', '60', 'unlocked')}
+NOT_IN_PRESETS_SETTINGS = ('gpu_readbacks',)
 SETTING_DEFAULTS = {'show_fps': False, **gfxlogic.SETTING_DEFAULTS}
 
 # ------------------------------------------------------------------ in-game graphics presets
@@ -163,6 +165,8 @@ def export_preset(settings, states, name='', what='', port_version='', exported=
     `states` as Backend.fix_states: {item id: value or None}. Items left on automatic stay out."""
     items = {}
     for item in backports_table.ITEMS:
+        if item.id in backports_table.NOT_IN_PRESETS:
+            continue
         value = backports_table.effective(item, states)
         if value is not None:
             items[item.id] = str(value)
@@ -274,6 +278,8 @@ def parse_preset(data, profile=''):
     settings, items = {}, {}
     by_id = {item.id: item for item in backports_table.ITEMS}
     for key, value in raw_settings.items():
+        if key in NOT_IN_PRESETS_SETTINGS:
+            continue
         if key not in EXPORT_SETTINGS:
             problems.append(Problem('unknown_setting', str(key), False))
             continue
@@ -282,6 +288,8 @@ def parse_preset(data, profile=''):
         except ValueError:
             problems.append(Problem('bad_setting', f'{key} = {_short(value)}', False))
     for item_id, value in raw_items.items():
+        if item_id in backports_table.NOT_IN_PRESETS:
+            continue
         item = by_id.get(item_id)
         if item is None:
             problems.append(Problem('unknown_item', str(item_id), False))
@@ -353,9 +361,8 @@ def change_text(change, t, pt):
             label = t('vram' if key == 'vram_budget_mb' else key)
         except KeyError:
             label = key
-        if key in ('gpu_readbacks', 'frame_rate'):
-            prefix = 'readbacks_' if key == 'gpu_readbacks' else 'fps_'
-            old, new = t(prefix + str(old)), t(prefix + str(new))
+        if key == 'frame_rate':
+            old, new = t('fps_' + str(old)), t('fps_' + str(new))
             return t('ps_change', label=label, old=old, new=new)
         return t('ps_change', label=label, old=_value_text(None, old, t, pt), new=_value_text(None, new, t, pt))
     item = next(i for i in backports_table.ITEMS if i.id == key)

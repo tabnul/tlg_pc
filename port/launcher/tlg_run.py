@@ -239,6 +239,12 @@ def load_settings():
         settings.update(json.loads(config_path().read_text(encoding='utf-8')))
     except (OSError, ValueError):
         pass
+    # Once: the Qt launcher stored every switch, defaults included, so deferred_readback=false from
+    # before it became the default (2026-10-26) would keep it off. The marker is saved with the next
+    # save, so a later choice in the Advanced settings dialog stays.
+    if not settings.get('readback_defaults_2026_10'):
+        settings.pop('deferred_readback', None)
+        settings['readback_defaults_2026_10'] = True
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
     ini = read_ini(user_dir() / 'tlg.ini')
     try:

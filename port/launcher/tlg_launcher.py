@@ -18,6 +18,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import backports_table  # noqa: E402
 import logtail  # noqa: E402
 import preset_share  # noqa: E402
 import tlg_run  # noqa: E402
@@ -166,6 +167,26 @@ TEXT = {
                   'em Depuração, depois no jogo segure L1 e aperte L3 (teclado: segure 1, aperte Z).'),
     'graphics': ('Graphics…', 'Gráficos…'),
     'graphics_title': ('Graphics', 'Gráficos'),
+    'advanced': ('Advanced…', 'Avançado…'),
+    'advanced_title': ('Advanced settings', 'Configurações avançadas'),
+    'advanced_hint': ('GPU readbacks: how the game gets back what the GPU wrote. Keep the defaults unless a scene '
+                      'breaks or you are testing. Changes apply at the next start (the readback batch at once). '
+                      'Graphics presets never change these.',
+                      'Leituras da GPU: como o jogo recebe de volta o que a GPU escreveu. Mantenha os padrões, a '
+                      'não ser que uma cena quebre ou você esteja testando. As mudanças valem no próximo início (o '
+                      'lote de leituras na hora). Os presets de gráficos nunca mudam estas opções.'),
+    'gpu_readbacks': ('GPU readback mode', 'Modo de leitura da GPU'),
+    'gpu_readbacks_hint': ('How strictly CPU reads of GPU-written memory wait for the GPU.',
+                           'Quão rigorosamente leituras da CPU de memória escrita pela GPU esperam a GPU.'),
+    'gpu_readbacks_why': ('The game reads GPU compute results on the CPU: Relaxed can give it stale data, Off none '
+                          'at all.',
+                          'O jogo lê resultados de compute da GPU na CPU: Relaxado pode dar dados velhos, '
+                          'Desligado nenhum.'),
+    'readbacks_2': ('Precise', 'Preciso'),
+    'readbacks_1': ('Relaxed', 'Relaxado'),
+    'readbacks_0': ('Off', 'Desligado'),
+    'readback_batch_hint': ('When the game reads GPU-written memory, also copy back the GPU-written data around it.',
+                            'Quando o jogo lê memória escrita pela GPU, copia também os dados escritos pela GPU ao redor.'),
     'graphics_tips': ('Tip: tweak while playing', 'Dica: ajuste jogando'),
     'graphics_hint': ('Best set in game: the in-game graphics menu has these settings and more (filters, colour, '
                       'Lab), and every change shows right away on the scene you are looking at. Go somewhere '
@@ -577,6 +598,7 @@ class Launcher:
         ttk.Button(buttons, text=self.t('logs'), command=lambda: self.open(tlg_run.LOG_DIR)).pack(side='right', padx=6)
         ttk.Button(buttons, text=self.t('mods'), command=self.mods_dialog).pack(side='right', padx=6)
         ttk.Button(buttons, text=self.t('graphics'), command=self.graphics_dialog).pack(side='right', padx=(6, 0))
+        ttk.Button(buttons, text=self.t('advanced'), command=self.advanced_dialog).pack(side='right', padx=(6, 0))
         ttk.Button(buttons, text=self.t('saves'), command=lambda: self.open(tlg_run.USER_DIR / 'savedata')).pack(side='right')
         self.cache_button = ttk.Button(buttons, text=self.t('clear_cache'), command=self.clear_cache)
         self.cache_button.pack(side='right', padx=(0, 6))
@@ -1128,6 +1150,98 @@ class Launcher:
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=reset).pack(side='left')
+        ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
+
+    def advanced_dialog(self):
+        """The GPU readback switches (backports_table.READBACK, the readback mode, the in-game
+        readback batch). Each row shows its default and why; graphics presets never set them."""
+        if getattr(self, 'advanced_window', None) and self.advanced_window.winfo_exists():
+            self.advanced_window.lift()
+            return
+        win = self.advanced_window = tk.Toplevel(self.root)
+        win.title(self.t('advanced_title'))
+        win.transient(self.root)
+        frame = ttk.Frame(win, padding=12)
+        frame.pack(fill='both', expand=True)
+        lang = int(self.pt())
+        ttk.Label(frame, text=self.t('advanced_hint'), wraplength=740, justify='left').grid(
+            row=0, column=0, columnspan=2, sticky='w', pady=(0, 8))
+        columns = ttk.Frame(frame), ttk.Frame(frame)
+        for index, column in enumerate(columns):
+            column.grid(row=1, column=index, sticky='nw', padx=(0 if index == 0 else 10, 0 if index == 1 else 10))
+        rows = [0, 0]
+
+        def place(column):
+            rows[column] += 2
+            return columns[column], rows[column] - 2
+
+        def note(parent, row, what, default, why):
+            text = what + '\n' + self.t('mark_default', value=default) + ' — ' + why
+            ttk.Label(parent, text=text, foreground='#777', wraplength=360, justify='left').grid(
+                row=row + 1, column=0, columnspan=2, sticky='w', pady=(0, 6))
+
+        def save(key, value, default):
+            # A value equal to the default is not stored, so a later change of the default reaches it.
+            if value == default:
+                self.settings.pop(key, None)
+            else:
+                self.settings[key] = value
+            tlg_run.save_settings(self.settings)
+
+        resets = []
+        # The readback mode (settings.json gpu_readbacks -> TLG_READBACKS).
+        parent, row = place(0)
+        ttk.Label(parent, text=self.t('gpu_readbacks')).grid(row=row, column=0, sticky='w')
+        modes = ('2', '1', '0')
+        mode = ttk.Combobox(parent, values=[self.t('readbacks_' + m) for m in modes], state='readonly', width=14)
+        current = str(self.settings.get('gpu_readbacks', '2'))
+        mode.current(modes.index(current) if current in modes else 0)
+        mode.grid(row=row, column=1, sticky='w', padx=6)
+
+        def mode_picked():
+            self.settings['gpu_readbacks'] = modes[mode.current()]
+            tlg_run.save_settings(self.settings)
+
+        mode.bind('<<ComboboxSelected>>', lambda _: mode_picked())
+        note(parent, row, self.t('gpu_readbacks_hint'), self.t('readbacks_2'), self.t('gpu_readbacks_why'))
+        resets.append(lambda: (mode.current(0), mode_picked()))
+        # Start-up switches: on by default in the left column, off in the right one.
+        for item in backports_table.READBACK:
+            default = item.default == '1'
+            parent, row = place(0 if default else 1)
+            var = tk.BooleanVar(value=bool(self.settings.get(item.key, default)))
+
+            def toggled(item=item, var=var, default=default):
+                save(item.key, var.get(), default)
+
+            ttk.Checkbutton(parent, text=item.name[lang], variable=var, command=toggled).grid(
+                row=row, column=0, columnspan=2, sticky='w')
+            note(parent, row, item.what[lang], self.t('mark_on' if default else 'mark_off'),
+                 backports_table.READBACK_WHY[item.id][lang])
+            resets.append(lambda var=var, default=default, toggled=toggled: (var.set(default), toggled()))
+        # The in-game menu's readback batch (tlg.ini, applies at once).
+        batch = next(item for item in backports_table.MENU if item.key == 'readback_batch')
+        parent, row = place(1)
+        ttk.Label(parent, text=batch.name[lang]).grid(row=row, column=0, sticky='w')
+        sizes = [choice[0] for choice in batch.choices]
+        size = ttk.Combobox(parent, values=[choice[1 + lang] for choice in batch.choices], state='readonly', width=24)
+        chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('readback_batch', batch.default)
+        size.current(sizes.index(chosen) if chosen in sizes else sizes.index(batch.default))
+        size.grid(row=row, column=1, sticky='w', padx=6)
+
+        def size_picked():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'readback_batch': sizes[size.current()]})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        size.bind('<<ComboboxSelected>>', lambda _: size_picked())
+        note(parent, row, self.t('readback_batch_hint'), batch.choices[sizes.index(batch.default)][1 + lang],
+             backports_table.READBACK_WHY[batch.id][lang])
+        resets.append(lambda: (size.current(sizes.index(batch.default)), size_picked()))
+
+        bottom = ttk.Frame(frame)
+        bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
+        ttk.Button(bottom, text=self.t('reset'), command=lambda: [reset() for reset in resets]).pack(side='left')
         ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
 
     def check(self, parent, row, key):
