@@ -107,6 +107,11 @@ public:
     /// Return true when a region is modified from the GPU
     [[nodiscard]] bool IsRegionGpuModified(VAddr addr, size_t size);
 
+    /// True when GPU writes to these exact bytes have not been downloaded yet.
+    [[nodiscard]] bool HasPendingGpuWrite(VAddr addr, size_t size) const {
+        return gpu_modified_ranges.Intersects(addr, size);
+    }
+
     /// Processes the fault buffer.
     void ProcessFaultBuffer();
 

@@ -88,6 +88,7 @@ enum : std::uint64_t {
     ReadbackSideQueue = 2, ///< readbacks of finished GPU writes copy on the second queue
     FenceFlush = 4,        ///< submit GPU writes to guest memory at an end-of-pipe fence
     FenceFlushMore = 8,    ///< the same at EOS, label WRITE_DATA and compute RELEASE_MEM
+    ImageHashBacking = 32, ///< texture change hashes read through the backing view
 };
 inline bool Disabled2(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;
