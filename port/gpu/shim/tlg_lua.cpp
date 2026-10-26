@@ -303,6 +303,46 @@ bool GameEdits(std::string& patched, std::string_view name) {
         }
         return false;
     }
+    // Cutscene markers for the bench: the engine sends DemoRoot.NextState on every state change
+    // of every cutscene ("demo"): its file, then the state (action_N ... finish, force_finish
+    // when skipped). Log it as "Lua: demo <file> <state>". A cutscene can also end without its
+    // finish (the flashback fades out before it and hands back to gameplay), so log each mission
+    // scene the game enters too: "Lua: mission <stage> <scene>".
+    static constexpr std::string_view DemoEvent =
+        "function MS_DemoRoot_NextState(ext, act, id, sender, param)";
+    static constexpr std::string_view SceneCall = "function MSCore_L_CallState(func, stage, state, et)";
+    if (name == "data_trico/game/scripts/common/MissionScript.lua") {
+        const size_t demo = patched.find(DemoEvent);
+        const size_t scene = patched.find(SceneCall);
+        if (demo == std::string::npos || scene == std::string::npos) {
+            return false;
+        }
+        static constexpr std::string_view DemoLog =
+            " local f=(loadstring or load)('--TLGLOG demo '..tostring(sender)..' '"
+            "..tostring(param)) if f then f() end";
+        static constexpr std::string_view SceneLog =
+            " if func=='onEnter' then local f=(loadstring or load)('--TLGLOG mission '"
+            "..tostring(stage)..' '..tostring(state)) if f then f() end end";
+        // The later one first, so the earlier offset stays valid.
+        if (demo > scene) patched.insert(demo + DemoEvent.size(), DemoLog);
+        patched.insert(scene + SceneCall.size(), SceneLog);
+        if (demo < scene) patched.insert(demo + DemoEvent.size(), DemoLog);
+        return true;
+    }
+    // And each fade to black ("Lua: fade out <seconds>"): such a cutscene fades out before the
+    // scene change, so the bench can stop measuring where the fade starts.
+    static constexpr std::string_view FadeOut =
+        "function FadeOut( time, wait, force, cb, force_exec_cb, _system, _useSystemDt )";
+    if (name == "data_trico/game/scripts/stages/common/ASC_basic.lua") {
+        const size_t at = patched.find(FadeOut);
+        if (at == std::string::npos) {
+            return false;
+        }
+        patched.insert(at + FadeOut.size(),
+                       " local f=(loadstring or load)('--TLGLOG fade out '..tostring(time))"
+                       " if f then f() end");
+        return true;
+    }
     // Bridge fix (setting bridge_fix): the GoldHEN "Collapsing Bridge Freeze Fix". The slow
     // motion while the bridge in the pit collapses can leave the game frozen; skip it.
     static constexpr std::string_view SlowMotion = "MS.SetGameSpeed(0.10, 0.2)";
