@@ -180,10 +180,11 @@ DEFAULT_SETTINGS = {
     'reopen_launcher': True,       # ... and open again when the game exits
 }
 FRAME_RATES = ['30', '60', 'unlocked']
-# 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI).
+# 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI). 32:9 is
+# experimental: the game runs, but some overlays sit to the left and menu parts are stretched.
 RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
                '2560x1080', '3440x1440', '3840x1600', '5120x2160',
-               '3840x1080', '5120x1440']
+               '3840x1080', '5120x1440', '7680x2160']
 # The frame rate mode prepare() really applied (another eboot build stays at 30).
 applied_frame_rate = '30'
 # The size the resolution patch really applied (None: the game's own 1920x1080).
@@ -441,7 +442,7 @@ def resolution_label(size):
     """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
     width, height = (int(n) for n in size.split('x'))
     ratio = width / height
-    name = '32:9' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
+    name = '32:9, experimental' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
     return f'{width} × {height} ({name})'
 
 
