@@ -402,8 +402,8 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
     ASSERT_MSG(cache_result == vk::Result::eSuccess, "Failed to create pipeline cache: {}",
                vk::to_string(cache_result));
     pipeline_cache = std::move(cache);
-    // tlg: the compiler threads always exist; the in-game menu switches async compilation live
-    // (TlgSettings::async_shaders, TLG_ASYNC_SHADERS at start).
+    // tlg: the compiler threads always exist; async compilation is off unless TLG_ASYNC_SHADERS=1
+    // (TlgSettings::async_shaders).
     {
         const auto count = std::clamp(TlgThreads::Available() / 2, 1u, 6u);
         const auto capture_count = std::min(2u, std::max(1u, TlgThreads::Available() / 4));

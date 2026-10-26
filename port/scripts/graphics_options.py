@@ -13,7 +13,7 @@ from pathlib import Path
 RESOLUTIONS = ('native', '480p', '720p', '1440p', '1800p', '4K')
 ENGINE_FPS = (60, 120, 240)
 DEFAULTS = {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
-            'stale_readback': '1', 'async_shaders': '1'}
+            'stale_readback': '1'}
 RESOLUTION_PREFIX = 'Resolution Patch'
 FPS_PREFIX = 'Frame Rate Patch'
 TEXTURE_FIX = 'Bug Fix - Texture Corruption Fix'
@@ -58,7 +58,7 @@ def startup_options(ini):
         options['render_resolution'] = 'native'
     if options['engine_fps'] not in {str(f) for f in ENGINE_FPS}:
         options['engine_fps'] = '120'
-    for key in ('deferred_readback', 'stale_readback', 'async_shaders'):
+    for key in ('deferred_readback', 'stale_readback'):
         options[key] = '0' if options[key] == '0' else '1'
     return options
 
@@ -108,5 +108,4 @@ def applied_engine_fps(names):
 
 def environment(options):
     return {'TLG_DEFERRED_READBACK': options['deferred_readback'],
-            'TLG_STALE_READBACK': options['stale_readback'],
-            'TLG_ASYNC_SHADERS': options['async_shaders']}
+            'TLG_STALE_READBACK': options['stale_readback']}
