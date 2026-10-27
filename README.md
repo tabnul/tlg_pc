@@ -139,9 +139,11 @@ launcher.
 The idea comes from the GoldHEN "Level Select + QA Menu" patch by illusiony and DanielSvoboda. On
 its own, that patch's stage switch leaves a black screen and runs the game out of video memory
 after a few jumps. This port fixes both, so you can jump from stage to stage at will, which is
-handy for revisiting a favourite area or comparing graphics settings across the game. The same
-Debug box has the GoldHEN *collapsing bridge freeze fix* for players whose game freezes when the
-bridge in the pit collapses. Both are off by default.
+handy for revisiting a favourite area or comparing graphics settings across the game. Both are
+off by default.
+
+The GoldHEN *collapsing bridge freeze fix* (same authors) is always on: without it the game can
+freeze when the bridge in the pit collapses. It skips the slow motion of that moment.
 
 ## Download
 
