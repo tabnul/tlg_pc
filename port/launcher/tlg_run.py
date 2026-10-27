@@ -172,6 +172,7 @@ DEFAULT_SETTINGS = {
     'mouse_sensitivity': 1.0,
     'mouse_invert_y': False,
     'key_map': {},                 # PS4 button -> 'Key|Mouse Left' (empty: the default)
+    'menu_confirm': 'cross',       # cross | circle; menu-only, applied on next launch
     'frame_rate': '30',            # 30 | 60 | unlocked (scripts/tlg_patches.py; TLG_FPS wins)
     'resolution': '1920x1080',     # WxH (scripts/tlg_patches.py; TLG_RESOLUTION wins)
     'gpu_readbacks': '2',          # TLG_READBACKS: 2 precise (the game reads GPU compute results), 0 fast
@@ -199,7 +200,7 @@ DEFAULT_KEYS = {
     'touchpad_left': 'Tab', 'touchpad_right': 'Backspace', 'up': 'I', 'down': 'K', 'left': 'J', 'right': 'L',
 }
 # Synced with tlg.ini both ways: the in-game menu saves them there.
-INI_KEYS = ('mouse_enabled', 'mouse_sensitivity', 'mouse_invert_y', 'key_map')
+INI_KEYS = ('mouse_enabled', 'mouse_sensitivity', 'mouse_invert_y', 'key_map', 'menu_confirm')
 
 
 def key_map_spec(mapping):
@@ -259,7 +260,14 @@ def load_settings():
         pass
     if 'key_map' in ini:
         settings['key_map'] = parse_key_map(ini['key_map'])
+    if 'menu_confirm' in ini:
+        settings['menu_confirm'] = ini['menu_confirm']
     return settings
+
+
+def menu_confirm(settings):
+    value = os.environ.get('TLG_MENU_CONFIRM', settings.get('menu_confirm', 'cross'))
+    return 'circle' if value == 'circle' else 'cross'
 
 
 def save_settings(settings):
@@ -506,7 +514,8 @@ def prepare(settings, log=print):
         [*python_command(scripts / 'content_profile.py'), game, '--out', str(OUT_DIR)],
         [*python_command(scripts / 'tlg_patches.py'), game, '--out', str(OUT_DIR), '--mode', frame_rate(settings),
          '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config()), '--resolution', resolution(settings),
-         *(['--skip-logos'] if settings.get('skip_logos') else [])],
+         *(['--skip-logos'] if settings.get('skip_logos') else []),
+         '--menu-confirm', menu_confirm(settings)],
     ]
     for step in steps:
         result = subprocess.run(step, cwd=str(scripts), capture_output=True, text=True,
@@ -643,6 +652,7 @@ def build_env(settings, extra=None):
         env.setdefault(key, value)  # explicit TLG_* in the environment always win
     env['TLG_GC_BUDGET_MB'] = os.environ.get('TLG_GC_BUDGET_MB', str(int(settings['vram_budget_mb'])))
     env['TLG_READBACKS'] = os.environ.get('TLG_READBACKS', str(settings.get('gpu_readbacks', '2')))
+    env['TLG_MENU_CONFIRM'] = menu_confirm(settings)
     env['TLG_STICK_DEADZONE'] = os.environ.get(
         'TLG_STICK_DEADZONE', f"{int(settings.get('stick_deadzone', 10)) / 100:.2f}")
     env['TLG_LANGUAGE'] = os.environ.get('TLG_LANGUAGE', str(
@@ -794,6 +804,7 @@ def launch(settings, seconds=0, extra_env=None, detached=False, header=()):
         'mouse_enabled': int(bool(settings.get('mouse_enabled', True))),
         'mouse_sensitivity': f"{float(settings.get('mouse_sensitivity', 1.0)):.2f}",
         'mouse_invert_y': int(bool(settings.get('mouse_invert_y', False))),
+        'menu_confirm': settings.get('menu_confirm', 'cross'),
         'key_map': key_map_spec(key_map) if isinstance(key_map, dict) else str(key_map),
     })
     log = new_log()

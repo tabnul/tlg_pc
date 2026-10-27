@@ -97,6 +97,7 @@ TEXT = {
     'audio': ('Audio', 'Áudio'),
     'native_audio': ('Native audio (libSceNgs2.sprx from your console)', 'Áudio nativo (libSceNgs2.sprx do seu console)'),
     'controls': ('Controls', 'Controles'),
+    'menu_confirm': ('Menu confirm button (next launch)', 'Botão de confirmação (próxima inicialização)'),
     'mouse_enabled': ('Mouse turns the camera', 'Mouse gira a câmera'),
     'mouse_invert_y': ('Invert mouse Y axis', 'Inverter eixo Y do mouse'),
     'mouse_sensitivity': ('Mouse sensitivity', 'Sensibilidade do mouse'),
@@ -516,6 +517,8 @@ class Launcher:
         controls.columnconfigure(1, weight=1)
         self.check(controls, 0, 'mouse_enabled')
         self.check(controls, 1, 'mouse_invert_y')
+        self.combo(controls, 4, 'menu_confirm', ['cross', 'circle'],
+                   lambda k: 'Cross (X / A)' if k == 'cross' else 'Circle (O / B)')
         ttk.Label(controls, text=self.t('mouse_sensitivity')).grid(row=2, column=0, sticky='w', pady=(4, 0))
         sens = tk.DoubleVar(value=float(self.settings.get('mouse_sensitivity', 1.0)))
         self.vars['mouse_sensitivity'] = sens
