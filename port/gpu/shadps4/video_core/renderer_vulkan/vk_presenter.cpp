@@ -20,6 +20,7 @@
 #include "video_core/renderer_vulkan/vk_warmup_inbox.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 #include "video_core/texture_cache/image.h"
+#include "tlg_toggles.h"
 
 #include <algorithm>
 #include <array>
@@ -61,6 +62,19 @@ static bool SkipPresentClear() {
         return on;
     }();
     return skip;
+}
+
+/// tlg: the frame (the post-process target, blitted to the swapchain) is 10-bit, so the HDR10
+/// PQ signal keeps its precision; the swapchain's 8-bit SDR format banded dark gradients in HDR.
+/// TLG_FRAME_10BIT=0, or the live toggle bit Frame10Bit: the swapchain's SDR format, as before.
+static vk::Format FrameFormat(const Swapchain& swapchain) {
+    static const bool ten_bit = [] {
+        const char* env = std::getenv("TLG_FRAME_10BIT");
+        return !(env && env[0] == '0');
+    }();
+    return ten_bit && !TlgToggle::Disabled2(TlgToggle::Frame10Bit)
+               ? vk::Format::eA2B10G10R10UnormPack32
+               : swapchain.GetSurfaceFormat().format;
 }
 
 bool CanBlitToSwapchain(const vk::PhysicalDevice physical_device, vk::Format format) {
@@ -164,7 +178,8 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     smaa_pass.Create(device, instance.GetAllocator());
     cas_pass.Create(device, instance.GetAllocator());
     postfx_timer.Create(device, instance.GetPhysicalDevice().getProperties().limits.timestampPeriod);
-    pp_pass.Create(device, swapchain.GetSurfaceFormat().format);
+    pp_pass.Create(device, vk::Format::eA2B10G10R10UnormPack32);
+    pp_pass_8bit.Create(device, swapchain.GetSurfaceFormat().format);
     TlgOverlay::Init(instance, swapchain.GetSurfaceFormat().format, num_images);
 
     const bool binary_cache = EmulatorSettingsImpl::Flag("TLG_PIPELINE_BINARIES", true) &&
@@ -231,7 +246,7 @@ void Presenter::RecreateFrame(Frame* frame, u32 width, u32 height) {
         vmaDestroyImage(instance.GetAllocator(), frame->image, frame->allocation);
     }
 
-    const vk::Format format = swapchain.GetSurfaceFormat().format;
+    const vk::Format format = FrameFormat(swapchain);
     const vk::ImageCreateInfo image_info = {
         .flags = vk::ImageCreateFlagBits::eMutableFormat,
         .imageType = vk::ImageType::e2D,
@@ -284,6 +299,13 @@ void Presenter::RecreateFrame(Frame* frame, u32 width, u32 height) {
     frame->height = height;
 
     frame->is_hdr = swapchain.GetHDR();
+    frame->format = format;
+    static vk::Format logged{};
+    if (format != logged) {
+        logged = format;
+        std::printf("GPU: frame format %s\n",
+                    format == vk::Format::eA2B10G10R10UnormPack32 ? "10-bit" : "8-bit");
+    }
 }
 
 Frame* Presenter::PrepareLastFrame() {
@@ -571,7 +593,8 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     if (timed) {
         postfx_timer.Stamp(cmdbuf, HostPasses::PostFxTimer::Cas);
     }
-    pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);
+    (frame->format == vk::Format::eA2B10G10R10UnormPack32 ? pp_pass : pp_pass_8bit)
+        .Render(cmdbuf, image_view, image_size, *frame, pp_settings);
     if (timed) {
         postfx_timer.Stamp(cmdbuf, HostPasses::PostFxTimer::PostProcess);
         postfx_timer.End(graphics.smaa, use_cas, graphics.color_adjust);
@@ -965,7 +988,7 @@ Frame* Presenter::GetRenderFrame() {
     }
 
     if (frame->width != expected_frame_width || frame->height != expected_frame_height ||
-        frame->is_hdr != swapchain.GetHDR()) {
+        frame->is_hdr != swapchain.GetHDR() || frame->format != FrameFormat(swapchain)) {
         RecreateFrame(frame, expected_frame_width, expected_frame_height);
     }
 

@@ -63,12 +63,9 @@ TEXT = {
     'skip_logos': ('Skip the boot logos', 'Pular os logotipos de abertura'),
     'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
     'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),
-    'bridge_fix': ('Collapsing bridge freeze fix', 'Correção do travamento da ponte que desaba'),
     'debug_hint': ('Level select: hold L1 while the title menu closes (Continue/New Game). QA menu: in game, hold L1 and press L3. '
-                   'Bridge fix: only if the game freezes when the bridge in the pit collapses; skips that slow motion. '
                    'GoldHEN patches by illusiony and DanielSvoboda.',
                    'Seleção de fases: segure L1 enquanto o menu inicial fecha (Continuar/Novo jogo). Menu de QA: no jogo, segure L1 e aperte L3. '
-                   'Correção da ponte: só se o jogo travar quando a ponte do fosso desaba; pula essa câmera lenta. '
                    'Patches GoldHEN de illusiony e DanielSvoboda.'),
     'show_fps': ('Show FPS overlay at start (F10 toggles)', 'Mostrar overlay de FPS ao iniciar (F10 alterna)'),
     'vram': ('Texture cache budget (MB of VRAM)', 'Orçamento do cache de texturas (MB de VRAM)'),
@@ -97,6 +94,7 @@ TEXT = {
     'audio': ('Audio', 'Áudio'),
     'native_audio': ('Native audio (libSceNgs2.sprx from your console)', 'Áudio nativo (libSceNgs2.sprx do seu console)'),
     'controls': ('Controls', 'Controles'),
+    'menu_confirm': ('Menu confirm button (next launch)', 'Botão de confirmação (próxima inicialização)'),
     'mouse_enabled': ('Mouse turns the camera', 'Mouse gira a câmera'),
     'mouse_invert_y': ('Invert mouse Y axis', 'Inverter eixo Y do mouse'),
     'mouse_sensitivity': ('Mouse sensitivity', 'Sensibilidade do mouse'),
@@ -300,7 +298,8 @@ TEXT = {
     'already': ('The game is already running.', 'O jogo já está rodando.'),
     'error': ('Error', 'Erro'),
 }
-GAME_LANGUAGE_NAMES = {'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
+GAME_LANGUAGE_NAMES = {'ja': tlg_run.JAPANESE_FALLBACK_LABEL,
+                       'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
                        'de': 'Deutsch', 'it': 'Italiano', 'nl': 'Nederlands',
                        'pt_PT': 'Português (Portugal)', 'ru': 'Русский', 'fi': 'Suomi',
                        'sv': 'Svenska', 'da': 'Dansk', 'no': 'Norsk', 'pl': 'Polski',
@@ -516,6 +515,8 @@ class Launcher:
         controls.columnconfigure(1, weight=1)
         self.check(controls, 0, 'mouse_enabled')
         self.check(controls, 1, 'mouse_invert_y')
+        self.combo(controls, 4, 'menu_confirm', ['cross', 'circle'],
+                   lambda k: 'Cross (X / A)' if k == 'cross' else 'Circle (O / B)')
         ttk.Label(controls, text=self.t('mouse_sensitivity')).grid(row=2, column=0, sticky='w', pady=(4, 0))
         sens = tk.DoubleVar(value=float(self.settings.get('mouse_sensitivity', 1.0)))
         self.vars['mouse_sensitivity'] = sens
@@ -575,9 +576,8 @@ class Launcher:
         debug = ttk.LabelFrame(middle, text=self.t('debug'), padding=8)
         debug.grid(sticky='ew', pady=(8, 0))
         self.check(debug, 0, 'level_select')
-        self.check(debug, 1, 'bridge_fix')
         ttk.Label(debug, text=self.t('debug_hint'), foreground='#777', wraplength=360, justify='left').grid(
-            row=2, column=0, columnspan=3, sticky='w')
+            row=1, column=0, columnspan=3, sticky='w')
 
         log_frame = ttk.LabelFrame(main, text='Log', padding=4)
         log_frame.grid(row=2, column=3, sticky='nsew', **pad)
@@ -844,7 +844,7 @@ class Launcher:
         """Reload the combo for the game folder: another CUSA ships another set of languages."""
         if getattr(self, 'game_lang_box', None) is None:
             return
-        values = list(tlg_run.game_languages(self.settings.get('game_dir')))
+        values = [key for key in tlg_run.game_language_choices(self.settings) if key != 'auto']
         self.game_lang_values = values
         self.game_lang_box.configure(values=[GAME_LANGUAGE_NAMES.get(v, v) for v in values])
         current = self.settings.get('game_language')

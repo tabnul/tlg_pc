@@ -117,6 +117,11 @@ launcher has the same settings, so you can set things up before starting.
 - **Frame rate:** 30 (as on PS4), 60 or unlocked. Unlocked lowers the base frame rate by about
   10 FPS against 60 at the same spot (about 57 vs 48 FPS in our test), so pick 60 unless your PC
   runs well above 60.
+- **Menu buttons:** [Cross/Circle confirmation](docs/menu-buttons.md), without swapping gameplay
+  buttons. The in-game menu conversion requires the verified EU 01.03 executable.
+- **Japanese text (experimental):** on EU CUSA03745 update 01.03, choose **日本語 (EU 1.03 text
+  fallback)** in Game language. The embedded-asset fallback moves or deletes no archives. See
+  [setup and limitations](docs/japanese.md); this is not Japanese-region disc support.
 
 Every setting shows the value the game originally used. Its help text says what we would pick and
 why, and what it costs where we measured it. We tested every candidate setting. The ones that made
@@ -134,9 +139,11 @@ launcher.
 The idea comes from the GoldHEN "Level Select + QA Menu" patch by illusiony and DanielSvoboda. On
 its own, that patch's stage switch leaves a black screen and runs the game out of video memory
 after a few jumps. This port fixes both, so you can jump from stage to stage at will, which is
-handy for revisiting a favourite area or comparing graphics settings across the game. The same
-Debug box has the GoldHEN *collapsing bridge freeze fix* for players whose game freezes when the
-bridge in the pit collapses. Both are off by default.
+handy for revisiting a favourite area or comparing graphics settings across the game. Both are
+off by default.
+
+The GoldHEN *collapsing bridge freeze fix* (same authors) is always on: without it the game can
+freeze when the bridge in the pit collapses. It skips the slow motion of that moment.
 
 ## Download
 
@@ -181,6 +188,8 @@ well (`build_dlss.sh`).
 - [gow3_pc](https://github.com/FelipePrado0/gow3_pc), [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
   and the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which the port builds on.
 - illusiony and DanielSvoboda for the GoldHEN level select, QA menu and bridge fix patches.
+- [kanjieater](https://github.com/kanjieater) for the Cross/Circle menu confirmation and the
+  EU 1.03 Japanese text option (upstream PRs #140, #141). Thank you!
 - [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) for audio.
 - [4x-UltraSharp](https://huggingface.co/Kim2091/UltraSharp) by Kim2091, the default texture
   upscale model (CC BY-NC-SA 4.0), and Microsoft's
@@ -188,6 +197,9 @@ well (`build_dlss.sh`).
 - NVIDIA DLSS, under the NVIDIA DLSS license.
 - [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
   FSR 4 on Vulkan, which FSR 3.1 Native AA runs on. Thank you!
+- Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
+  another program's DLL already sits in the PS4 address range
+  ([SpartanPort #1076](https://github.com/FelipePrado0/SpartanPort/pull/1076)). Thank you!
 
 GPL-2.0, see [port/LICENSE](port/LICENSE).
 
