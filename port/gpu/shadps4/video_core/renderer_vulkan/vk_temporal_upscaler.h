@@ -68,14 +68,22 @@ public:
     /// Start of a frame in the command stream (display pass).
     bool OnFrameStart();
     bool RasterScaling() const;
-    /// tlg: the post chain: the upscaled scene (RunGameMotion) and the targets of passes that
-    /// sample a chain image. Those passes draw at the native size: drawing them into the
-    /// reduced proxies (resolved with nearest blits) would throw the upscaled detail away.
+    /// tlg: the post chain: the upscaled scene (RunGameMotion) and what passes and dispatches
+    /// that sample a chain image write. Those passes draw at the native size: drawing them into
+    /// the reduced proxies (resolved with nearest blits) would throw the upscaled detail away.
+    /// A pass or dispatch that samples none writes new content: its outputs leave the chain
+    /// (the next frame renders its scene into the same images while the last post still runs).
     [[nodiscard]] bool InPostChain(VideoCore::ImageId id) const noexcept {
         return std::find(post_chain.begin(), post_chain.end(), id) != post_chain.end();
     }
     void AddPostChain(VideoCore::ImageId id) {
         if (id && !InPostChain(id)) post_chain.push_back(id);
+    }
+    void RemovePostChain(VideoCore::ImageId id) {
+        if (const auto it = std::find(post_chain.begin(), post_chain.end(), id);
+            it != post_chain.end()) {
+            post_chain.erase(it);
+        }
     }
     /// tlg: LOD bias for scene materials, log2(render / output) while a reduced scene is
     /// upscaled (0 at native size, for TAA and without an upscaler).
@@ -272,6 +280,21 @@ private:
         std::array<float, 2> jitter{};
         bool valid = false;
     } game_frame;
+    /// The scene depth of game_frame, copied before the first native write to it after the sky
+    /// pass (SceneTargets::watch_uid): the game draws depth again before the upscale, which made
+    /// the upscaler read that depth and, at reduced sizes, fall back to native.
+    struct DepthHold {
+        VideoCore::UniqueImage image;
+        vk::UniqueImageView view;
+        vk::Format format{};
+        u32 width = 0, height = 0;
+        u64 uid = 0;          ///< the image it was copied from
+        bool valid = false;
+        bool reduced = false; ///< copied from the reduced proxy
+    } depth_hold;
+    void HoldDepth(VideoCore::Image& depth);
+    /// Upscales since the last log line: reduced, native fallback, with the held depth.
+    u32 count_reduced = 0, count_fallback = 0, count_held = 0, count_total = 0;
     std::array<u32, 2> game_size{};
     VideoCore::ImageId ldr_target{};
     VideoCore::ImageId ui_color{}, ui_depth{};

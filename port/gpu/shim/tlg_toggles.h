@@ -92,6 +92,9 @@ enum : std::uint64_t {
     ImageHashBacking = 32, ///< texture change hashes read through the backing view
     Frame10Bit = 64,       ///< the 10-bit frame image (bit set: 8-bit, as before; live A/B)
     PostReduced = 128,     ///< test: post passes after the upscale stay on the reduced proxies
+    /// On by default (bit set: off): the upscaler keeps a copy of the scene depth from before
+    /// the native depth writes between the sky pass and the upscale (live A/B).
+    DepthHold = 256,
 };
 inline bool Disabled2(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;

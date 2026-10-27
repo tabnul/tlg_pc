@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include <string>
 #include <array>
 #include <memory>
 #include <optional>
@@ -69,6 +70,8 @@ public:
     /// The reduced proxy of `image` (level 0) holds its current content, depth included: the
     /// upscaler's inputs (Read).
     [[nodiscard]] bool ProxyHolds(const VideoCore::Image& image) const;
+    /// Debug: why ProxyHolds is false ("valid" when it holds).
+    [[nodiscard]] std::string ProxyState(const VideoCore::Image& image) const;
     /// SampleProxy for a view obtained before (valid while Generation() is unchanged): the
     /// layout to sample it in.
     vk::ImageLayout PrepareSample(const VideoCore::Image& image, u32 level = 0);
@@ -82,6 +85,10 @@ public:
     }
     void ResolveAll();
     bool debug = false; ///< TLG_SCENE_DEBUG frame: print resolves and fills
+    /// The upscaler's depth hold (TemporalUpscaler::HoldDepth): called once, before the first
+    /// native write to the image with this uid, which disarms it.
+    u64 watch_uid = 0;
+    std::function<void(VideoCore::Image&)> on_watched_write;
 private:
     struct Entry {
         VideoCore::ImageId source{};

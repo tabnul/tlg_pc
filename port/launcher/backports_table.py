@@ -106,6 +106,12 @@ MENU = [
           ('Where the fog starts and reaches full strength. Default 100% is as shipped; lower brings the fog closer.',
            'Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo traz a neblina mais perto.'),
           lo=25, hi=400, unit='%'),
+    _menu('Effects', 'haze_fringe', 'int', '100', ('Haze color fringe', 'Franja colorida na névoa'),
+          ("The game's chromatic aberration on the light haze: yellow and blue edges around objects against fog, "
+           'strongest toward the screen edges. Default 100% is as shipped; 0% gives clean edges.',
+           'A aberração cromática do jogo na névoa de luz: bordas amarelas e azuis em volta de objetos contra a '
+           'neblina, mais fortes perto das bordas da tela. Padrão 100% é o original; 0% deixa as bordas limpas.'),
+          lo=0, hi=100, unit='%'),
     _menu('Effects', 'grass_smooth', 'bool', '1', ('Grass animated every frame', 'Grama animada todo quadro'),
           ('The game moves most grass only every 4th frame. On (default) moves it every frame; off is as shipped.',
            'O jogo move a maior parte da grama só a cada 4 quadros. Ligado (padrão) a move todo quadro; desligado é o original.')),

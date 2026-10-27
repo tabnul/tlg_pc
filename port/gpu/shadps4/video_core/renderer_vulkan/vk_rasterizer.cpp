@@ -253,12 +253,16 @@ VideoCore::ImageId Rasterizer::FindTargetMemoized(VideoCore::TextureCache::Image
 // "nodecal" the SamplesSceneDepth rule.
 // Lab half_scale: "halfonly <ps hex>" upscales only the half-resolution passes of these pixel
 // shaders, "halfnot <ps hex>" keeps these native (to find which pass breaks or gains).
+// "native <ps hex>": passes of these pixel shaders draw at the native size in a reduced scene.
 namespace {
 struct JitterControl {
     std::vector<std::pair<u32, u32>> ranges;
-    std::vector<u32> skip, only, never, half_only, half_not, bias;
+    std::vector<u32> skip, only, never, half_only, half_not, bias, native;
     std::vector<u32> skip_n; ///< "skipn <index count>": skip only these meshes of the skip shaders
     std::vector<u32> zslack; ///< "zslack <ps>": these draws depth-test with a small tolerance (pull forward)
+    /// "point <ps> <sampler index>": that sampler of the shader filters nearest (filter A/B).
+    std::vector<std::pair<u32, u32>> point;
+    std::vector<u32> sampler_log; ///< "slog <ps>": log the shader's guest sampler filters once
     bool map = false;
     bool follow = false, no_mesh = false, no_decal = false;
     bool bias_all = false;
@@ -366,6 +370,15 @@ void ReadJitterControl() {
             if (std::fscanf(file, "%u", &count) == 1) next.skip_n.push_back(count);
             continue;
         }
+        if (!std::strcmp(token, "point")) {
+            u32 ps, index;
+            if (std::fscanf(file, "%x %u", &ps, &index) == 2) next.point.emplace_back(ps, index);
+            continue;
+        }
+        if (!std::strcmp(token, "slog")) {
+            if (std::fscanf(file, "%x", &hash) == 1) next.sampler_log.push_back(hash);
+            continue;
+        }
         if (!std::strcmp(token, "zslackval")) {
             std::fscanf(file, "%f %f", &next.slack_constant, &next.slack_slope);
             continue;
@@ -377,6 +390,7 @@ void ReadJitterControl() {
                      : !std::strcmp(token, "halfnot")  ? &next.half_not
                      : !std::strcmp(token, "bias")     ? &next.bias
                      : !std::strcmp(token, "zslack")   ? &next.zslack
+                     : !std::strcmp(token, "native")   ? &next.native
                                                     : nullptr;
         if (list) {
             if (std::fscanf(file, "%x", &hash) == 1) list->push_back(hash);
@@ -402,9 +416,12 @@ void ReadJitterControl() {
     std::fclose(file);
     // Logged when the file changes (a "map" token prints every time: remove it after one map).
     const auto summary = fmt::format(
-        "{} ranges, {} only, {} not, {} skipped, {} halfonly, {} halfnot, {} bias{}{}{}{}{}",
+        "{} ranges, {} only, {} not, {} skipped, {} halfonly, {} halfnot, {} bias, {} native, "
+        "{} point, {} slog{}{}{}{}{}",
         next.ranges.size(), next.only.size(), next.never.size(), next.skip.size(),
-        next.half_only.size(), next.half_not.size(), next.bias.size(), next.follow ? ", follow" : "",
+        next.half_only.size(), next.half_not.size(), next.bias.size(), next.native.size(),
+        next.point.size(), next.sampler_log.size(),
+        next.follow ? ", follow" : "",
         next.no_mesh ? ", nomesh" : "", next.no_decal ? ", nodecal" : "",
         next.bias_all ? ", biasall" : "", next.zbias_native ? ", zbiasnative" : "");
     static std::string last_summary;
@@ -1236,6 +1253,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         static const char* scene_debug = std::getenv("TLG_SCENE_DEBUG");
         scene_debug_frame = scene_debug && std::remove(scene_debug) == 0;
         scene_targets->debug = scene_debug_frame;
+        if (scene_debug_frame) std::printf("Scene display pass\n");
         scene_targets->SetShadowScale(u32(std::clamp(TlgSettings::Get().shadow_scale.load(), 1, 4)));
         scene_targets->SetHalfScale(TlgSettings::Get().half_scale.load() >= 2 ? 2u : 1u);
         scene_targets->ShadowReport();
@@ -1694,6 +1712,7 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     if (!BindResources(pipeline)) {
         return;
     }
+    UpdatePostChain();
 
     if (needs_barrier) {
         runtime.FlushBarriers();
@@ -1745,6 +1764,7 @@ void Rasterizer::DispatchIndirectRecord(const ComputePipeline* pipeline, VAddr a
     if (!BindResources(pipeline)) {
         return;
     }
+    UpdatePostChain();
 
     const auto [buffer, base] = buffer_cache.ObtainBuffer(address + offset, size, false);
     needs_barrier |= runtime.IsBufferAccessed(buffer, base, size);
@@ -1936,6 +1956,7 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
     buffer_infos.clear();
     image_infos.clear();
     samples_post_chain = false;
+    written_images.clear();
     // tlg: G-buffer passes sample material textures for a scene rendered below the output
     // size; the temporal upscaler restores the detail of the output's mip level (FSR guide:
     // log2(render / output)). Shadows, post-processing and UI keep the guest's bias.
@@ -2788,7 +2809,11 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
             }
 
             bound_images.emplace_back(image_id);
-            samples_post_chain |= upscaler->InPostChain(image_id);
+            if (is_storage) {
+                written_images.push_back(image_id);
+            } else {
+                samples_post_chain |= upscaler->InPostChain(image_id);
+            }
 
             auto& image = texture_cache.GetImage(image_id);
             auto& image_view = texture_cache.FindTexture(
@@ -2912,6 +2937,25 @@ void Rasterizer::BindSamplers(const Shader::Info& stage, const PreparedStage* pr
         const auto& sampler = stage.samplers[sampler_index];
         auto ssharp =
             prepared ? prepared->sampler_sharps[sampler_index] : sampler.GetSharp(stage);
+        if (stage.sw_stage == Shader::SwStage::Fragment) {
+            const u32 ps = u32(stage.pgm_hash);
+            auto& logged = jitter_control.sampler_log;
+            if (const auto it = std::find(logged.begin(), logged.end(), ps); it != logged.end()) {
+                std::printf("Sampler ps %08x #%u: mag %u min %u mip %u aniso %u depth %d lod %.2f-%.2f\n",
+                            ps, sampler_index, u32(ssharp.xy_mag_filter.Value()),
+                            u32(ssharp.xy_min_filter.Value()), u32(ssharp.mip_filter.Value()),
+                            u32(ssharp.max_aniso.Value()), int(sampler.is_depth), ssharp.MinLod(),
+                            ssharp.MaxLod());
+                if (sampler_index + 1 == stage.samplers.size()) logged.erase(it);
+                std::fflush(stdout);
+            }
+            for (const auto& [point_ps, index] : jitter_control.point) {
+                if (point_ps == ps && index == sampler_index) {
+                    ssharp.xy_mag_filter.Assign(AmdGpu::Filter::Point);
+                    ssharp.xy_min_filter.Assign(AmdGpu::Filter::Point);
+                }
+            }
+        }
         const auto vk_sampler = texture_cache.GetSampler(
             ssharp, Regs().ta_bc_base, sampler.is_depth, sampler.is_depth ? 0.0f : sampler_lod_bias);
         image_infos.emplace_back(vk_sampler, VK_NULL_HANDLE, vk::ImageLayout::eGeneral);
@@ -2929,6 +2973,16 @@ bool Rasterizer::PostChainPass(u32 mrt_mask) const {
     // Only sampling counts: the game renders every frame's scene into the same image, so a
     // target in the chain is also written by the next frame's G-buffer.
     return samples_post_chain;
+}
+
+void Rasterizer::UpdatePostChain() {
+    for (const auto id : written_images) {
+        if (samples_post_chain) {
+            upscaler->AddPostChain(id);
+        } else {
+            upscaler->RemovePostChain(id);
+        }
+    }
 }
 
 Rasterizer::BeginSignature Rasterizer::MakeBeginSignature(const GraphicsPipeline* pipeline) const {
@@ -3057,7 +3111,8 @@ bool Rasterizer::BindTexturesFromSet(const Shader::Info& stage, const PreparedSt
 
 RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
     // tlg: RenderStateMemo (see BeginMemo).
-    const bool memo_on = !TlgToggle::Disabled(TlgToggle::RenderStateMemo) && !FrameCapture::Active();
+    const bool memo_on = !TlgToggle::Disabled(TlgToggle::RenderStateMemo) &&
+                         !FrameCapture::Active() && jitter_control.native.empty();
     if (TlgStats::enabled && ((begin_memo_hits + begin_memo_misses) & 0x3FFFF) == 0x3FFFF) {
         std::printf("Render state memo: %llu hits, %llu misses; texture sets: %llu hits, %llu "
                     "misses\n",
@@ -3091,9 +3146,11 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         }
         if (usable) {
             ++begin_memo_hits;
-            if (signature.post_chain) {
-                for (u32 cb = 0; cb < AmdGpu::NUM_COLOR_BUFFERS; ++cb) {
+            for (u32 cb = 0; cb < AmdGpu::NUM_COLOR_BUFFERS; ++cb) {
+                if (signature.post_chain) {
                     upscaler->AddPostChain(signature.ids[cb]);
+                } else {
+                    upscaler->RemovePostChain(signature.ids[cb]);
                 }
             }
             attachment_feedback_loop = false;
@@ -3143,8 +3200,17 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     const bool post_pass = PostChainPass(key.mrt_mask);
     if (post_pass && !TlgToggle::Disabled2(TlgToggle::PostReduced)) {
         reduced = false;
-        for (u32 cb = 0; cb < cb_descs.size(); ++cb) {
-            if (key.mrt_mask >> cb & 1) upscaler->AddPostChain(cb_descs[cb].first);
+    }
+    if (reduced && key.mrt_mask && !jitter_control.native.empty() &&
+        Listed(jitter_control.native, pipeline->GetStage(Shader::SwStage::Fragment).pgm_hash)) {
+        reduced = false;
+    }
+    for (u32 cb = 0; cb < cb_descs.size(); ++cb) {
+        if (!(key.mrt_mask >> cb & 1)) continue;
+        if (post_pass) {
+            upscaler->AddPostChain(cb_descs[cb].first);
+        } else {
+            upscaler->RemovePostChain(cb_descs[cb].first);
         }
     }
     // tlg: a depth-only pass into a shadow map draws into its upscaled proxy instead.
@@ -3194,7 +3260,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     }
     // TLG_SCENE_DEBUG=<file>: once the file exists, why the passes of one frame keep the
     // native size (see NoteFrameStart).
-    const bool debug_pass = scene_debug_frame && scene_started;
+    const bool debug_pass = scene_debug_frame;
     std::string why;
     if (debug_pass) {
         why = fmt::format("pass vs {:08x} ps {:08x} mrt {:#x} samples {} raster_scaling {} post {}:",
@@ -3246,11 +3312,13 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     if (debug_pass) {
         if (db_desc.first) {
             const auto& depth = texture_cache.GetImage(db_desc.first);
-            why += fmt::format(" depth [{} {}x{} eligible {}]",
+            why += fmt::format(" depth [{} {}x{} eligible {} uid {}]",
                                vk::to_string(depth.info.pixel_format), depth.info.size.width,
-                               depth.info.size.height, scene_targets->Eligible(depth));
+                               depth.info.size.height, scene_targets->Eligible(depth),
+                               depth.image_uid);
         }
-        std::printf("Scene pass: reduced %d %s\n", reduced, why.c_str());
+        std::printf("Scene pass: reduced %d started %d %s\n", reduced, int(scene_started),
+                    why.c_str());
     }
     // (A shadow pass keeps the FragCoord conversion right with a scene of k x 1920x1080.)
     push_data.scene_size =

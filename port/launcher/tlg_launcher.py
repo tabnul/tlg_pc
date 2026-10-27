@@ -239,6 +239,13 @@ TEXT = {
                                  'brings the fog closer.',
                                  'Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo '
                                  'traz a neblina mais perto.'),
+    'effect_haze_fringe': ('Haze color fringe', 'Franja colorida na névoa'),
+    'effect_haze_fringe_hint': ("The game's chromatic aberration on the light haze: yellow and blue edges around "
+                                'objects against fog, strongest toward the screen edges. Default 100% is as shipped; '
+                                '0% gives clean edges.',
+                                'A aberração cromática do jogo na névoa de luz: bordas amarelas e azuis em volta de '
+                                'objetos contra a neblina, mais fortes perto das bordas da tela. Padrão 100% é o '
+                                'original; 0% deixa as bordas limpas.'),
     'effect_boy_wind': ('Boy wind (hair + clothing)', 'Vento no menino (cabelo + roupa)'),
     'effect_boy_wind_hint': ("How strongly the wind moves the boy's hair and clothing. Default 100% is as shipped and "
                              'can look like a storm; 50% is recommended, 30% is calm.',
@@ -399,7 +406,7 @@ LOD_BIAS_DEFAULT = -4
 ANISO_LEVELS = [0, 2, 4, 8, 16]  # 0 = the game's own (PS4); default 16
 EFFECTS = {'ssao': (100, 0, 400), 'bloom': (100, 0, 400), 'ssr': (100, 0, 400), 'motion_blur': (100, 0, 400),
            'vignette_add': (0, 0, 100), 'game_sharpen': (100, 0, 100),
-           'fog_distance': (100, 25, 400), 'boy_wind': (100, 0, 200),
+           'fog_distance': (100, 25, 400), 'haze_fringe': (100, 0, 100), 'boy_wind': (100, 0, 200),
            'tree_wind': (100, 0, 200), 'trico_feathers': (100, 0, 400),
            'fov': (70, 50, 110, '°')}
 

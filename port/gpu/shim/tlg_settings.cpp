@@ -31,7 +31,8 @@ constexpr std::pair<const char*, Effect> EffectKeys[] = {
     {"ssr", &Values::ssr},
     {"game_sharpen", &Values::game_sharpen}, {"shadow_distance", &Values::shadow_distance},
     {"trico_feathers", &Values::trico_feathers}, {"boy_wind", &Values::boy_wind}, {"tree_wind", &Values::tree_wind},
-    {"fog_distance", &Values::fog_distance}, {"grass_smooth", &Values::grass_smooth}};
+    {"fog_distance", &Values::fog_distance}, {"haze_fringe", &Values::haze_fringe},
+    {"grass_smooth", &Values::grass_smooth}};
 
 std::atomic<int>* EffectSetting(Values& v, const std::string& key) {
     for (const auto& [name, member] : EffectKeys)

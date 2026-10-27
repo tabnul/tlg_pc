@@ -198,6 +198,8 @@ private:
     BeginSignature MakeBeginSignature(const GraphicsPipeline* pipeline) const;
     /// tlg: the draw samples or writes an image of the upscaler's post chain (InPostChain).
     bool PostChainPass(u32 mrt_mask) const;
+    /// tlg: after a dispatch's bindings: its storage writes join or leave the post chain.
+    void UpdatePostChain();
     struct BeginMemo {
         bool valid = false;
         BeginSignature signature;
@@ -347,6 +349,8 @@ private:
     bool scene_started = false;
     /// tlg: this draw samples an image of the upscaler's post chain (InPostChain).
     bool samples_post_chain = false;
+    /// tlg: the storage images this draw or dispatch writes (post chain bookkeeping).
+    boost::container::static_vector<VideoCore::ImageId, Shader::NUM_IMAGES> written_images;
     std::unique_ptr<ObjectMotion> object_motion;
     bool motion_draw = false;
     u64 motion_geometry{};    ///< vertex-stream identity of the current direct draw

@@ -178,18 +178,37 @@ void SceneTargets::ResolveAll() {
     }
 }
 void SceneTargets::NativeAccess(VideoCore::Image& image, vk::AccessFlags2 access) {
-    if (copying || !image.scene_proxy) return; // most images never had a proxy
     constexpr auto writes = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite |
         vk::AccessFlagBits2::eColorAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentWrite |
         vk::AccessFlagBits2::eMemoryWrite;
+    if (watch_uid && image.image_uid == watch_uid && (access & writes) && !copying) {
+        watch_uid = 0;
+        if (debug) std::printf("Scene depth hold: uid %llu\n", (unsigned long long)image.image_uid);
+        if (on_watched_write) on_watched_write(image);
+    }
+    if (copying || !image.scene_proxy) return; // most images never had a proxy
     const u32 levels = std::min(16u, image.info.resources.levels);
     for (u32 level = 0; level < levels; ++level) {
         const auto it = entries.find(Key(image.image_uid, level));
         if (it == entries.end()) continue;
         auto& entry = *it->second;
         if (entry.state.dirty) Copy(entry, image, true);
+        if ((access & writes) && debug) {
+            std::printf("Scene native write: %s %ux%u level %u uid %llu, access %s%s\n",
+                        vk::to_string(image.info.pixel_format).c_str(), image.info.size.width,
+                        image.info.size.height, level, (unsigned long long)image.image_uid,
+                        vk::to_string(access & writes).c_str(),
+                        entry.state.valid ? " (proxy was valid)" : "");
+        }
         if (access & writes) entry.state.NativeWrite();
     }
+}
+std::string SceneTargets::ProxyState(const VideoCore::Image& image) const {
+    if (copying) return "copying";
+    if (!image.scene_proxy) return "no proxy";
+    const auto it = entries.find(Key(image.image_uid, 0));
+    if (it == entries.end()) return "no entry";
+    return it->second->state.valid ? "valid" : "native newer";
 }
 void SceneTargets::Transition(Entry& e, vk::ImageAspectFlags aspect, vk::ImageLayout layout,
                                vk::PipelineStageFlags2 stages, vk::AccessFlags2 access) {

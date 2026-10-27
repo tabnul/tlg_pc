@@ -175,6 +175,7 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
                                    CameraMotion& camera_motion_, SceneTargets& scene_targets_)
     : instance{instance_}, scheduler{scheduler_}, texture_cache{texture_cache_},
       runtime{runtime_}, camera_motion{camera_motion_}, scene_targets{scene_targets_} {
+    scene_targets.on_watched_write = [this](VideoCore::Image& image) { HoldDepth(image); };
     // Reject unsupported shaders before allocating resources or recording a frame.
     TlgSettings::ConfigureUpscalerSupport(instance.IsFsr4Int8Supported(),
                                          instance.IsFsr411Supported());
@@ -238,7 +239,9 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
 }
 
 TemporalUpscaler::~TemporalUpscaler() {
-    if (resources_ready) scheduler.Finish();
+    scene_targets.watch_uid = 0;
+    scene_targets.on_watched_write = nullptr;
+    if (resources_ready || depth_hold.image) scheduler.Finish();
     if (context) {
         scheduler.Finish();
         ffxVkPortableUpscaleContextDestroy(context);
@@ -423,10 +426,105 @@ void TemporalUpscaler::OnGameMotionPass(VideoCore::ImageId scene, VideoCore::Ima
     if (scene_targets.debug) std::printf("Scene game motion pass\n");
     // The jitter this frame's geometry was drawn with; the post runs in the next emulator frame.
     game_frame = {scene, motion, depth, jitter, scene && motion && depth};
+    depth_hold.valid = false;
+    scene_targets.watch_uid = 0;
     if (depth) {
-        const auto& size = texture_cache.GetImage(depth).info.size;
-        game_size = {size.width, size.height};
+        const auto& image = texture_cache.GetImage(depth);
+        game_size = {image.info.size.width, image.info.size.height};
+        if (GameMotion() && !TlgToggle::Disabled2(TlgToggle::DepthHold)) {
+            scene_targets.watch_uid = image.image_uid;
+        }
+        if (scene_targets.debug) {
+            std::printf("Scene game motion pass: depth uid %llu\n",
+                        (unsigned long long)image.image_uid);
+        }
     }
+}
+
+void TemporalUpscaler::HoldDepth(VideoCore::Image& depth) {
+    if (!game_frame.valid) return;
+    const bool reduced = scene_targets.Reduced() && scene_targets.ProxyHolds(depth);
+    const auto size = reduced ? scene_targets.Size()
+                              : SceneResolution::Size{depth.info.size.width,
+                                                      depth.info.size.height};
+    const auto format = depth.info.pixel_format;
+    if (!depth_hold.image || depth_hold.format != format || depth_hold.width != size.width ||
+        depth_hold.height != size.height) {
+        // Command buffers recorded before may still read the old copy.
+        scheduler.DeferOperation([image = std::move(depth_hold.image),
+                                  view = std::move(depth_hold.view)]() mutable {});
+        const auto device = instance.GetDevice();
+        depth_hold.image = VideoCore::UniqueImage(device, instance.GetAllocator());
+        depth_hold.image.Create(vk::ImageCreateInfo{
+            .imageType = vk::ImageType::e2D,
+            .format = format,
+            .extent = {size.width, size.height, 1},
+            .mipLevels = 1, .arrayLayers = 1, .samples = vk::SampleCountFlagBits::e1,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
+                     vk::ImageUsageFlagBits::eSampled |
+                     vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            .initialLayout = vk::ImageLayout::eUndefined,
+        });
+        depth_hold.view = Check(device.createImageViewUnique({
+            .image = vk::Image(depth_hold.image), .viewType = vk::ImageViewType::e2D,
+            .format = format,
+            .subresourceRange = {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1},
+        }));
+        depth_hold.format = format;
+        depth_hold.width = size.width;
+        depth_hold.height = size.height;
+    }
+    scheduler.EndRendering();
+    vk::Image src;
+    vk::ImageLayout src_layout;
+    if (reduced) {
+        VideoCore::ImageViewInfo info;
+        info.format = format;
+        const auto proxy = scene_targets.Read(game_frame.depth, info,
+                                              vk::PipelineStageFlagBits2::eCopy,
+                                              vk::AccessFlagBits2::eTransferRead);
+        src = proxy.image;
+        src_layout = proxy.layout;
+    } else {
+        runtime.Transit(&depth, vk::ImageLayout::eTransferSrcOptimal,
+                        vk::PipelineStageFlagBits2::eCopy, vk::AccessFlagBits2::eTransferRead);
+        runtime.FlushBarriers();
+        src = depth.GetImage();
+        src_layout = vk::ImageLayout::eTransferSrcOptimal;
+    }
+    const vk::Image dst = vk::Image(depth_hold.image);
+    const auto aspect = vk::ImageAspectFlagBits::eDepth;
+    scheduler.Record([src, src_layout, dst, aspect, w = size.width,
+                      h = size.height](vk::CommandBuffer cmdbuf) {
+        const auto barrier = [&](vk::ImageLayout old_layout, vk::PipelineStageFlags2 src_stage,
+                                 vk::AccessFlags2 src_access, vk::ImageLayout new_layout,
+                                 vk::PipelineStageFlags2 dst_stage, vk::AccessFlags2 dst_access) {
+            const vk::ImageMemoryBarrier2 b{
+                .srcStageMask = src_stage, .srcAccessMask = src_access,
+                .dstStageMask = dst_stage, .dstAccessMask = dst_access,
+                .oldLayout = old_layout, .newLayout = new_layout, .image = dst,
+                .subresourceRange = {aspect, 0, 1, 0, 1},
+            };
+            cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+        };
+        // The last upscale's reads of the old content come before.
+        barrier(vk::ImageLayout::eUndefined, vk::PipelineStageFlagBits2::eAllCommands,
+                vk::AccessFlagBits2::eMemoryRead, vk::ImageLayout::eTransferDstOptimal,
+                vk::PipelineStageFlagBits2::eCopy, vk::AccessFlagBits2::eTransferWrite);
+        const vk::ImageCopy region{
+            .srcSubresource = {aspect, 0, 0, 1},
+            .dstSubresource = {aspect, 0, 0, 1},
+            .extent = {w, h, 1},
+        };
+        cmdbuf.copyImage(src, src_layout, dst, vk::ImageLayout::eTransferDstOptimal, region);
+        barrier(vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eCopy,
+                vk::AccessFlagBits2::eTransferWrite, vk::ImageLayout::eGeneral,
+                vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eMemoryRead);
+    });
+    depth_hold.uid = depth.image_uid;
+    depth_hold.reduced = reduced;
+    depth_hold.valid = true;
 }
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
@@ -439,6 +537,8 @@ void TemporalUpscaler::OnDispatch(u64 cs_hash) {
             game_reset = true;
         }
         game_frame.valid = false;
+        depth_hold.valid = false;
+        scene_targets.watch_uid = 0;
         return;
     }
     // tlg: DLSS only runs as DLAA on the game's motion (above); the GoW3 scene path made it shake.
@@ -1118,9 +1218,20 @@ void TemporalUpscaler::RunGameMotion() {
     }
     // tlg: an upscaling preset: the scene passes drew into the reduced proxies (SceneTargets),
     // which DLSS or FSR read; the result goes back into the game's own full-size scene.
+    // The game draws into the scene depth again before this upscale: then the copy made before
+    // that (HoldDepth) is this frame's depth.
+    const bool held = depth_hold.valid && depth_hold.uid == depth.image_uid;
     const bool reduced = scene_targets.Reduced() && scene_targets.EligibleScene(color) &&
                          scene_targets.ProxyHolds(color) && scene_targets.ProxyHolds(motion) &&
-                         scene_targets.ProxyHolds(depth);
+                         (held ? depth_hold.reduced : scene_targets.ProxyHolds(depth));
+    const bool use_hold = held && depth_hold.reduced == reduced;
+    if (scene_targets.Reduced()) ++(reduced ? count_reduced : count_fallback);
+    if (use_hold) ++count_held;
+    if (++count_total >= 600) {
+        std::printf("Upscaler: last 600 upscales: reduced %u, native fallback %u, depth held %u\n",
+                    count_reduced, count_fallback, count_held);
+        count_reduced = count_fallback = count_held = count_total = 0;
+    }
     const u32 w = reduced ? scene_targets.Size().width : ow;
     const u32 h = reduced ? scene_targets.Size().height : oh;
     if (!EnsureResources(w, h, ow, oh, true)) {
@@ -1135,6 +1246,13 @@ void TemporalUpscaler::RunGameMotion() {
         logged = line;
         std::printf("Upscaler: %s on game motion vectors%s\n", line,
                     scene_targets.Reduced() && !reduced ? " (scene proxies not current)" : "");
+        if (scene_targets.Reduced() && !reduced) {
+            std::printf("Upscaler: proxies: color %s (eligible %d), motion %s, depth %s\n",
+                        scene_targets.ProxyState(color).c_str(),
+                        int(scene_targets.EligibleScene(color)),
+                        scene_targets.ProxyState(motion).c_str(),
+                        scene_targets.ProxyState(depth).c_str());
+        }
     }
     vk::Image color_image = color.GetImage(), depth_image = depth.GetImage();
     vk::ImageView color_view, motion_src_view, depth_view;
@@ -1146,22 +1264,35 @@ void TemporalUpscaler::RunGameMotion() {
         const auto c = scene_targets.Read(game_frame.scene, info);
         info.format = vk::Format::eR16G16Sfloat;
         const auto m = scene_targets.Read(game_frame.motion, info);
-        info.format = depth_format;
-        const auto d = scene_targets.Read(game_frame.depth, info);
         color_image = c.image;
-        depth_image = d.image;
         color_view = c.view;
         motion_src_view = m.view;
-        depth_view = d.view;
+        if (!use_hold) {
+            info.format = depth_format;
+            const auto d = scene_targets.Read(game_frame.depth, info);
+            depth_image = d.image;
+            depth_view = d.view;
+        }
     } else {
         color_view = CachedView(color, color.info.pixel_format, vk::ImageAspectFlagBits::eColor);
         motion_src_view =
             CachedView(motion, vk::Format::eR16G16Sfloat, vk::ImageAspectFlagBits::eColor);
-        depth_view = CachedView(depth, depth_format, vk::ImageAspectFlagBits::eDepth);
-        runtime.Transit(&depth, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+        if (!use_hold) {
+            depth_view = CachedView(depth, depth_format, vk::ImageAspectFlagBits::eDepth);
+            runtime.Transit(&depth, vk::ImageLayout::eGeneral, read,
+                            vk::AccessFlagBits2::eShaderRead);
+        }
         runtime.Transit(&motion, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
         runtime.Transit(&color, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
         runtime.FlushBarriers();
+    }
+    const auto hold_usage = vk::ImageUsageFlagBits::eTransferSrc |
+                            vk::ImageUsageFlagBits::eTransferDst |
+                            vk::ImageUsageFlagBits::eSampled |
+                            vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    if (use_hold) {
+        depth_image = vk::Image(depth_hold.image);
+        depth_view = *depth_hold.view;
     }
     const auto cmdbuf = scheduler.CommandBuffer();
     const auto all = vk::PipelineStageFlagBits2::eAllCommands;
@@ -1211,7 +1342,8 @@ void TemporalUpscaler::RunGameMotion() {
                         w, h, ow, oh, frame_ms, game_frame.jitter);
     } else {
         ok = RecordFsr3(cmdbuf, color_image, color.info.pixel_format, color.usage_flags,
-                        depth_image, depth_format, depth.usage_flags, w, h, ow, oh, frame_ms,
+                        depth_image, depth_format, use_hold ? hold_usage : depth.usage_flags,
+                        w, h, ow, oh, frame_ms,
                         false, game_frame.jitter);
     }
     if (!ok) return;
