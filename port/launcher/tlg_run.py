@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 import time
@@ -79,8 +80,23 @@ def default_language(game_dir=''):
     return DEFAULT_LANGUAGE_BY_TITLE.get(title, 'es_LA')
 
 
-# Every language key either disc has (the Qt launcher's names table covers them all).
-GAME_LANGUAGES = {**LANGUAGES_US, **LANGUAGES_EU, **LANGUAGES_ASIA}
+JAPANESE_FALLBACK_LABEL = '日本語 (EU 1.03 text fallback)'
+
+
+def japanese_fallback_available(game_dir):
+    """Only the verified EU 01.03 asset layout; not Japanese-region disc support."""
+    if not game_dir or shader_cache.title_id(game_dir) != 'CUSA03745':
+        return False
+    try:
+        return (mod_patches.game_app_version(game_dir) == '01.03' and
+                all((Path(game_dir) / name).is_file()
+                    for name in ('trico_boot.psarc', 'trico_bootp.psarc')))
+    except (OSError, ValueError, struct.error):
+        return False
+
+
+# 'ja' is an explicit embedded-asset fallback, not native engine language 0.
+GAME_LANGUAGES = {**LANGUAGES_US, **LANGUAGES_EU, **LANGUAGES_ASIA, 'ja': 2}
 # The closest choice when the system's language is missing from the disc.
 _LANGUAGE_SIBLING = {'pt_BR': 'pt_PT', 'pt_PT': 'pt_BR', 'es_LA': 'es_ES', 'es_ES': 'es_LA',
                      'fr_CA': 'fr', 'fr': 'fr_CA'}
@@ -121,6 +137,8 @@ def game_language_choices(settings):
     """The game language box of the Qt launcher: 'auto', the languages the disc has and the saved
     choice even when the disc lacks it (never changed behind the player's back)."""
     keys = ['auto'] + list(game_languages(settings.get('game_dir', '')))
+    if japanese_fallback_available(settings.get('game_dir', '')):
+        keys.append('ja')
     choice = settings.get('game_language', 'auto')
     return keys + [choice] if choice in GAME_LANGUAGES and choice not in keys else keys
 
@@ -130,6 +148,8 @@ def resolve_game_language(settings, environ=None):
     system (or its closest variant); anything else is English, as before."""
     table = game_languages(settings.get('game_dir', ''))
     choice = settings.get('game_language', 'auto')
+    if choice == 'ja' and japanese_fallback_available(settings.get('game_dir', '')):
+        return 'ja'
     if choice in table:
         return choice
     if choice == 'auto':
@@ -138,6 +158,21 @@ def resolve_game_language(settings, environ=None):
             if key in table:
                 return key
     return 'en'
+
+
+def game_language_environment(settings, environ=None):
+    """Select the internal French id plus a non-destructive guest archive mask for Japanese.
+
+    Explicit engine-language overrides still win; a different override disables the mask.
+    Never inherit a stale mask from a previous launch when another language is selected.
+    """
+    environ = os.environ if environ is None else environ
+    language = resolve_game_language(settings, environ)
+    engine_id = 2 if language == 'ja' else game_languages(settings.get('game_dir')).get(language, 1)
+    selected = environ.get('TLG_LANGUAGE', str(engine_id))
+    return {'TLG_LANGUAGE': selected,
+            'TLG_JAPANESE_FALLBACK': '1' if language == 'ja' and selected == '2' else '0'}
+
 
 # TLG defaults (see README "Opções" and the reasons in each comment).
 DEFAULT_ENV = {
@@ -655,8 +690,7 @@ def build_env(settings, extra=None):
     env['TLG_MENU_CONFIRM'] = menu_confirm(settings)
     env['TLG_STICK_DEADZONE'] = os.environ.get(
         'TLG_STICK_DEADZONE', f"{int(settings.get('stick_deadzone', 10)) / 100:.2f}")
-    env['TLG_LANGUAGE'] = os.environ.get('TLG_LANGUAGE', str(
-        game_languages(settings.get('game_dir')).get(resolve_game_language(settings), 1)))
+    env.update(game_language_environment(settings))
     if settings.get('ui_language', 'en_US') != 'auto':
         env['TLG_UI_LANG'] = settings['ui_language']
     # Without the console module the port's own mixer (runtime_ngs2.c) plays the audio.

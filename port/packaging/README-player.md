@@ -35,7 +35,9 @@ Nada disso vai no download; você precisa da sua própria cópia. Use **The Last
 3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
-5. Escolha o idioma do jogo (inglês, português, espanhol ou francês) e clique em **Jogar**. A primeira partida demora um pouco mais.
+5. Escolha um dos idiomas oferecidos para sua pasta do jogo e clique em **Jogar**. A primeira partida demora um pouco mais.
+
+**Texto japonês experimental (EU 01.03):** com CUSA03745 e a atualização 01.03 aplicada na mesma pasta, escolha **日本語 (EU 1.03 text fallback)**. Não mova nem apague os arquivos franceses: o port os oculta apenas da visão do jogo nesta execução. Para voltar ao francês, escolha Français e inicie novamente. É necessário um launcher e runtime que incluam esse recurso; isso não adiciona suporte ao executável da edição japonesa do disco. Menus e dicas de jogo em japonês foram verificados; áudio/texto do jogo inteiro ainda não foram testados. Os botões de controle não são trocados.
 
 No Linux, `./install_desktop.sh` adiciona o jogo ao menu de aplicativos.
 
@@ -109,7 +111,9 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
-5. Pick the game language (English, Portuguese, Spanish or French) and click **Play**. The first start takes a little longer.
+5. Pick one of the languages offered for your game folder and click **Play**. The first start takes a little longer.
+
+**Experimental Japanese text (EU 01.03):** with CUSA03745 and update 01.03 applied to the same folder, select **日本語 (EU 1.03 text fallback)**. Do not move or delete the French archives: the port hides them only from the game's view for that launch. To return to French, select Français and launch again. Both launcher and runtime must contain this feature; it does not add Japanese-region disc executable support. Japanese menus and gameplay prompts were verified, not full-game audio/text coverage. Controller buttons are not swapped.
 
 On Linux, `./install_desktop.sh` adds the game to the applications menu.
 

@@ -119,6 +119,9 @@ launcher has the same settings, so you can set things up before starting.
   runs well above 60.
 - **Menu buttons:** [Cross/Circle confirmation](docs/menu-buttons.md), without swapping gameplay
   buttons. The in-game menu conversion requires the verified EU 01.03 executable.
+- **Japanese text (experimental):** on EU CUSA03745 update 01.03, choose **日本語 (EU 1.03 text
+  fallback)** in Game language. The embedded-asset fallback moves or deletes no archives. See
+  [setup and limitations](docs/japanese.md); this is not Japanese-region disc support.
 
 Every setting shows the value the game originally used. Its help text says what we would pick and
 why, and what it costs where we measured it. We tested every candidate setting. The ones that made
