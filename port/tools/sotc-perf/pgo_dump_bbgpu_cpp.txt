@@ -1,0 +1,46 @@
+}
+
+#if defined(BB_PGO_GENERATE) && defined(BB_PGO_CLANG)
+// sotc: Clang instrumentation (compiler-rt profile runtime): write (merging into the %m file)
+// and reset, so the file sums the intervals like the GCC path below.
+extern "C" int __llvm_profile_write_file(void);
+extern "C" void __llvm_profile_reset_counters(void);
+static void __gcov_dump(void) { __llvm_profile_write_file(); }
+static void __gcov_reset(void) { __llvm_profile_reset_counters(); }
+#elif defined(BB_PGO_GENERATE)
+extern "C" void __gcov_dump(void);
+extern "C" void __gcov_reset(void);
+#endif
+#ifdef BB_PGO_GENERATE
+// Instrumented build (BB_PGO=generate): the game often ends through _exit (watchdog, guest
+// exit), which skips the profile write at exit. Write every 30 s and reset: the files sum the
+// intervals.
+static void StartProfileWriter() {
+    std::thread([] {
+        Common::SetCurrentThreadName("bb:pgo");
+        for (;;) {
+            std::this_thread::sleep_for(std::chrono::seconds(30));
+            __gcov_dump();
+            __gcov_reset();
+            std::printf("PGO: profile written\n");
+        }
+    }).detach();
+}
+#endif
+
+extern "C" int bbgpu_init(const BbGpuConfig* config) {
+    BbSettings::Load();
+#ifdef BB_PGO_GENERATE
+    StartProfileWriter();
+#endif
+    g_sdk_version = config->sdk_version;
+#ifdef _WIN32
+    if (config->user_dir && !std::getenv("BB_GPU_USER_DIR")) _putenv_s("BB_GPU_USER_DIR", config->user_dir);
+#else
+    if (config->user_dir) setenv("BB_GPU_USER_DIR", config->user_dir, 0);
+#endif
+    Core::Emulator::FillElfInfo(*config);
+    const std::string title = config->title ? config->title : "Shadow of the Colossus";
+    const s32 width = config->width, height = config->height;
+    g_window_thread = std::thread([title, width, height] {
+        Common::SetCurrentThreadName("sotc:window");

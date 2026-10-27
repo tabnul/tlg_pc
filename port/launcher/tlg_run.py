@@ -180,10 +180,11 @@ DEFAULT_SETTINGS = {
     'reopen_launcher': True,       # ... and open again when the game exits
 }
 FRAME_RATES = ['30', '60', 'unlocked']
-# 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI).
+# 16:9, then ultrawide 21:9 and super ultrawide 32:9 (Hor+ and a widened UI). 32:9 is
+# experimental: the game runs, but some overlays sit to the left and menu parts are stretched.
 RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
                '2560x1080', '3440x1440', '3840x1600', '5120x2160',
-               '3840x1080', '5120x1440']
+               '3840x1080', '5120x1440', '7680x2160']
 # The frame rate mode prepare() really applied (another eboot build stays at 30).
 applied_frame_rate = '30'
 # The size the resolution patch really applied (None: the game's own 1920x1080).
@@ -239,6 +240,12 @@ def load_settings():
         settings.update(json.loads(config_path().read_text(encoding='utf-8')))
     except (OSError, ValueError):
         pass
+    # Once: the Qt launcher stored every switch, defaults included, so deferred_readback=false from
+    # before it became the default (2026-10-26) would keep it off. The marker is saved with the next
+    # save, so a later choice in the Advanced settings dialog stays.
+    if not settings.get('readback_defaults_2026_10'):
+        settings.pop('deferred_readback', None)
+        settings['readback_defaults_2026_10'] = True
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
     ini = read_ini(user_dir() / 'tlg.ini')
     try:
@@ -441,7 +448,7 @@ def resolution_label(size):
     """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
     width, height = (int(n) for n in size.split('x'))
     ratio = width / height
-    name = '32:9' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
+    name = '32:9, experimental' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
     return f'{width} × {height} ({name})'
 
 
@@ -661,8 +668,10 @@ def build_env(settings, extra=None):
     # The present limiter never lets more frames through than the patched engine rate; unlocked
     # flips as soon as a frame is ready (480 Hz vblank) up to the display refresh or the menu limit.
     env['TLG_ENGINE_FPS'] = {'30': '30', '60': '60'}.get(applied_frame_rate, '240')
-    if applied_frame_rate == 'unlocked':
-        env.setdefault('TLG_VBLANK_HZ', '0')
+    # 30/60: a 240 Hz vblank shows a late frame ~4 ms late instead of a whole 60 Hz vblank later
+    # (bench 2026-10-25: frames over 1.5x median 360 -> 13 in the garden); the limiter keeps the
+    # flips at the engine rate (driver.cpp PresentThread).
+    env.setdefault('TLG_VBLANK_HZ', '0' if applied_frame_rate == 'unlocked' else '240')
     # The game renders natively at the patched size: the upscaler stays off (vk_temporal_upscaler).
     if applied_resolution:
         env['TLG_RESOLUTION_PATCH'] = applied_resolution

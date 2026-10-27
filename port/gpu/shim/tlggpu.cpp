@@ -196,9 +196,18 @@ u32 TlgDisplayRefreshHz() {
     return hz;
 }
 
-#ifdef TLG_PGO_GENERATE
+#if defined(TLG_PGO_GENERATE) && defined(TLG_PGO_CLANG)
+// Clang instrumentation (compiler-rt profile runtime): write (merging into the %m file) and
+// reset, so the file sums the intervals like the GCC path below.
+extern "C" int __llvm_profile_write_file(void);
+extern "C" void __llvm_profile_reset_counters(void);
+static void __gcov_dump(void) { __llvm_profile_write_file(); }
+static void __gcov_reset(void) { __llvm_profile_reset_counters(); }
+#elif defined(TLG_PGO_GENERATE)
 extern "C" void __gcov_dump(void);
 extern "C" void __gcov_reset(void);
+#endif
+#ifdef TLG_PGO_GENERATE
 // Instrumented build (TLG_PGO=generate): the game often ends through _exit (watchdog, guest
 // exit), which skips the profile write at exit. Write every 30 s and reset: the files sum the
 // intervals.

@@ -21,7 +21,7 @@ class GraphicsOptionsTest(unittest.TestCase):
         options, reverted = g.prepare(self.ini, self.state)
         self.assertFalse(reverted)
         self.assertEqual(options, {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
-                                   'stale_readback': '1', 'async_shaders': '1'})
+                                   'stale_readback': '1'})
 
     def test_write_keys_keeps_other_lines(self):
         self.ini.write_text('# comment\nshow_fps=1\nengine_fps=60\n', encoding='utf-8')
@@ -67,7 +67,7 @@ class GraphicsOptionsTest(unittest.TestCase):
 
     def test_environment(self):
         env = g.environment(g.startup_options({'stale_readback': '0'}))
-        self.assertEqual(env, {'TLG_DEFERRED_READBACK': '1', 'TLG_STALE_READBACK': '0', 'TLG_ASYNC_SHADERS': '1'})
+        self.assertEqual(env, {'TLG_DEFERRED_READBACK': '1', 'TLG_STALE_READBACK': '0'})
 
 
 if __name__ == '__main__':

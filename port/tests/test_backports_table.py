@@ -75,12 +75,12 @@ class TableTest(unittest.TestCase):
 
     def test_states_round_trip_and_defaults_store_nothing(self):
         ini = {'fsr1': '1', 'rcas_strength': '75', 'color_contrast': '1.20', 'overlay_corner': '9'}
-        states = bt.read_states(ini, {'deferred_readback': True, 'background_warmup': True})
+        states = bt.read_states(ini, {'deferred_readback': False, 'background_warmup': True})
         self.assertEqual(states['menu:fsr1'], '1')
         self.assertIsNone(states['menu:rcas_strength'])          # equal to the default
         self.assertEqual(states['menu:color_contrast'], '1.2')
         self.assertIsNone(states['menu:overlay_corner'])         # invalid choice
-        self.assertEqual(states['TLG_DEFERRED_READBACK'], '1')
+        self.assertEqual(states['TLG_DEFERRED_READBACK'], '0')
         self.assertIsNone(states['TLG_BACKGROUND_WARMUP'])
         updates = bt.ini_updates(states)
         self.assertEqual(updates['fsr1'], '1')
@@ -90,11 +90,11 @@ class TableTest(unittest.TestCase):
     def test_environment_only_for_changes_and_outside_values_win(self):
         states = {i.id: None for i in bt.ITEMS}
         self.assertEqual(bt.environment(states), {})
-        states['TLG_DEFERRED_READBACK'] = '1'
+        states['TLG_DEFERRED_READBACK'] = '0'
         states['TLG_READBACK_LINEAR'] = '0'
         states['menu:fsr1'] = '1'                                 # tlg.ini, never the environment
-        self.assertEqual(bt.environment(states), {'TLG_DEFERRED_READBACK': '1', 'TLG_READBACK_LINEAR': '0'})
-        self.assertEqual(bt.environment(states, {'TLG_READBACK_LINEAR': '1'}), {'TLG_DEFERRED_READBACK': '1'})
+        self.assertEqual(bt.environment(states), {'TLG_DEFERRED_READBACK': '0', 'TLG_READBACK_LINEAR': '0'})
+        self.assertEqual(bt.environment(states, {'TLG_READBACK_LINEAR': '1'}), {'TLG_DEFERRED_READBACK': '0'})
         self.assertEqual(bt.changes(states), 2)                   # menu preferences do not count
 
     def test_save_experimental_writes_ini_and_settings(self):
@@ -114,6 +114,36 @@ class TableTest(unittest.TestCase):
             self.assertEqual(tlg_run.experimental_states(settings)['TLG_BLOCK1D'], '1')
             env = tlg_run.build_env(dict(settings, game_dir=''))
             self.assertEqual(env['TLG_BLOCK1D'], '1')
+
+    def test_stored_deferred_readback_off_is_dropped_once(self):
+        import json
+        import os
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp,                 mock.patch.dict(os.environ, {'APPDATA': tmp, 'TLG_USER_DIR': tmp}):
+            tlg_run.config_path().parent.mkdir(parents=True)
+            tlg_run.config_path().write_text(json.dumps({'deferred_readback': False}), encoding='utf-8')
+            settings = tlg_run.load_settings()
+            self.assertNotIn('deferred_readback', settings)
+            self.assertIsNone(tlg_run.experimental_states(settings)['TLG_DEFERRED_READBACK'])
+            settings['deferred_readback'] = False      # a later choice in the Advanced dialog stays
+            tlg_run.save_settings(settings)
+            self.assertIs(False, tlg_run.load_settings()['deferred_readback'])
+
+
+class ReadbackTest(unittest.TestCase):
+    def test_every_readback_row_says_why_and_no_preset_sets_one(self):
+        self.assertEqual(set(bt.READBACK_WHY), bt.NOT_IN_PRESETS)
+        for en, pt in bt.READBACK_WHY.values():
+            self.assertTrue(en and pt)
+        self.assertFalse(bt.NOT_IN_PRESETS & set(gfxlogic.PRESET_ITEMS))
+        for preset_id, _, items in gfxlogic.PRESETS:
+            self.assertFalse(bt.NOT_IN_PRESETS & set(items), preset_id)
+
+    def test_deferred_readback_is_on_by_default(self):
+        item = gfxlogic.item_by_id('TLG_DEFERRED_READBACK')
+        self.assertEqual(bt.effective(item, bt.read_states({}, {})), '1')
+        self.assertEqual(bt.environment(bt.read_states({}, {})), {})
 
 
 class PresetTest(unittest.TestCase):

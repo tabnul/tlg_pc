@@ -27,7 +27,16 @@ if (TLG_LTO)
         message(WARNING "LTO unavailable: ${tlg_ipo_error}")
     endif()
 endif()
-if (TLG_PGO STREQUAL "generate")
+if (TLG_PGO STREQUAL "generate" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Clang (Windows, MSYS2 CLANG64): raw profiles TLG_PGO_DIR/default_*.profraw, merged with
+    # llvm-profdata into TLG_PGO_DIR/tlggpu.profdata (build.sh does that).
+    add_compile_options(-fprofile-generate=${TLG_PGO_DIR} -fprofile-update=atomic)
+    add_link_options(-fprofile-generate=${TLG_PGO_DIR})
+    add_compile_definitions(TLG_PGO_GENERATE TLG_PGO_CLANG)
+elseif (TLG_PGO STREQUAL "use" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-fprofile-use=${TLG_PGO_DIR}/tlggpu.profdata -Wno-profile-instr-unprofiled
+                        -Wno-profile-instr-out-of-date -Wno-profile-instr-missing -Wno-backend-plugin)
+elseif (TLG_PGO STREQUAL "generate")
     # Atomic counters: the GPU, recording, preparation and copy threads run the same code.
     add_compile_options(-fprofile-generate=${TLG_PGO_DIR} -fprofile-update=atomic)
     add_link_options(-fprofile-generate=${TLG_PGO_DIR})

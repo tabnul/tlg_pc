@@ -1,0 +1,137 @@
+commit a3ce79a181ac030a2ced0858fd758962f8c662a0
+Author: tabnul <tabnuland@gmail.com>
+Date:   Sun Oct 25 14:22:49 2026 +0100
+
+    sotc: performance tools (spike sampler, GPU time, route replay)
+    
+    Everything is off unless switched on:
+    - SOTC_SPIKE_OUT=<file> (probe.c) samples every named thread's stack every
+      SOTC_SPIKE_US (default 2000) us for the whole run. tools/spike_report.py
+      shows what each thread did during the slow frames (SOTCCLOCK in the log
+      gives the shared clock).
+    - SOTC_GPU_TIME=1 timestamps every submit and logs GPU busy time and the
+      idle gaps per second.
+    - SOTC_MUTEX_STATS=1 logs contended guest mutex waits by waiter and owner
+      site.
+    - Pad replay: routes replay by guest frames (bbgpu_guest_frames), and a
+      second F9 writes <file>.2 instead of truncating the recording.
+      tools/sotc_route.py records and replays a route with a save.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+diff --git a/src/probe.c b/src/probe.c
+index 1dff978..226c371 100644
+--- a/src/probe.c
++++ b/src/probe.c
+@@ -437,6 +437,103 @@ static DWORD WINAPI profiler(void *name) {
+     fflush(stderr);
+     return 0;
+ }
++/* sotc: SOTC_SPIKE_OUT=<file>: samples every named thread every SOTC_SPIKE_US (default 2000) us
++ * for the whole run and streams the samples (QueryPerformanceCounter us, thread, rip and callers)
++ * to the file, for what each thread did during a slow frame (SOTCSTALL lines carry the same clock;
++ * tools/spike_report.py). Records: 'G' image base; 'M' base size name; 'T' tid name;
++ * 'S' us tid n addresses. Nothing that may take a lock runs while a thread is suspended. */
++static DWORD WINAPI spike_sampler(void *path) {
++    typedef HRESULT (WINAPI *Describe)(HANDLE, PWSTR *);
++    Describe describe=(Describe)(void *)GetProcAddress(GetModuleHandleA("kernel32.dll"),"GetThreadDescription");
++    const char *interval=getenv("SOTC_SPIKE_US");
++    const DWORD wait_us=interval ? (DWORD)atoi(interval) : 2000;
++    FILE *out=fopen((const char *)path,"wb");
++    if (!out) { fprintf(stderr,"SOTC spike: cannot write %s\n",(const char *)path); return 0; }
++    setvbuf(out,NULL,_IOFBF,1<<20);
++    LARGE_INTEGER frequency; QueryPerformanceFrequency(&frequency);
++    enum { MAX_THREADS=256, DEPTH=24 };
++    static struct { DWORD id; HANDLE handle; } threads[MAX_THREADS];
++    int thread_count=0;
++    ULONGLONG next_refresh=0;
++    const DWORD self=GetCurrentThreadId(), pid=GetCurrentProcessId();
++    timeBeginPeriod(1);
++    for (;;) {
++        if (GetTickCount64()>=next_refresh) {
++            next_refresh=GetTickCount64()+1000;
++            fputc('G',out); uint64_t base=(uintptr_t)image; fwrite(&base,8,1,out);
++            HANDLE snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,pid);
++            MODULEENTRY32 me={.dwSize=sizeof(me)};
++            for (BOOL ok=Module32First(snapshot,&me); ok; ok=Module32Next(snapshot,&me)) {
++                uint64_t b=(uintptr_t)me.modBaseAddr; uint32_t size=me.modBaseSize; uint16_t n=(uint16_t)strlen(me.szModule);
++                fputc('M',out); fwrite(&b,8,1,out); fwrite(&size,4,1,out); fwrite(&n,2,1,out); fwrite(me.szModule,1,n,out);
++            }
++            CloseHandle(snapshot);
++            snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,0);
++            THREADENTRY32 te={.dwSize=sizeof(te)};
++            for (BOOL ok=Thread32First(snapshot,&te); ok && thread_count<MAX_THREADS; ok=Thread32Next(snapshot,&te)) {
++                if (te.th32OwnerProcessID!=pid || te.th32ThreadID==self) continue;
++                int known=0;
++                for (int i=0;i<thread_count;++i) if (threads[i].id==te.th32ThreadID) known=1;
++                if (known) continue;
++                HANDLE t=OpenThread(THREAD_SUSPEND_RESUME|THREAD_GET_CONTEXT|THREAD_QUERY_LIMITED_INFORMATION,FALSE,te.th32ThreadID);
++                if (!t) continue;
++                PWSTR text=NULL; char name[128]="";
++                if (describe && SUCCEEDED(describe(t,&text)) && text) {
++                    WideCharToMultiByte(CP_UTF8,0,text,-1,name,sizeof(name),NULL,NULL);
++                    LocalFree(text);
++                }
++                if (!name[0]) { CloseHandle(t); continue; } /* unnamed: driver and system threads */
++                threads[thread_count].id=te.th32ThreadID; threads[thread_count++].handle=t;
++                uint32_t id=te.th32ThreadID; uint16_t n=(uint16_t)strlen(name);
++                fputc('T',out); fwrite(&id,4,1,out); fwrite(&n,2,1,out); fwrite(name,1,n,out);
++            }
++            CloseHandle(snapshot);
++            fflush(out);
++        }
++        for (int i=0;i<thread_count;++i) {
++            if (!threads[i].handle) continue;
++            uint64_t stack[DEPTH]; uint8_t n=0;
++            LARGE_INTEGER now;
++            if (SuspendThread(threads[i].handle)==(DWORD)-1) { CloseHandle(threads[i].handle); threads[i].handle=NULL; continue; }
++            QueryPerformanceCounter(&now);
++            CONTEXT c={.ContextFlags=CONTEXT_CONTROL|CONTEXT_INTEGER};
++            if (GetThreadContext(threads[i].handle,&c)) {
++                stack[n++]=c.Rip;
++                sigjmp_buf unwind_recover;
++                volatile int stop=0;
++                if (sigsetjmp(unwind_recover,0)) stop=1;
++                else runtime_fault_recover=&unwind_recover;
++                while (!stop && n<DEPTH) {
++                    DWORD64 base=0;
++                    PRUNTIME_FUNCTION fn=RtlLookupFunctionEntry(c.Rip,&base,NULL);
++                    if (fn) {
++                        PVOID handler_data=NULL; DWORD64 establisher=0;
++                        RtlVirtualUnwind(UNW_FLAG_NHANDLER,base,c.Rip,fn,&c,&handler_data,&establisher,NULL);
++                    } else if (image && c.Rip-(uintptr_t)image<0x20000000) {
++                        /* guest code keeps frame pointers */
++                        uintptr_t saved, ret;
++                        if (!c.Rbp || !read_word(c.Rbp,&saved) || !read_word(c.Rbp+8,&ret)) break;
++                        c.Rsp=c.Rbp+16; c.Rip=ret; c.Rbp=saved;
++                    } else {
++                        uintptr_t ret;
++                        if (!read_word((uintptr_t)c.Rsp,&ret)) break;
++                        c.Rip=ret; c.Rsp+=8;
++                    }
++                    if (!c.Rip) break;
++                    stack[n++]=c.Rip;
++                }
++                runtime_fault_recover=NULL;
++            }
++            ResumeThread(threads[i].handle);
++            if (!n) continue;
++            uint64_t us=(uint64_t)(now.QuadPart*1000000.0/frequency.QuadPart);
++            uint32_t id=threads[i].id;
++            fputc('S',out); fwrite(&us,8,1,out); fwrite(&id,4,1,out); fwrite(&n,1,1,out); fwrite(stack,8,n,out);
++        }
++        Sleep(wait_us/1000 ? wait_us/1000 : 1);
++    }
++    return 0;
++}
+ static DWORD WINAPI stacks_watcher(void *path) {
+     for (;;) {
+         Sleep(500);
+@@ -1087,6 +1184,7 @@ int main(int argc, char **argv) {
+     if (getenv("BB_FAULT_RING")) fault_ring_open(getenv("BB_FAULT_RING"));
+     if (getenv("BB_STACKS_TRIGGER")) CreateThread(NULL,0,stacks_watcher,(void *)getenv("BB_STACKS_TRIGGER"),0,NULL);
+     if (getenv("SOTC_PROFILE")) CreateThread(NULL,0,profiler,(void *)getenv("SOTC_PROFILE"),0,NULL);
++    if (getenv("SOTC_SPIKE_OUT")) CreateThread(NULL,0,spike_sampler,(void *)getenv("SOTC_SPIKE_OUT"),0,NULL);
+     SetUnhandledExceptionFilter(unhandled_fault);
+     if (getenv("BB_STRICT_HANDLES")) {
+         PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY strict={0};

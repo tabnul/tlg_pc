@@ -75,8 +75,9 @@ default on RTX cards. **FSR 3.1 Native AA** does the same with AMD FSR on any ca
 between the chosen anti-aliasing and the original SMAA. See [docs/dlaa.md](docs/dlaa.md).
 
 **Any resolution and aspect ratio.** The game renders at the window's resolution, including 21:9
-and 32:9. The menus, hints and subtitles are laid out for the wider screen instead of being
-stretched.
+and 32:9. At 21:9 the menus, hints and subtitles are laid out for the wider screen instead of
+being stretched. 32:9 is experimental: the game runs, but some overlays sit to the left and parts
+of the menus are stretched.
 
 **AI-upscaled textures.** [ps4-texturepack-generator](https://github.com/tabnul/ps4-texturepack-generator),
 a separate tool, turns the textures of your own copy into a 4x upscaled pack (colour textures and

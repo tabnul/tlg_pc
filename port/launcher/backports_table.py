@@ -9,6 +9,8 @@ every row here was checked against THIS port's sources (tests/test_backports_tab
   - DIAGNOSTICS: TLG_* environment switches the GPU code reads at start (texture_cache.h,
     vk_presenter.cpp, resource.h, emulator_settings.h). They are kept in settings.json and passed
     as TLG_<name>=0/1 only when the player changed them.
+  - READBACK: the same kind of switches for GPU readbacks (Tk launcher: Advanced settings), never
+    part of a graphics preset.
 There are no BPnn backports in this port (the GPU code has no TLG_BPnn switches), and no
 Advanced parameters (advanced_table.py is empty), so those screens stay hidden.
 """
@@ -145,10 +147,6 @@ MENU = [
            'Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado.'),
           choices=(('0', 'Off (recommended)', 'Desligado (recomendado)'), ('16', '16 MB', '16 MB'),
                    ('64', '64 MB (not recommended)', '64 MB (não recomendado)'))),
-    _menu('Performance', 'async_shaders', 'bool', '1',
-          ('Compile new shaders in the background', 'Compilar shaders novos em segundo plano'),
-          ('Fewer hitches when a new effect appears; an object whose shader is not ready yet may be missing for a frame.',
-           'Menos engasgos quando aparece um efeito novo; um objeto cujo shader ainda não está pronto pode sumir por um quadro.')),
     _menu('Overlay', 'overlay_fps', 'bool', '1', ('Overlay: FPS', 'Overlay: FPS'),
           ('Shows the frame rate in the performance overlay.', 'Mostra os quadros por segundo no overlay.')),
     _menu('Overlay', 'overlay_frametime', 'bool', '1', ('Overlay: frame time', 'Overlay: tempo de quadro'),
@@ -179,14 +177,6 @@ BACKPORTS = []   # no TLG_BPnn switch exists in this port's GPU code
 # Start-up switches (environment, read once when the game starts). Defaults: the value the game
 # gets from this port (tlg_run.DEFAULT_ENV or the code's own fallback).
 DIAGNOSTICS = [
-    _ab('deferred_readback', 'TLG_DEFERRED_READBACK', False, False,
-        ('Deferred GPU readbacks', 'Leituras da GPU adiadas'),
-        ('Only the thread that reads GPU results waits, not the whole GPU. Experimental in this game.',
-         'Só a thread que lê resultados da GPU espera, não a GPU inteira. Experimental neste jogo.'), risky=True),
-    _ab('stale_readback', 'TLG_STALE_READBACK', False, False,
-        ('Stale readbacks', 'Leituras da GPU com um quadro de atraso'),
-        ('CPU reads see the last published GPU version instead of waiting (needs deferred readbacks).',
-         'A CPU lê a última versão publicada pela GPU em vez de esperar (precisa das leituras adiadas).'), risky=True),
     _ab('direct_memory_access', 'TLG_DIRECT_MEMORY_ACCESS', False, False,
         ('Direct memory access (shaders)', 'Acesso direto à memória (shaders)'),
         ('Shaders read constants straight from the game\'s memory when their address is computed: '
@@ -195,10 +185,6 @@ DIAGNOSTICS = [
          'Os shaders leem constantes direto da memória do jogo quando o endereço é calculado: corrige '
          'algumas cenas com problema, mas o jogo fica mais lento. Os shaders dela são compilados de novo, '
          'num cache próprio.'), risky=True),
-    _ab('readback_linear', 'TLG_READBACK_LINEAR', True, False,
-        ('Read small render targets back', 'Ler de volta render targets pequenos'),
-        ('Copies small and linear render targets back to the CPU: the game\'s auto exposure needs it (#38, #40).',
-         'Copia render targets pequenos e lineares de volta para a CPU: a exposição automática do jogo precisa (#38, #40).')),
     _ab('background_warmup', 'TLG_BACKGROUND_WARMUP', True, False,
         ('Load pipelines while playing', 'Carregar pipelines durante o jogo'),
         ('The cached pipelines load in the background (a corner note shows progress); off blocks until all are loaded.',
@@ -218,8 +204,69 @@ DIAGNOSTICS = [
          'Derruba o jogo no driver NVIDIA 595; desligado por padrão neste port.'), broken=True),
 ]
 
+# GPU readback start-up switches: the Tk launcher's Advanced settings dialog. Never part of a
+# graphics preset (NOT_IN_PRESETS): they trade correctness for speed, not looks.
+READBACK = [
+    _ab('deferred_readback', 'TLG_DEFERRED_READBACK', True, False,
+        ('Deferred GPU readbacks', 'Leituras da GPU adiadas'),
+        ('Only the thread that reads GPU results waits, not the whole GPU.',
+         'Só a thread que lê resultados da GPU espera, não a GPU inteira.')),
+    _ab('rb_hot', 'TLG_RB_HOT', True, False,
+        ('Hot readbacks', 'Leituras quentes'),
+        ('Small regions the game reads back again and again stay readable instead of waiting each time.',
+         'Regiões pequenas que o jogo lê de novo e de novo ficam legíveis em vez de esperar toda vez.')),
+    _ab('fast_read_fault', 'TLG_FAST_READ_FAULT', True, False,
+        ('Skip readbacks of unchanged memory', 'Pular leituras de memória não alterada'),
+        ('A CPU read of memory the GPU did not write does not wait for the GPU thread.',
+         'Uma leitura da CPU de memória que a GPU não escreveu não espera a thread da GPU.')),
+    _ab('readback_linear', 'TLG_READBACK_LINEAR', True, False,
+        ('Read small render targets back', 'Ler de volta render targets pequenos'),
+        ('Copies small and linear render targets back to the CPU.',
+         'Copia render targets pequenos e lineares de volta para a CPU.')),
+    _ab('stale_readback', 'TLG_STALE_READBACK', False, False,
+        ('Stale readbacks', 'Leituras da GPU com um quadro de atraso'),
+        ('CPU reads see the last published GPU version instead of waiting (needs deferred readbacks).',
+         'A CPU lê a última versão publicada pela GPU em vez de esperar (precisa das leituras adiadas).'), risky=True),
+    _ab('gc_batch_download', 'TLG_GC_BATCH_DOWNLOAD', False, False,
+        ('Batch write-backs of evicted textures', 'Agrupar a cópia de texturas descartadas'),
+        ('When textures are evicted, waits for the GPU once for all of them instead of once per texture.',
+         'Quando texturas são descartadas, espera a GPU uma vez para todas em vez de uma vez por textura.')),
+    _ab('async_fences', 'TLG_ASYNC_FENCES', False, False,
+        ('Asynchronous fences', 'Fences assíncronas'),
+        ('Signals the game\'s fences once the memory copies before them are done, instead of waiting for them.',
+         'Sinaliza as fences do jogo quando as cópias de memória antes delas terminam, em vez de esperar por elas.')),
+]
+# Why each default is what it is (shown under the row, with the default).
+READBACK_WHY = {
+    'TLG_DEFERRED_READBACK': ('3-6% more FPS on three test routes (2026-10-26). Turn it off only to check '
+                              'whether a broken scene comes from it.',
+                              '3-6% mais FPS em três rotas de teste (2026-10-26). Desligue só para ver se uma '
+                              'cena com problema vem disso.'),
+    'TLG_RB_HOT': ('Halves the readbacks: 6-13% more FPS in the pulse test, the other routes unchanged (2026-10-25).',
+                   'Corta as leituras pela metade: 6-13% mais FPS no teste pulse, as outras rotas iguais (2026-10-25).'),
+    'TLG_FAST_READ_FAULT': ('Off only adds waits for the GPU thread (about 3 ms per read in inFAMOUS, hundreds '
+                            'per second).',
+                            'Desligado só acrescenta esperas pela thread da GPU (cerca de 3 ms por leitura no inFAMOUS, '
+                            'centenas por segundo).'),
+    'TLG_READBACK_LINEAR': ('The game\'s auto exposure needs it: off makes scenes too dark or too bright (#38, #40).',
+                            'A exposição automática do jogo precisa: desligado deixa cenas escuras ou claras demais '
+                            '(#38, #40).'),
+    'TLG_STALE_READBACK': ('The game drives gameplay from GPU results: in a test with its GPU queries one frame late '
+                           'the boy missed Trico.',
+                           'O jogo usa resultados da GPU na jogabilidade: num teste com as consultas da GPU um quadro '
+                           'atrasadas o menino errou o Trico.'),
+    'TLG_GC_BATCH_DOWNLOAD': ('Not measured in this game yet.', 'Ainda não medido neste jogo.'),
+    'TLG_ASYNC_FENCES': ('Measured slower (79 against 83 FPS): the game waits on these fences.',
+                         'Medido mais lento (79 contra 83 FPS): o jogo espera por essas fences.'),
+    'menu:readback_batch': ('Off is 2-5 FPS faster than a batch since the fence flushes and the side queue (2026-10-23).',
+                            'Desligado é 2-5 FPS mais rápido que um lote desde as submissões nas fences e a fila '
+                            'extra (2026-10-23).'),
+}
+
 ADVANCED = advanced_table.build(_make)
-ITEMS = MENU + BACKPORTS + DIAGNOSTICS + ADVANCED
+ITEMS = MENU + BACKPORTS + DIAGNOSTICS + READBACK + ADVANCED
+# Rows a graphics preset never sets, exports or imports (they are in the Advanced settings dialog).
+NOT_IN_PRESETS = frozenset([item.id for item in READBACK] + ['menu:readback_batch'])
 PREFIX = 'TLG_'
 
 
@@ -313,7 +360,7 @@ def is_recommended(item):
 def changes(states):
     """How many start-up switches differ from the Recommended profile. The game menu options
     (overlay corner, limits...) are preferences and do not count."""
-    return sum(1 for item in BACKPORTS + DIAGNOSTICS if states.get(item.id) is not None)
+    return sum(1 for item in BACKPORTS + DIAGNOSTICS + READBACK if states.get(item.id) is not None)
 
 
 def advanced_changes(states):
