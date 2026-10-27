@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "tlg_overlay.h"
+#include "../../src/runtime_menu.h"
 
 #include <algorithm>
 #include <atomic>
@@ -996,7 +997,9 @@ void TextEntryBox() {
     ImGui::SetWindowFontScale(1.0f);
     ImGui::Separator();
     ImGui::TextDisabled("Keyboard: type, Backspace to erase, Enter = OK, Esc = cancel");
-    ImGui::TextDisabled("Controller: Cross (A) = OK, Circle (B) = cancel");
+    ImGui::TextDisabled("%s", menu_circle_confirm()
+        ? "Controller: Circle (B) = OK, Cross (A) = cancel"
+        : "Controller: Cross (A) = OK, Circle (B) = cancel");
     ImGui::End();
 }
 
@@ -1051,8 +1054,9 @@ struct SavePainter {
     void Line(float x0, float y0, float x1, float y1, u32 rgb, float thickness, float alpha = 1.0f) const {
         dl->AddLine(P(x0, y0), P(x1, y1), SaveColor(rgb, alpha), thickness * k);
     }
-    // A controller button: 0 Cross (confirm), 1 Circle (back), centred at (x, y).
+    // Semantic action: 0 confirm, 1 back; choose its physical glyph by menu policy.
     void Button(float x, float y, int which) const {
+        which ^= menu_circle_confirm();
         const ImVec2 c = P(x, y);
         dl->AddCircleFilled(c, 11.0f * k, SaveColor(kSaveThumb));
         dl->AddCircle(c, 11.0f * k, SaveColor(kSaveKnob), 0, 1.0f * k);
@@ -1559,6 +1563,7 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr; // window positions are not kept
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+    io.ConfigNavSwapGamepadButtons = menu_circle_confirm();
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
     io.BackendPlatformName = "tlg";
 
@@ -1693,7 +1698,8 @@ bool HandleSaveEvent(const SDL_Event& event) {
         move = button == SDL_GAMEPAD_BUTTON_DPAD_UP || button == SDL_GAMEPAD_BUTTON_DPAD_LEFT ? -1
                : button == SDL_GAMEPAD_BUTTON_DPAD_DOWN || button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT ? 1
                                                                                                   : 0;
-        finish = button == SDL_GAMEPAD_BUTTON_SOUTH ? 1 : button == SDL_GAMEPAD_BUTTON_EAST ? 2 : 0;
+        finish = menu_button_result(button == SDL_GAMEPAD_BUTTON_SOUTH,
+                                    button == SDL_GAMEPAD_BUTTON_EAST);
         break;
     }
     case SDL_EVENT_MOUSE_MOTION: {

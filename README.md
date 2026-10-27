@@ -117,6 +117,11 @@ launcher has the same settings, so you can set things up before starting.
 - **Frame rate:** 30 (as on PS4), 60 or unlocked. Unlocked lowers the base frame rate by about
   10 FPS against 60 at the same spot (about 57 vs 48 FPS in our test), so pick 60 unless your PC
   runs well above 60.
+- **Menu buttons:** [Cross/Circle confirmation](docs/menu-buttons.md), without swapping gameplay
+  buttons. The in-game menu conversion requires the verified EU 01.03 executable.
+- **Japanese text (experimental):** on EU CUSA03745 update 01.03, choose **日本語 (EU 1.03 text
+  fallback)** in Game language. The embedded-asset fallback moves or deletes no archives. See
+  [setup and limitations](docs/japanese.md); this is not Japanese-region disc support.
 
 Every setting shows the value the game originally used. Its help text says what we would pick and
 why, and what it costs where we measured it. We tested every candidate setting. The ones that made
@@ -181,6 +186,8 @@ well (`build_dlss.sh`).
 - [gow3_pc](https://github.com/FelipePrado0/gow3_pc), [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
   and the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which the port builds on.
 - illusiony and DanielSvoboda for the GoldHEN level select, QA menu and bridge fix patches.
+- [kanjieater](https://github.com/kanjieater) for the Cross/Circle menu confirmation and the
+  EU 1.03 Japanese text option (upstream PRs #140, #141). Thank you!
 - [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) for audio.
 - [4x-UltraSharp](https://huggingface.co/Kim2091/UltraSharp) by Kim2091, the default texture
   upscale model (CC BY-NC-SA 4.0), and Microsoft's

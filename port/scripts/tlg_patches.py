@@ -9,7 +9,8 @@ before anything is written, so another build never gets byte writes in the wrong
 loader (probe.c apply_patches) applies the file after relocation. Image offsets are eboot
 virtual addresses; the Ghidra addresses in the comments (base 0x1000000) are offset + 0x1000000.
 
-30 with no mods enabled writes an empty patch file: the game runs exactly as on PS4.
+30 with no mods and the default Cross-confirm writes an empty patch file.
+Circle-confirm adds a separately hash-guarded game-menu conversion (verified EU 01.03 only).
 
 Mods/cheats (--mods-dir/--mods-config, mod_patches.py): shadPS4/GoldHEN cheat XML files the
 player drops in the mods folder. Nothing in there has any effect until it is enabled (the
@@ -295,6 +296,29 @@ def garlic_writes(eboot):
     size_mb = 2816 + GARLIC_EXTRA_MB
     return [(garlic, GARLIC_SIZE_EXPECTED[:2] + struct.pack('<I', size_mb << 20),
              f'garlic: {GARLIC_SIZE:#x} GPU heap 2816 -> {size_mb} MB')]
+# Verified EU CUSA03745 01.03, decoded from the SELF. Other builds fail closed.
+MENU_ELF_SHA256 = 'ce2a5da1de13d7e43a2403cefe649f0f35a968e8b3779b911a314292472ef573'
+MENU_OFFSET = 0xd2ebee
+MENU_EXPECTED = bytes.fromhex('41c1e20541c1e5034509d54489e9')
+
+
+def menu_writes(eboot, preference):
+    """Only synthesize different menu flags; ordinary gameplay face-button bits stay intact.
+
+    The game ignores system parameter 1000. Its normalizer separately appends confirm
+    (0x20000) and cancel (0x40000): raw Circle 0x2000 << 5, raw Cross 0x4000 << 3.
+    Shifting both by 4 exchanges these two extra flags, not the ordinary Cross/Circle bits.
+    """
+    if preference == 'cross':
+        return []
+    if preference != 'circle':
+        raise ValueError(f'unknown menu confirm button: {preference!r}')
+    if not eboot or hashlib.sha256(eboot).hexdigest() != MENU_ELF_SHA256:
+        raise ValueError('Circle confirm requires the verified CUSA03745 01.03 executable')
+    start = TEXT_FILE_OFFSET + MENU_OFFSET
+    if eboot[start:start + len(MENU_EXPECTED)] != MENU_EXPECTED:
+        raise ValueError('menu flag conversion instructions do not match')
+    return [(MENU_OFFSET, bytes.fromhex('41c1e20441c1e504'), 'Circle-confirm / Cross-back menu flags')]
 
 
 def write_patch_file(path, writes):
@@ -341,7 +365,7 @@ def compile_mods(game_dir, eboot, mods_dir, mods_config, lines):
 
 
 def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution=None,
-            skip_logos=False):
+            skip_logos=False, menu_confirm='cross'):
     """Writes out/patches.bin for the mode plus any enabled mod; returns (applied mode, lines).
     Any problem with the frame rate patches (other eboot build, unexpected bytes) falls back to
     30 FPS without them; a mod problem only drops that mod, never the frame rate patches."""
@@ -414,7 +438,19 @@ def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution
         lines.append(f'GPU heap: {error}: not applied, 2816 MB')
     for _, data, what in heap:
         lines.append(f'Patch {what} ({data.hex()})')
-    writes = fps_writes + mod_writes + res_writes + logo + heap
+    menu = []
+    if menu_confirm != 'cross':
+        try:
+            menu = menu_writes(read_eboot_elf(game_dir), menu_confirm)
+            lines.append('Menu buttons: Circle confirms, Cross goes back (gameplay unchanged)')
+        except ValueError as error:
+            lines.append(f'Menu buttons: {error}; game-menu patch not applied')
+    # External mods must not silently overwrite the selected menu policy.
+    if any(a < b + len(other) and b < a + len(data)
+           for a, data, _ in menu for b, other, _ in mod_writes):
+        lines.append('Mods: overlap with menu-button conversion; external mods not applied')
+        mod_writes = []
+    writes = fps_writes + menu + mod_writes + res_writes + logo + heap
     write_patch_file(Path(out_dir) / 'patches.bin', writes)
     lines.append(f'Frame rate: {mode} FPS mode, {len(writes)} patch writes')
     return mode, lines
@@ -429,9 +465,11 @@ def main():
     p.add_argument('--mods-config', help='mods.json: {"enabled": [...], "disabled": [...]}')
     p.add_argument('--resolution', help='WxH, e.g. 3440x1440 (default 1920x1080)')
     p.add_argument('--skip-logos', action='store_true', help='skip the boot logos')
+    p.add_argument('--menu-confirm', choices=('cross', 'circle'), default='cross',
+                   help='menu confirm button; Circle game-menu patch requires verified EU 01.03')
     a = p.parse_args()
     _, lines = prepare(a.game_dir, a.out, a.mode, a.mods_dir, a.mods_config, a.resolution,
-                       a.skip_logos)
+                       a.skip_logos, a.menu_confirm)
     print('\n'.join(lines))
 
 

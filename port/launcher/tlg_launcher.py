@@ -97,6 +97,7 @@ TEXT = {
     'audio': ('Audio', 'Áudio'),
     'native_audio': ('Native audio (libSceNgs2.sprx from your console)', 'Áudio nativo (libSceNgs2.sprx do seu console)'),
     'controls': ('Controls', 'Controles'),
+    'menu_confirm': ('Menu confirm button (next launch)', 'Botão de confirmação (próxima inicialização)'),
     'mouse_enabled': ('Mouse turns the camera', 'Mouse gira a câmera'),
     'mouse_invert_y': ('Invert mouse Y axis', 'Inverter eixo Y do mouse'),
     'mouse_sensitivity': ('Mouse sensitivity', 'Sensibilidade do mouse'),
@@ -300,7 +301,8 @@ TEXT = {
     'already': ('The game is already running.', 'O jogo já está rodando.'),
     'error': ('Error', 'Erro'),
 }
-GAME_LANGUAGE_NAMES = {'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
+GAME_LANGUAGE_NAMES = {'ja': tlg_run.JAPANESE_FALLBACK_LABEL,
+                       'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
                        'de': 'Deutsch', 'it': 'Italiano', 'nl': 'Nederlands',
                        'pt_PT': 'Português (Portugal)', 'ru': 'Русский', 'fi': 'Suomi',
                        'sv': 'Svenska', 'da': 'Dansk', 'no': 'Norsk', 'pl': 'Polski',
@@ -516,6 +518,8 @@ class Launcher:
         controls.columnconfigure(1, weight=1)
         self.check(controls, 0, 'mouse_enabled')
         self.check(controls, 1, 'mouse_invert_y')
+        self.combo(controls, 4, 'menu_confirm', ['cross', 'circle'],
+                   lambda k: 'Cross (X / A)' if k == 'cross' else 'Circle (O / B)')
         ttk.Label(controls, text=self.t('mouse_sensitivity')).grid(row=2, column=0, sticky='w', pady=(4, 0))
         sens = tk.DoubleVar(value=float(self.settings.get('mouse_sensitivity', 1.0)))
         self.vars['mouse_sensitivity'] = sens
@@ -844,7 +848,7 @@ class Launcher:
         """Reload the combo for the game folder: another CUSA ships another set of languages."""
         if getattr(self, 'game_lang_box', None) is None:
             return
-        values = list(tlg_run.game_languages(self.settings.get('game_dir')))
+        values = [key for key in tlg_run.game_language_choices(self.settings) if key != 'auto']
         self.game_lang_values = values
         self.game_lang_box.configure(values=[GAME_LANGUAGE_NAMES.get(v, v) for v in values])
         current = self.settings.get('game_language')

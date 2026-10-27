@@ -90,6 +90,9 @@ void runtime_file_configure(const char *app0,const char *user) {
     snprintf(user_root,sizeof(user_root),"%s",user);
     runtime_file_mount("/app0",app0);
     runtime_file_mount("/hostapp",app0);
+    const char *japanese=getenv("TLG_JAPANESE_FALLBACK");
+    if (japanese && !strcmp(japanese,"1"))
+        puts("Runtime: Japanese text fallback: French root archives hidden from guest; host files unchanged");
     const char *writable[]={"temp0","download0","data"};
     mkdir(user,0755);
     for (int i=0;i<3;++i) {
@@ -99,6 +102,34 @@ void runtime_file_configure(const char *app0,const char *user) {
         runtime_file_mount(guest,path);
     }
 }
+/* Opt-in EU Japanese-text fallback: hide only the root French localization archives
+ * from the guest. Never move/delete host files or affect saves/other language packs. */
+static int language_archive_name(const char *name,const char *expected) {
+    for (;*name && *expected;++name,++expected) {
+        unsigned char c=(unsigned char)*name;
+        if (c>='A' && c<='Z') c+=(unsigned char)('a'-'A');
+        if (c!=(unsigned char)*expected) return 0;
+    }
+    return !*name && !*expected;
+}
+static int japanese_hidden_archive(const char *guest) {
+    const char *enabled=getenv("TLG_JAPANESE_FALLBACK");
+    if (!enabled || strcmp(enabled,"1") || !guest) return 0;
+    const char *p=guest;
+    if (*p=='/') {
+        if (!strncmp(p,"/app0/",6)) p+=6;
+        else if (!strncmp(p,"/hostapp/",9)) p+=9;
+        else return 0;
+    }
+    for (;;) {
+        while (*p=='/') ++p;
+        if (p[0]=='.' && p[1]=='/') { p+=2; continue; }
+        break;
+    }
+    return language_archive_name(p,"trico_frf.psarc") ||
+           language_archive_name(p,"trico_frfp.psarc");
+}
+
 /* Resolve a guest path to a host path; returns 0 or a host errno. */
 static int translate(const char *guest,char *out,size_t size) {
     if (!guest || !*guest) return ENOENT;
@@ -107,6 +138,7 @@ static int translate(const char *guest,char *out,size_t size) {
     else snprintf(buffer,sizeof(buffer),"%s",guest);
     for (const char *p=buffer;(p=strstr(p,".."));p+=2)
         if ((p==buffer || p[-1]=='/') && (p[2]==0 || p[2]=='/')) return EACCES;
+    if (japanese_hidden_archive(buffer)) return ENOENT;
     pthread_mutex_lock(&lock);
     size_t best=0; const Mount *m=NULL;
     for (size_t i=0;i<mount_count;++i) {
@@ -136,13 +168,16 @@ static int host_flags(int flags) {
     return r|O_CLOEXEC;
 }
 static void free_listing(Listing *l) { if (l) { free(l->names); free(l->offsets); free(l->types); free(l); } }
-static Listing *list_directory(const char *path) {
+static Listing *list_directory(const char *path,const char *guest) {
     DIR *d=opendir(path);
     if (!d) return NULL;
     Listing *l=calloc(1,sizeof(*l));
     size_t capacity=0,bytes=0,cap_names=0;
     struct dirent *e;
     while (l && (e=readdir(d))) {
+        char child_guest[1400];
+        if ((size_t)snprintf(child_guest,sizeof(child_guest),"%s/%s",guest,e->d_name)<sizeof(child_guest) &&
+            japanese_hidden_archive(child_guest)) continue;
         size_t n=strlen(e->d_name)+1;
         if (l->count==capacity) {
             capacity=capacity ? capacity*2 : 64;
@@ -227,7 +262,7 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     int host=-1;
     if (!host_stat(path,&s) && S_ISDIR(s.st_mode)) {
         if (flags&3) return -EISDIR;
-        if (!(dir=list_directory(path))) return -EACCES;
+        if (!(dir=list_directory(path,guest))) return -EACCES;
     } else if (flags&0x20000) {
         e=errno==ENOENT ? ENOENT : ENOTDIR;
         if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
@@ -252,7 +287,7 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     }
     struct stat s;
     Listing *dir=NULL;
-    if (!fstat(host,&s) && S_ISDIR(s.st_mode)) dir=list_directory(path);
+    if (!fstat(host,&s) && S_ISDIR(s.st_mode)) dir=list_directory(path,guest);
 #endif
     pthread_mutex_lock(&lock);
     int fd=-1;
