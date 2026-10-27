@@ -314,6 +314,13 @@ if (WIN32)
     set_target_properties(isa-sse4a-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_compile_options(isa-sse4a-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
     target_include_directories(isa-sse4a-test PRIVATE .. ../src)
+    # Memory another program holds in the PS4 range at start-up (SpartanPort #1076).
+    add_executable(memory-reserve-test EXCLUDE_FROM_ALL ../tests/test_memory_reserve.c ../src/compat_win.c)
+    set_target_properties(memory-reserve-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
+    target_compile_options(memory-reserve-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+    target_include_directories(memory-reserve-test PRIVATE .. ../src)
+    target_link_libraries(memory-reserve-test PRIVATE onecore bcrypt -pthread)
+    target_link_options(memory-reserve-test PRIVATE -Wl,--disable-high-entropy-va)
     add_executable(tlg-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tlg-gpu-capabilities.rc)
     target_link_libraries(tlg-gpu-capabilities PRIVATE Vulkan::Vulkan)
     # "Play The Last Guardian.exe": the game with the launcher's saved settings, no launcher window.
