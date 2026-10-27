@@ -356,10 +356,10 @@ bool GameEdits(std::string& patched, std::string_view name) {
                        " if f then f() end");
         return true;
     }
-    // Bridge fix (setting bridge_fix): the GoldHEN "Collapsing Bridge Freeze Fix". The slow
-    // motion while the bridge in the pit collapses can leave the game frozen; skip it.
+    // Bridge fix (always on): the GoldHEN "Collapsing Bridge Freeze Fix". The slow motion
+    // while the bridge in the pit collapses can leave the game frozen; skip it.
     static constexpr std::string_view SlowMotion = "MS.SetGameSpeed(0.10, 0.2)";
-    if (s.bridge_fix && name == "data_trico/game/scripts/stages/s10_Pit/missionScript.lua") {
+    if (name == "data_trico/game/scripts/stages/s10_Pit/missionScript.lua") {
         const size_t at = patched.find(SlowMotion);
         if (at == std::string::npos) {
             return false;

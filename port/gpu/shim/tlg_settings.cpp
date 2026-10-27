@@ -147,8 +147,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.dlaa = i != 0;
     } else if (key == "level_select") {
         v.level_select = i != 0;
-    } else if (key == "bridge_fix") {
-        v.bridge_fix = i != 0;
     } else if (key == "shadow_scale") {
         v.shadow_scale = i >= 4 ? 4 : i >= 2 ? 2 : 1;
     } else if (std::atomic<int>* effect = EffectSetting(v, key)) {
@@ -321,7 +319,7 @@ void Load() {
         {"TLG_MOUSE_INVERT_Y", "mouse_invert_y"},    {"TLG_MOUSE_SMOOTHING", "mouse_smoothing"},
         {"TLG_MOUSE_ACCEL", "mouse_accel"},          {"TLG_MOUSE_DEADZONE", "mouse_deadzone"},
         {"TLG_SMAA", "smaa"},                        {"TLG_DLAA", "dlaa"},
-        {"TLG_LEVEL_SELECT", "level_select"},        {"TLG_BRIDGE_FIX", "bridge_fix"},
+        {"TLG_LEVEL_SELECT", "level_select"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
         {"TLG_HDR", "hdr"},
     };
@@ -483,8 +481,7 @@ void Save() {
                  int(v.dlaa.load()),v.shadow_scale.load(), int(v.smaa.load()), int(v.cas.load()), v.cas_strength.load(),
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
-    std::fprintf(file, "level_select=%d\nbridge_fix=%d\n", int(v.level_select.load()),
-                 int(v.bridge_fix.load()));
+    std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
     std::fprintf(file, "fov=%d\n", v.fov.load());
