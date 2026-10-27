@@ -188,6 +188,9 @@ well (`build_dlss.sh`).
 - NVIDIA DLSS, under the NVIDIA DLSS license.
 - [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
   FSR 4 on Vulkan, which FSR 3.1 Native AA runs on. Thank you!
+- Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
+  another program's DLL already sits in the PS4 address range
+  ([SpartanPort #1076](https://github.com/FelipePrado0/SpartanPort/pull/1076)). Thank you!
 
 GPL-2.0, see [port/LICENSE](port/LICENSE).
 
