@@ -31,7 +31,8 @@ void ResetAll();
 /// The game's value for the wind skinning frame skip (fixed menu row), "" when unknown.
 std::string WindGame();
 
-/// Lua for the settings tick: the helpers plus one call per row. Game thread.
+/// Lua for the settings tick: the helpers plus one call per row, run once per compile; each
+/// run of the tick's function then calls LabApply(). Game thread.
 std::string Lua(int wind_skip);
 /// "<index> <text>" from a "--TLGVAL" chunk: the game's value of row `index` (-1: wind).
 void Report(std::string_view text);

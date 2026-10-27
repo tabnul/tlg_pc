@@ -4,6 +4,8 @@
 // is replaced by code applying the Effects settings to the game's post-process objects, so
 // menu changes apply live, plus the Lab rows (tlg_lab.h). "--TLGLOG <text>" chunks print <text>
 // (data out of Lua); "--TLGVAL <row> <value>" chunks report a Lab row's game value.
+// The settings code compiles into a function the tick keeps and runs every time; it is sent
+// again only when its text changes, so a tick compiles nothing and creates few strings.
 #include "tlg_lab.h"
 #include "tlg_settings.h"
 #include <algorithm>
@@ -23,8 +25,10 @@ using LoadFn = int(__attribute__((sysv_abi))*)(void*, void*, const char*, uint64
 LoadFn original;
 
 constexpr std::string_view Bootstrap = R"(
-do local n,ls=0,loadstring or load RegisterTick(function() n=n+1 if n>=15 then n=0
-local f,e=ls('--TLGSET') local ok=true if f then ok,e=pcall(f) end
+do local n,ls,run=0,loadstring or load RegisterTick(function() n=n+1 if n>=15 then n=0
+local f,e=ls(run and '--TLGSET' or '--TLGSET new') local ok=true
+if f then ok,e=pcall(f) if ok and type(e)=='function' then run=e end end
+if f and ok and run then ok,e=pcall(run) end
 if (not f or not ok) and e~=_TLGERR then _TLGERR=e local g=ls('--TLGLOG error: '..tostring(e)) if g then g() end end
 end end) end
 )";
@@ -38,7 +42,6 @@ local ls=loadstring or load
 local function L(s) local f=ls('--TLGLOG '..s) if f then f() end end
 _TLGB=_TLGB or {}
 local B=_TLGB
-B.run=(B.run or 0)+1
 local function Parts(v) local t={} for n in tostring(v):gmatch('%S+') do t[#t+1]=tonumber(n) or 0 end return t end
 local function Scale(o,key,prop,pct,parts,add)
   if not o then return end
@@ -66,35 +69,24 @@ local function Feature(o,name,pct)
   if pct==0 and on then o.features='~'..name B.off[name]=true
   elseif pct>0 and B.off[name] then B.off[name]=nil if not on then o.features='|'..name end end
 end
-local pp=FindObject('_default_env_pp')
-local cam=FindObject('_trico_camera')
-local cs=FindObject('_default_env_cs')
 local XY,XZ,ALL,XYZ={1,2},{1,3},{1,2,3,4},{1,2,3}
--- Area loads add objects, so the lists below are made again when the game finishes a load
--- (RegionController.IsLoading goes back to false). Listing every object stalls the game, which
--- re-listing every 20 ticks did every few seconds with any wind setting off its default. Without
--- the loading state the lists are made again every 240 ticks.
-local okl,ld=pcall(function() return RegionController.IsLoading() end)
-B.gen=B.gen or 0
-if not okl then if B.run%240==0 then B.gen=B.gen+1 end
-elseif ld then B.ld=true elseif B.ld then B.ld=nil B.gen=B.gen+1 end
--- Names of the objects of one class whose name contains match; one enumeration serves every
--- caller and the class of each name is looked up once.
+local function Loading() return RegionController.IsLoading() end
+-- Names of the objects of one class whose name contains match; the class of each name is looked
+-- up once. EnumerateObjectList(match) filters in the engine (a substring test on the name): the
+-- full list is ~200k names, and pushing those into Lua after every load stalled the game 0.7-0.9 s.
 local function Each(key,class,match)
   local l=B[key] or {c={}}
   B[key]=l
   if not l.n or l.gen~=B.gen then
     l.n={} l.gen=B.gen
-    if B.allgen~=B.gen then B.all=EnumerateObjectList() or {} B.allgen=B.gen end
-    for _,n in ipairs(B.all) do
-      if n:find(match,1,true) then
-        local c=l.c[n]
-        if c==nil then
-          local o=FindObject(n)
-          if o then c=tostring(o._class_name)==class l.c[n]=c end
-        end
-        if c then l.n[#l.n+1]=n end
+    local all=EnumerateObjectList(match) or {}
+    for _,n in ipairs(all) do
+      local c=l.c[n]
+      if c==nil then
+        local o=FindObject(n)
+        if o then c=tostring(o._class_name)==class l.c[n]=c end
       end
+      if c then l.n[#l.n+1]=n end
     end
   end
   return l.n
@@ -102,9 +94,9 @@ end
 -- The wind settings write once per area load and when the user changes them, not every run (a
 -- value the game resets in between returns at the next load).
 local function Due(key,v)
-  local s=B.gen..'|'..tostring(v)
-  if B[key]==s then return false end
-  B[key]=s return true
+  local e=B[key]
+  if type(e)=='table' and e.g==B.gen and e.v==v then return false end
+  B[key]={g=B.gen,v=v} return true
 end
 -- Trico's feathers and hair sway by the wind Influence of his SwingTypes (one per model part).
 -- At the default nothing runs once restored.
@@ -162,6 +154,23 @@ local function TreeWind(pct)
 end
 )";
 
+// The start of the function the tick runs: objects are looked up again every run.
+constexpr std::string_view PerRun = R"(
+return function()
+B.run=(B.run or 0)+1
+local pp=FindObject('_default_env_pp')
+local cam=FindObject('_trico_camera')
+local cs=FindObject('_default_env_cs')
+-- Area loads add objects, so the lists above are made again when the game finishes a load
+-- (RegionController.IsLoading goes back to false). Listing every object stalls the game, which
+-- re-listing every 20 ticks did every few seconds with any wind setting off its default. Without
+-- the loading state the lists are made again every 240 ticks.
+local okl,ld=pcall(Loading)
+B.gen=B.gen or 0
+if not okl then if B.run%240==0 then B.gen=B.gen+1 end
+elseif ld then B.ld=true elseif B.ld then B.ld=nil B.gen=B.gen+1 end
+)";
+
 // Development: the file named by TLG_LUA_EXEC runs once each time it changes (live console).
 std::string DevChunk() {
     static const char* path = std::getenv("TLG_LUA_EXEC");
@@ -175,7 +184,9 @@ std::string DevChunk() {
     std::stringstream text;
     text << file.rdbuf();
     std::printf("Lua: running %s\n", path);
-    return "\ndo\n" + text.str() + "\nend\n";
+    return "\ndo\nlocal pp,cam,cs=FindObject('_default_env_pp'),FindObject('_trico_camera'),"
+           "FindObject('_default_env_cs')\n" +
+           text.str() + "\nend\n";
 }
 
 // Wider than 16:9 the resolution patch widens the UI canvas to 1080*W/H (tlg_patches.py); the
@@ -194,6 +205,9 @@ std::string SetChunk() {
     static const int subtitle_shift = SubtitleShift();
     const auto& s = TlgSettings::Get();
     std::string code(Prelude);
+    code += TlgLab::Lua(s.wind_skip.load());
+    code += DevChunk();
+    code += PerRun;
     char line[1024];
     std::snprintf(line, sizeof(line),
                   "Scale(pp,'bloom','bloomAmount',%d) Feature(pp,'Bloom',%d)\n"
@@ -218,8 +232,7 @@ std::string SetChunk() {
                       subtitle_shift);
         code += line;
     }
-    code += TlgLab::Lua(s.wind_skip.load());
-    code += DevChunk();
+    code += "LabApply()\nend\n";
     return code;
 }
 
@@ -375,9 +388,12 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
         return original(L, options, Empty.data(), Empty.size(), name);
     }
     if (StartsWith(buffer, size, "--TLGSET")) {
-        static std::string code; // game thread only
-        code = SetChunk();
-        return original(L, options, code.data(), code.size(), name);
+        // "--TLGSET new": the tick has no function yet (first tick, or a new Lua state).
+        static std::string sent; // game thread only
+        std::string code = SetChunk();
+        if (code == sent && size == 8) return original(L, options, Empty.data(), Empty.size(), name);
+        sent = std::move(code);
+        return original(L, options, sent.data(), sent.size(), name);
     }
     Dump(buffer, size, name);
     static constexpr std::string_view Marker = "function RegisterTick(";
