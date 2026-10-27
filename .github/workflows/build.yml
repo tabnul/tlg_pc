@@ -75,6 +75,10 @@ jobs:
         shell: msys2 {0}
         working-directory: port
     steps:
+      # LF checkout: the fsr-vulkan patches are LF (.gitattributes), the submodule sources must match.
+      - run: git config --global core.autocrlf false
+        shell: pwsh
+        working-directory: .
       - uses: actions/checkout@v4
         with:
           submodules: recursive
