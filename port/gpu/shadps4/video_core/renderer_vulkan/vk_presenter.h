@@ -37,6 +37,7 @@ struct Frame {
     vk::Semaphore ready_semaphore;
     u64 ready_tick;
     bool is_hdr{false};
+    vk::Format format{}; ///< tlg: FrameFormat() at creation
     u8 id{};
 
 };
@@ -122,6 +123,7 @@ private:
     HostPasses::FsrPass::Settings fsr_settings{};
     HostPasses::PostProcessingPass::Settings pp_settings{};
     HostPasses::PostProcessingPass pp_pass;
+    HostPasses::PostProcessingPass pp_pass_8bit; ///< tlg: for 8-bit frames (FrameFormat)
     HostPasses::SmaaPass smaa_pass;  ///< tlg: tlg.ini smaa
     HostPasses::CasPass cas_pass;    ///< tlg: tlg.ini cas
     HostPasses::PostFxTimer postfx_timer; ///< tlg: TLG_POSTFX_PROFILE=1
