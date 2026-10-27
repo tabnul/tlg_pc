@@ -33,7 +33,8 @@ local function Walk(name,path)
   end
   if o~=nil then return o,prop end
 end
-local function Val(i,s) local f=ls('--TLGVAL '..i..' '..s) if f then f() end end
+local VALS={}
+local function Val(i,s) if VALS[i]==s then return end VALS[i]=s local f=ls('--TLGVAL '..i..' '..s) if f then f() end end
 local function Lab(i,name,path,mode,parts,v,on)
   local k=name..'|'..path local t=LAB[k]
   if not t then t={n=name,p=path,ops={}} LAB[k]=t LAB[#LAB+1]=t end
@@ -209,7 +210,6 @@ std::string Lua(int wind_skip) {
                       row.path.c_str(), row.mode, parts.c_str(), row.value, row.active ? "true" : "false");
         code += line;
     }
-    code += "LabApply()\n";
     return code;
 }
 
