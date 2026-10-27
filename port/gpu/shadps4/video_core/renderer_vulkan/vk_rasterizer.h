@@ -196,8 +196,6 @@ private:
         bool operator==(const BeginSignature&) const = default;
     };
     BeginSignature MakeBeginSignature(const GraphicsPipeline* pipeline) const;
-    /// tlg: the draw samples or writes an image of the upscaler's post chain (InPostChain).
-    bool PostChainPass(u32 mrt_mask) const;
     /// tlg: after a dispatch's bindings: its storage writes join or leave the post chain.
     void UpdatePostChain();
     struct BeginMemo {
@@ -214,7 +212,8 @@ private:
 
     void UpdateDynamicState(const GraphicsPipeline* pipeline, bool is_indexed) const;
     void UpdateViewportScissorState() const;
-    void UpdateDepthStencilState() const;
+    /// tlg: `zslack_listed` (debug "zslack") and `color_targets` pick the reduced depth slack.
+    void UpdateDepthStencilState(bool zslack_listed, bool color_targets) const;
     /// tlg: the squaring pipeline of a scaled MIN/MAX blend when this draw can use it.
     vk::Pipeline SquarePass(const GraphicsPipeline& pipeline) const;
     void UpdatePrimitiveState(bool is_indexed) const;

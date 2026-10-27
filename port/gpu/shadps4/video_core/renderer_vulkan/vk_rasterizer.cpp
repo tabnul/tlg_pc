@@ -255,11 +255,16 @@ VideoCore::ImageId Rasterizer::FindTargetMemoized(VideoCore::TextureCache::Image
 // shaders, "halfnot <ps hex>" keeps these native (to find which pass breaks or gains).
 // "native <ps hex>": passes of these pixel shaders draw at the native size in a reduced scene.
 namespace {
+/// tlg: the depth tolerance of reduced LessEqual draws (UpdateDepthStencilState): constant and
+/// slope bias towards the camera.
+constexpr float DepthSlackConstant = -16.0f;
+constexpr float DepthSlackSlope = -1.0f;
 struct JitterControl {
     std::vector<std::pair<u32, u32>> ranges;
     std::vector<u32> skip, only, never, half_only, half_not, bias, native;
     std::vector<u32> skip_n; ///< "skipn <index count>": skip only these meshes of the skip shaders
-    std::vector<u32> zslack; ///< "zslack <ps>": these draws depth-test with a small tolerance (pull forward)
+    /// "zslack <ps>": these draws depth-test with a small tolerance (pulled forward).
+    std::vector<u32> zslack;
     /// "point <ps> <sampler index>": that sampler of the shader filters nearest (filter A/B).
     std::vector<std::pair<u32, u32>> point;
     std::vector<u32> sampler_log; ///< "slog <ps>": log the shader's guest sampler filters once
@@ -267,11 +272,10 @@ struct JitterControl {
     bool follow = false, no_mesh = false, no_decal = false;
     bool bias_all = false;
     bool zbias_native = false; ///< "zbiasnative": slope bias per reduced pixel (pre-fix A/B)
-    float slack_constant = -16.0f, slack_slope = -1.0f; ///< "zslackval <c> <s>": the slack bias
+    /// "zslackval <c> <s>": the depth slack bias instead of DepthSlackConstant / DepthSlackSlope.
+    float slack_constant = DepthSlackConstant, slack_slope = DepthSlackSlope;
     u32 index = 0; ///< jitter-eligible draws since the sky pass
 } jitter_control;
-bool zslack_draw = false; ///< the current draw is listed in "zslack"
-bool color_draw = false;  ///< the current draw writes color targets
 
 /// Meshes (index address, count) drawn jittered into a scene depth since the sky pass.
 std::vector<std::pair<VAddr, u32>> jittered_meshes;
@@ -1443,7 +1447,8 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         }
         std::printf("Jitter draw: ps %08x mrt %#x indices %u inst %u zwrite %u zfunc %u blend %u "
                     "depth #%u jittered %d zbias %d %g %g %g vs %016llx clipoff %d images%s\n",
-                    pipeline->FragmentHash(), pipeline->GetGraphicsKey().mrt_mask, regs.num_indices, regs.num_instances.NumInstances(),
+                    u32(pipeline->FragmentHash()), pipeline->GetGraphicsKey().mrt_mask,
+                    regs.num_indices, regs.num_instances.NumInstances(),
                     u32(regs.depth_control.depth_write_enable), u32(regs.depth_control.depth_func),
                     u32(regs.blend_control[0].enable), db_desc.first.index,
                     int(draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f),
@@ -1465,8 +1470,9 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     const vk::Pipeline handle = pipeline->Handle();
     const vk::Pipeline square = SquarePass(*pipeline);
     const bool clear_smaa_weights = upscaler->SkipGameSmaa(vs_info.pgm_hash);
-    const bool skipped = !jitter_control.skip.empty() && SkippedShader(pipeline->FragmentHash()) &&
-                         (jitter_control.skip_n.empty() || Listed(jitter_control.skip_n, regs.num_indices));
+    const bool skipped =
+        !jitter_control.skip.empty() && SkippedShader(pipeline->FragmentHash()) &&
+        (jitter_control.skip_n.empty() || Listed(jitter_control.skip_n, regs.num_indices));
     const vk::Rect2D render_area{{0, 0}, {state.width, state.height}};
     const u32 num_indices = regs.num_indices;
     const u32 num_instances = regs.num_instances.NumInstances();
@@ -1615,9 +1621,10 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
                        1, draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f, samples_depth);
         if (jitter_control.map) {
             const auto& z = Regs().depth_control;
-            std::printf("Jitter draw: ps %08x mrt %#x indirect max %u indexed %d zwrite %u zfunc %u "
-                        "blend %u depth #%u jittered %d vs %016llx\n",
-                        pipeline->FragmentHash(), pipeline->GetGraphicsKey().mrt_mask, max_count,
+            std::printf("Jitter draw: ps %08x mrt %#x indirect max %u indexed %d zwrite %u "
+                        "zfunc %u blend %u depth #%u jittered %d vs %016llx\n",
+                        u32(pipeline->FragmentHash()), pipeline->GetGraphicsKey().mrt_mask,
+                        max_count,
                         int(is_indexed), u32(z.depth_write_enable), u32(z.depth_func),
                         u32(Regs().blend_control[0].enable), db_desc.first.index,
                         int(draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f),
@@ -1965,7 +1972,8 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
     const bool bias_forced =
         !pipeline->IsCompute() && scene_started &&
         (jitter_control.bias_all ||
-         Listed(jitter_control.bias, static_cast<const GraphicsPipeline*>(pipeline)->FragmentHash()));
+         Listed(jitter_control.bias,
+                static_cast<const GraphicsPipeline*>(pipeline)->FragmentHash()));
     if (bias_forced || (!pipeline->IsCompute() && !TlgToggle::Disabled(TlgToggle::SceneMipBias) &&
         std::popcount(static_cast<const GraphicsPipeline*>(pipeline)->GetGraphicsKey().mrt_mask &
                       0xff) >= 5)) {
@@ -2941,7 +2949,8 @@ void Rasterizer::BindSamplers(const Shader::Info& stage, const PreparedStage* pr
             const u32 ps = u32(stage.pgm_hash);
             auto& logged = jitter_control.sampler_log;
             if (const auto it = std::find(logged.begin(), logged.end(), ps); it != logged.end()) {
-                std::printf("Sampler ps %08x #%u: mag %u min %u mip %u aniso %u depth %d lod %.2f-%.2f\n",
+                std::printf("Sampler ps %08x #%u: mag %u min %u mip %u aniso %u depth %d "
+                            "lod %.2f-%.2f\n",
                             ps, sampler_index, u32(ssharp.xy_mag_filter.Value()),
                             u32(ssharp.xy_min_filter.Value()), u32(ssharp.mip_filter.Value()),
                             u32(ssharp.max_aniso.Value()), int(sampler.is_depth), ssharp.MinLod(),
@@ -2967,12 +2976,6 @@ void Rasterizer::BindSamplers(const Shader::Info& stage, const PreparedStage* pr
         set_write.descriptorType = vk::DescriptorType::eSampler;
         set_write.pImageInfo = &image_infos.back();
     }
-}
-
-bool Rasterizer::PostChainPass(u32 mrt_mask) const {
-    // Only sampling counts: the game renders every frame's scene into the same image, so a
-    // target in the chain is also written by the next frame's G-buffer.
-    return samples_post_chain;
 }
 
 void Rasterizer::UpdatePostChain() {
@@ -3006,7 +3009,7 @@ Rasterizer::BeginSignature Rasterizer::MakeBeginSignature(const GraphicsPipeline
     sig.motion = key.motion_vectors;
     sig.scene_started = scene_started;
     sig.raster_scaling = upscaler->RasterScaling();
-    sig.post_chain = PostChainPass(key.mrt_mask);
+    sig.post_chain = samples_post_chain;
     sig.upscaler_state = upscaler->RedirectState();
     sig.generation = texture_cache.RegistryGeneration();
     std::memcpy(&sig.depth_control, &regs.depth_control, sizeof(u32));
@@ -3195,9 +3198,11 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     // A proxy attachment cannot represent MSAA or a feedback loop that reads the
     // same image through the guest's native descriptor during this draw.
     bool reduced = scene_started && upscaler->RasterScaling() && key.num_samples == 1;
-    // tlg: a post pass (it samples or writes the upscaled scene or a later post target) draws
-    // at the native size, and its targets join the chain.
-    const bool post_pass = PostChainPass(key.mrt_mask);
+    // tlg: a post pass (it samples the upscaled scene or a later post target) draws at the
+    // native size, and its targets join the chain. Only sampling counts: the game renders every
+    // frame's scene into the same image, so a target in the chain is also written by the next
+    // frame's G-buffer.
+    const bool post_pass = samples_post_chain;
     if (post_pass && !TlgToggle::Disabled2(TlgToggle::PostReduced)) {
         reduced = false;
     }
@@ -3263,17 +3268,17 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     const bool debug_pass = scene_debug_frame;
     std::string why;
     if (debug_pass) {
-        why = fmt::format("pass vs {:08x} ps {:08x} mrt {:#x} samples {} raster_scaling {} post {}:",
+        why = fmt::format("pass vs {:08x} ps {:08x} mrt {:#x} samples {} raster_scaling {} "
+                          "post {}:",
                           pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
                           key.mrt_mask ? pipeline->GetStage(Shader::SwStage::Fragment).pgm_hash
                                        : 0,
                           key.mrt_mask, u32(key.num_samples), upscaler->RasterScaling(),
                           post_pass);
-        why += fmt::format(" [dbg sampled {} ids", samples_post_chain);
+        why += " targets";
         for (u32 cb = 0; cb < cb_descs.size(); ++cb) {
             if (key.mrt_mask >> cb & 1) why += fmt::format(" {}", cb_descs[cb].first.index);
         }
-        why += "]";
     }
     // Only this pass's attachments: slots past the mask's width keep earlier passes' targets,
     // often the G-buffer images the lighting passes sample (bound), which kept those native.
@@ -3762,9 +3767,8 @@ void Rasterizer::UnmapMemory(VAddr addr, u64 size) {
 
 void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool is_indexed) const {
     UpdateViewportScissorState();
-    zslack_draw = Listed(jitter_control.zslack, pipeline->FragmentHash());
-    color_draw = pipeline->GetGraphicsKey().mrt_mask != 0;
-    UpdateDepthStencilState();
+    UpdateDepthStencilState(Listed(jitter_control.zslack, pipeline->FragmentHash()),
+                            pipeline->GetGraphicsKey().mrt_mask != 0);
     UpdatePrimitiveState(is_indexed);
     UpdateRasterizationState();
     UpdateColorBlendingState(pipeline);
@@ -3946,7 +3950,7 @@ vk::Pipeline Rasterizer::SquarePass(const GraphicsPipeline& pipeline) const {
     return square;
 }
 
-void Rasterizer::UpdateDepthStencilState() const {
+void Rasterizer::UpdateDepthStencilState(bool zslack_listed, bool color_targets) const {
     const auto& regs = Regs();
     auto& dynamic_state = scheduler.GetDynamicState();
 
@@ -3973,8 +3977,8 @@ void Rasterizer::UpdateDepthStencilState() const {
     // prepasses (no color targets) keep their depth as is.
     const bool reduced = target_scale[0] != 1.0f || target_scale[1] != 1.0f;
     const bool zslack =
-        zslack_draw ||
-        (reduced && depth_test_enabled && (!depth_stencil.depth_write_enable || color_draw) &&
+        zslack_listed ||
+        (reduced && depth_test_enabled && (!depth_stencil.depth_write_enable || color_targets) &&
          regs.depth_control.depth_func == AmdGpu::CompareFunc::LessEqual &&
          !regs.polygon_control.NeedsBias() && !TlgToggle::Disabled2(TlgToggle::SceneDepthSlack));
     const auto depth_bias_enabled = regs.polygon_control.NeedsBias() || zslack;

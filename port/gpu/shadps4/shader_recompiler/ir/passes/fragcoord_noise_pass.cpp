@@ -70,7 +70,8 @@ void FragCoordNoisePass(IR::Program& program) {
     if (patched || shared) {
         static u32 logged = 0;
         if (logged++ < 64) {
-            std::printf("Shader: FragCoord noise on the pass grid, %u inputs (%u shared) in %016llx\n",
+            std::printf("Shader: FragCoord noise on the pass grid, %u inputs (%u shared) in "
+                        "%016llx\n",
                         patched, shared, static_cast<unsigned long long>(program.info.pgm_hash));
         }
     }

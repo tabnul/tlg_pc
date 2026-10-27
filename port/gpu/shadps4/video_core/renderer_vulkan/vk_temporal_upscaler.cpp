@@ -277,6 +277,10 @@ float Halton(u32 index, u32 base) {
     }
     return result;
 }
+/// The depth hold's copy (HoldDepth): what the upscalers' depth inputs are created with.
+constexpr vk::ImageUsageFlags HoldUsage =
+    vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
+    vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eDepthStencilAttachment;
 } // namespace
 
 bool TemporalUpscaler::ReducedScene(const VideoCore::Image& color) const {
@@ -423,7 +427,6 @@ void TemporalUpscaler::AdvanceJitter() {
 
 void TemporalUpscaler::OnGameMotionPass(VideoCore::ImageId scene, VideoCore::ImageId motion,
                                         VideoCore::ImageId depth) {
-    if (scene_targets.debug) std::printf("Scene game motion pass\n");
     // The jitter this frame's geometry was drawn with; the post runs in the next emulator frame.
     game_frame = {scene, motion, depth, jitter, scene && motion && depth};
     depth_hold.valid = false;
@@ -434,10 +437,10 @@ void TemporalUpscaler::OnGameMotionPass(VideoCore::ImageId scene, VideoCore::Ima
         if (GameMotion() && !TlgToggle::Disabled2(TlgToggle::DepthHold)) {
             scene_targets.watch_uid = image.image_uid;
         }
-        if (scene_targets.debug) {
-            std::printf("Scene game motion pass: depth uid %llu\n",
-                        (unsigned long long)image.image_uid);
-        }
+    }
+    if (scene_targets.debug) {
+        std::printf("Scene game motion pass: depth uid %llu\n",
+                    depth ? (unsigned long long)texture_cache.GetImage(depth).image_uid : 0ULL);
     }
 }
 
@@ -461,9 +464,7 @@ void TemporalUpscaler::HoldDepth(VideoCore::Image& depth) {
             .extent = {size.width, size.height, 1},
             .mipLevels = 1, .arrayLayers = 1, .samples = vk::SampleCountFlagBits::e1,
             .tiling = vk::ImageTiling::eOptimal,
-            .usage = vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
-                     vk::ImageUsageFlagBits::eSampled |
-                     vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            .usage = HoldUsage,
             .initialLayout = vk::ImageLayout::eUndefined,
         });
         depth_hold.view = Check(device.createImageViewUnique({
@@ -528,7 +529,9 @@ void TemporalUpscaler::HoldDepth(VideoCore::Image& depth) {
 }
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
-    if (scene_targets.debug) std::printf("Scene dispatch: cs %08llx\n", (unsigned long long)cs_hash);
+    if (scene_targets.debug) {
+        std::printf("Scene dispatch: cs %08llx\n", (unsigned long long)cs_hash);
+    }
     if (cs_hash == game_trigger_hash && game_frame.valid) {
         if (GameMotion()) {
             RunGameMotion();
@@ -1197,7 +1200,9 @@ bool TemporalUpscaler::RecordReactive(vk::ImageView color_view) {
 }
 
 void TemporalUpscaler::RunGameMotion() {
-    if (scene_targets.debug) std::printf("Scene upscale: RunGameMotion scene %u\n", game_frame.scene.index);
+    if (scene_targets.debug) {
+        std::printf("Scene upscale: RunGameMotion scene %u\n", game_frame.scene.index);
+    }
     auto& color = texture_cache.GetImage(game_frame.scene);
     auto& motion = texture_cache.GetImage(game_frame.motion);
     auto& depth = texture_cache.GetImage(game_frame.depth);
@@ -1227,7 +1232,9 @@ void TemporalUpscaler::RunGameMotion() {
     const bool use_hold = held && depth_hold.reduced == reduced;
     if (scene_targets.Reduced()) ++(reduced ? count_reduced : count_fallback);
     if (use_hold) ++count_held;
-    if (++count_total >= 600) {
+    // TLG_FRAME_STATS: how often the reduced inputs held and the depth hold was used.
+    static const bool stats = std::getenv("TLG_FRAME_STATS") != nullptr;
+    if (stats && ++count_total >= 600) {
         std::printf("Upscaler: last 600 upscales: reduced %u, native fallback %u, depth held %u\n",
                     count_reduced, count_fallback, count_held);
         count_reduced = count_fallback = count_held = count_total = 0;
@@ -1286,10 +1293,6 @@ void TemporalUpscaler::RunGameMotion() {
         runtime.Transit(&color, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
         runtime.FlushBarriers();
     }
-    const auto hold_usage = vk::ImageUsageFlagBits::eTransferSrc |
-                            vk::ImageUsageFlagBits::eTransferDst |
-                            vk::ImageUsageFlagBits::eSampled |
-                            vk::ImageUsageFlagBits::eDepthStencilAttachment;
     if (use_hold) {
         depth_image = vk::Image(depth_hold.image);
         depth_view = *depth_hold.view;
@@ -1342,9 +1345,8 @@ void TemporalUpscaler::RunGameMotion() {
                         w, h, ow, oh, frame_ms, game_frame.jitter);
     } else {
         ok = RecordFsr3(cmdbuf, color_image, color.info.pixel_format, color.usage_flags,
-                        depth_image, depth_format, use_hold ? hold_usage : depth.usage_flags,
-                        w, h, ow, oh, frame_ms,
-                        false, game_frame.jitter);
+                        depth_image, depth_format, use_hold ? HoldUsage : depth.usage_flags,
+                        w, h, ow, oh, frame_ms, false, game_frame.jitter);
     }
     if (!ok) return;
     if (const int dump = DumpFrame(); dump >= 0) {

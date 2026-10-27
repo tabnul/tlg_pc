@@ -141,8 +141,11 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::Optimization::LowerWave64BallotPass(program, runtime_info, profile);
     Shader::Optimization::ConstantPropagationPass(program.post_order_blocks);
     Shader::Optimization::DeadCodeEliminationPass(program);
-    static const bool noise_pass = !std::getenv("TLG_NOISE_PASS") ||
-                                   std::getenv("TLG_NOISE_PASS")[0] != '0'; // tlg: A/B switch
+    // tlg: TLG_NOISE_PASS=0 turns FragCoordNoisePass off (A/B).
+    static const bool noise_pass = [] {
+        const char* env = std::getenv("TLG_NOISE_PASS");
+        return !env || env[0] != '0';
+    }();
     if (info.sw_stage == SwStage::Fragment && noise_pass) {
         Shader::Optimization::FragCoordNoisePass(program);
     }
