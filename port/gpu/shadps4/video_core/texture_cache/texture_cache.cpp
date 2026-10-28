@@ -1642,6 +1642,74 @@ void TextureCache::RunGarbageCollector() {
 
     GarbageCollectImages();
     GarbageCollectSamplers();
+    CleanUpAfterLoad();
+}
+
+// tlg: setting texture_cleanup. GarbageCollectImages only runs when VRAM gets short (above 70% of
+// TLG_GC_BUDGET_MB, or above (VRAM - 8 GB) / 2 without it), so with a high budget or a big card the
+// images of every stage visited stayed: 200k images after 28 stage loads, and s04_FirstAntenna
+// _090_GardenTerrace_001 dropped from 69 to 57 FPS (back to 69 after this cleanup, 2026-10-28).
+// tlg_lua.cpp marks the end of each stage load; 2 s later, free every image not used since then,
+// except those holding GPU-written data (the collector above keeps them too unless pressed).
+// Freeing them all at once (12k-47k images) cost one 70-160 ms frame, mostly in the deferred
+// destruction of the Vulkan images (DeleteImage), which runs in one go when the GPU passes the tick:
+// slices of 1 ms still left a 40-50 ms frame. So it frees at most 1024 images per submission and
+// goes on at the next one; images used in the meantime get a newer tick and stay.
+void TextureCache::CleanUpAfterLoad() {
+    auto& s = TlgSettings::Get();
+    const auto now = std::chrono::steady_clock::now();
+    if (s.stage_loaded.exchange(false, std::memory_order_relaxed)) {
+        load_cleanup_pending = true;
+        load_cleanup_running = false;
+        load_cleanup_tick = gc_tick;
+        load_cleanup_time = now;
+        return;
+    }
+    if (load_cleanup_pending) {
+        if (now - load_cleanup_time < std::chrono::seconds(2)) {
+            return;
+        }
+        load_cleanup_pending = false;
+        load_cleanup_running = s.texture_cleanup;
+        load_cleanup_freed = load_cleanup_bytes = load_cleanup_slices = 0;
+    }
+    if (!load_cleanup_running) {
+        return;
+    }
+    static constexpr u64 SliceImages = 1024;
+    TlgStats::Timer gc_timer{TlgStats::t_gc};
+    std::scoped_lock lock{mutex};
+    u64 kept = 0, freed = 0;
+    bool slice_full = false;
+    ++load_cleanup_slices;
+    lru_cache.ForEachItemBelow(load_cleanup_tick, [&](ImageId image_id) {
+        if (freed == SliceImages) {
+            slice_full = true;
+            return true;
+        }
+        auto& image = slot_images[image_id];
+        ResolveReadbacks(image.info.guest_address, image.info.guest_size, true,
+                         ReadbackSource::CacheCleanup);
+        if (image.SafeToDownload()) {
+            ++kept;
+            return false;
+        }
+        ++freed;
+        ++load_cleanup_freed;
+        load_cleanup_bytes += Common::AlignUp(image.info.guest_size, 1024);
+        FreeImage(image_id);
+        return false;
+    });
+    if (slice_full) {
+        return;
+    }
+    load_cleanup_running = false;
+    std::printf("Texture cache: cleanup after the load freed %llu images (%llu MiB), kept %llu with "
+                "GPU-written data, in %llu slices\n",
+                (unsigned long long)load_cleanup_freed,
+                (unsigned long long)(load_cleanup_bytes >> 20), (unsigned long long)kept,
+                (unsigned long long)load_cleanup_slices);
+    std::fflush(stdout);
 }
 
 void TextureCache::TouchImage(const Image& image) {

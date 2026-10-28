@@ -155,6 +155,14 @@ MENU = [
            'Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado.'),
           choices=(('0', 'Off (recommended)', 'Desligado (recomendado)'), ('16', '16 MB', '16 MB'),
                    ('64', '64 MB (not recommended)', '64 MB (não recomendado)'))),
+    _menu('Performance', 'texture_cleanup', 'bool', '1',
+          ('Texture cleanup after loads', 'Limpeza de texturas após carregamentos'),
+          ('After each stage or checkpoint load, frees the textures of earlier stages that the new one does not '
+           'use; without it the game gets slower with every stage visited. On is recommended; off is the '
+           'emulator\'s original behaviour.',
+           'Após cada carregamento de fase ou de checkpoint, libera as texturas de fases anteriores que a nova '
+           'não usa; sem isso o jogo fica mais lento a cada fase visitada. Ligado é o recomendado; desligado é '
+           'o comportamento original do emulador.')),
     _menu('Overlay', 'overlay_fps', 'bool', '1', ('Overlay: FPS', 'Overlay: FPS'),
           ('Shows the frame rate in the performance overlay.', 'Mostra os quadros por segundo no overlay.')),
     _menu('Overlay', 'overlay_frametime', 'bool', '1', ('Overlay: frame time', 'Overlay: tempo de quadro'),
