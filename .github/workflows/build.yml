@@ -69,7 +69,18 @@ jobs:
           progress_pid=$!
           trap 'kill "$progress_pid" 2>/dev/null || true' EXIT
           TLG_LTO=OFF TLG_PGO=off bash build.sh
+      # DLAA: the same pinned DLSS SDK as Windows; gpu/dlss_bridge built with GCC (libtlg_dlss.so).
+      - name: DLSS SDK
+        uses: actions/checkout@v4
+        with:
+          repository: NVIDIA/DLSS
+          ref: v310.9.16
+          path: dlss-sdk
+      - name: DLSS bridge
+        run: DLSS_SDK_ROOT="$GITHUB_WORKSPACE/dlss-sdk" bash packaging/linux/build_dlss.sh
       - name: Package
+        env:
+          TLG_REQUIRE_DLSS: '1'
         run: bash packaging/linux/package.sh
       - uses: actions/upload-artifact@v4
         with:
