@@ -570,6 +570,9 @@ void ImageTab() {
         SliderRow(TL("Fog distance", "Distância da neblina"), s.fog_distance, 25, 400, "%d%%",
                   TL("Where the fog starts and reaches full strength. Default 100% is as shipped; lower brings the fog closer.",
                      "Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo traz a neblina mais perto."), d.fog_distance, 100);
+        SliderRow(TL("Haze color fringe", "Franja colorida na névoa"), s.haze_fringe, 0, 100, "%d%%",
+                  TL("The game's chromatic aberration on the light haze: yellow and blue edges around objects against fog, strongest toward the screen edges. Sharp anti-aliasing (DLAA, DLSS) makes it stand out more. Default 0% gives clean edges; 100% is as shipped.",
+                     "A aberração cromática do jogo na névoa de luz: bordas amarelas e azuis em volta de objetos contra a neblina, mais fortes perto das bordas da tela. O anti-aliasing nítido (DLAA, DLSS) a deixa mais visível. Padrão 0% deixa as bordas limpas; 100% é o original."), d.haze_fringe, 100);
         ImGui::EndTable();
     }
     ImGui::SeparatorText(TL("Wind and foliage", "Vento e vegetação"));
