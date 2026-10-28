@@ -47,12 +47,13 @@ GAME_RECOMMENDED = {'dlaa': '1', 'smaa': '0', 'fsr1': '0', 'rcas': '1', 'rcas_st
                     'cas_strength': '100', 'shadow_scale': '1', 'fov': '70', 'bloom': '100', 'dof': '100',
                     'motion_blur': '100', 'vignette_add': '0', 'ssao': '100', 'ssr': '100',
                     'game_sharpen': '100', 'shadow_distance': '100', 'trico_feathers': '100',
-                    'boy_wind': '100', 'tree_wind': '100', 'fog_distance': '100', 'grass_smooth': '1',
+                    'boy_wind': '100', 'tree_wind': '100', 'fog_distance': '100', 'haze_fringe': '0',
+                    'grass_smooth': '1',
                     'color_adjust': '1', 'color_brightness': '0.00', 'color_contrast': '1.00',
                     'color_saturation': '1.00', 'color_gamma': '0.75', 'lod_bias': '-4', 'aniso': '16',
                     'texture_pack': 'off'}
 GAME_STOCK = {**GAME_RECOMMENDED, 'dlaa': '0', 'rcas': '0', 'lod_bias': '0', 'aniso': '0', 'grass_smooth': '0',
-              'color_adjust': '0', 'color_gamma': '1.00'}
+              'haze_fringe': '100', 'color_adjust': '0', 'color_gamma': '1.00'}
 
 
 def game_presets(folder):
