@@ -758,6 +758,16 @@ void PerformanceTab() {
                      "Quando o jogo lê memória escrita pela GPU, copia também os outros dados escritos pela GPU ao redor. "
                      "Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado."),
                   d.readback_batch);
+        CheckRow(TL("Texture cleanup after loads", "Limpeza de texturas após carregamentos"), s.texture_cleanup,
+                 TL("After each stage or checkpoint load, frees the textures of earlier stages that the new one does "
+                    "not use. Without it they stay in video memory until it runs short, and the game gets slower "
+                    "with every stage visited (69 to 57 FPS after 28 loads in a test). On (default) is recommended; "
+                    "off is the emulator's original behaviour.",
+                    "Após cada carregamento de fase ou de checkpoint, libera as texturas de fases anteriores que a "
+                    "nova não usa. Sem isso elas ficam na memória de vídeo até faltar espaço, e o jogo fica mais "
+                    "lento a cada fase visitada (69 para 57 FPS após 28 carregamentos num teste). Ligado (padrão) é "
+                    "o recomendado; desligado é o comportamento original do emulador."),
+                 d.texture_cleanup);
         ImGui::EndTable();
     }
 }

@@ -415,6 +415,7 @@ private:
 
     void GarbageCollectImages();
     void GarbageCollectSamplers();
+    void CleanUpAfterLoad();
 
 private:
     const Vulkan::Instance& instance;
@@ -435,6 +436,14 @@ private:
     u64 total_used_memory = 0;
     u64 gc_evictions = 0, gc_downloads = 0; ///< tlg: pressure report
     std::chrono::steady_clock::time_point gc_report_time{};
+    /// tlg: texture_cleanup (CleanUpAfterLoad): the gc tick and time the last stage load ended.
+    bool load_cleanup_pending = false;
+    bool load_cleanup_running = false;
+    u64 load_cleanup_tick = 0;
+    u64 load_cleanup_freed = 0;
+    u64 load_cleanup_bytes = 0;
+    u64 load_cleanup_slices = 0;
+    std::chrono::steady_clock::time_point load_cleanup_time{};
     u64 trigger_gc_memory = 0;
     u64 pressure_gc_memory = 0;
     u64 critical_gc_memory = 0;
