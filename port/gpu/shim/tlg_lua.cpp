@@ -69,7 +69,7 @@ local function Feature(o,name,pct)
   if pct==0 and on then o.features='~'..name B.off[name]=true
   elseif pct>0 and B.off[name] then B.off[name]=nil if not on then o.features='|'..name end end
 end
-local XY,XZ,ALL,XYZ={1,2},{1,3},{1,2,3,4},{1,2,3}
+local X,XY,XZ,ALL,XYZ={1},{1,2},{1,3},{1,2,3,4},{1,2,3}
 local function Loading() return RegionController.IsLoading() end
 -- Names of the objects of one class whose name contains match; the class of each name is looked
 -- up once. EnumerateObjectList(match) filters in the engine (a substring test on the name): the
@@ -217,11 +217,12 @@ std::string SetChunk() {
                   "Scale(pp,'vig','vignetteParams',100,XZ,%.4f)\n"
                   "Scale(pp,'sharp','sharpenScale',%d)\n"
                   "Scale(pp,'fogd','fogParam',%d,XY)\n"
+                  "Scale(pp,'lvca','lightVolumeChromaticAberration',%d,X)\n"
                   "Feathers(%d) Fov(%d) Grass(%s) BoyWind(%d) TreeWind(%d)\n",
                   s.bloom.load(), s.bloom.load(), s.ssao.load(), s.ssao.load(), s.ssr.load(),
                   s.ssr.load(), s.motion_blur.load(), s.motion_blur.load(),
                   s.vignette.load() * 0.01, std::min(s.game_sharpen.load(), 100),
-                  s.fog_distance.load(), s.trico_feathers.load(), s.fov.load(),
+                  s.fog_distance.load(), s.haze_fringe.load(), s.trico_feathers.load(), s.fov.load(),
                   s.grass_smooth.load() ? "true" : "false", s.boy_wind.load(), s.tree_wind.load());
     code += line;
     if (subtitle_shift) {

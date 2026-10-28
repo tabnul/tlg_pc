@@ -61,7 +61,7 @@ struct Values {
     /// post-process and camera objects through Lua (tlg_lua.cpp). 100 = as shipped.
     std::atomic<int> bloom{100}, dof{100}, motion_blur{100}, vignette{0},
         ssao{100}, ssr{100}, game_sharpen{100}, shadow_distance{100}, trico_feathers{100},
-        boy_wind{100}, tree_wind{100}, fog_distance{100};
+        boy_wind{100}, tree_wind{100}, fog_distance{100}, haze_fringe{0};
     /// Grass animated every frame (1, default) or every 4th frame as shipped (0); tlg_lua.cpp.
     std::atomic<int> grass_smooth{1};
     /// Lab tab (menu, live; tuning tests): texture LOD bias under DLAA in quarter steps (-4 =
