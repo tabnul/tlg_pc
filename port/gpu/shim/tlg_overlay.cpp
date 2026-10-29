@@ -760,13 +760,15 @@ void PerformanceTab() {
                   d.readback_batch);
         CheckRow(TL("Texture cleanup after loads", "Limpeza de texturas após carregamentos"), s.texture_cleanup,
                  TL("After each stage or checkpoint load, frees the textures of earlier stages that the new one does "
-                    "not use. Without it they stay in video memory until it runs short, and the game gets slower "
-                    "with every stage visited (69 to 57 FPS after 28 loads in a test). On (default) is recommended; "
-                    "off is the emulator's original behaviour.",
+                    "not use. Without it they stay in video memory until it runs short. In one test it kept 69 FPS "
+                    "where the game had dropped to 57 after 28 loads, but in a longer test the game still got "
+                    "slower over many loads (issue #20), so it is off by default for now. Off is the emulator's "
+                    "original behaviour.",
                     "Após cada carregamento de fase ou de checkpoint, libera as texturas de fases anteriores que a "
-                    "nova não usa. Sem isso elas ficam na memória de vídeo até faltar espaço, e o jogo fica mais "
-                    "lento a cada fase visitada (69 para 57 FPS após 28 carregamentos num teste). Ligado (padrão) é "
-                    "o recomendado; desligado é o comportamento original do emulador."),
+                    "nova não usa. Sem isso elas ficam na memória de vídeo até faltar espaço. Num teste manteve 69 "
+                    "FPS onde o jogo tinha caído para 57 após 28 carregamentos, mas num teste mais longo o jogo "
+                    "ainda ficou mais lento após muitos carregamentos (issue #20), então por enquanto vem desligado. "
+                    "Desligado é o comportamento original do emulador."),
                  d.texture_cleanup);
         ImGui::EndTable();
     }

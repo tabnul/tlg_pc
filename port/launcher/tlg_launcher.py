@@ -73,11 +73,13 @@ TEXT = {
                   'Higher is not faster: the cache is only cleaned when it gets full, so a high budget lets the textures of earlier stages pile up and slows the game down after stage changes, unless the cleanup below is on.',
                   'Placa de 6 GB: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. É a memória da placa de vídeo (VRAM), não a RAM; nunca acima da VRAM da placa. '
                   'Mais alto não é mais rápido: o cache só é limpo quando enche, então um orçamento alto deixa as texturas de fases anteriores se acumularem e deixa o jogo mais lento após trocas de fase, a menos que a limpeza abaixo esteja ligada.'),
-    'texture_cleanup': ('Clean up textures after each load (recommended)',
-                        'Limpar texturas após cada carregamento (recomendado)'),
-    'texture_cleanup_hint': ('Frees the textures of earlier stages after each stage or checkpoint load (69 against 57 FPS after 28 loads in a test). '
+    'texture_cleanup': ('Clean up textures after each load',
+                        'Limpar texturas após cada carregamento'),
+    'texture_cleanup_hint': ('Frees the textures of earlier stages after each stage or checkpoint load. It helped in one test (69 against 57 FPS after 28 loads), '
+                             'but in a longer test the game still got slower over many loads (issue #20), so it is off by default for now. '
                              'Off is the emulator\'s original behaviour. Also in the in-game menu (Insert → Performance).',
-                             'Libera as texturas de fases anteriores após cada carregamento de fase ou de checkpoint (69 contra 57 FPS após 28 carregamentos num teste). '
+                             'Libera as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Ajudou num teste (69 contra 57 FPS após 28 carregamentos), '
+                             'mas num teste mais longo o jogo ainda ficou mais lento após muitos carregamentos (issue #20), então por enquanto vem desligado. '
                              'Desligado é o comportamento original do emulador. Também no menu do jogo (Insert → Desempenho).'),
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
@@ -575,7 +577,7 @@ class Launcher:
         memory.grid(row=4, column=0, columnspan=2, sticky='w')
         ttk.Label(memory, text=self.t('vram_hint'), foreground='#777', wraplength=360).grid(row=0, column=0, sticky='w')
         # The in-game menu's texture cleanup (tlg.ini, applies at once).
-        cleanup = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_cleanup', '1') != '0')
+        cleanup = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_cleanup', '0') != '0')
 
         def cleanup_toggled():
             tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
