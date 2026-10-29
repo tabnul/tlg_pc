@@ -13,6 +13,7 @@
 #include <boost/container/small_vector.hpp>
 #include <fmt/format.h>
 #include "tlg_freeze.h"
+#include "tlg_rb_diag.h"
 #include "tlg_toggles.h"
 #include "common/assert.h"
 #include "common/debug.h"
@@ -164,7 +165,17 @@ struct PageManager::Impl {
     static bool GuestFaultSignalHandler(void* context, void* fault_address) {
         const auto start = std::chrono::steady_clock::now();
         const auto addr = reinterpret_cast<VAddr>(fault_address);
+        TlgRbDiag::FixScope fix{context, Common::IsWriteError(context)};
+        TlgRbDiag::Ctx diag_ctx;
+        const bool diag = TlgRbDiag::Enabled();
+        if (diag) {
+            TlgRbDiag::BeginFault(diag_ctx, context, addr, Common::IsWriteError(context),
+                                  rasterizer->IsGpuSideThread());
+        }
         const bool handled = HandleGuestFault(context, addr);
+        if (diag) {
+            TlgRbDiag::EndFault(diag_ctx, handled);
+        }
         ProfileFault(context, addr, Common::IsWriteError(context),
                      static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                          std::chrono::steady_clock::now() - start).count()));

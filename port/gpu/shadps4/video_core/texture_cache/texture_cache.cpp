@@ -7,6 +7,7 @@
 #include "tlg_settings.h"
 #include "tlg_toggles.h"
 #include "tlg_freeze.h"
+#include "tlg_rb_diag.h"
 #include "common/assert.h"
 #include "common/debug.h"
 #include "common/div_ceil.h"
@@ -99,6 +100,9 @@ void TextureCache::RetireReadbacks() {
         [this](auto& entry) {
             if (entry.valid) {
                 entry.payload.Invalidate();
+                if (TlgRbDiag::Enabled()) {
+                    TlgRbDiag::NoteImageLand(entry.address, entry.payload.mapped, entry.size);
+                }
                 Core::Memory::Instance()->TryWriteBacking(std::bit_cast<u8*>(entry.address),
                     entry.payload.mapped, entry.size);
                 if (entry.watched) WatchReadback<false>(entry.address, entry.size);
@@ -123,7 +127,14 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
         }
         if (!pending_readbacks.RequiredTick(address, size)) return false;
     }
-    const auto resolve = [this, address, size, source] {
+    // tlg diag (TLG_RB_DIAG): the fault this resolve serves (CPU sources only) and its cost.
+    auto* const rb_diag = source == ReadbackSource::CpuRead || source == ReadbackSource::CpuWrite
+                              ? TlgRbDiag::Current()
+                              : nullptr;
+    const u64 rb_start = TlgRbDiag::Enabled() ? TlgRbDiag::NowNs() : 0;
+    bool rb_pending = false, rb_waited = false;
+    const auto resolve = [this, address, size, source, rb_diag, &rb_pending, &rb_waited] {
+        TlgRbDiag::Scope rb_scope{rb_diag};
         const bool diag = Vulkan::WaitDiagnostics::Enabled();
         std::scoped_lock lock{readback_mutex};
         bool waited = false;
@@ -140,6 +151,8 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
         if (const u64 tick = pending_readbacks.RequiredTick(address, size)) {
             ++readbacks_waited;
             waited = !scheduler.IsFree(tick);
+            rb_pending = true;
+            rb_waited = waited;
             const auto start = diag ? std::chrono::steady_clock::now()
                                     : std::chrono::steady_clock::time_point{};
             scheduler.Wait(tick);
@@ -154,6 +167,10 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
     TlgFreeze::WaitScope wait{"GPU readback", reinterpret_cast<const void*>(address)}; // tlg
     if (assume_locks) resolve();
     else liverpool->SendCommand<true>(resolve);
+    if (rb_start) {
+        TlgRbDiag::NoteImageResolve(rb_diag, u32(source), address, size, rb_pending, rb_waited,
+                                    TlgRbDiag::NowNs() - rb_start);
+    }
     return true;
 }
 
@@ -189,14 +206,24 @@ void TextureCache::ProcessDownloadImages() {
             const auto& image = slot_images[image_id];
             if (False(image.flags & ImageFlagBits::GpuModified)) continue;
             const u64 size = ReadbackSize(image.info);
+            if (TlgRbDiag::FixSkipImage(size) || TlgRbDiag::SkipImage(image.info.guest_address)) {
+                // tlg diag (TLG_RB_CONTROL skipimg/onlyimg, TLG_RB_IMG_MAX_BYTES): RAM keeps
+                // its old bytes.
+                if (TlgRbDiag::Enabled()) TlgRbDiag::NoteImageSkip(image.info.guest_address);
+                continue;
+            }
             if (!pending_readbacks.CanFit(size)) {
                 ++readbacks_waited;
+                const u64 rb_start = TlgRbDiag::Enabled() ? TlgRbDiag::NowNs() : 0;
                 scheduler.Finish();
                 RetireReadbacks();
+                if (rb_start) TlgRbDiag::NoteImageFinish(0, TlgRbDiag::NowNs() - rb_start);
             }
             if (auto copy = RecordImageDownload(image_id)) {
                 if (!pending_readbacks.CanFit(copy->size)) {
+                    const u64 rb_start = TlgRbDiag::Enabled() ? TlgRbDiag::NowNs() : 0;
                     scheduler.Finish();
+                    if (rb_start) TlgRbDiag::NoteImageFinish(1, TlgRbDiag::NowNs() - rb_start);
                     copy->staging.Invalidate();
                     Core::Memory::Instance()->TryWriteBacking(
                         std::bit_cast<u8*>(copy->guest_address), copy->staging.mapped, copy->size);
@@ -218,6 +245,12 @@ void TextureCache::ProcessDownloadImages() {
                     }
                     pending_readbacks.Push(copy->guest_address, copy->size,
                         scheduler.CurrentTick(), copy->staging);
+                    if (TlgRbDiag::Enabled()) {
+                        TlgRbDiag::NoteImageQueue(copy->guest_address, image.info.size.width,
+                            image.info.size.height, image.info.num_bits,
+                            u32(image.info.pixel_format), image.usage.render_target,
+                            copy->size);
+                    }
                     has_pending_readbacks.store(true, std::memory_order_release);
                     ++readbacks_queued;
                     readbacks_peak_bytes = std::max(readbacks_peak_bytes, pending_readbacks.Bytes());
@@ -269,7 +302,9 @@ void TextureCache::ProcessDownloadImages() {
     if (pending.empty()) {
         return;
     }
+    const u64 rb_start = TlgRbDiag::Enabled() ? TlgRbDiag::NowNs() : 0;
     scheduler.Finish();
+    if (rb_start) TlgRbDiag::NoteImageFinish(2, TlgRbDiag::NowNs() - rb_start);
     for (const PendingDownload& download : pending) {
         download.staging.Invalidate();
         Core::Memory::Instance()->TryWriteBacking(std::bit_cast<u8*>(download.guest_address),

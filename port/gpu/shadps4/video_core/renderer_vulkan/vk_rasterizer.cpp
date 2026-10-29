@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <xxhash.h>
 #include "video_core/renderer_vulkan/ui_composition.h"
+#include "tlg_rb_diag.h"
 #include "tlg_settings.h"
 #include "tlg_toggles.h"
 #include "video_core/renderer_vulkan/vk_frame_capture.h"
@@ -2476,6 +2477,8 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                     LOG_ERROR(Render, "Clamped size from {} to {} for stage {:#x}",
                               vsharp.GetSize(), size, stage.pgm_hash);
                 }
+                TlgRbDiag::ProducerScope diag_producer{
+                    TlgRbDiag::ProducerKind(u32(stage.sw_stage) + 1), stage.pgm_hash};
                 const auto [buffer, offset] = buffer_cache.ObtainBuffer(
                     vsharp.base_address, size, desc.is_written, desc.is_formatted);
                 const u64 offset_aligned = Common::AlignDown(offset, alignment);
@@ -3470,6 +3473,7 @@ void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds
         if (is_gds) {
             return {buffer_cache.GetGdsBuffer(), address};
         }
+        TlgRbDiag::ProducerScope diag_producer{TlgRbDiag::ProdFill, 0};
         return buffer_cache.ObtainBuffer(address, num_bytes, true);
     }();
     runtime.FillBuffer(buffer, offset, num_bytes, value);
@@ -3497,6 +3501,7 @@ void Rasterizer::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, b
         if (dst_gds) {
             return {gds_buffer, dst};
         }
+        TlgRbDiag::ProducerScope diag_producer{TlgRbDiag::ProdDmaCopy, 0};
         return buffer_cache.ObtainBuffer(dst, num_bytes, true, true);
     }();
     const vk::BufferCopy copy = {
@@ -3548,8 +3553,14 @@ bool Rasterizer::ReadMemory(VAddr addr, u64 size, bool assume_locks) {
     // longer waits for the GPU command thread to reach its request (~3 ms per fault in inFAMOUS,
     // hundreds per second). TLG_FAST_READ_FAULT=0 restores the round trip.
     static const bool fast = [] { const char* e = std::getenv("TLG_FAST_READ_FAULT"); return !(e && *e == '0'); }();
-    if (fast && !assume_locks && !buffer_cache.IsRegionGpuModified(addr, size)) {
+    if (auto* diag = TlgRbDiag::Current();
+        TlgRbDiag::FixSkip() || (diag && !diag->write && TlgRbDiag::SkipBuffer(*diag))) {
+        // tlg diag (TLG_RB_DIAG, TLG_RB_SKIP_READ): the CPU reads the stale bytes.
         buffer_cache.ReleaseReadProtection(addr, size);
+        TlgRbDiag::AddOutcome(TlgRbDiag::Skipped);
+    } else if (fast && !assume_locks && !buffer_cache.IsRegionGpuModified(addr, size)) {
+        buffer_cache.ReleaseReadProtection(addr, size);
+        TlgRbDiag::AddOutcome(TlgRbDiag::FastRelease);
     } else if (!image_readback || buffer_cache.IsRegionGpuModified(addr, size)) {
         buffer_cache.ReadMemory(addr, size, false, assume_locks);
     }

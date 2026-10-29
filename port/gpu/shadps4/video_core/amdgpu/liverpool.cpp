@@ -8,6 +8,7 @@
 #endif
 #include <time.h>
 #include "tlg_copy.h"
+#include "tlg_rb_diag.h"
 #include "tlg_toggles.h"
 #include <cstdio>
 #include <boost/preprocessor/stringize.hpp>
@@ -254,6 +255,9 @@ void SignalEop(const PM4CmdEventWriteEop& eop) {
         [](void* address, u64 data, u32 num_bytes) {
             auto* memory = Core::Memory::Instance();
             TlgWriteLog::Note(reinterpret_cast<u64>(address), &data, num_bytes, TlgWriteLog::Fence);
+            if (TlgRbDiag::Enabled()) {
+                TlgRbDiag::NoteLabel(TlgRbDiag::LabelEop, reinterpret_cast<u64>(address));
+            }
             if (!memory->TryWriteBacking(address, &data, num_bytes)) {
                 memcpy(address, &data, num_bytes);
             }
@@ -340,6 +344,9 @@ void RunWriteData(Vulkan::Rasterizer& rasterizer, const u8* data) {
     }
     TlgWriteLog::Note(write_data->Address<u64>(), write_data->data,
                      (header->type3.count.Value() - 2) * sizeof(u32), TlgWriteLog::WriteData);
+    if (TlgRbDiag::Enabled()) {
+        TlgRbDiag::NoteLabel(TlgRbDiag::LabelWriteData, write_data->Address<u64>());
+    }
     std::memcpy(write_data->Address<u64*>(), write_data->data,
                 (header->type3.count.Value() - 2) * sizeof(u32));
 }
@@ -354,6 +361,9 @@ void RunEventWriteEos(Vulkan::Rasterizer& rasterizer, const u8* data) {
     event_eos.SignalFence([](void* address, u64 value, u32 num_bytes) {
         auto* memory = Core::Memory::Instance();
         TlgWriteLog::Note(reinterpret_cast<u64>(address), &value, num_bytes, TlgWriteLog::Fence);
+        if (TlgRbDiag::Enabled()) {
+            TlgRbDiag::NoteLabel(TlgRbDiag::LabelEos, reinterpret_cast<u64>(address));
+        }
         if (!memory->TryWriteBacking(address, &value, num_bytes)) {
             memcpy(address, &value, num_bytes);
         }
@@ -1587,6 +1597,10 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
                 rasterizer->FlushForFence(TlgStats::FenceComputeWriteData);
             }
             if (!write_data->wr_one_addr.Value()) {
+                if (TlgRbDiag::Enabled()) {
+                    TlgRbDiag::NoteLabel(TlgRbDiag::LabelComputeWriteData,
+                                         write_data->Address<u64>());
+                }
                 std::memcpy(write_data->Address<void*>(), write_data->data, data_size);
             } else {
                 UNREACHABLE();
@@ -1621,6 +1635,9 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
                 rasterizer->WaitDeferredSignals();
             }
             const auto* release_mem = reinterpret_cast<const PM4CmdReleaseMem*>(header);
+            if (TlgRbDiag::Enabled()) {
+                TlgRbDiag::NoteLabel(TlgRbDiag::LabelReleaseMem, release_mem->Address<u64>());
+            }
             if (rasterizer) {
                 rasterizer->ProcessDownloadImages();
                 rasterizer->FlushForFence(TlgStats::FenceReleaseMem);

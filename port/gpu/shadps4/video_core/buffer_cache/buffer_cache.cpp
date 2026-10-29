@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <magic_enum/magic_enum.hpp>
 #include "tlg_copy.h"
+#include "tlg_rb_diag.h"
 #include "tlg_settings.h"
 #include "tlg_toggles.h"
 #include "common/alignment.h"
@@ -146,9 +147,25 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
 BufferCache::~BufferCache() = default;
 
 void BufferCache::InvalidateMemory(VAddr device_addr, u64 size, bool assume_locks) {
-    memory_tracker->InvalidateRegion(device_addr, size, [this, device_addr, size, assume_locks] {
+    // tlg diag (TLG_RB_DIAG, TLG_RB_SKIP_WRITE): a skipped write fault keeps the CPU bytes, as
+    // readbacks off does.
+    if (auto* diag = TlgRbDiag::Current();
+        (TlgRbDiag::FixSkip() || (diag && diag->write && TlgRbDiag::SkipBuffer(*diag))) &&
+        IsRegionGpuModified(device_addr, size)) {
+        memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
+        memory_tracker->MarkRegionAsCpuModified(device_addr, size);
+        TlgRbDiag::AddOutcome(TlgRbDiag::Skipped);
+        return;
+    }
+    bool flushed = false;
+    memory_tracker->InvalidateRegion(device_addr, size, [&] {
+        flushed = true;
+        TlgRbDiag::InternalScope diag{device_addr, true};
         ReadMemory(device_addr, size, true, assume_locks);
     });
+    if (!flushed) {
+        TlgRbDiag::AddOutcome(TlgRbDiag::WriteNoFlush);
+    }
 }
 
 // tlg: the game fills its per-frame buffers (constants, skinning output) sequentially and
@@ -188,7 +205,14 @@ void BufferCache::ExtendWriteFault(VAddr device_addr) {
 }
 
 void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool assume_locks) {
-    const auto flush_request = [this, device_addr, size, is_write] {
+    TlgRbDiag::InternalScope diag_internal{device_addr, is_write};
+    auto* const diag = TlgRbDiag::Current();
+    const u64 diag_sent = diag && !assume_locks ? TlgRbDiag::NowNs() : 0;
+    const auto flush_request = [this, device_addr, size, is_write, diag, diag_sent] {
+        TlgRbDiag::Scope diag_scope{diag};
+        if (diag_sent) {
+            diag->queue_ns += TlgRbDiag::NowNs() - diag_sent;
+        }
         const u32 first_block = device_addr >> block_shift;
         const u32 last_block = (device_addr + size - 1) >> block_shift;
         const auto* arena = GetArena(first_block, last_block);
@@ -228,6 +252,7 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     if (readback_stats_enabled) {
         readback_requests.fetch_add(1, std::memory_order_relaxed);
     }
+    const u64 diag_start = TlgRbDiag::Current() ? TlgRbDiag::NowNs() : 0;
 
     // A CPU fault must see every preceding GPU write before it resumes, so the wait itself
     // cannot be deferred. At 60 FPS, however, the first fault can download all exact dirty
@@ -368,6 +393,9 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
     if (total_size_bytes == 0) {
+        if (diag_start) {
+            TlgRbDiag::NoteDownload(TlgRbDiag::NowNs() - diag_start, 0, 0, 0, false, true);
+        }
         if (readback_stats_enabled) {
             readback_empty_requests.fetch_add(1, std::memory_order_relaxed);
         }
@@ -404,6 +432,11 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
     const auto wait_start = std::chrono::steady_clock::now();
+    const u64 diag_wait = diag_start ? TlgRbDiag::NowNs() : 0;
+    const u32 diag_state = last_write == 0                      ? 0
+                           : write_done                          ? 1
+                           : last_write < scheduler.CurrentTick() ? 2
+                                                                  : 3;
     const bool side = write_done && !TlgToggle::Disabled2(TlgToggle::ReadbackSideQueue) &&
                       CopyOnReadbackQueue(arena, download.buffer, copies, last_write);
     if (!side) {
@@ -421,10 +454,14 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     }
 
     download.buffer->Invalidate(download.offset, download.size);
+    const u64 diag_writeback = diag_start ? TlgRbDiag::NowNs() : 0;
     for (size_t i = 0; i < copies.size(); ++i) {
         const auto& copy = copies[i];
         const VAddr dst_addr = arena_base + copy.srcOffset;
         const u8* src = download.mapped + (copy.dstOffset - download.offset);
+        if (diag_start) {
+            TlgRbDiag::NoteCopy(dst_addr, src, copy.size, i >= requested_copies);
+        }
         if (i < requested_copies) {
             memory->TryWriteBacking(std::bit_cast<u8*>(dst_addr), src, copy.size);
             continue;
@@ -444,6 +481,10 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
     for (const auto& [run_addr, run_size] : hot_runs) {
         memory_tracker->UnmarkRegionAsGpuModified(run_addr, run_size);
+    }
+    if (diag_start) {
+        TlgRbDiag::NoteDownload(diag_wait - diag_start, diag_writeback - diag_wait,
+                                TlgRbDiag::NowNs() - diag_writeback, diag_state, side, false);
     }
     ReportReadbackStats();
 }
@@ -718,6 +759,9 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
             TlgStats::buffer_upload_bytes.load(std::memory_order_relaxed) - uploaded_before;
     }
     if (is_written) {
+        if (TlgRbDiag::Enabled()) {
+            TlgRbDiag::NoteGpuWrite(device_addr, size, __builtin_return_address(0));
+        }
         gpu_modified_ranges.Add(device_addr, size);
         // tlg: Runtime::AccessBuffer notes the tick the write is recorded in; this covers a
         // write that does not pass through it.
