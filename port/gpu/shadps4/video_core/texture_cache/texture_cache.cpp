@@ -23,6 +23,7 @@
 #include "video_core/renderer_vulkan/vk_wait_diagnostics.h"
 #include "video_core/texture_cache/aliasing.h"
 #include "video_core/texture_cache/host_compatibility.h"
+#include <vk_mem_alloc.h>
 #include "video_core/texture_cache/texture_cache.h"
 #include "video_core/texture_cache/tile_manager.h"
 
@@ -48,6 +49,12 @@ TextureCache::TextureCache(const Vulkan::Instance& instance_, Vulkan::Scheduler&
     if (gc_batch_downloads) {
         std::printf("GPU: collector write-backs batched, one GPU wait per collection "
                     "(TLG_GC_BATCH_DOWNLOAD)\n");
+    }
+    Common::lru_stop_early = (gc_fix & 1) != 0;
+    if (gc_fix != 3) {
+        std::printf("GPU: collector fixes TLG_GC_FIX=%u, default 3 (1: queue walk stops early, 2: "
+                    "images it cannot free move to the back)\n",
+                    gc_fix);
     }
 
     u32 max_samplers = instance.GetMaxSamplerAllocationCount();
@@ -1496,6 +1503,7 @@ void TextureCache::GarbageCollectImages() {
             }
         }
     }
+    ReportMemory();
     if (total_used_memory < trigger_gc_memory) {
         return;
     }
@@ -1504,6 +1512,7 @@ void TextureCache::GarbageCollectImages() {
     bool aggresive = false;
     u64 ticks_to_destroy = 0;
     size_t num_deletions = 0;
+    size_t visited = 0; // tlg: TLG_GC_FIX bit 2
 
     // tlg: TLG_GC_BATCH_DOWNLOAD=1: selected images are only recorded (their copies too) and
     // freed by evict(): one GPU wait, then per image, in selection order, the write-back while it
@@ -1542,15 +1551,22 @@ void TextureCache::GarbageCollectImages() {
         ticks_to_destroy = std::min(ticks_to_destroy, gc_tick);
         num_deletions = aggresive ? 40 : pressured ? 20 : 10;
     };
+    // tlg: TLG_GC_FIX bit 2: an image the pass cannot free no longer counts against its budget
+    // and moves to the back of the queue, so the next pass reaches images it can free. Before,
+    // such images used up the 10-40 slots of every pass and stayed at the front.
+    const bool skip_fix = (gc_fix & 2) != 0;
     const auto clean_up = [&](ImageId image_id) {
-        if (num_deletions == 0) {
+        if (num_deletions == 0 || (skip_fix && ++visited > 256)) {
             return true;
         }
+        ++gc_walked;
         if (std::ranges::find(evictions, image_id, &Eviction::image_id) != evictions.end()) {
             // Selected by the first pass, freed by evict().
             return false;
         }
-        --num_deletions;
+        if (!skip_fix) {
+            --num_deletions;
+        }
         auto& image = slot_images[image_id];
         ResolveReadbacks(image.info.guest_address, image.info.guest_size, true,
                          ReadbackSource::CacheCleanup);
@@ -1558,11 +1574,23 @@ void TextureCache::GarbageCollectImages() {
         const bool tiled = image.info.IsTiled();
         if (tiled && download) {
             // This is a workaround for now. We can't handle non-linear image downloads.
+            ++gc_skip_tiled;
+            if (skip_fix) {
+                lru_cache.Touch(image.lru_id, gc_tick);
+            }
             return false;
         }
         if (download && !pressured) {
+            ++gc_skip_unpressured;
+            if (skip_fix) {
+                lru_cache.Touch(image.lru_id, gc_tick);
+            }
             return false;
         }
+        if (skip_fix) {
+            --num_deletions;
+        }
+        ++gc_freed;
         if (gc_batch_downloads) {
             evictions.push_back(Eviction{image_id, std::nullopt});
             if (download) {
@@ -1606,11 +1634,14 @@ void TextureCache::GarbageCollectImages() {
 
     // Try to remove anything old enough and not high priority.
     configure(false);
+    ++gc_passes;
     lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
 
     if (used_memory() >= critical_gc_memory) {
         // If we are still over the critical limit, run an aggressive GC
         configure(true);
+        visited = 0;
+        ++gc_passes;
         lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
     }
     evict();
@@ -1628,6 +1659,114 @@ void TextureCache::GarbageCollectImages() {
             gc_evictions = gc_downloads = 0;
         }
     }
+}
+
+// tlg: with TLG_FRAME_STATS, every 5 s: what fills video memory, by owner, and the texture cache
+// images left from before the last stage load (issues #20, #104: long sessions slow down and an
+// 8 GB card filled up). The collector compares the driver's figure (all of it) with its budget,
+// but only frees texture cache images.
+void TextureCache::ReportMemory() {
+    const auto now = std::chrono::steady_clock::now();
+    if (!TlgStats::enabled || now - memory_report_time < std::chrono::seconds(5)) {
+        return;
+    }
+    memory_report_time = now;
+    const auto& props = instance.GetMemoryProperties();
+    VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+    vmaGetHeapBudgets(instance.GetAllocator(), budgets);
+    u64 blocks = 0, allocated = 0;
+    for (u32 i = 0; i < props.memoryHeapCount; ++i) {
+        if (props.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+            blocks += budgets[i].statistics.blockBytes;
+            allocated += budgets[i].statistics.allocationBytes;
+        }
+    }
+    const u64 driver = instance.CanReportMemoryUsage() ? instance.GetDeviceMemoryUsage() : 0;
+    const u64 arenas = TlgStats::arena_resident_bytes.load(std::memory_order_relaxed);
+    s64 image_mib[TlgStats::ImageOwners], image_count[TlgStats::ImageOwners];
+    s64 all_images = 0;
+    for (u32 i = 0; i < TlgStats::ImageOwners; ++i) {
+        const s64 bytes = TlgStats::image_bytes[i].load(std::memory_order_relaxed);
+        all_images += bytes;
+        image_mib[i] = bytes >> 20;
+        image_count[i] = TlgStats::image_count[i].load(std::memory_order_relaxed);
+    }
+    struct Group {
+        u64 count = 0, bytes = 0;
+        void Add(u64 size) {
+            ++count;
+            bytes += size;
+        }
+    };
+    Group all, written, unevictable, tracked, old, old_written;
+    u64 passes, walked, skip_tiled, skip_unpressured, freed;
+    {
+        std::scoped_lock lock{mutex};
+        passes = std::exchange(gc_passes, 0);
+        walked = std::exchange(gc_walked, 0);
+        skip_tiled = std::exchange(gc_skip_tiled, 0);
+        skip_unpressured = std::exchange(gc_skip_unpressured, 0);
+        freed = std::exchange(gc_freed, 0);
+        const auto host_bytes = [](const Image& image) {
+            u64 bytes = 0;
+            for (const auto& backing : image.backing_images) {
+                bytes += backing.image.size_bytes;
+            }
+            return bytes;
+        };
+        for (Image& image : slot_images) {
+            const u64 bytes = host_bytes(image);
+            all.Add(bytes);
+            if (image.SafeToDownload()) {
+                written.Add(bytes);
+                if (image.info.IsTiled()) {
+                    unevictable.Add(bytes);
+                }
+            }
+            if (image.IsTracked()) {
+                tracked.Add(bytes);
+            }
+        }
+        lru_cache.ForEachItemBelow(load_cleanup_tick, [&](ImageId image_id) {
+            const Image& image = slot_images[image_id];
+            const u64 bytes = host_bytes(image);
+            old.Add(bytes);
+            if (image.SafeToDownload()) {
+                old_written.Add(bytes);
+            }
+        });
+    }
+    const auto mib = [](u64 bytes) { return static_cast<unsigned long long>(bytes >> 20); };
+    const auto num = [](u64 count) { return static_cast<unsigned long long>(count); };
+    std::printf("Memory stats: driver %llu MiB (collector %llu/%llu/%llu); VMA blocks %llu MiB, "
+                "%llu allocated; images MiB (count): texture cache %lld (%lld), scene targets "
+                "%lld (%lld), upscaler and host passes %lld (%lld), texture pack %lld (%lld); "
+                "buffer arenas %llu MiB; other VMA %lld MiB; outside VMA %lld MiB\n",
+                mib(driver), mib(trigger_gc_memory), mib(pressure_gc_memory),
+                mib(critical_gc_memory), mib(blocks), mib(allocated),
+                (long long)image_mib[TlgStats::OwnerTextureCache],
+                (long long)image_count[TlgStats::OwnerTextureCache],
+                (long long)image_mib[TlgStats::OwnerScene],
+                (long long)image_count[TlgStats::OwnerScene],
+                (long long)image_mib[TlgStats::OwnerHost], (long long)image_count[TlgStats::OwnerHost],
+                (long long)image_mib[TlgStats::OwnerPack], (long long)image_count[TlgStats::OwnerPack],
+                mib(arenas), (long long)((s64(allocated) - all_images) >> 20),
+                (long long)((s64(driver) - s64(blocks) - s64(arenas)) >> 20));
+    std::printf("Texture cache images: %llu (%llu MiB); GPU-written %llu (%llu MiB), of those tiled "
+                "%llu (%llu MiB, never evicted); tracked %llu (%llu MiB); from before the last load "
+                "%llu (%llu MiB), GPU-written %llu (%llu MiB)\n",
+                num(all.count), mib(all.bytes), num(written.count), mib(written.bytes),
+                num(unevictable.count), mib(unevictable.bytes), num(tracked.count),
+                mib(tracked.bytes), num(old.count), mib(old.bytes), num(old_written.count),
+                mib(old_written.bytes));
+    const u64 lookups = TlgStats::region_lookups.exchange(0, std::memory_order_relaxed);
+    const u64 candidates = TlgStats::region_candidates.exchange(0, std::memory_order_relaxed);
+    std::printf("Collector (5 s): %llu passes, %llu images walked, %llu skipped (tiled GPU-written), "
+                "%llu skipped (write-back waits for pressure), %llu freed; image lookups %llu, "
+                "images looked at %llu (%.1f per lookup)\n",
+                num(passes), num(walked), num(skip_tiled), num(skip_unpressured), num(freed),
+                num(lookups), num(candidates),
+                lookups ? static_cast<double>(candidates) / static_cast<double>(lookups) : 0.0);
 }
 
 void TextureCache::GarbageCollectSamplers() {
@@ -1677,6 +1816,74 @@ void TextureCache::RunGarbageCollector() {
 
     GarbageCollectImages();
     GarbageCollectSamplers();
+    CleanUpAfterLoad();
+}
+
+// tlg: setting texture_cleanup. GarbageCollectImages only runs when VRAM gets short (above 70% of
+// TLG_GC_BUDGET_MB, or above (VRAM - 8 GB) / 2 without it), so with a high budget or a big card the
+// images of every stage visited stayed: 200k images after 28 stage loads, and s04_FirstAntenna
+// _090_GardenTerrace_001 dropped from 69 to 57 FPS (back to 69 after this cleanup, 2026-10-28).
+// tlg_lua.cpp marks the end of each stage load; 2 s later, free every image not used since then,
+// except those holding GPU-written data (the collector above keeps them too unless pressed).
+// Freeing them all at once (12k-47k images) cost one 70-160 ms frame, mostly in the deferred
+// destruction of the Vulkan images (DeleteImage), which runs in one go when the GPU passes the tick:
+// slices of 1 ms still left a 40-50 ms frame. So it frees at most 1024 images per submission and
+// goes on at the next one; images used in the meantime get a newer tick and stay.
+void TextureCache::CleanUpAfterLoad() {
+    auto& s = TlgSettings::Get();
+    const auto now = std::chrono::steady_clock::now();
+    if (s.stage_loaded.exchange(false, std::memory_order_relaxed)) {
+        load_cleanup_pending = true;
+        load_cleanup_running = false;
+        load_cleanup_tick = gc_tick;
+        load_cleanup_time = now;
+        return;
+    }
+    if (load_cleanup_pending) {
+        if (now - load_cleanup_time < std::chrono::seconds(2)) {
+            return;
+        }
+        load_cleanup_pending = false;
+        load_cleanup_running = s.texture_cleanup;
+        load_cleanup_freed = load_cleanup_bytes = load_cleanup_slices = 0;
+    }
+    if (!load_cleanup_running) {
+        return;
+    }
+    static constexpr u64 SliceImages = 1024;
+    TlgStats::Timer gc_timer{TlgStats::t_gc};
+    std::scoped_lock lock{mutex};
+    u64 kept = 0, freed = 0;
+    bool slice_full = false;
+    ++load_cleanup_slices;
+    lru_cache.ForEachItemBelow(load_cleanup_tick, [&](ImageId image_id) {
+        if (freed == SliceImages) {
+            slice_full = true;
+            return true;
+        }
+        auto& image = slot_images[image_id];
+        ResolveReadbacks(image.info.guest_address, image.info.guest_size, true,
+                         ReadbackSource::CacheCleanup);
+        if (image.SafeToDownload()) {
+            ++kept;
+            return false;
+        }
+        ++freed;
+        ++load_cleanup_freed;
+        load_cleanup_bytes += Common::AlignUp(image.info.guest_size, 1024);
+        FreeImage(image_id);
+        return false;
+    });
+    if (slice_full) {
+        return;
+    }
+    load_cleanup_running = false;
+    std::printf("Texture cache: cleanup after the load freed %llu images (%llu MiB), kept %llu with "
+                "GPU-written data, in %llu slices\n",
+                (unsigned long long)load_cleanup_freed,
+                (unsigned long long)(load_cleanup_bytes >> 20), (unsigned long long)kept,
+                (unsigned long long)load_cleanup_slices);
+    std::fflush(stdout);
 }
 
 void TextureCache::TouchImage(const Image& image) {

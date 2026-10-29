@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright 2026 IFreemz (shadps4_dlss bridge), tlg contributors
 # SPDX-License-Identifier: MIT
 #
-# tlg_dlss.dll links the NVIDIA DLSS SDK (MSVC only) and is built separately from the port:
+# tlg_dlss.dll (Windows, MSVC: the SDK's Windows libraries are MSVC only) or libtlg_dlss.so
+# (Linux, GCC: packaging/linux/build_dlss.sh) links the NVIDIA DLSS SDK and is built separately
+# from the port:
 #   cmake -S gpu/dlss_bridge -B out/dlss-bridge -G "Visual Studio 17 2022" -A x64 \
 #         -DDLSS_SDK_ROOT=<github.com/NVIDIA/DLSS checkout> -DVULKAN_INCLUDE=<Vulkan-Headers include>
 #   cmake --build out/dlss-bridge --config Release
@@ -12,8 +14,8 @@ project(tlg_dlss LANGUAGES CXX)
 set(DLSS_SDK_ROOT "" CACHE PATH "NVIDIA DLSS SDK root (contains include/ and lib/)")
 set(VULKAN_INCLUDE "" CACHE PATH "Vulkan-Headers include directory")
 
-if (NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "The DLSS bridge is Windows x64 only")
+if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8 OR NOT (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    message(FATAL_ERROR "The DLSS bridge is Windows x64 or Linux x86-64 only")
 endif()
 if (NOT EXISTS "${DLSS_SDK_ROOT}/include/nvsdk_ngx_vk.h")
     message(FATAL_ERROR "Set DLSS_SDK_ROOT to the NVIDIA DLSS SDK (github.com/NVIDIA/DLSS)")
@@ -26,5 +28,13 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
 add_library(tlg_dlss SHARED tlg_dlss_bridge.cpp tlg_dlss_bridge.h)
 target_include_directories(tlg_dlss PRIVATE "${DLSS_SDK_ROOT}/include" "${VULKAN_INCLUDE}")
-target_link_libraries(tlg_dlss PRIVATE "${DLSS_SDK_ROOT}/lib/Windows_x86_64/x64/nvsdk_ngx_s.lib")
-target_compile_definitions(tlg_dlss PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+if (WIN32)
+    target_link_libraries(tlg_dlss PRIVATE "${DLSS_SDK_ROOT}/lib/Windows_x86_64/x64/nvsdk_ngx_s.lib")
+    target_compile_definitions(tlg_dlss PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+else()
+    # Only TlgDlssGetApi is exported; the C++ runtime is linked in, so the bridge loads on any
+    # distribution the port runs on.
+    set_target_properties(tlg_dlss PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    target_link_libraries(tlg_dlss PRIVATE "${DLSS_SDK_ROOT}/lib/Linux_x86_64/libnvsdk_ngx.a"
+                          ${CMAKE_DL_LIBS} -static-libstdc++ -static-libgcc)
+endif()

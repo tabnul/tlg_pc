@@ -313,7 +313,7 @@ void VideoOutDriver::Flip(const Request& req) {
                                                 : 0);
 
     // tlg: TLG_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds
-    // (TLG_FRAME_STATS_MS sets another window, e.g. 1000 for per-second FPS in the warp sweep).
+    // (TLG_FRAME_STATS_MS sets another window, e.g. 1000 for per-second FPS in the scene check).
     static const bool frame_stats = EmulatorSettingsImpl::Flag("TLG_FRAME_STATS", false);
     static const double stats_window_s = [] {
         const char* env = std::getenv("TLG_FRAME_STATS_MS");
