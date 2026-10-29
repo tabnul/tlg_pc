@@ -69,18 +69,20 @@ TEXT = {
                    'Patches GoldHEN de illusionyy e DanielSvoboda.'),
     'show_fps': ('Show FPS overlay at start (F10 toggles)', 'Mostrar overlay de FPS ao iniciar (F10 alterna)'),
     'vram': ('Texture cache budget (MB of VRAM)', 'Orçamento do cache de texturas (MB de VRAM)'),
-    'vram_hint': ('6 GB card: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. This is video card memory (VRAM), not RAM; never above your card\'s VRAM. '
-                  'Higher is not faster: the cache is only cleaned when it gets full, so a high budget lets the textures of earlier stages pile up and slows the game down after stage changes, unless the cleanup below is on.',
-                  'Placa de 6 GB: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. É a memória da placa de vídeo (VRAM), não a RAM; nunca acima da VRAM da placa. '
-                  'Mais alto não é mais rápido: o cache só é limpo quando enche, então um orçamento alto deixa as texturas de fases anteriores se acumularem e deixa o jogo mais lento após trocas de fase, a menos que a limpeza abaixo esteja ligada.'),
+    'vram_hint': ('5000 suits every card with 6 GB or more: keep it there, also on a big card. Do not set it higher: the cache is only cleaned when it gets full, '
+                  'so a high budget lets old textures pile up and slows the game down over a long session. '
+                  'Only lower it if your card needs it: less than 6 GB of VRAM (4 GB card: 3700). This is video card memory (VRAM), not RAM.',
+                  '5000 serve para toda placa com 6 GB ou mais: deixe assim, também numa placa grande. Não aumente: o cache só é limpo quando enche, '
+                  'então um orçamento alto deixa texturas antigas se acumularem e deixa o jogo mais lento numa sessão longa. '
+                  'Só diminua se a sua placa precisar: menos de 6 GB de VRAM (placa de 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
     'texture_cleanup': ('Clean up textures after each load',
                         'Limpar texturas após cada carregamento'),
-    'texture_cleanup_hint': ('Frees the textures of earlier stages after each stage or checkpoint load. It helped in one test (69 against 57 FPS after 28 loads), '
-                             'but in a longer test the game still got slower over many loads (issue #20), so it is off by default for now. '
-                             'Off is the emulator\'s original behaviour. Also in the in-game menu (Insert → Performance).',
-                             'Libera as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Ajudou num teste (69 contra 57 FPS após 28 carregamentos), '
-                             'mas num teste mais longo o jogo ainda ficou mais lento após muitos carregamentos (issue #20), então por enquanto vem desligado. '
-                             'Desligado é o comportamento original do emulador. Também no menu do jogo (Insert → Desempenho).'),
+    'texture_cleanup_hint': ('Frees the textures of earlier stages all at once after each stage or checkpoint load. Not needed any more: since the texture cache '
+                             'cleanup was fixed (issue #104), old textures no longer pile up with the budget at 5000. It can cause a short stutter after a load, '
+                             'so it is off by default. Also in the in-game menu (Insert → Performance).',
+                             'Libera de uma vez as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Não é mais necessário: desde que a limpeza '
+                             'do cache de texturas foi corrigida (issue #104), texturas antigas não se acumulam mais com o orçamento em 5000. Pode causar um breve travamento '
+                             'após um carregamento, então vem desligado. Também no menu do jogo (Insert → Desempenho).'),
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
