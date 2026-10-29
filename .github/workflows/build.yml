@@ -1,4 +1,4 @@
-# (Linux builds as an artifact; releases stay Windows only until it is tested: tabnul/tlg_pc#1.)
+# (Releases ship Linux and Windows; the Linux package is untested so far: tabnul/tlg_pc#1.)
 # Pull requests to master (from integration) build the Windows package, kept as a run artifact for 3
 # days. Only a pushed tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest.
 # Every release is kept as version history. No game or console file is ever built in or uploaded.
@@ -20,8 +20,7 @@ permissions:
   contents: write
 
 jobs:
-  # Linux: built and kept as a run artifact; the release job still ships Windows only until
-  # the package is tested (tabnul/tlg_pc#1).
+  # Linux: released next to Windows, marked untested until it is tested (tabnul/tlg_pc#1).
   linux:
     runs-on: ubuntu-24.04
     defaults:
@@ -165,8 +164,7 @@ jobs:
           retention-days: 3
 
   release:
-    # Linux: needs: [linux, windows]
-    needs: [windows]
+    needs: [linux, windows]
     # Only a pushed v* tag publishes; master pushes and pull requests stop at the artifacts.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
@@ -191,10 +189,8 @@ jobs:
         run: |
           set -euo pipefail
           ls -la dist
-          # Linux: test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
-          test -f dist/tlg-windows-x86_64.zip
+          test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
           short=${GITHUB_SHA::7}
-          # Linux: the template's Download list gets "- Linux x86-64 (glibc 2.39+): `tlg-linux-x86_64.tar.gz`" above Windows.
           tag=$GITHUB_REF_NAME
           # The notes are .github/release-template.md, with {{CHANGES}} taken from the annotated
           # tag's message (git tag -a v0.2 -m "..."). A lightweight tag leaves that part out.
@@ -217,8 +213,7 @@ jobs:
             echo "tag=$tag" >> "$GITHUB_OUTPUT"; exit 0
           fi
           # SHA256SUMS: the launcher's updater checks the downloaded package against it.
-          # Linux: (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
-          (cd dist && sha256sum tlg-windows-x86_64.zip > SHA256SUMS)
+          (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
           # Upload into a draft first, so a failed upload never leaves a half-published release.
           # Releases are kept forever as version history; nothing here deletes one.
           # --verify-tag: the pushed tag is used as is. With --target the API may create a tag,
@@ -226,8 +221,7 @@ jobs:
           gh release create "$tag" dist/* --draft --verify-tag \
             --title "$tag ($(date -u +%Y-%m-%d) · ${short})" --notes-file notes.md
           n=$(gh release view "$tag" --json assets --jq '.assets | length')
-          # Linux: [[ $n -ge 3 ]]
-          [[ $n -ge 2 ]] || { echo "draft release has $n assets"; exit 1; }
+          [[ $n -ge 3 ]] || { echo "draft release has $n assets"; exit 1; }
           for try in 1 2 3; do
             gh release edit "$tag" --draft=false --latest && break
             sleep 10
