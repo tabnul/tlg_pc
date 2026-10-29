@@ -137,6 +137,44 @@ struct Buffer {
             write_ticks[g] = std::max(write_ticks[g], tick);
         }
     }
+    /// tlg: RAM received this arena's GPU bytes for the range (DownloadMemory wrote them
+    /// back); each fully covered 64 KiB group remembers the write tick it is current at.
+    /// Partially covered edge groups stay unmarked: an island clipped at the window edge
+    /// shares their tick but was not downloaded.
+    void NoteDownloaded(u64 offset, u64 size) const {
+        if (size == 0 || write_ticks.empty()) {
+            return;
+        }
+        constexpr u64 group = u64{1} << WriteTickShift;
+        const u64 first = (offset + group - 1) >> WriteTickShift;
+        const u64 end = std::min<u64>(offset + size, size_bytes) >> WriteTickShift;
+        if (first >= end) {
+            return;
+        }
+        if (downloaded_ticks.size() < write_ticks.size()) {
+            downloaded_ticks.resize(write_ticks.size());
+        }
+        for (u64 g = first; g < std::min<u64>(end, write_ticks.size()); ++g) {
+            downloaded_ticks[g] = write_ticks[g];
+        }
+    }
+    /// tlg: true when no GPU write was recorded for the range since RAM last received its
+    /// bytes, so a download would copy what RAM already holds.
+    [[nodiscard]] bool UnchangedSinceDownload(u64 offset, u64 size) const {
+        if (size == 0 || downloaded_ticks.empty()) {
+            return false;
+        }
+        const u64 last = (offset + size - 1) >> WriteTickShift;
+        if (last >= downloaded_ticks.size() || last >= write_ticks.size()) {
+            return false;
+        }
+        for (u64 g = offset >> WriteTickShift; g <= last; ++g) {
+            if (write_ticks[g] == 0 || downloaded_ticks[g] != write_ticks[g]) {
+                return false;
+            }
+        }
+        return true;
+    }
     /// Highest write tick in the range; 0 when nothing was noted.
     [[nodiscard]] u64 LastWrite(u64 offset, u64 size) const {
         u64 tick = 0;
@@ -158,6 +196,7 @@ struct Buffer {
     MemoryType mem_type{MemoryType::DeviceLocal};
     UniqueBuffer buffer;
     mutable std::vector<u64> write_ticks;
+    mutable std::vector<u64> downloaded_ticks;
 };
 
 struct StreamBuffer : public Buffer {
