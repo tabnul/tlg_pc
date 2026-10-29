@@ -255,7 +255,7 @@ void Dump(const char* buffer, uint64_t size, const char* name) {
         .write(buffer, static_cast<std::streamsize>(size));
 }
 
-// Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusiony
+// Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusionyy
 // and DanielSvoboda, applied to the source. Startup gets the QA menu (in game: hold L1, press
 // L3); the title menu's press-build level select is enabled (hold L1 as the menu closes).
 // The game is paused while the QA menu is open. The menu also closes itself when a stage is

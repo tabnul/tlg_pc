@@ -136,7 +136,7 @@ launcher.
 - **QA menu:** in game, hold L1 and press L3 (keyboard: hold 1, press Z). It is the developers' own
   menu, and from there you can jump to any stage.
 
-The idea comes from the GoldHEN "Level Select + QA Menu" patch by illusiony and DanielSvoboda. On
+The idea comes from the GoldHEN "Level Select + QA Menu" patch by illusionyy and DanielSvoboda. On
 its own, that patch's stage switch leaves a black screen and runs the game out of video memory
 after a few jumps. This port fixes both, so you can jump from stage to stage at will, which is
 handy for revisiting a favourite area or comparing graphics settings across the game. Both are
@@ -187,7 +187,7 @@ well (`build_dlss.sh`).
 - [HayatoG/tlg_pc](https://github.com/HayatoG/tlg_pc) by HayatoG: the port this fork is based on.
 - [gow3_pc](https://github.com/FelipePrado0/gow3_pc), [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
   and the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which the port builds on.
-- illusiony and DanielSvoboda for the GoldHEN level select, QA menu and bridge fix patches.
+- illusionyy and DanielSvoboda for the GoldHEN level select, QA menu and bridge fix patches.
 - [kanjieater](https://github.com/kanjieater) for the Cross/Circle menu confirmation and the
   EU 1.03 Japanese text option (upstream PRs #140, #141). Thank you!
 - [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9) for audio.
