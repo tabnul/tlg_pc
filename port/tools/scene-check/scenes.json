@@ -1,0 +1,1112 @@
+[
+ {
+  "stage": "s02_TricosCave",
+  "area": "_010_Care_Step1",
+  "scene": "s02_01_Care_Step1_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_020_Care_Step2",
+  "scene": "s02_02_Care_Step2_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_030_Care_Finished",
+  "scene": "s02_03_Care_Finished_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_040_Narrow_Way",
+  "scene": "s02_04_Narrow_Way_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_050_Tritrigger_Get",
+  "scene": "s02_05_Tritrigger_Get_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_060_Accidental_Shooting",
+  "scene": "s02_06_Accidental_Shooting_001"
+ },
+ {
+  "stage": "s02_TricosCave",
+  "area": "_070_Destroy_Door",
+  "scene": "s02_07_Destroy_Door_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_010_CanyonStart",
+  "scene": "CA_a01_CanyonStart_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_020_LakeEntrance_001",
+  "scene": "CA_b01_LakeEntrance_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_025_BarrelBroken_001",
+  "scene": "CA_b01_BarrelBroken_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_030_InsideLake_001",
+  "scene": "CA_b01_InsideLake_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_040_WallLookUp_001",
+  "scene": "CA_b01_WallLookUp_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_045_CondorRoar_001",
+  "scene": "CA_c01_CondorRoar_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_050_StepingStone_001",
+  "scene": "CA_c01_SteppingStone_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_060_StatueBreak_001",
+  "scene": "CA_c01_StatueBreak_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_065_StatueBreakEnd_001",
+  "scene": "CA_c01_StatueBreakEnd_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_070_ChainRoom_001",
+  "scene": "CA_d01_ChainRoom_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_080_PulseDoorCave_001",
+  "scene": "CA_e01_PulseDoorCave_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_090_CrouchMove_001",
+  "scene": "CA_f01_CrouchMove_001"
+ },
+ {
+  "stage": "s03_Canyon",
+  "area": "_100_ApproachAntenna_001",
+  "scene": "CA_g01_ApproachAntenna_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_010_FAStart",
+  "scene": "FA_a01_Start_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_020_ClearanceArea_001",
+  "scene": "FA_a01_ClearanceArea_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_030_OpenGate_001",
+  "scene": "FA_a01_OpenGate_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_040_AntennaRoom_001",
+  "scene": "FA_a04_AntennaRoom_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_050_SleepingTrico_001",
+  "scene": "FA_a04_SleepingTrico_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_060_Watercourse_001",
+  "scene": "FA_a04_OpenGate_002"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_070_FourthSoldiers_001",
+  "scene": "FA_b01_SoldiersTerrace_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_075_TricoAwakeBattle_001",
+  "scene": "FA_a04_TricoAwakeBattle_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_085_HangDownChain_001",
+  "scene": "FA_b01_HangDownChain_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_090_GardenTerrace_001",
+  "scene": "FA_c01_GardenTerrace_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_095_SmellPotHouse_001",
+  "scene": "FA_c01_SmellPotHouse_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_100_TreesRoad_001",
+  "scene": "FA_d01_TreesRoad_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_110_WatersideGarden_001",
+  "scene": "FA_d03_WatersideGarden_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_120_BrokenRoom_001",
+  "scene": "FA_e01_BrokenRoom_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_130_PillarsArea_001",
+  "scene": "FA_f01_PillarsArea_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_140_EscapePillarsArea_001",
+  "scene": "FA_f01_EscapePillarsArea_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_150_LastSoldier_001",
+  "scene": "FA_f02_LastSoldier_001"
+ },
+ {
+  "stage": "s04_FirstAntenna",
+  "area": "_160_FAEnd",
+  "scene": "FA_f02_End_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_010_AttackedStart",
+  "scene": "AT_Start_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_020_SwitchRoom",
+  "scene": "AT_SwitchRoom_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_030_Outdoor",
+  "scene": "AT_Outdoor_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_040_BarrelBox",
+  "scene": "AT_BarrelBox_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_041_AfterBarrelBoxRoom",
+  "scene": "AT_AfterBarrelBoxRoom_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_050_CondorRise",
+  "scene": "AT_CondorRise_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_060_OnWoodenPanel",
+  "scene": "AT_OnWoodenPanel_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_070_SoldiersRoom01",
+  "scene": "AT_SoldiersRoom_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_080_AT_PullSwitch01",
+  "scene": "AT_PullSwitch_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_090_SoldiersDestruction",
+  "scene": "AT_SoldiersDestruction_001"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_100_SoldiersRoom02",
+  "scene": "AT_SoldiersRoom_002"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_105_AT_PullSwitch02",
+  "scene": "AT_PullSwitch_002"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_110_SoldiersDestruction02",
+  "scene": "AT_SoldiersDestruction_002"
+ },
+ {
+  "stage": "s05_Attacked",
+  "area": "_120_AT_toFB",
+  "scene": "AT_toFB_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_010_b01_game_start",
+  "scene": "FB_b01_Start_intarest_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_011_b01_After_OneWayDoor",
+  "scene": "FB_b01_After_OneWayDoor_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_020_c02_boy_athletic",
+  "scene": "FB_c02_boy_athletic_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_021_c01_Before_SwitchDown",
+  "scene": "FB_c01_Before_SwitchDown_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_022_b01_Before_SuspendPot",
+  "scene": "FB_b01_Before_SuspendPot_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_023_b01_SuspendPot",
+  "scene": "FB_b01_SuspendPot_003"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_024_d01_NearStopper",
+  "scene": "FB_d01_NearStopper_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_030_d01_Mirrors_Room",
+  "scene": "FB_d01_MirrorsRoom_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_040_e01_OutDoor",
+  "scene": "FB_e01_Outdoor_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_041_dropMirrorCart",
+  "scene": "FB_e01_MirrorCart_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_050_e02_on_the_bridge",
+  "scene": "FB_e02_IntervalBridge_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_051_e02_DropMirror2",
+  "scene": "FB_DropMirror2_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_060_f01_goal_terrace",
+  "scene": "FB_f01_GoalTerrace_001"
+ },
+ {
+  "stage": "s06_FallingBridge",
+  "area": "_070_f01_goal",
+  "scene": "FB_f01_Demo_002"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_010_AloneStart_01",
+  "scene": "AL_a01_AloneStart_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_020_FirstRoom_01",
+  "scene": "AL_a01_firstRoom_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_030_MirrorFall_01",
+  "scene": "AL_a01_MillerFall_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_040_GateOpen_01",
+  "scene": "AL_a01_GateOpen_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_050_SkyAthletics_01",
+  "scene": "AL_a01_SkyAthletics_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_060_Seesaw_01",
+  "scene": "AL_b01_Seesaw_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_070_YajirobeMirror_01",
+  "scene": "AL_b01_YajirobeMirror_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_080_YajirobeSwitch_01",
+  "scene": "AL_b01_YajirobeSwitch_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_090_StepColumn_01",
+  "scene": "AL_b01_StepColumn_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_100_StepColumn_02",
+  "scene": "AL_b01_StepColumn_02"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_110_BreakBridge_01",
+  "scene": "AL_b01_BreakBridge_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_120_TowerStart_01",
+  "scene": "AL_c01_TowerStart_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_130_FirstBattle_01",
+  "scene": "AL_c01_FirstBattle_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_140_SpearAttack_01",
+  "scene": "AL_c01_SpearAttack_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_150_ThirdBattle_01",
+  "scene": "AL_c01_ThirdBattle_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_160_BeamArea_01",
+  "scene": "AL_c01_BeamArea_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_170_AloneEnd_01",
+  "scene": "AL_d01_AloneEnd_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_180_TruckPull_01",
+  "scene": "AL_d01_TruckPush_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_190_DarkPlace_01",
+  "scene": "AL_d01_DarkPlace_01"
+ },
+ {
+  "stage": "s07_Alone",
+  "area": "_200_BridgePush_01",
+  "scene": "AL_d01_BridgePush_01"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_010_Start_001",
+  "scene": "s08_01_Start_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_020_MirrorYajirobe_001",
+  "scene": "s08_02_MirrorYajirobe_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_020_arrive_at_LT_001",
+  "scene": "s08_02_arrive_at_LT_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_020_wireHang_001",
+  "scene": "s08_02_wireHang_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_021_DemoMirrorFall_001",
+  "scene": "s08_02d_DemoMirrorFall_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_030_LeaningYajirobe_001",
+  "scene": "s08_03_LeaningYajirobe_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_040_Climb_Tower_001",
+  "scene": "s08_04_Climb_Tower_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_050_SmallMirror_001",
+  "scene": "s08_05_SmallMirror_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_060_Climb_Tower_Again_001",
+  "scene": "s08_06_Climb_Tower_Again_001"
+ },
+ {
+  "stage": "s08_LargeTower",
+  "area": "_070_Top_001",
+  "scene": "s08_07_Top_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_000_Start",
+  "scene": "FB2_Start_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_005_Try_Touch_Under",
+  "scene": "FB2_Try_Touch_Under"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_006_After_Try_Touch_Under",
+  "scene": "FB2_After_Try_Touch_Under"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_010_Start_HungryEvent",
+  "scene": "FB2_Start_HungryEvent"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_015_End_HungryEvent",
+  "scene": "FB2_End_HungryEvent"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_020_MiddleLayer",
+  "scene": "FB2_MiddleLayer_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_030_TopLayer",
+  "scene": "FB2_TopLayer_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_031_SoldiersRoom",
+  "scene": "FB2_SoldiersRoom_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_032_FB2_Battle1_End",
+  "scene": "FB2_Battle1_End_001"
+ },
+ {
+  "stage": "s09_FallingBridge2",
+  "area": "_040_End",
+  "scene": "FB2_End_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_000_Start_000",
+  "scene": "s10_00_Start_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_010_Lever_Down_001",
+  "scene": "s10_01_Lever_Down_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_020_Smelling_Pot_001",
+  "scene": "s10_02_Smelling_Pot_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_021_Pitfall_001",
+  "scene": "s10_02_Pitfall_002"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_030_Escape_Pitfall_001",
+  "scene": "s10_03_Escape_Pitfall_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_040_Entrance_Bridge_001",
+  "scene": "s10_04_Entrance_Bridge_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_040_Hungry_start_001",
+  "scene": "s10_04_Hungry_start_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_041_Hungry_end_001",
+  "scene": "s10_04_Hungry_end_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_041_In_the_Bridge_001",
+  "scene": "s10_04_In_the_Bridge_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_050_Bar_Gate_001",
+  "scene": "s10_05_Bar_Gate_001"
+ },
+ {
+  "stage": "s10_Pit",
+  "area": "_080_Jump_in_Bridge_001",
+  "scene": "s10_08_Jump_in_Bridge_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_000_CC_start_01",
+  "scene": "CC_Start_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_010_CC_Turn_The_Gear_001",
+  "scene": "CC_Turn_The_Gear_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_020_CC_JumpingCart_01",
+  "scene": "CC_JumpingCart_01"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_025_CC_Arena_2F_OpenDoor_01",
+  "scene": "CC_Arena_2F_OpenDoor_01"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_030_CC_Passage_Area_001",
+  "scene": "CC_Passage_Area_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_040_CC_switch_gateWater_01_001",
+  "scene": "CC_switch_gateWater_01_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_050_CC_diving_01_001",
+  "scene": "CC_diving_01_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_060_CC_switch_gateWater_02_001",
+  "scene": "CC_switch_gateWater_02_001"
+ },
+ {
+  "stage": "s11_ColumnCorridor",
+  "area": "_070_CC_ColumnCorridor_End",
+  "scene": "CC_ColumnCorridor_End"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_000_Start",
+  "scene": "s12_00_Start_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_010_Elevator_Station",
+  "scene": "s12_01_Elevator_Station_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_020_Climbing_Alone",
+  "scene": "s12_02_Climbing_Alone_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_030_Enter_Arico",
+  "scene": "s12_03_Enter_Arico_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_040_Escape_from_Arico",
+  "scene": "s12_04_Escape_from_Arico_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_050_Run_into_Ruins",
+  "scene": "s12_05_Run_into_Ruins_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_060_Escape_by_Elevator",
+  "scene": "s12_06_Escape_by_Elevator_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_070_Enter_Trico",
+  "scene": "s12_07_Enter_Trico_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_080_Roll_Cage",
+  "scene": "s12_08_Roll_Cage_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_100_Elevator_Station_Again",
+  "scene": "s12_10_Elevator_Station_Again_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_110_Climbing_with_Trico",
+  "scene": "s12_11_Climbing_with_Trico_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_111_Hungry_start",
+  "scene": "s12_11_Hungry_start_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_112_Hungry_end",
+  "scene": "s12_11_Hungry_end_001"
+ },
+ {
+  "stage": "s12_TheNest",
+  "area": "_120_Escape_from_The_Nest",
+  "scene": "s12_12_Escape_from_The_Nest_001"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_000_Cliff",
+  "scene": "FF_a01_EnterCliff"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_002_Cliff_Edge",
+  "scene": "FF_a01_Cliff_Edge"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_005_Garden",
+  "scene": "FF_b01_EnterGarden"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_010_Get_Wild",
+  "scene": "FF_c01_EnterAntenna"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_020_Care_Start",
+  "scene": "FF_c01b_BoyCareStart"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_040_Care_End",
+  "scene": "FF_c01_HoleSwitch"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_045_Care_End_Before_Entrance",
+  "scene": "FF_c01_HoleSwitch2"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_050_Tunnel_Entrance",
+  "scene": "FF_c01_TunnelEntrance"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_055_Tunnel_Switch",
+  "scene": "FF_c01_TunnelOpenBolt"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_060_Tunnel_Stop",
+  "scene": "FF_d01a_TunnelStop"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_070_Tunnel_End",
+  "scene": "FF_d01b_TunnelEnd"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_075_Second_Battle_Start",
+  "scene": "FF_d01b_Second_Battle_Start"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_080_Second_Battle_End",
+  "scene": "FF_e01_Second_Battle_End"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_082_Bridge_to_the_SD",
+  "scene": "FF_e01_Bridge_to_the_SD"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_083_Bridge_Arrival",
+  "scene": "FF_e01_Bridge_Arrival"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_084_Athletic_Start",
+  "scene": "FF_f01_Athletic_Start"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_085_Athletic_SD",
+  "scene": "FF_f01_Athletic_SD"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_086_Athletic_End",
+  "scene": "FF_f01_Athletic_End"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_087_Soldier64_Entry",
+  "scene": "FF_f01_Soldier64_Entry"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_090_Celling1",
+  "scene": "FF_i01_Celling1"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_100_Celling2",
+  "scene": "FF_i01_Celling2"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_105_Celling2b",
+  "scene": "FF_i01_Celling2b"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_110_Celling3",
+  "scene": "FF_i01_Celling3"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_115_Celling3b",
+  "scene": "FF_i01_Celling3b"
+ },
+ {
+  "stage": "s13_FirstFlight",
+  "area": "_120_Clear",
+  "scene": "FF_i01_clear"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_000_Start",
+  "scene": "CH_a01_Start_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_005_BeforeDropMirror",
+  "scene": "CH_a01_BeforeDropMirror_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_010_AfterDropMirror",
+  "scene": "CH_a01_AfterDropMirror_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_020_StartBattle",
+  "scene": "CH_a01_StartBattle_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_030_BeforeTailPinch",
+  "scene": "CH_c01_BeforeTailPinch_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_031_AfterTailPinch",
+  "scene": "CH_c01_AfterTailPinch_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_040_BeforeDropTruck",
+  "scene": "CH_d01_BeforeDropTruck_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_041_AfterDropTruck",
+  "scene": "CH_d01_AfterDropTruck_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_050_CareSpear",
+  "scene": "CH_e01_CareSpear_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_051_CareBarrel",
+  "scene": "CH_e01_CareBarrel_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_060_EndCare",
+  "scene": "CH_e01_EndCare_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_065_GetTritrigger",
+  "scene": "CH_e01_GetTritrigger_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_070_BeforePulseBreakDoorDestruction",
+  "scene": "CH_e01_BeforePulseBreakDoorDestruction_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_071_AfterPulseBreakDoorDestruction",
+  "scene": "CH_e01_AfterPulseBreakDoorDestruction_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_072_LowBridgeBeforeSoldier",
+  "scene": "CH_d01_LowBridgeBeforeSoldier_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_073_LowBridgeAfterSoldier",
+  "scene": "CH_d01_LowBridgeAfterSoldier_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_074_HighBridgeBeforeSoldier",
+  "scene": "CH_c01_HighBridgeBeforeSoldier_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_075_HighBridgeAfterSoldier",
+  "scene": "CH_c01_HighBridgeAfterSoldier_001"
+ },
+ {
+  "stage": "s14_CondorClash",
+  "area": "_080_TopOfCondorClash",
+  "scene": "CH_a01_TopOfCondorClash_001"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_000_SF_Start",
+  "scene": "SF_a01_Start"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_010_SF_BrokenAntenna",
+  "scene": "SF_a01_BrokenAntenna"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_020_SF_CH_Roof",
+  "scene": "SF_a01_CH_Roof"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_030_SF_After_CH_Roof",
+  "scene": "SF_b01_After_CH_Roof"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_040_SF_Before_1st_Jump",
+  "scene": "SF_c01_Before_1st_Jump"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_050_SF_After_1st_Jump",
+  "scene": "SF_b01_After_1st_Jump"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_060_SF_Before_Longjump",
+  "scene": "SF_b02_Before_Longjump"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_070_SF_After_Longjump",
+  "scene": "SF_c02_After_Longjump"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_080_SF_Before_bridge",
+  "scene": "SF_c02_Before_bridge"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_090_SF_Before_bridge_Switch",
+  "scene": "SF_c02_Before_bridge_Switch"
+ },
+ {
+  "stage": "s15_SecondFlight",
+  "area": "_100_SF_Before_SecondFlight",
+  "scene": "SF_c02_Before_SecondFlight"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_000_SD_Start",
+  "scene": "SD_a01_Start"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_010_SD_Platform_Battle_End",
+  "scene": "SD_a01_Platform_Battle_End_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_020_SD_Open_Door_01",
+  "scene": "SD_a01_Open_Door_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_030_SD_Elevator_01",
+  "scene": "SD_a01_Elevator_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_035_SD_B1F_01",
+  "scene": "SD_a01_B1F_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_040_SD_Open_Shutter01_01",
+  "scene": "SD_a01_Open_Shutter01_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_050_SD_2F_BattleStart_01",
+  "scene": "SD_a01_2F_BattleStart_01"
+ },
+ {
+  "stage": "s16_SoldiersDen",
+  "area": "_060_SD_2F_BattleEnd_01",
+  "scene": "SD_a01_2F_BattleEnd_01"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_000_Start",
+  "scene": "ST_000_Start"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_010_BrainRoom",
+  "scene": "ST_010_BrainRoom"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_015_BoyFrontOfTheFan",
+  "scene": "ST_015_BoyFrontOfTheFan"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_020_TricoOnTheRoof",
+  "scene": "ST_020_TricoOnTheRoof"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_021_TricoOnTheRoof_afterDemo",
+  "scene": "ST_021_TricoOnTheRoof"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_030_TricoBattle",
+  "scene": "ST_030_TricoBattle"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_040_FallingFromSentinelTower",
+  "scene": "ST_040_FallingFromSentinelTower"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_050_GrabOnEnemyCondor",
+  "scene": "ST_050_GrabOnEnemyCondor"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_060_LandingRoof",
+  "scene": "ST_060_LandingRoof"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_070_PickUpTrigger",
+  "scene": "ST_070_PickUpTrigger"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_080_BreakingTail",
+  "scene": "ST_080_BreakingTail"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_081_Tale",
+  "scene": "ST_081_Tale"
+ },
+ {
+  "stage": "s17_SentinelTower",
+  "area": "_090_ShootingBrain",
+  "scene": "ST_090_ShootingBrain"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_010_Ending_C",
+  "scene": "_010_Ending_C"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_020_Ending_D",
+  "scene": "_020_Ending_D"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_030_Ending_StaffRoll",
+  "scene": "_030_Ending_StaffRoll"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_050_Ending_TimeLapse",
+  "scene": "_050_Ending_TimeLapse"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_060_Ending_E",
+  "scene": "_060_Ending_E"
+ },
+ {
+  "stage": "s18_Ending",
+  "area": "_070_Ending_Owari",
+  "scene": "_070_Ending_Owari"
+ }
+]

@@ -145,6 +145,12 @@ off by default.
 The GoldHEN *collapsing bridge freeze fix* (same authors) is always on: without it the game can
 freeze when the bridge in the pit collapses. It skips the slow motion of that moment.
 
+**Scene check, for testers and developers.** A script that visits every start point of the game by
+itself (219 scenes), measures the FPS of each second and takes a screenshot of each. Run it before and
+after a change to see what the change does across the whole game, or let it open a list of scenes one
+by one so you can look at them yourself. It comes with the scene list and a start save. See
+[docs/scene-check.md](docs/scene-check.md).
+
 ## Download
 
 Builds of this fork are under [Releases](https://github.com/tabnul/tlg_pc/releases).
