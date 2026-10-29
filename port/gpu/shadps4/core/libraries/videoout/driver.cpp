@@ -312,8 +312,14 @@ void VideoOutDriver::Flip(const Request& req) {
     Vulkan::FrameCapture::OnFlip(req.index >= 0 ? req.port->buffer_slots[req.index].address_left
                                                 : 0);
 
-    // tlg: TLG_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds.
+    // tlg: TLG_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds
+    // (TLG_FRAME_STATS_MS sets another window, e.g. 1000 for per-second FPS in the scene check).
     static const bool frame_stats = EmulatorSettingsImpl::Flag("TLG_FRAME_STATS", false);
+    static const double stats_window_s = [] {
+        const char* env = std::getenv("TLG_FRAME_STATS_MS");
+        const int ms = env ? std::atoi(env) : 0;
+        return ms > 0 ? ms / 1000.0 : 5.0;
+    }();
     if (frame_stats) {
         using Clock = std::chrono::steady_clock;
         static Clock::time_point window_start = Clock::now(), last = window_start;
@@ -473,7 +479,7 @@ void VideoOutDriver::Flip(const Request& req) {
         last_buffer_bytes = buffer_bytes;
         ++frames;
         const double window = std::chrono::duration<double>(now - window_start).count();
-        if (window >= 5.0) {
+        if (window >= stats_window_s) {
             const u32 compiles = Vulkan::g_tlg_compiles.exchange(0);
             const u64 compile_ns = Vulkan::g_tlg_compile_ns.exchange(0);
             const double capture_ms = Vulkan::g_tlg_capture_ns.exchange(0) / 1e6;

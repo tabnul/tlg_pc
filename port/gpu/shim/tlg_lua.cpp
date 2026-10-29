@@ -3,7 +3,8 @@
 // install_lua_hook). utils.lua gets a tick that loads "--TLGSET" every 15 frames; that chunk
 // is replaced by code applying the Effects settings to the game's post-process objects, so
 // menu changes apply live, plus the Lab rows (tlg_lab.h). "--TLGLOG <text>" chunks print <text>
-// (data out of Lua); "--TLGVAL <row> <value>" chunks report a Lab row's game value.
+// (data out of Lua); "--TLGVAL <row> <value>" chunks report a Lab row's game value;
+// "--TLGLOADED" marks the end of a stage load.
 // The settings code compiles into a function the tick keeps and runs every time; it is sent
 // again only when its text changes, so a tick compiles nothing and creates few strings.
 #include "tlg_lab.h"
@@ -254,7 +255,7 @@ void Dump(const char* buffer, uint64_t size, const char* name) {
         .write(buffer, static_cast<std::streamsize>(size));
 }
 
-// Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusiony
+// Debug menus (setting level_select): the GoldHEN "Level Select + QA Menu" patch by illusionyy
 // and DanielSvoboda, applied to the source. Startup gets the QA menu (in game: hold L1, press
 // L3); the title menu's press-build level select is enabled (hold L1 as the menu closes).
 // The game is paused while the QA menu is open. The menu also closes itself when a stage is
@@ -282,7 +283,22 @@ bool GameEdits(std::string& patched, std::string_view name) {
         patched += QaMenu;
         return true;
     }
-    if (s.level_select && name == "data_trico/game/scripts/common/GameSetupTbl.lua") {
+    if (name == "data_trico/game/scripts/common/GameSetupTbl.lua") {
+        // Setting texture_cleanup (always marked, the setting is live): both stage loads, a stage
+        // start and a restart (continue, checkpoint), end by disconnecting the time blocker.
+        // "--TLGLOADED" tells the texture cache (TextureCache::CleanUpAfterLoad).
+        static constexpr std::string_view LoadEnd = "Disconnect( GameSetupTbl.timeBlocker )";
+        static constexpr std::string_view Loaded =
+            " do local f=(loadstring or load)('--TLGLOADED') if f then f() end end";
+        bool changed = false;
+        for (size_t at = patched.find(LoadEnd); at != std::string::npos;
+             at = patched.find(LoadEnd, at + LoadEnd.size() + Loaded.size())) {
+            patched.insert(at + LoadEnd.size(), Loaded);
+            changed = true;
+        }
+        if (!s.level_select) {
+            return changed;
+        }
         // A stage started from the QA menu is loaded on top of the current one (StartStage
         // unloads nothing), so each switch held two stages and ran the GPU heap out of memory.
         // Do what the game's own restart does: disconnect the stage's regions, preload the new
@@ -293,7 +309,7 @@ bool GameEdits(std::string& patched, std::string_view name) {
         const size_t blocker = patched.find(Blocker);
         const size_t preloaded = patched.find(Preloaded);
         if (blocker == std::string::npos || preloaded == std::string::npos || preloaded < blocker) {
-            return false;
+            return changed;
         }
         patched.insert(preloaded, "if _TLGQA_UNLOAD then _TLGQA_UNLOAD = nil RegionController.UnloadAll_IfDisconnect() end ");
         patched.insert(blocker + Blocker.size(),
@@ -386,6 +402,10 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     }
     if (StartsWith(buffer, size, "--TLGVAL ")) {
         TlgLab::Report(std::string_view(buffer + 9, size - 9));
+        return original(L, options, Empty.data(), Empty.size(), name);
+    }
+    if (StartsWith(buffer, size, "--TLGLOADED")) {
+        TlgSettings::Get().stage_loaded = true;
         return original(L, options, Empty.data(), Empty.size(), name);
     }
     if (StartsWith(buffer, size, "--TLGSET")) {

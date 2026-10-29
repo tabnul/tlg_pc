@@ -1,4 +1,4 @@
-# (Linux is disabled for now: see the commented-out job.)
+# (Releases ship Linux and Windows; the Linux package is untested so far: tabnul/tlg_pc#1.)
 # Pull requests to master (from integration) build the Windows package, kept as a run artifact for 3
 # days. Only a pushed tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest.
 # Every release is kept as version history. No game or console file is ever built in or uploaded.
@@ -20,53 +20,73 @@ permissions:
   contents: write
 
 jobs:
-  # Linux build disabled for now (Windows only); uncomment this job and the lines marked
-  # "Linux" in the release job to bring it back.
-  #linux:
-  #  runs-on: ubuntu-24.04
-  #  defaults:
-  #    run:
-  #      working-directory: port
-  #  env:
-  #    CC: gcc-14
-  #    CXX: g++-14
-  #    PKG_CONFIG_PATH: /opt/tlgdeps/lib/pkgconfig:/opt/tlgdeps/lib64/pkgconfig:/opt/tlgdeps/lib/x86_64-linux-gnu/pkgconfig
-  #    CMAKE_PREFIX_PATH: /opt/tlgdeps
-  #    LD_LIBRARY_PATH: /opt/tlgdeps/lib:/opt/tlgdeps/lib64:/opt/tlgdeps/lib/x86_64-linux-gnu
-  #  steps:
-  #    - uses: actions/checkout@v4
-  #      with:
-  #        submodules: recursive
-  #    - name: System packages
-  #      run: |
-  #        sudo apt-get update -q
-  #        sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
-  #          curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \
-  #          libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
-  #          libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
-  #          libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
-  #          libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
-  #    - name: Cache built libraries
-  #      id: deps
-  #      uses: actions/cache@v4
-  #      with:
-  #        path: /opt/tlgdeps
-  #        key: tlgdeps-ubuntu2404-${{ hashFiles('port/packaging/linux/build_deps.sh') }}
-  #    - name: Build libraries (SDL3, Zydis, fmt, FFmpeg)
-  #      if: steps.deps.outputs.cache-hit != 'true'
-  #      run: |
-  #        sudo mkdir -p /opt/tlgdeps && sudo chown "$USER" /opt/tlgdeps
-  #        bash packaging/linux/build_deps.sh
-  #    - name: Build
-  #      run: TLG_LTO=OFF TLG_PGO=off bash build.sh
-  #    - name: Package
-  #      run: bash packaging/linux/package.sh
-  #    - uses: actions/upload-artifact@v4
-  #      with:
-  #        name: tlg-linux-x86_64
-  #        path: port/dist/tlg-linux-x86_64.tar.gz
-  #        if-no-files-found: error
-  #        retention-days: 3
+  # Linux: released next to Windows, marked untested until it is tested (tabnul/tlg_pc#1).
+  linux:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: port
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      PKG_CONFIG_PATH: /opt/tlgdeps/lib/pkgconfig:/opt/tlgdeps/lib64/pkgconfig:/opt/tlgdeps/lib/x86_64-linux-gnu/pkgconfig
+      CMAKE_PREFIX_PATH: /opt/tlgdeps
+      LD_LIBRARY_PATH: /opt/tlgdeps/lib:/opt/tlgdeps/lib64:/opt/tlgdeps/lib/x86_64-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: System packages
+        # 2026-10-23 this step hung in apt-get for hours: fail fast instead, a re-run gets a mirror.
+        timeout-minutes: 15
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
+            curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \
+            libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+            libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
+            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
+      - name: Cache built libraries
+        id: deps
+        uses: actions/cache@v4
+        with:
+          path: /opt/tlgdeps
+          key: tlgdeps-ubuntu2404-${{ hashFiles('port/packaging/linux/build_deps.sh') }}
+      - name: Build libraries (SDL3, Zydis, fmt, FFmpeg)
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: |
+          sudo mkdir -p /opt/tlgdeps && sudo chown "$USER" /opt/tlgdeps
+          bash packaging/linux/build_deps.sh
+      - name: Build
+        run: |
+          # Keep compilation progress visible while build.sh captures Ninja's full log.
+          (while sleep 30; do
+            echo "Build running: $(date -u +%H:%M:%S) UTC"
+            tail -n 2 out/gpu-build.log 2>/dev/null || true
+          done) &
+          progress_pid=$!
+          trap 'kill "$progress_pid" 2>/dev/null || true' EXIT
+          TLG_LTO=OFF TLG_PGO=off bash build.sh
+      # DLAA: the same pinned DLSS SDK as Windows; gpu/dlss_bridge built with GCC (libtlg_dlss.so).
+      - name: DLSS SDK
+        uses: actions/checkout@v4
+        with:
+          repository: NVIDIA/DLSS
+          ref: v310.9.16
+          path: dlss-sdk
+      - name: DLSS bridge
+        run: DLSS_SDK_ROOT="$GITHUB_WORKSPACE/dlss-sdk" bash packaging/linux/build_dlss.sh
+      - name: Package
+        env:
+          TLG_REQUIRE_DLSS: '1'
+        run: bash packaging/linux/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tlg-linux-x86_64
+          path: port/dist/tlg-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 3
 
   windows:
     runs-on: windows-latest
@@ -144,8 +164,7 @@ jobs:
           retention-days: 3
 
   release:
-    # Linux: needs: [linux, windows]
-    needs: [windows]
+    needs: [linux, windows]
     # Only a pushed v* tag publishes; master pushes and pull requests stop at the artifacts.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
@@ -170,10 +189,8 @@ jobs:
         run: |
           set -euo pipefail
           ls -la dist
-          # Linux: test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
-          test -f dist/tlg-windows-x86_64.zip
+          test -f dist/tlg-linux-x86_64.tar.gz && test -f dist/tlg-windows-x86_64.zip
           short=${GITHUB_SHA::7}
-          # Linux: the template's Download list gets "- Linux x86-64 (glibc 2.39+): `tlg-linux-x86_64.tar.gz`" above Windows.
           tag=$GITHUB_REF_NAME
           # The notes are .github/release-template.md, with {{CHANGES}} taken from the annotated
           # tag's message (git tag -a v0.2 -m "..."). A lightweight tag leaves that part out.
@@ -196,8 +213,7 @@ jobs:
             echo "tag=$tag" >> "$GITHUB_OUTPUT"; exit 0
           fi
           # SHA256SUMS: the launcher's updater checks the downloaded package against it.
-          # Linux: (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
-          (cd dist && sha256sum tlg-windows-x86_64.zip > SHA256SUMS)
+          (cd dist && sha256sum tlg-linux-x86_64.tar.gz tlg-windows-x86_64.zip > SHA256SUMS)
           # Upload into a draft first, so a failed upload never leaves a half-published release.
           # Releases are kept forever as version history; nothing here deletes one.
           # --verify-tag: the pushed tag is used as is. With --target the API may create a tag,
@@ -205,8 +221,7 @@ jobs:
           gh release create "$tag" dist/* --draft --verify-tag \
             --title "$tag ($(date -u +%Y-%m-%d) · ${short})" --notes-file notes.md
           n=$(gh release view "$tag" --json assets --jq '.assets | length')
-          # Linux: [[ $n -ge 3 ]]
-          [[ $n -ge 2 ]] || { echo "draft release has $n assets"; exit 1; }
+          [[ $n -ge 3 ]] || { echo "draft release has $n assets"; exit 1; }
           for try in 1 2 3; do
             gh release edit "$tag" --draft=false --latest && break
             sleep 10

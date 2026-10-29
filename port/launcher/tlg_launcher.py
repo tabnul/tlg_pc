@@ -64,13 +64,23 @@ TEXT = {
     'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
     'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),
     'debug_hint': ('Level select: hold L1 while the title menu closes (Continue/New Game). QA menu: in game, hold L1 and press L3. '
-                   'GoldHEN patches by illusiony and DanielSvoboda.',
+                   'GoldHEN patches by illusionyy and DanielSvoboda.',
                    'Seleção de fases: segure L1 enquanto o menu inicial fecha (Continuar/Novo jogo). Menu de QA: no jogo, segure L1 e aperte L3. '
-                   'Patches GoldHEN de illusiony e DanielSvoboda.'),
+                   'Patches GoldHEN de illusionyy e DanielSvoboda.'),
     'show_fps': ('Show FPS overlay at start (F10 toggles)', 'Mostrar overlay de FPS ao iniciar (F10 alterna)'),
     'vram': ('Texture cache budget (MB of VRAM)', 'Orçamento do cache de texturas (MB de VRAM)'),
-    'vram_hint': ('6 GB card: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. This is video card memory (VRAM), not RAM; never above your card\'s VRAM.',
-                  'Placa de 6 GB: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. É a memória da placa de vídeo (VRAM), não a RAM; nunca acima da VRAM da placa.'),
+    'vram_hint': ('6 GB card: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. This is video card memory (VRAM), not RAM; never above your card\'s VRAM. '
+                  'Higher is not faster: the cache is only cleaned when it gets full, so a high budget lets the textures of earlier stages pile up and slows the game down after stage changes, unless the cleanup below is on.',
+                  'Placa de 6 GB: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500. É a memória da placa de vídeo (VRAM), não a RAM; nunca acima da VRAM da placa. '
+                  'Mais alto não é mais rápido: o cache só é limpo quando enche, então um orçamento alto deixa as texturas de fases anteriores se acumularem e deixa o jogo mais lento após trocas de fase, a menos que a limpeza abaixo esteja ligada.'),
+    'texture_cleanup': ('Clean up textures after each load',
+                        'Limpar texturas após cada carregamento'),
+    'texture_cleanup_hint': ('Frees the textures of earlier stages after each stage or checkpoint load. It helped in one test (69 against 57 FPS after 28 loads), '
+                             'but in a longer test the game still got slower over many loads (issue #20), so it is off by default for now. '
+                             'Off is the emulator\'s original behaviour. Also in the in-game menu (Insert → Performance).',
+                             'Libera as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Ajudou num teste (69 contra 57 FPS após 28 carregamentos), '
+                             'mas num teste mais longo o jogo ainda ficou mais lento após muitos carregamentos (issue #20), então por enquanto vem desligado. '
+                             'Desligado é o comportamento original do emulador. Também no menu do jogo (Insert → Desempenho).'),
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
@@ -563,7 +573,21 @@ class Launcher:
                            command=self.changed)
         spin.grid(row=3, column=1, sticky='w', padx=6, pady=(6, 0))
         spin.bind('<FocusOut>', lambda _: self.changed())
-        ttk.Label(video, text=self.t('vram_hint'), foreground='#777', wraplength=360).grid(row=4, column=0, columnspan=2, sticky='w')
+        memory = ttk.Frame(video)
+        memory.grid(row=4, column=0, columnspan=2, sticky='w')
+        ttk.Label(memory, text=self.t('vram_hint'), foreground='#777', wraplength=360).grid(row=0, column=0, sticky='w')
+        # The in-game menu's texture cleanup (tlg.ini, applies at once).
+        cleanup = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_cleanup', '0') != '0')
+
+        def cleanup_toggled():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'texture_cleanup': '1' if cleanup.get() else '0'})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        ttk.Checkbutton(memory, text=self.t('texture_cleanup'), variable=cleanup, command=cleanup_toggled).grid(
+            row=1, column=0, sticky='w', pady=(4, 0))
+        ttk.Label(memory, text=self.t('texture_cleanup_hint'), foreground='#777', wraplength=360).grid(
+            row=2, column=0, sticky='w')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         ttk.Label(video, text=self.t('resolution_hint'), foreground='#777', wraplength=320).grid(
             row=8, column=0, columnspan=2, sticky='w')
