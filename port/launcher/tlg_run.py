@@ -179,7 +179,7 @@ DEFAULT_ENV = {
     'TLG_PIPELINE_BINARIES': '0',  # VK_KHR_pipeline_binary crashes on the NVIDIA 595 driver
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
-    'TLG_GC_BUDGET_MB': '5600',    # texture cache budget for 6 GB of VRAM
+    'TLG_GC_BUDGET_MB': '5000',    # texture cache budget; higher only piles up old textures (#104)
     # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
     'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
     'TLG_OBJECT_MOTION': '0',
@@ -199,7 +199,7 @@ DEFAULT_SETTINGS = {
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
     'level_select': False,         # tlg.ini; tlg_lua.cpp
-    'vram_budget_mb': 5600,
+    'vram_budget_mb': 5000,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
     'mouse_enabled': True,
@@ -281,6 +281,16 @@ def load_settings():
     if not settings.get('readback_defaults_2026_10'):
         settings.pop('deferred_readback', None)
         settings['readback_defaults_2026_10'] = True
+    # Once (issue #104): a budget above the default, stored before 5000 became the advice
+    # (2026-10-29), only lets old textures pile up; it goes back to 5000. A lower one (a small card)
+    # stays. The marker is saved with the next save, so a later choice stays.
+    if not settings.get('budget_default_2026_10'):
+        budget = DEFAULT_SETTINGS['vram_budget_mb']
+        try:
+            settings['vram_budget_mb'] = min(int(settings['vram_budget_mb']), budget)
+        except (TypeError, ValueError):
+            settings['vram_budget_mb'] = budget
+        settings['budget_default_2026_10'] = True
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
     ini = read_ini(user_dir() / 'tlg.ini')
     try:
