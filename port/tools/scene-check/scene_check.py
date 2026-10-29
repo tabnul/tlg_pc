@@ -337,7 +337,7 @@ def set_pack(pack):
 
 
 def main():
-    global SAVE, START
+    global SAVE, START, MEASURE_S
     if running():
         sys.exit("the game is running")
     if A.exe:
@@ -348,10 +348,14 @@ def main():
     order = [(p["stage"], p["area"]) for p in pts]
     index = {p: n for n, p in enumerate(order, 1)}  # k: the point's place in the full list
     scenes = {(p["stage"], p["area"]): p["scene"] for p in pts}
-    todo = [tuple(l.strip().split(":")) for l in open(A.points) if ":" in l] if A.points else order
+    # a points line is stage:area, or stage:area:seconds to measure that point for its own time
+    lines = [l.strip().split(":") for l in open(A.points) if ":" in l] if A.points else [list(p) for p in order]
+    todo = [tuple(l[:2]) for l in lines]
+    own_s = [float(l[2]) if len(l) > 2 else A.seconds for l in lines]
     unknown = [":".join(p) for p in todo if p not in scenes]
     if unknown:
         sys.exit(f"not in scenes.json: {', '.join(unknown)}")
+    own_s = [s for p, s in zip(todo, own_s) if p not in SKIP]
     todo = [p for p in todo if p not in SKIP]
     for d in ("shots", "logs"):
         os.makedirs(os.path.join(OUT, d), exist_ok=True)
@@ -384,13 +388,17 @@ def main():
                 if (stage, area) in done:
                     continue
                 k = index.get((stage, area), 0)
+                MEASURE_S = own_s[n - 1]
                 game, row, secs = visit(game if A.mode == "jump" else None, k, stage, area, scenes[(stage, area)], env)
                 if A.mode == "launch" or row["status"] != "ok" or not running():
                     game.close()  # in jump mode the next point starts clean after a failure
                     game = None
                 w.writerow(row)
                 f.flush()
-                secs_all[f"{k:03d}_{stage}_{area}"] = secs
+                key = f"{k:03d}_{stage}_{area}"
+                while key in secs_all:  # a point listed twice (e.g. the same scene at start and end)
+                    key += "+"
+                secs_all[key] = secs
                 json.dump(secs_all, open(SECONDS, "w"))
                 visited += 1
                 left = (time.monotonic() - t_start) / visited * (len(todo) - n) / 60
