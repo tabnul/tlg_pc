@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 IFreemz (shadps4_dlss bridge), tlg contributors
 // SPDX-License-Identifier: MIT
 //
-// tlg_dlss.dll: the only part of the project that uses the NVIDIA DLSS (NGX) SDK. Built with
-// MSVC (the SDK's libraries are MSVC only); the port loads it at run time.
+// tlg_dlss.dll / libtlg_dlss.so: the only part of the project that uses the NVIDIA DLSS (NGX)
+// SDK. Built with MSVC on Windows (the SDK's Windows libraries are MSVC only) and with GCC on
+// Linux (libnvsdk_ngx.a); the port loads it at run time.
 // Adapted from IFreemz/shadPS4-Bloodborne-DLSS-FSR (dlss_bridge).
 
 #include <algorithm>
@@ -19,7 +20,11 @@
 namespace {
 
 constexpr char ProjectId[] = "42359704-c9f3-4806-9fb5-d469000fdb8a";
+#ifdef _WIN32
 constexpr char EngineVersion[] = "tlg-windows";
+#else
+constexpr char EngineVersion[] = "tlg-linux";
+#endif
 
 struct State {
     TlgDlssLogFn log{};
@@ -245,6 +250,12 @@ const TlgDlssApi api{TLG_DLSS_BRIDGE_ABI, Configure,      InstanceExtensions, De
 
 } // namespace
 
-extern "C" __declspec(dllexport) const TlgDlssApi* TlgDlssGetApi() {
+#ifdef _WIN32
+#define TLG_DLSS_EXPORT __declspec(dllexport)
+#else
+#define TLG_DLSS_EXPORT __attribute__((visibility("default")))
+#endif
+
+extern "C" TLG_DLSS_EXPORT const TlgDlssApi* TlgDlssGetApi() {
     return &api;
 }

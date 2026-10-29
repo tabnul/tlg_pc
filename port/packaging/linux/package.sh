@@ -45,6 +45,19 @@ ldd out/tlg-probe out/gpu/libtlggpu.so | awk '/=> \// {print $1, $3}' | sort -u 
     cp -L "$path" "$dest/out/lib/$soname"
 done
 # SDL3 loads its video/audio backends at run time from the player's system: nothing else to copy.
+# DLAA (optional): the bridge and NVIDIA's runtime from build_dlss.sh, with NVIDIA's license (the
+# DLSS SDK license allows shipping the runtime inside an application). Without them the DLAA
+# setting is greyed out and the game keeps its own anti-aliasing.
+if [[ -f out/libtlg_dlss.so && -f out/NVIDIA-DLSS-LICENSE.txt ]] && compgen -G 'out/libnvidia-ngx-dlss.so.*' >/dev/null; then
+    strip -o "$dest/out/libtlg_dlss.so" out/libtlg_dlss.so
+    cp out/libnvidia-ngx-dlss.so.* out/NVIDIA-DLSS-LICENSE.txt "$dest/out/"
+    echo "Packaged DLSS: libtlg_dlss.so, $(cd out && echo libnvidia-ngx-dlss.so.*)"
+elif [[ -n ${TLG_REQUIRE_DLSS:-} ]]; then
+    echo 'TLG_REQUIRE_DLSS is set but the DLSS bridge is missing from out/: run build_dlss.sh' >&2
+    exit 1
+else
+    echo 'No DLSS bridge in out/ (build_dlss.sh not run): packaging without DLAA'
+fi
 cp -r scripts "$dest/"
 find "$dest" -name __pycache__ -prune -exec rm -r {} +
 cp LICENSE packaging/README-player.md "$dest/"

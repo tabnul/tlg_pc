@@ -18,6 +18,9 @@
 #endif
 #include <windows.h>
 #include "../../../dlss_bridge/tlg_dlss_bridge.h"
+#elif defined(__linux__)
+#include <dlfcn.h>
+#include "../../../dlss_bridge/tlg_dlss_bridge.h"
 #endif
 
 namespace Vulkan {
@@ -27,11 +30,13 @@ int Dlss::QualityForScale(float scale) {
     return scale >= 2.9f ? 4 : scale >= 1.95f ? 3 : scale >= 1.65f ? 2 : scale > 1.01f ? 1 : 0;
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
 
 namespace {
-constexpr wchar_t BridgeName[] = L"tlg_dlss.dll";
-constexpr wchar_t NgxName[] = L"nvngx_dlss.dll";
+#ifdef _WIN32
+using Module = HMODULE;
+constexpr char BridgeName[] = "tlg_dlss.dll";
+constexpr char NgxName[] = "nvngx_dlss.dll";
 
 std::filesystem::path ExecutableDirectory() {
     std::wstring path(MAX_PATH, L'\0');
@@ -39,6 +44,47 @@ std::filesystem::path ExecutableDirectory() {
     path.resize(length);
     return std::filesystem::path{path}.parent_path();
 }
+
+Module OpenModule(const std::filesystem::path& path) {
+    return LoadLibraryW(path.c_str());
+}
+
+void* ModuleSymbol(Module module, const char* name) {
+    return reinterpret_cast<void*>(GetProcAddress(module, name));
+}
+
+bool HasNgxRuntime(const std::filesystem::path& directory) {
+    return std::filesystem::is_regular_file(directory / NgxName);
+}
+#else
+// Linux: libtlg_dlss.so, and NVIDIA's libnvidia-ngx-dlss.so.<version> (NGX finds the version).
+using Module = void*;
+constexpr char BridgeName[] = "libtlg_dlss.so";
+constexpr std::string_view NgxPrefix = "libnvidia-ngx-dlss.so.";
+
+std::filesystem::path ExecutableDirectory() {
+    std::error_code error;
+    return std::filesystem::read_symlink("/proc/self/exe", error).parent_path();
+}
+
+Module OpenModule(const std::filesystem::path& path) {
+    return dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+}
+
+void* ModuleSymbol(Module module, const char* name) {
+    return dlsym(module, name);
+}
+
+bool HasNgxRuntime(const std::filesystem::path& directory) {
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator{directory, error}) {
+        if (entry.is_regular_file(error) && entry.path().filename().string().starts_with(NgxPrefix)) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
 
 void BridgeLog(int warning, const char* message) {
     std::printf("DLSS: %s%s\n", warning ? "warning: " : "", message);
@@ -70,7 +116,7 @@ bool CollectExtensions(const VkExtensionProperties* required, u32 count,
 } // namespace
 
 struct Dlss::Impl {
-    HMODULE module{};
+    Module module{};
     const TlgDlssApi* api{};
     std::vector<std::string> instance_extensions, device_extensions;
     std::optional<FeatureDesc> feature;
@@ -91,8 +137,7 @@ Dlss* Dlss::Get() {
             return nullptr;
         }
         const auto directory = ExecutableDirectory();
-        if (!std::filesystem::is_regular_file(directory / BridgeName) ||
-            !std::filesystem::is_regular_file(directory / NgxName)) {
+        if (!std::filesystem::is_regular_file(directory / BridgeName) || !HasNgxRuntime(directory)) {
             return nullptr;
         }
         auto* created = new Dlss;
@@ -109,13 +154,13 @@ Dlss* Dlss::Get() {
 
 Dlss::Dlss() : impl{std::make_unique<Impl>()} {
     const auto directory = ExecutableDirectory();
-    impl->module = LoadLibraryW((directory / BridgeName).c_str());
+    impl->module = OpenModule(directory / BridgeName);
     const auto get_api =
-        impl->module ? reinterpret_cast<TlgDlssGetApiFn>(GetProcAddress(impl->module, "TlgDlssGetApi"))
+        impl->module ? reinterpret_cast<TlgDlssGetApiFn>(ModuleSymbol(impl->module, "TlgDlssGetApi"))
                      : nullptr;
     impl->api = get_api ? get_api() : nullptr;
     if (!impl->api || impl->api->abi != TLG_DLSS_BRIDGE_ABI) {
-        impl->Disable("tlg_dlss.dll is missing or from another version");
+        impl->Disable(std::string{BridgeName} + " is missing or from another version");
         return;
     }
     // NGX writes its logs and model updates here: beside the saves and shader caches.
@@ -125,7 +170,8 @@ Dlss::Dlss() : impl{std::make_unique<Impl>()} {
     }
     std::error_code error;
     std::filesystem::create_directories(data, error);
-    if (!impl->api->Configure(directory.c_str(), data.c_str(), BridgeLog)) {
+    // NGX takes wide-character paths on Linux too.
+    if (!impl->api->Configure(directory.wstring().c_str(), data.wstring().c_str(), BridgeLog)) {
         impl->Disable("bridge configuration failed");
     }
 }
