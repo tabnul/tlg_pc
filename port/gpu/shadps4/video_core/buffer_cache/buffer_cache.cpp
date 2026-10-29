@@ -136,6 +136,9 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
 
     const u64 bda_pagetable_size =
         (blocks_per_arena_page * num_arena_pages) * sizeof(vk::DeviceAddress);
+    // Zero-initialized; Windows commits its pages on first touch, so only ranges with written
+    // bindings cost real memory.
+    exact_write_pages = std::make_unique<std::atomic<u64>[]>(ExactPageWords);
     fault_manager = std::make_unique<FaultManager>(instance, scheduler, *this, block_shift,
                                                    blocks_per_arena_page * num_arena_pages);
     bda_pagetable_buffer = std::make_unique<Buffer>(
@@ -145,7 +148,83 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
 
 BufferCache::~BufferCache() = default;
 
+// tlg phase 4, default off: the false-share skip never showed a gain beyond noise (condor,
+// pulse, top-5 slowest scenes, 2026-10-29). TLG_RB_FALSESHARE=1 re-enables it for reference.
+static bool TlgFalseShareOn() {
+    static const bool on = [] {
+        const char* env = std::getenv("TLG_RB_FALSESHARE");
+        return env && env[0] == '1';
+    }();
+    return on;
+}
+
+void BufferCache::SetExactWritePages(VAddr addr, u64 size) {
+    if (size == 0 || !TlgFalseShareOn()) {
+        return;
+    }
+    u64 first = addr >> ExactPageShift;
+    const u64 last = (addr + size - 1) >> ExactPageShift;
+    while (first <= last) {
+        const u64 lo = first & 63;
+        const u64 hi = std::min<u64>(63, lo + (last - first));
+        const u64 mask = (hi == 63 ? ~u64{0} : ((u64{1} << (hi + 1)) - 1)) & ~((u64{1} << lo) - 1);
+        exact_write_pages[(first >> 6) & (ExactPageWords - 1)].fetch_or(mask);
+        first += hi - lo + 1;
+    }
+}
+
+void BufferCache::ClearExactWritePagesInner(VAddr addr, u64 size) {
+    // Only pages fully inside the range: an edge page may share bytes with a neighboring
+    // island that was not downloaded, and a stale set bit only costs a missed skip.
+    u64 first = (addr + (u64{1} << ExactPageShift) - 1) >> ExactPageShift;
+    const u64 end = (addr + size) >> ExactPageShift;
+    while (first < end) {
+        const u64 lo = first & 63;
+        const u64 hi = std::min<u64>(63, lo + (end - 1 - first));
+        const u64 mask = (hi == 63 ? ~u64{0} : ((u64{1} << (hi + 1)) - 1)) & ~((u64{1} << lo) - 1);
+        exact_write_pages[(first >> 6) & (ExactPageWords - 1)].fetch_and(~mask);
+        first += hi - lo + 1;
+    }
+}
+
+bool BufferCache::AnyExactWritePage(VAddr addr, u64 size) const {
+    if (size == 0) {
+        return false;
+    }
+    u64 first = addr >> ExactPageShift;
+    const u64 last = (addr + size - 1) >> ExactPageShift;
+    while (first <= last) {
+        const u64 lo = first & 63;
+        const u64 hi = std::min<u64>(63, lo + (last - first));
+        const u64 mask = (hi == 63 ? ~u64{0} : ((u64{1} << (hi + 1)) - 1)) & ~((u64{1} << lo) - 1);
+        if (exact_write_pages[(first >> 6) & (ExactPageWords - 1)].load() & mask) {
+            return true;
+        }
+        first += hi - lo + 1;
+    }
+    return false;
+}
+
 void BufferCache::InvalidateMemory(VAddr device_addr, u64 size, bool assume_locks) {
+    // tlg phase 4 (default off, TLG_RB_FALSESHARE=1 enables): a write fault whose pages hold no
+    // not-yet-downloaded GPU bytes (tracker bits left over from page- or window-granular
+    // marking) skips the round trip through the GPU thread. The unmark checks the exact-page
+    // bitmap under the region lock, so a binding being marked right now is never lost: it
+    // sets its bitmap pages before it takes that lock.
+    if (TlgFalseShareOn() && !AnyExactWritePage(device_addr, size)) {
+        const bool clean = memory_tracker->UnmarkGpuIfClean(
+            device_addr, size,
+            [this](VAddr sub_addr, u64 sub_size) { return !AnyExactWritePage(sub_addr, sub_size); });
+        if (clean) {
+            memory_tracker->MarkRegionAsCpuModified(device_addr, size);
+            if (readback_stats_enabled) {
+                readback_false_share_skips.fetch_add(1, std::memory_order_relaxed);
+            }
+            return;
+        }
+        // A written binding landed on these pages between the check and the lock: the normal
+        // path below still sees its tracker bits and flushes.
+    }
     memory_tracker->InvalidateRegion(device_addr, size, [this, device_addr, size, assume_locks] {
         ReadMemory(device_addr, size, true, assume_locks);
     });
@@ -195,12 +274,29 @@ void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool as
 
         // GPU-modified ranges come as many small scattered islands,
         // so the download is widened to a window around the request
-        constexpr u64 WindowSize = 512_KB;
+        // tlg: the width is tunable; each fault pays a near-fixed sync cost, so a wider
+        // window that prefetches neighboring islands saves later faults (TLG_RB_WINDOW KiB).
+        static const u64 WindowSize = [] {
+            const char* env = std::getenv("TLG_RB_WINDOW");
+            const u64 kib = env ? std::strtoull(env, nullptr, 10) : 512;
+            return std::bit_ceil(std::clamp<u64>(kib, 64, 8192)) * 1024;
+        }();
+        // tlg phase 1 (TLG_RB_EXACTWRITE=0 disables): a write fault downloads only the GPU
+        // islands overlapping the written pages, not the whole window. The CPU needs coherence
+        // only there, and a narrow gather waits for the producer of those bytes instead of the
+        // youngest write anywhere in the window. Read faults keep the prefetch window.
+        static const bool exact_write = [] {
+            const char* env = std::getenv("TLG_RB_EXACTWRITE");
+            return !env || env[0] != '0';
+        }();
+        const u64 window_size = exact_write && is_write ? TRACKER_BYTES_PER_PAGE : WindowSize;
         const VAddr arena_end = arena->cpu_addr + arena->size_bytes;
         const VAddr window_start =
-            std::max<VAddr>(Common::AlignDown(device_addr, WindowSize), arena->cpu_addr);
+            std::max<VAddr>(Common::AlignDown(device_addr, window_size), arena->cpu_addr);
         const VAddr window_end = std::min<VAddr>(
-            std::max<VAddr>(window_start + WindowSize, device_addr + size), arena_end);
+            std::max<VAddr>(window_start + window_size,
+                            Common::AlignUp(device_addr + size, TRACKER_BYTES_PER_PAGE)),
+            arena_end);
         DownloadMemory(arena, window_start, window_end - window_start);
         if (is_write) {
             memory_tracker->MarkRegionAsCpuModified(device_addr, size);
@@ -227,6 +323,13 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
 
     if (readback_stats_enabled) {
         readback_requests.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    // tlg: land a finished background readback first. One on this same arena must land now,
+    // even if that blocks: its islands are no longer in gpu_modified_ranges, so the gather
+    // below would miss them and the unmark at the end would then hide stale bytes.
+    if (async_active) {
+        ResolveAsyncReadback(arena);
     }
 
     // A CPU fault must see every preceding GPU write before it resumes, so the wait itself
@@ -268,9 +371,21 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
 
+    // tlg: an island with no recorded GPU write since RAM last received its bytes would
+    // download what RAM already holds (site g:c4c630: a third of its downloads), so the
+    // wait and the copy are skipped. TLG_RB_STALESKIP=0 restores the old behavior.
+    static const bool stale_skip = [] {
+        const char* env = std::getenv("TLG_RB_STALESKIP");
+        return !env || env[0] != '0';
+    }();
+    u64 stale_bytes = 0;
     const auto add_download = [&](VAddr start, VAddr end) {
         const u64 new_offset = start - arena_base;
         const u64 new_size = end - start;
+        if (stale_skip && arena->UnchangedSinceDownload(new_offset, new_size)) {
+            stale_bytes += new_size;
+            return;
+        }
         copies.push_back(vk::BufferCopy{
             .srcOffset = new_offset,
             .dstOffset = total_size_bytes,
@@ -368,6 +483,15 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
     if (total_size_bytes == 0) {
+        // Every island was stale-skipped: RAM is already right, but the pages must still be
+        // unprotected or the same fault fires forever.
+        if (stale_bytes != 0) {
+            memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
+            ClearExactWritePagesInner(download_addr, download_size);
+            if (readback_stats_enabled) {
+                readback_stale_bytes.fetch_add(stale_bytes, std::memory_order_relaxed);
+            }
+        }
         if (readback_stats_enabled) {
             readback_empty_requests.fetch_add(1, std::memory_order_relaxed);
         }
@@ -391,7 +515,7 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
     for (const auto& copy : copies) {
         last_write = std::max(last_write, arena->LastWrite(copy.srcOffset, copy.size));
     }
-    const bool write_done = last_write != 0 && scheduler.IsFree(last_write);
+    bool write_done = last_write != 0 && scheduler.IsFree(last_write);
     if (readback_stats_enabled) {
         if (last_write == 0) {
             readback_writes_unknown.fetch_add(1, std::memory_order_relaxed);
@@ -404,6 +528,18 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
     const auto wait_start = std::chrono::steady_clock::now();
+    // tlg: a last write that is submitted but not finished only needs a wait for its own
+    // tick, not a Finish() of the whole queue behind it; after the wait the side-queue copy
+    // is as safe as for a finished write. TLG_RB_TICKWAIT=0 restores the old full finish.
+    static const bool tick_wait = [] {
+        const char* env = std::getenv("TLG_RB_TICKWAIT");
+        return !env || env[0] != '0';
+    }();
+    if (tick_wait && !write_done && last_write != 0 && last_write < scheduler.CurrentTick() &&
+        !TlgToggle::Disabled2(TlgToggle::ReadbackSideQueue)) {
+        scheduler.Wait(last_write);
+        write_done = true;
+    }
     const bool side = write_done && !TlgToggle::Disabled2(TlgToggle::ReadbackSideQueue) &&
                       CopyOnReadbackQueue(arena, download.buffer, copies, last_write);
     if (!side) {
@@ -442,8 +578,27 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         }
     }
     memory_tracker->UnmarkRegionAsGpuModified(download_addr, download_size);
+    ClearExactWritePagesInner(download_addr, download_size);
     for (const auto& [run_addr, run_size] : hot_runs) {
         memory_tracker->UnmarkRegionAsGpuModified(run_addr, run_size);
+        ClearExactWritePagesInner(run_addr, run_size);
+    }
+    // Every island in the window was written back (or stale-skipped), so its fully covered
+    // 64 KiB groups are current at their write ticks.
+    arena->NoteDownloaded(download_addr - arena_base, download_size);
+    if (stale_bytes != 0 && readback_stats_enabled) {
+        readback_stale_bytes.fetch_add(stale_bytes, std::memory_order_relaxed);
+    }
+    // tlg: prefetch the arena's remaining dirty islands in the background (TLG_RB_ASYNC=1).
+    // Default OFF: measured -20% on the condor route 2026-10-29 - the copy's GPU-side wait on
+    // the youngest producer tick occupies the side queue and every later readback queues
+    // behind it. Kept for reference only.
+    static const bool async_enabled = [] {
+        const char* env = std::getenv("TLG_RB_ASYNC");
+        return env && env[0] == '1';
+    }();
+    if (async_enabled && !async_active && !TlgToggle::Disabled2(TlgToggle::ReadbackSideQueue)) {
+        IssueAsyncReadback(arena);
     }
     ReportReadbackStats();
 }
@@ -528,6 +683,149 @@ bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
     return true;
 }
 
+void BufferCache::ResolveAsyncReadback(const Buffer* arena) {
+    const vk::Device device = instance.GetDevice();
+    if (arena != async_arena) {
+        // Another arena faulted: only land the copy when it is already done.
+        if (device.getFenceStatus(*async_fence) != vk::Result::eSuccess) {
+            return;
+        }
+    } else {
+        // The fault needs pages this copy owns, so it must land now. The producer tick was
+        // submitted before the copy went out, so the fence always signals without our help.
+        const vk::Result wait_result =
+            device.waitForFences(*async_fence, true, std::numeric_limits<u64>::max());
+        ASSERT_MSG(wait_result == vk::Result::eSuccess, "Async readback fence wait failed: {}",
+                   vk::to_string(wait_result));
+    }
+    const vk::Result reset_result = device.resetFences(*async_fence);
+    ASSERT_MSG(reset_result == vk::Result::eSuccess, "Async readback fence reset failed: {}",
+               vk::to_string(reset_result));
+    async_staging->Invalidate(0, AsyncStagingBytes);
+    for (const auto& copy : async_copies) {
+        const u8* src = async_staging->mapped_data.data() + copy.staging_offset;
+        // Checked page by page: a guest write since the gather wins over the GPU bytes.
+        memory_tracker->WriteUnlessCpuModified(
+            copy.addr, copy.size, [&](VAddr part_addr, u64 part_size) {
+                memory->TryWriteBacking(std::bit_cast<u8*>(part_addr),
+                                        src + (part_addr - copy.addr), part_size);
+            });
+        memory_tracker->UnmarkRegionAsGpuModified(copy.addr, copy.size);
+        ClearExactWritePagesInner(copy.addr, copy.size);
+    }
+    async_copies.clear();
+    async_arena = nullptr;
+    async_active = false;
+}
+
+void BufferCache::IssueAsyncReadback(const Buffer* arena) {
+    const vk::Queue queue = instance.GetReadbackQueue();
+    if (!queue || !readback_pool) {
+        // The pool exists once the synchronous side-queue path has run; until then the scene
+        // has produced no side copies and a prefetch has nothing proven to gain.
+        return;
+    }
+    // Gather the islands whose producer is already submitted. A recording tick cannot be
+    // used: this thread is the one that will submit it, and the copy's GPU-side wait on it
+    // would then never be satisfied once a same-arena fault blocks on the fence. An unknown
+    // producer (0) stays with the synchronous path, which treats it conservatively.
+    const VAddr arena_base = arena->cpu_addr;
+    const u64 current_tick = scheduler.CurrentTick();
+    boost::container::small_vector<vk::BufferCopy, 16> copies;
+    u64 total = 0;
+    u64 wait_value = 0;
+    gpu_modified_ranges.ForEachInRange(arena_base, arena->size_bytes, [&](VAddr start, VAddr end) {
+        constexpr u64 align = 64;
+        const u64 island_size = end - start;
+        const u64 aligned = Common::AlignUp(island_size, align);
+        if (copies.size() >= 128 || aligned > AsyncStagingBytes - total) {
+            return;
+        }
+        const u64 lw = arena->LastWrite(start - arena_base, island_size);
+        if (lw == 0 || lw >= current_tick) {
+            return;
+        }
+        copies.push_back(vk::BufferCopy{
+            .srcOffset = start - arena_base,
+            .dstOffset = total,
+            .size = island_size,
+        });
+        wait_value = std::max(wait_value, lw);
+        total += aligned;
+    });
+    if (copies.empty()) {
+        return;
+    }
+    const vk::Device device = instance.GetDevice();
+    if (!async_fence) {
+        auto [fence_result, fence] = device.createFenceUnique({});
+        if (fence_result != vk::Result::eSuccess) {
+            return;
+        }
+        auto [alloc_result, cmdbufs] = device.allocateCommandBuffers({
+            .commandPool = *readback_pool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1,
+        });
+        if (alloc_result != vk::Result::eSuccess) {
+            return;
+        }
+        async_fence = std::move(fence);
+        async_cmdbuf = cmdbufs.front();
+        async_staging = std::make_unique<Buffer>(instance, 0, AsyncStagingBytes,
+                                                 MemoryType::HostCached,
+                                                 "tlg async readback staging");
+    }
+    const vk::CommandBufferBeginInfo begin_info{
+        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+    };
+    if (async_cmdbuf.begin(begin_info) != vk::Result::eSuccess) {
+        return;
+    }
+    async_cmdbuf.copyBuffer(arena->Handle(), async_staging->Handle(),
+                            static_cast<u32>(copies.size()), copies.data());
+    const vk::MemoryBarrier2 host_barrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eCopy,
+        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eHost,
+        .dstAccessMask = vk::AccessFlagBits2::eHostRead,
+    };
+    async_cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &host_barrier,
+    });
+    if (async_cmdbuf.end() != vk::Result::eSuccess) {
+        return;
+    }
+    // The producer tick is waited for on the GPU; the submit returns at once.
+    const vk::Semaphore timeline = scheduler.GetWorkSemaphore()->Handle();
+    const vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eTransfer;
+    const vk::TimelineSemaphoreSubmitInfo timeline_si{
+        .waitSemaphoreValueCount = 1,
+        .pWaitSemaphoreValues = &wait_value,
+    };
+    const vk::SubmitInfo submit_info{
+        .pNext = &timeline_si,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &timeline,
+        .pWaitDstStageMask = &wait_stage,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &async_cmdbuf,
+    };
+    if (queue.submit(submit_info, *async_fence) != vk::Result::eSuccess) {
+        return;
+    }
+    async_copies.clear();
+    for (const auto& copy : copies) {
+        // Out of gpu_modified_ranges so no later gather downloads it twice; the pages stay
+        // tracker-protected until the writeback, so reads still fault and resolve first.
+        gpu_modified_ranges.Subtract(arena_base + copy.srcOffset, copy.size);
+        async_copies.push_back({arena_base + copy.srcOffset, copy.size, copy.dstOffset});
+    }
+    async_arena = arena;
+    async_active = true;
+}
+
 void BufferCache::ReportReadbackStats() {
     if (!readback_stats_enabled) {
         return;
@@ -562,6 +860,11 @@ void BufferCache::ReportReadbackStats() {
                 static_cast<unsigned long long>(readback_hot_regions.exchange(0)),
                 readback_hot_bytes.exchange(0) / 1048576.0,
                 readback_hot_skipped.exchange(0) / 1048576.0);
+    std::printf("Buffer readback stale skips (5 s): %.2f MiB not re-downloaded, %llu write "
+                "faults resolved without a flush\n",
+                readback_stale_bytes.exchange(0, std::memory_order_relaxed) / 1048576.0,
+                static_cast<unsigned long long>(
+                    readback_false_share_skips.exchange(0, std::memory_order_relaxed)));
     std::printf("Buffer readback waits (5 s): %.1f ms in Finish, %.1f ms in %llu side copies; "
                 "last GPU write done %llu, submitted %llu, still "
                 "recording %llu, unknown %llu; fence flushes EOP %llu, EOS %llu, WRITE_DATA %llu, "
@@ -708,6 +1011,11 @@ std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 s
     const u64 last_block = (device_addr + size - 1) >> block_shift;
     const auto* arena = GetArena(first_block, last_block);
     EnsureResident(arena, first_block, last_block);
+    if (is_written) {
+        // Before SynchronizeMemory flags the tracker pages: a write fault that sees a GPU
+        // tracker bit must also see these bits, or it would skip the flush (phase 4).
+        SetExactWritePages(device_addr, size);
+    }
     const u64 uploaded_before = TlgStats::buffer_upload_bytes.load(std::memory_order_relaxed);
     SynchronizeMemory(arena, device_addr, size, is_written, is_texel_buffer);
     if (stats) {
@@ -853,6 +1161,7 @@ void BufferCache::EnsureResident(const Buffer* arena, u64 first_block, u64 last_
         .memoryTypeIndex = arena_memory_type_index,
     };
     const auto device_memory = Vulkan::Check(instance.GetDevice().allocateMemory(alloc_info));
+    TlgStats::arena_resident_bytes.fetch_add(alloc_info.allocationSize, std::memory_order_relaxed);
 
     boost::container::small_vector<vk::BufferCopy, 8> copies;
     const auto staging =

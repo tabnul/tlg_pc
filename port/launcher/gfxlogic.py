@@ -94,27 +94,16 @@ def matching_preset(settings, states):
 
 
 # --------------------------------------------------------------------------------- VRAM budget
-# The Tk launcher's rule ("6 GB card: 5600 · 8 GB: 7000 · 12 GB: 10500 · 16 GB: 14000 · 24 GB: 21500"),
-# in MB of VRAM to give the texture cache; in between the budget follows the line joining the points.
-BUDGET_POINTS = ((6, 5600), (8, 7000), (12, 10500), (16, 14000), (24, 21500))
+# The Tk launcher's advice (#104): 5000 MB for every card with 6 GB or more. A higher budget is not
+# faster: the texture cache is only cleaned when it gets full, so old textures pile up and slow the
+# game down over a long session. Smaller cards follow the old 6 GB = 5600 line (4 GB: 3700).
+BUDGET_DEFAULT = 5000
 BUDGET_MIN, BUDGET_MAX = 2000, 24000      # the Tk spin box range
 
 
 def suggested_budget_mb(vram_gb):
     """MB of texture-cache budget for a card with this much VRAM (rounded to 100)."""
-    gb = float(vram_gb)
-    points = BUDGET_POINTS
-    if gb <= points[0][0]:
-        value = points[0][1] * gb / points[0][0]
-    elif gb >= points[-1][0]:
-        value = points[-1][1] + (gb - points[-1][0]) * 900
-    else:
-        value = points[-1][1]
-        for (g0, b0), (g1, b1) in zip(points, points[1:]):
-            if g0 <= gb <= g1:
-                value = b0 + (b1 - b0) * (gb - g0) / (g1 - g0)
-                break
-    value = min(value, gb * 1024 * 0.95)   # never the whole card
+    value = min(BUDGET_DEFAULT, 5600 * float(vram_gb) / 6)   # also leaves ~10% of a small card free
     return int(min(max(round(value / 100) * 100, BUDGET_MIN), BUDGET_MAX))
 
 
