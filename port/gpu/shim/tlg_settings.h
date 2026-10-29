@@ -107,7 +107,8 @@ struct Values {
     std::atomic<int> readback_batch{0};
     /// After each stage load, free the textures the new stage does not use (TextureCache::
     /// CleanUpAfterLoad). Off: as the emulator does it, they stay until VRAM runs short. Live.
-    std::atomic<bool> texture_cleanup{true};
+    /// Off by default: the game still gets slower over many loads with it on (issue #20).
+    std::atomic<bool> texture_cleanup{false};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: run.py turns them into patches and environment variables; "Apply and restart".
