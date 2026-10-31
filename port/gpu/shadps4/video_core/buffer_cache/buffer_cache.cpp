@@ -110,6 +110,10 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
     if (const char* hot = std::getenv("TLG_RB_HOT")) {
         hot_readbacks_enabled = *hot != '0';
     }
+    if (const char* gather = std::getenv("TLG_RB_WRITEGATHER")) {
+        const u64 kib = std::strtoull(gather, nullptr, 10);
+        write_gather_window = kib ? std::bit_ceil(std::clamp<u64>(kib, 64, 8192)) * 1024 : 0;
+    }
     if (readback_batch_limit || readback_stats_enabled) {
         const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                 std::chrono::steady_clock::now().time_since_epoch())
@@ -329,7 +333,18 @@ void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool as
             std::max<VAddr>(window_start + window_size,
                             Common::AlignUp(device_addr + size, TRACKER_BYTES_PER_PAGE)),
             arena_end);
-        DownloadMemory(arena, window_start, window_end - window_start);
+        // tlg load dip: an exact write fault still offers the window around it as a gather of
+        // neighbour islands whose GPU writes have already finished (see DownloadMemory).
+        VAddr gather_start = 0;
+        u64 gather_size = 0;
+        if (exact_write && is_write && write_gather_window != 0) {
+            gather_start = std::max<VAddr>(Common::AlignDown(device_addr, write_gather_window),
+                                           arena->cpu_addr);
+            const VAddr gather_end =
+                std::min<VAddr>(gather_start + write_gather_window, arena_end);
+            gather_size = gather_end - gather_start;
+        }
+        DownloadMemory(arena, window_start, window_end - window_start, gather_start, gather_size);
         if (is_write) {
             memory_tracker->MarkRegionAsCpuModified(device_addr, size);
         }
@@ -345,7 +360,8 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
     memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
 }
 
-void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size) {
+void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size,
+                                 VAddr gather_addr, u64 gather_size) {
     boost::container::small_vector<vk::BufferCopy, 1> copies;
     u64 total_size_bytes = 0;
     u64 copy_size_bytes = 0;
@@ -512,6 +528,68 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
                                              std::memory_order_relaxed);
                 readback_hot_skipped.fetch_add(skipped, std::memory_order_relaxed);
             }
+        }
+    }
+    // tlg load dip (2026-10-31): in the seconds after a load the guest fires 7000-9600 write
+    // faults per second, each downloading ~6 KB whose GPU writer has long finished (99.5 %),
+    // and each paying the ~70 us side-queue round trip on its own. When the must-download
+    // waits for nothing, the finished islands around it ride along in the same copy: they
+    // add no wait (their writes are done too), and the later faults in the region find clean
+    // pages. Islands with a running or unknown writer stay behind; CPU-written pages are
+    // skipped and the writeback checks them again under the region lock, as for hot runs.
+    if (gather_size != 0 && requested_copies != 0) {
+        u64 must_last_write = 0;
+        for (const auto& copy : copies) {
+            must_last_write = std::max(must_last_write, arena->LastWrite(copy.srcOffset, copy.size));
+        }
+        if (must_last_write != 0 && scheduler.IsFree(must_last_write)) {
+            const size_t runs_before = hot_runs.size();
+            const u64 copy_before = copy_size_bytes;
+            u64 islands = 0;
+            memory_tracker->ForEachDownloadRange<false>(gather_addr, gather_size,
+                                                         [&](u64 address, u64 range_size) {
+                gpu_modified_ranges.ForEachInRange(address, range_size, [&](VAddr start, VAddr end) {
+                    if (copy_size_bytes - copy_before >= MaxGatherBytes ||
+                        islands >= MaxGatherIslands) {
+                        return;
+                    }
+                    const u64 lw = arena->LastWrite(start - arena_base, end - start);
+                    if (lw == 0 || !scheduler.IsFree(lw)) {
+                        return;
+                    }
+                    ++islands;
+                    VAddr run_start = start;
+                    const auto flush_run = [&](VAddr run_end) {
+                        if (run_end > run_start) {
+                            gpu_modified_ranges.ForEachInRange(run_start, run_end - run_start,
+                                                               add_download);
+                            hot_runs.emplace_back(run_start, run_end - run_start);
+                        }
+                    };
+                    for (VAddr page = start; page < end;) {
+                        const VAddr next = std::min<VAddr>(
+                            Common::AlignDown(page, TRACKER_BYTES_PER_PAGE) + TRACKER_BYTES_PER_PAGE,
+                            end);
+                        if (memory_tracker->IsRegionCpuModified(page, next - page)) {
+                            flush_run(page);
+                            run_start = next;
+                        }
+                        page = next;
+                    }
+                    flush_run(end);
+                });
+            });
+            for (size_t i = runs_before; i < hot_runs.size(); ++i) {
+                gpu_modified_ranges.Subtract(hot_runs[i].first, hot_runs[i].second);
+            }
+            if (readback_stats_enabled) {
+                readback_gather_requests.fetch_add(1, std::memory_order_relaxed);
+                readback_gather_islands.fetch_add(islands, std::memory_order_relaxed);
+                readback_gather_bytes.fetch_add(copy_size_bytes - copy_before,
+                                                std::memory_order_relaxed);
+            }
+        } else if (readback_stats_enabled) {
+            readback_gather_declined.fetch_add(1, std::memory_order_relaxed);
         }
     }
     if (total_size_bytes == 0) {
@@ -902,6 +980,12 @@ void BufferCache::ReportReadbackStats() {
                     changed / 1048576.0, compared / 1048576.0,
                     compared ? 100.0 * changed / compared : 0.0);
     }
+    std::printf("Buffer readback write gather (5 s): %llu write faults took %llu finished "
+                "neighbour islands along (%.2f MiB), %llu declined (own writer not done)\n",
+                static_cast<unsigned long long>(readback_gather_requests.exchange(0)),
+                static_cast<unsigned long long>(readback_gather_islands.exchange(0)),
+                readback_gather_bytes.exchange(0) / 1048576.0,
+                static_cast<unsigned long long>(readback_gather_declined.exchange(0)));
     std::printf("Buffer readback stale skips (5 s): %.2f MiB not re-downloaded, %llu write "
                 "faults resolved without a flush\n",
                 readback_stale_bytes.exchange(0, std::memory_order_relaxed) / 1048576.0,

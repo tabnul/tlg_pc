@@ -139,7 +139,10 @@ private:
 
     void EnsureResident(const Buffer* arena, u64 first_block, u64 last_block);
 
-    void DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size);
+    /// tlg: gather_addr/gather_size (0 = none) is a window of finished neighbour islands that
+    /// may ride along when the must-download itself waits for nothing (see the load-dip note).
+    void DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size, VAddr gather_addr = 0,
+                        u64 gather_size = 0);
 
     /// Opt-in telemetry for coherent buffer readback batching.
     void ReportReadbackStats();
@@ -218,6 +221,15 @@ private:
     std::atomic<u64> readback_hot_skipped{};
     std::atomic<u64> readback_stale_bytes{};
     std::atomic<u64> readback_false_share_skips{};
+    // tlg write-fault neighbour gather (load dip): window in bytes (TLG_RB_WRITEGATHER KiB,
+    // 0 disables), caps per request, and counters.
+    static constexpr u64 MaxGatherBytes = 2_MB;
+    static constexpr u64 MaxGatherIslands = 256;
+    u64 write_gather_window{512_KB};
+    std::atomic<u64> readback_gather_requests{};
+    std::atomic<u64> readback_gather_declined{};
+    std::atomic<u64> readback_gather_islands{};
+    std::atomic<u64> readback_gather_bytes{};
 
     /// tlg: one bit per 4 KiB guest page that really holds not-yet-downloaded GPU buffer
     /// bytes. The page tracker's GPU bits cover whole pages and whole download windows, so
