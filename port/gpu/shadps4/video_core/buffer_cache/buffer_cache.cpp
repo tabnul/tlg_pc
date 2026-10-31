@@ -7,8 +7,10 @@
 #include <unordered_map>
 #include <algorithm>
 #include <bit>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 #include <magic_enum/magic_enum.hpp>
 #include "tlg_copy.h"
 #include "tlg_settings.h"
@@ -27,7 +29,32 @@
 
 #include <vk_mem_alloc.h>
 
+extern "C" int runtime_memory_read_backing(uintptr_t address, void* data, uint64_t size);
+
 namespace VideoCore {
+
+// tlg: TLG_WRITE_ATTRIB=1 measures how much of a readback the GPU really changed. A range is
+// marked GPU-modified because a shader may write it, not because it did, so part of every
+// download reads back byte for byte what guest memory already held. The gap between the bytes
+// we copy and the bytes that differ is the ceiling for skipping downloads altogether
+// (companion to the stale skip below). Measured only on the requested copies, not the hot
+// prefetch ones, which are written page by page under the region lock.
+static void NoteDownloadChanged(VAddr dst_addr, const u8* src, u64 size) {
+    if (!TlgStats::write_attrib) {
+        return;
+    }
+    static thread_local std::vector<u8> before;
+    before.resize(size);
+    if (!runtime_memory_read_backing(dst_addr, before.data(), size)) {
+        return;
+    }
+    u64 changed = 0;
+    for (u64 i = 0; i < size; ++i) {
+        changed += before[i] != src[i];
+    }
+    TlgStats::download_compared_bytes.fetch_add(size, std::memory_order_relaxed);
+    TlgStats::download_changed_bytes.fetch_add(changed, std::memory_order_relaxed);
+}
 
 static constexpr size_t GDS_BUFFER_SIZE = 64_KB;
 static constexpr size_t STREAM_BUFFER_SIZE = 128_MB;
@@ -74,6 +101,11 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
     }
     if (const char* diag = std::getenv("TLG_BUFFER_READBACK_STATS")) {
         readback_stats_enabled = *diag == '1';
+    }
+    // tlg: the changed-byte measurement is printed by ReportReadbackStats, and the readback
+    // counters are what it has to be read against, so write attribution turns them on too.
+    if (TlgStats::write_attrib) {
+        readback_stats_enabled = true;
     }
     if (const char* hot = std::getenv("TLG_RB_HOT")) {
         hot_readbacks_enabled = *hot != '0';
@@ -562,6 +594,7 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
         const VAddr dst_addr = arena_base + copy.srcOffset;
         const u8* src = download.mapped + (copy.dstOffset - download.offset);
         if (i < requested_copies) {
+            NoteDownloadChanged(dst_addr, src, copy.size);
             memory->TryWriteBacking(std::bit_cast<u8*>(dst_addr), src, copy.size);
             continue;
         }
@@ -860,6 +893,15 @@ void BufferCache::ReportReadbackStats() {
                 static_cast<unsigned long long>(readback_hot_regions.exchange(0)),
                 readback_hot_bytes.exchange(0) / 1048576.0,
                 readback_hot_skipped.exchange(0) / 1048576.0);
+    if (TlgStats::write_attrib) {
+        const u64 compared =
+            TlgStats::download_compared_bytes.exchange(0, std::memory_order_relaxed);
+        const u64 changed = TlgStats::download_changed_bytes.exchange(0, std::memory_order_relaxed);
+        std::printf("Buffer readback changed bytes (5 s): %.2f MiB of %.2f MiB compared really "
+                    "differed (%.1f%%)\n",
+                    changed / 1048576.0, compared / 1048576.0,
+                    compared ? 100.0 * changed / compared : 0.0);
+    }
     std::printf("Buffer readback stale skips (5 s): %.2f MiB not re-downloaded, %llu write "
                 "faults resolved without a flush\n",
                 readback_stale_bytes.exchange(0, std::memory_order_relaxed) / 1048576.0,

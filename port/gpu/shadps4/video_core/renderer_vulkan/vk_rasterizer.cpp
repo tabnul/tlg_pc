@@ -8,7 +8,10 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
+#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include <xxhash.h>
 #include "video_core/renderer_vulkan/ui_composition.h"
 #include "tlg_settings.h"
@@ -37,6 +40,104 @@
 #include "video_core/texture_cache/texture_cache.h"
 
 namespace Vulkan {
+
+// tlg: TLG_WRITE_ATTRIB=1 reports the shaders whose writable buffer bindings mark the most guest
+// memory GPU-modified. The whole bound range is marked, written or not, and a later guest write
+// into it downloads the range and drains the GPU queue (BufferCache::DownloadMemory), so these
+// shaders name the source of our readback cost. Found by @KocBaturay (KocBaturay/tlg_pc
+// f56acb9c) while profiling the ROG Ally.
+//
+// The report is per mission scene (TlgStats::SetScene, from the Lua marker) so a scene sweep can
+// attribute per scene; a scene longer than 5 s also reports on that interval, tagged with the
+// same label and a part number.
+//
+// DMA fills and copies mark memory the same way but have no shader hash, so they report under
+// these two stand-ins (not real hashes: no shader can collide with them).
+static constexpr u64 DmaFillHash = 0xd3af111ull;
+static constexpr u64 DmaCopyHash = 0xd3ac0b1ull;
+
+static void NoteWrittenBinding(u64 pgm_hash, VAddr address, u64 size) {
+    if (!TlgStats::write_attrib) {
+        return;
+    }
+    struct Site {
+        u64 count = 0, bytes = 0, max_size = 0;
+        VAddr last = 0;
+    };
+    static std::mutex mutex;
+    static std::unordered_map<u64, Site> sites;
+    static auto window = std::chrono::steady_clock::now();
+    static u64 epoch = 0;
+    static u64 part = 0;
+    static u64 frames = 0;
+    // The label of the scene this window collected, not the one it ends in: a scene change is what
+    // closes the window, so by then SceneLabel() already names the next scene.
+    static std::string window_label{"(boot)"};
+    std::scoped_lock lock{mutex};
+    auto& site = sites[pgm_hash];
+    ++site.count;
+    site.bytes += size;
+    site.max_size = std::max(site.max_size, size);
+    site.last = address;
+    const auto now = std::chrono::steady_clock::now();
+    const u64 scene = TlgStats::scene_epoch.load(std::memory_order_acquire);
+    const bool scene_changed = scene != epoch;
+    if (!scene_changed && now - window < std::chrono::seconds(5)) {
+        return;
+    }
+    if (scene_changed && now - window < std::chrono::milliseconds(500)) {
+        // A fragment from the loading screen between two scenes: not worth a report of its own.
+        sites.clear();
+        window = now;
+        frames = TlgStats::gpu_frames.load(std::memory_order_relaxed);
+        epoch = scene;
+        part = 0;
+        window_label = TlgStats::SceneLabel();
+        return;
+    }
+    // gpu_frames counts display passes, of which the game has several per presented frame, so it is
+    // reported raw and the rate is per second: comparable between windows of different length, and
+    // divisible by the FPS of the same window (Frame stats) where a per-frame number is wanted.
+    const u64 gpu_frames = TlgStats::gpu_frames.load(std::memory_order_relaxed);
+    const u64 window_frames = gpu_frames - frames;
+    const double seconds =
+        std::chrono::duration_cast<std::chrono::duration<double>>(now - window).count();
+    std::vector<std::pair<u64, Site>> top(sites.begin(), sites.end());
+    std::sort(top.begin(), top.end(),
+              [](const auto& a, const auto& b) { return a.second.bytes > b.second.bytes; });
+    u64 total_bytes = 0, total_count = 0;
+    for (const auto& [hash, s] : sites) {
+        total_bytes += s.bytes;
+        total_count += s.count;
+    }
+    const std::string label = window_label;
+    std::printf("Written buffers [%s part %llu] %.1f s, %llu frames: %llu bindings, %.1f MB "
+                "marked GPU-modified (%.1f MB/s)\n",
+                label.c_str(), static_cast<unsigned long long>(part), seconds,
+                static_cast<unsigned long long>(window_frames),
+                static_cast<unsigned long long>(total_count), total_bytes / 1e6,
+                seconds > 0.0 ? total_bytes / 1e6 / seconds : 0.0);
+    for (size_t i = 0; i < top.size() && i < 8; ++i) {
+        const Site& s = top[i].second;
+        const u64 hash = top[i].first;
+        const char* what = hash == DmaFillHash   ? " (DMA fill)"
+                           : hash == DmaCopyHash ? " (DMA copy)"
+                                                 : "";
+        std::printf("    %016llx%s x%llu %.1f MB (%.1f%%), max %.1f KB @%#llx\n",
+                    static_cast<unsigned long long>(hash), what,
+                    static_cast<unsigned long long>(s.count), s.bytes / 1e6,
+                    total_bytes ? 100.0 * s.bytes / total_bytes : 0.0, s.max_size / 1e3,
+                    static_cast<unsigned long long>(s.last));
+    }
+    std::fflush(stdout);
+    sites.clear();
+    window = now;
+    frames = gpu_frames;
+    epoch = scene;
+    // Parts count the windows inside one scene, so a scene change starts at 0 again.
+    part = scene_changed ? 0 : part + 1;
+    window_label = TlgStats::SceneLabel();
+}
 
 static Shader::PushData MakeUserData(const AmdGpu::Regs& regs) {
     // TODO(roamic): Add support for multiple viewports and geometry shaders when ViewportIndex
@@ -2490,6 +2591,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                 if (desc.is_written) {
                     // Raw storage-buffer writes can also make an aliased cached image stale.
                     texture_cache.InvalidateMemoryFromGPU(vsharp.base_address, size);
+                    NoteWrittenBinding(stage.pgm_hash, vsharp.base_address, size);
                 }
                 needs_barrier |= runtime.IsBufferAccessed(buffer, offset, size, desc.is_written);
             }
@@ -3470,6 +3572,7 @@ void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds
         if (is_gds) {
             return {buffer_cache.GetGdsBuffer(), address};
         }
+        NoteWrittenBinding(DmaFillHash, address, num_bytes);
         return buffer_cache.ObtainBuffer(address, num_bytes, true);
     }();
     runtime.FillBuffer(buffer, offset, num_bytes, value);
@@ -3497,6 +3600,7 @@ void Rasterizer::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, b
         if (dst_gds) {
             return {gds_buffer, dst};
         }
+        NoteWrittenBinding(DmaCopyHash, dst, num_bytes);
         return buffer_cache.ObtainBuffer(dst, num_bytes, true, true);
     }();
     const vk::BufferCopy copy = {

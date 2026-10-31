@@ -9,6 +9,7 @@
 // again only when its text changes, so a tick compiles nothing and creates few strings.
 #include "tlg_lab.h"
 #include "tlg_settings.h"
+#include "tlg_toggles.h"
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -396,8 +397,23 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                                                       uint64_t size, const char* name) {
     static constexpr std::string_view Empty = "--";
     if (StartsWith(buffer, size, "--TLGLOG ")) {
-        std::printf("Lua: %.*s\n", static_cast<int>(size - 9), buffer + 9);
+        const std::string_view text(buffer + 9, size - 9);
+        std::printf("Lua: %.*s\n", static_cast<int>(text.size()), text.data());
         std::fflush(stdout);
+        // tlg: "mission <stage> <scene>" starts a new scene, so diagnostics that report per
+        // scene (TLG_WRITE_ATTRIB) can close their window here instead of on a wall clock. Only
+        // the stage's own scenes: the game also enters helper scenes all the time ("_Worker ...",
+        // "_tmp ...", "<stage> sub_...") and each of those would cut the report into fragments of
+        // a tenth of a second.
+        if (text.starts_with("mission ")) {
+            const std::string_view scene = text.substr(8);
+            const size_t space = scene.find(' ');
+            const bool helper = scene.starts_with("_") || space == std::string_view::npos ||
+                                scene.substr(space + 1).starts_with("sub_");
+            if (!helper) {
+                TlgStats::SetScene(scene);
+            }
+        }
         return original(L, options, Empty.data(), Empty.size(), name);
     }
     if (StartsWith(buffer, size, "--TLGVAL ")) {

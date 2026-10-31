@@ -14,6 +14,7 @@ from Lua, and what went wrong if anything. Windows only (tasklist/taskkill, scre
   scene test switches (checkpoint + RestartStageFromMenu, ~20 s a point). State carries over from the
   previous points, as in a long play session. After a point that fails, the game is closed and the next
   point gets a fresh launch. logs/ then holds one log per session, named after its first point.
+  --session N: close the game after N points (one fresh launch + N-1 jumps) and start a new session.
 --points FILE: STAGE:AREA lines instead of all points (scenes.json next to this script; points.py rebuilds it).
 --seconds N: how long each point runs after its load (default 10). 0: each point stays until you close the
   game window, then the next one opens (to look at points yourself; no screenshot then).
@@ -40,6 +41,7 @@ ap.add_argument("--env", action="append", default=[])
 ap.add_argument("--exe")
 ap.add_argument("--display", default="Fullscreen")
 ap.add_argument("--pack", default="off")
+ap.add_argument("--session", type=int, default=0)
 A = ap.parse_args()
 if not A.install or not os.path.exists(os.path.join(A.install, "Play The Last Guardian.exe")):
     ap.error("--install: the game folder with 'Play The Last Guardian.exe' (or set TLG_INSTALL)")
@@ -48,6 +50,7 @@ EXE = "tlg-probe.exe"
 OUT = os.path.join(ROOT, A.label)
 CSV = os.path.join(OUT, "results.csv")
 SECONDS = os.path.join(OUT, "seconds.json")
+ATTRIB = os.path.join(OUT, "attrib.json")
 EXEC = os.path.join(OUT, "exec.lua")
 LOGS = os.path.join(A.install, "out", "logs")
 INI = os.path.join(A.install, "user", "tlg.ini")
@@ -56,12 +59,21 @@ FIRST_SAVE = os.path.join(HERE, "start.save")
 SCENES = os.path.join(HERE, "scenes.json")
 MEASURE_S, LOAD_S = A.seconds, 120
 FPS = re.compile(r"Frame stats: ([\d.]+) FPS, worst frame ([\d.]+) ms .*?; (\d+) shader/pipeline compiles")
+# TLG_WRITE_ATTRIB=1 only (never in a benchmark): the shaders whose writable bindings mark the most
+# guest memory GPU-modified, and how much of a readback the GPU really changed. A report is a header
+# line plus up to eight indented site lines.
+ATTRIB_HEAD = re.compile(r"Written buffers \[(.+) part (\d+)\] ([\d.]+) s, (\d+) frames: (\d+) bindings, "
+                         r"([\d.]+) MB marked GPU-modified \(([\d.]+) MB/s\)")
+ATTRIB_SITE = re.compile(r"\s+([0-9a-f]{16})( \(DMA (?:fill|copy)\))? x(\d+) ([\d.]+) MB \(([\d.]+)%\), "
+                         r"max ([\d.]+) KB @(0x[0-9a-f]+|0)")  # printf %#llx writes a bare 0 for address 0
+CHANGED = re.compile(r"Buffer readback changed bytes \(5 s\): ([\d.]+) MiB of ([\d.]+) MiB compared really "
+                     r"differed \(([\d.]+)%\)")
 # The curse spell (rune screen) of these points waits for a button at the scene start.
 SKIP = {("s04_FirstAntenna", "_050_SleepingTrico_001"): "curse spell SpellFlashBack1 in onEnter, waits for input",
         ("s13_FirstFlight", "_020_Care_Start"): "curse spell SpellFlashBack2 in onEnter (FF_c01b_BoyCareStart)",
         ("s13_FirstFlight", "_087_Soldier64_Entry"): "curse spell SpellChant_FF65_01 (FF_f01_Soldier64_Entry)"}
 FIELDS = ["k", "stage", "area", "scene", "status", "warn", "entry", "launch_s", "load_s", "fps", "fps_min", "fps_max",
-          "worst_ms", "compiles", "stalls", "shot", "fade", "missions"]
+          "worst_ms", "compiles", "stalls", "shot", "fade", "mb_s", "top_write", "changed_pct", "missions"]
 HEAD = ("local ls = loadstring or load\n"
         "local function L(s) local g = ls('--TLGLOG ' .. tostring(s)) if g then g() end end\n")
 # At the title screen: close the QA menu if the level select opened it, make the next LoadCheckPoint load the
@@ -243,10 +255,11 @@ def launch(stage, scene, env, tag, row):
 
 def visit(game, k, stage, area, scene, env):
     """One point: a fresh launch (game None) or a jump in the running game, then MEASURE_S standing still.
-    Returns the game, the row and the per-second [fps, worst ms, compiles] list."""
+    Returns the game, the row, the per-second [fps, worst ms, compiles] list and the write-attribution
+    reports of the measured window (empty unless the run has TLG_WRITE_ATTRIB=1)."""
     tag = f"{k:03d}_{stage}_{area}"
     row = dict(k=k, stage=stage, area=area, scene=scene, status="ok", warn="", entry="jump" if game else "launch")
-    secs = []
+    secs, attrib = [], []
     entered = time.monotonic()
     if game:
         seen = len(game.lines())
@@ -254,7 +267,7 @@ def visit(game, k, stage, area, scene, env):
     else:
         game, seen = launch(stage, scene, env, tag, row)
         if seen is None:
-            return game, row, secs
+            return game, row, secs, attrib
     started = time.monotonic()
 
     def loaded(ls):
@@ -265,15 +278,39 @@ def visit(game, k, stage, area, scene, env):
         return i is not None and any("blocking overlay ended" in l for l in new[i:])
     if not game.wait(LOAD_S, loaded):
         row["status"] = "crash" if not running() else "no load"
-        return game, row, secs
+        return game, row, secs, attrib
     if any("Lua: warp error" in l for _, l in game.seen[seen:]):
         row["status"] = "warp error"
-        return game, row, secs
+        return game, row, secs, attrib
     t0 = time.monotonic()
     row["load_s"] = round(t0 - started, 1)
     row["launch_s"] = round(t0 - entered, 1)
     end = len(game.seen)
     stop = t0 + (MEASURE_S or float("inf")) + 0.5
+
+    def collect():
+        """The frame stats and the write-attribution reports of the measured window. Also called when
+        the point ends badly: the heaviest scenes are the ones that crash, and their shader log is
+        exactly what the analysis needs."""
+        report = None
+        for t, l in game.seen[end:]:
+            if t > stop:
+                continue
+            if m := FPS.match(l):
+                secs.append([float(m[1]), float(m[2]), int(m[3])])
+            elif m := ATTRIB_HEAD.match(l):
+                report = dict(scene=m[1], part=int(m[2]), seconds=float(m[3]), frames=int(m[4]),
+                              bindings=int(m[5]), mb=float(m[6]), mb_s=float(m[7]), sites=[])
+                attrib.append(report)
+            elif report is not None and (m := ATTRIB_SITE.match(l)):
+                report["sites"].append(dict(hash=m[1], dma=(m[2] or "").strip(" ()"), count=int(m[3]),
+                                            mb=float(m[4]), pct=float(m[5]), max_kb=float(m[6]), last=m[7]))
+            elif m := CHANGED.match(l):
+                # Not part of a report: the readback counters print on their own 5 s clock.
+                attrib.append(dict(changed_mib=float(m[1]), compared_mib=float(m[2]), changed_pct=float(m[3])))
+            elif l.startswith("Written buffers") or l.startswith("Buffer readback changed"):
+                report = None  # a line the regexes do not know: do not hang sites on a stale report
+
     if MEASURE_S:
         # standing still; a new loading screen in it means a reload (caught, game over)
         reload = game.wait(MEASURE_S, lambda ls: any("blocking overlay started" in l for _, l in ls[end:]))
@@ -284,7 +321,8 @@ def visit(game, k, stage, area, scene, env):
     restarted = lambda: any("sceSystemServiceLoadExec" in l for _, l in game.lines()[end:])
     if any("Fault: exception" in l for _, l in game.lines()[end:]) or MEASURE_S and not running() and not restarted():
         row["status"] = "crash"
-        return game, row, secs
+        collect()
+        return game, row, secs, attrib
     fade, row["shot"] = None, -1
     if MEASURE_S:
         row["shot"] = shot(os.path.join(OUT, "shots", tag + ".png"))
@@ -293,9 +331,7 @@ def visit(game, k, stage, area, scene, env):
         stat = next((l for _, l in game.seen[end:] if "Lua: warp stat" in l), "")
         fade = re.search(r"fade=([\d.]+)", stat)
     row["fade"] = fade[1] if fade else ""
-    for t, l in game.seen[end:]:
-        if t <= stop and (m := FPS.match(l)):
-            secs.append([float(m[1]), float(m[2]), int(m[3])])
+    collect()
     row["stalls"] = sum(1 for t, l in game.seen[end:] if t <= stop and l.startswith("Stall:"))
     missions = [l[13:] for _, l in game.seen[seen:] if l.startswith("Lua: mission ") and "_Worker" not in l]
     row["missions"] = " | ".join(missions)
@@ -303,6 +339,17 @@ def visit(game, k, stage, area, scene, env):
         row.update(fps=round(sum(s[0] for s in secs) / len(secs), 1), fps_min=min(s[0] for s in secs),
                    fps_max=max(s[0] for s in secs), worst_ms=max(s[1] for s in secs),
                    compiles=sum(s[2] for s in secs))
+    # The CSV keeps the headline of the attribution: the memory marked per frame and the worst site.
+    # The full reports are in attrib.json.
+    reports = [r for r in attrib if "sites" in r]
+    if reports:
+        row["mb_s"] = round(max(r["mb_s"] for r in reports), 1)
+        top = max((s for r in reports for s in r["sites"]), key=lambda s: s["mb"], default=None)
+        if top:
+            row["top_write"] = f"{top['dma'] or top['hash']} {top['pct']:.0f}%"
+    changed = [r for r in attrib if "changed_pct" in r]
+    if changed:
+        row["changed_pct"] = round(sum(r["changed_pct"] for r in changed) / len(changed), 1)
     warns = []
     if restarted():
         row["status"] = "restart"
@@ -317,7 +364,7 @@ def visit(game, k, stage, area, scene, env):
     if 0 <= row["shot"] < 12 and row["status"] == "ok":
         warns.append("dark shot")
     row["warn"] = ", ".join(warns)
-    return game, row, secs
+    return game, row, secs, attrib
 
 
 def set_display(mode):
@@ -364,6 +411,7 @@ def main():
         done = {(r["stage"], r["area"]) for r in csv.DictReader(open(CSV))}
         fields = next(csv.reader(open(CSV)))
     secs_all = json.load(open(SECONDS)) if os.path.exists(SECONDS) else {}
+    attrib_all = json.load(open(ATTRIB)) if os.path.exists(ATTRIB) else {}
     SAVE = save_dir()
     backup = os.path.join(OUT, "save_backup")
     if not os.path.exists(backup):  # empty when there is no save yet
@@ -377,7 +425,7 @@ def main():
     print(f"out {OUT}: {len(todo)} points, {len(done)} done, mode {A.mode}, env {env or '-'}", flush=True)
     if not MEASURE_S:
         print("each point stays until you close the game window; then the next one opens", flush=True)
-    t_start, game, visited = time.monotonic(), None, 0
+    t_start, game, visited, session_n = time.monotonic(), None, 0, 0
     try:
         new = not os.path.exists(CSV)
         with open(CSV, "a", newline="") as f:
@@ -389,10 +437,14 @@ def main():
                     continue
                 k = index.get((stage, area), 0)
                 MEASURE_S = own_s[n - 1]
-                game, row, secs = visit(game if A.mode == "jump" else None, k, stage, area, scenes[(stage, area)], env)
-                if A.mode == "launch" or row["status"] != "ok" or not running():
-                    game.close()  # in jump mode the next point starts clean after a failure
-                    game = None
+                game, row, secs, attrib = visit(game if A.mode == "jump" else None, k, stage, area,
+                                                scenes[(stage, area)], env)
+                session_n += 1
+                if (A.mode == "launch" or row["status"] != "ok" or not running() or
+                        (A.session and session_n >= A.session)):
+                    # in jump mode the next point starts clean after a failure or --session points
+                    game.close()
+                    game, session_n = None, 0
                 w.writerow(row)
                 f.flush()
                 key = f"{k:03d}_{stage}_{area}"
@@ -400,10 +452,15 @@ def main():
                     key += "+"
                 secs_all[key] = secs
                 json.dump(secs_all, open(SECONDS, "w"))
+                if attrib:  # only with TLG_WRITE_ATTRIB=1
+                    attrib_all[key] = attrib
+                    json.dump(attrib_all, open(ATTRIB, "w"), indent=1)
                 visited += 1
                 left = (time.monotonic() - t_start) / visited * (len(todo) - n) / 60
+                write = f"  {row['top_write']} {row['mb_s']} MB/s" if "top_write" in row else ""
                 print(f"{n:3}/{len(todo)} {k:03d} {stage} {area:32} {row['status']:10} {row.get('fps', ''):>5} fps"
-                      f"  load {row.get('load_s', '')} s  {row['entry']}  {row['warn']}  (~{left:.0f} min left)", flush=True)
+                      f"  load {row.get('load_s', '')} s  {row['entry']}{write}"
+                      f"  {row['warn']}  (~{left:.0f} min left)", flush=True)
     finally:
         if game:
             game.close()
