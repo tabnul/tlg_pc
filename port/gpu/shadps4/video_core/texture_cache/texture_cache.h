@@ -312,7 +312,7 @@ public:
         static constexpr bool BOOL_BREAK = std::is_same_v<FuncReturn, bool>;
         ImageIds images;
         u64 candidates = 0;
-        // tlg: the visited list is per call. With a mark in the shared flags a walk skipped images
+        // tlg: no mark in the shared flags here. With one, a walk skipped images
         // another thread was walking (FindImageFromRange and the stencil lookup run on the GPU
         // thread without the mutex), and a plain flags update from the other side could bring a
         // cleared mark back for good: every write fault on that image's pages then did nothing,
@@ -338,9 +338,10 @@ public:
                 if (!image.Overlaps(cpu_addr, size)) {
                     continue;
                 }
-                // An image on several pages: an earlier page of this walk already visited it.
+                // An image is listed on every page it covers, so on a later page of this walk only
+                // an image that starts there is new; the rest were visited on an earlier page.
                 if (!shared_mark && page != first_page &&
-                    std::ranges::find(images, image_id) != images.end()) {
+                    (image.info.guest_address >> Traits::PageBits) != page) {
                     continue;
                 }
                 if (shared_mark) {
