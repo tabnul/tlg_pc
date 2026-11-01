@@ -139,6 +139,22 @@ public:
     };
     bool DisplayOverride(VAddr address, Display& display);
 
+    /// tlg: frame generation inputs of the game frame just finished; once per frame, false when
+    /// no game frame ran since the last call (menus, movies, loading).
+    struct FgInputs {
+        vk::Image depth;
+        vk::ImageView depth_view;
+        vk::Format depth_format;
+        vk::Image motion;
+        vk::ImageView motion_view;
+        vk::Format motion_format;
+        u32 width, height;
+        bool reset;
+        float jitter_x, jitter_y; ///< in FSR's sign convention
+        float camera_near, camera_fov;
+    };
+    bool TakeFgInputs(FgInputs& inputs);
+
 private:
     /// tlg: views of guest images the upscaler reads, kept across frames: FSR 4 registers
     /// images by view in a registry of eight (a new view per frame filled it at Native AA).
@@ -300,6 +316,10 @@ private:
     std::unique_ptr<Fsr4Upscaler> fsr4;
     bool fsr4_failed = false;
     bool dlss_failed = false;
+    bool fg_pending = false;
+    bool fg_reset = false;
+    std::array<float, 2> fg_jitter{};
+    VideoCore::ImageId fg_depth{};
     VideoCore::UniqueImage motion_image;
     VideoCore::UniqueImage output_image;
     vk::UniqueImageView motion_view;

@@ -223,7 +223,8 @@ target_compile_options(tlggpu PRIVATE -Wno-deprecated-declarations -Wno-missing-
 if (NOT WIN32)
     target_link_options(tlggpu PRIVATE -Wl,--allow-shlib-undefined)
 endif()
-target_link_libraries(tlggpu PRIVATE ffx-vulkan::portable ffx-vulkan::fsr4-v07-vulkan)
+target_link_libraries(tlggpu PRIVATE ffx-vulkan::portable ffx-vulkan::fsr4-v07-vulkan
+    ffx-vulkan::fsr3-vk-framegeneration-3.1.6)
 target_link_libraries(tlggpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
     tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
 # xbyak is header-only: the distribution's copy when there is one (Fedora xbyak-devel), else the

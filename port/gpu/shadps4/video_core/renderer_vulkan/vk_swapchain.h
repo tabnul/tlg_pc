@@ -124,6 +124,7 @@ private:
     vk::Format view_format;
     vk::PresentModeKHR present_mode;
     bool vsync = true; ///< the setting present_mode was chosen for
+    bool fg_images = false; ///< tlg: made with the extra images of frame generation
     vk::Extent2D extent;
     vk::SurfaceTransformFlagBitsKHR transform;
     vk::CompositeAlphaFlagBitsKHR composite_alpha;

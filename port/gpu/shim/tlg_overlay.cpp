@@ -476,6 +476,11 @@ void ImageTab() {
         CheckRow("HDR", s.hdr,
                  TL("The game's own HDR10 output, used when HDR is on in Windows display settings. Applies after a restart.",
                     "A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. Vale após reiniciar."), d.hdr);
+        static const char* const fg_labels[] = {TL("Off", "Desligado"), "DLSS", "FSR 3.1"};
+        static const int fg_values[] = {0, 1, 2};
+        ChoiceRow(TL("Frame generation", "Geração de quadros"), s.frame_generation, fg_labels, fg_values, 3,
+                  TL("Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.",
+                     "Mostra uma imagem gerada entre dois quadros do jogo: movimento mais suave, um pouco mais de atraso de entrada. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca."), d.frame_generation);
         ImGui::EndTable();
     }
     const int iw = s.image_width, ih = s.image_height, ww = s.window_width, wh = s.window_height;

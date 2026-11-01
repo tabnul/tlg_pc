@@ -163,6 +163,8 @@ Dlss::Dlss() : impl{std::make_unique<Impl>()} {
         impl->Disable(std::string{BridgeName} + " is missing or from another version");
         return;
     }
+    // The switch is live, but the extensions must be there when the device is made.
+    impl->api->FgRequest(1);
     // NGX writes its logs and model updates here: beside the saves and shader caches.
     std::filesystem::path data = directory / "dlss";
     if (const char* user = std::getenv("TLG_GPU_USER_DIR"); user && user[0]) {
@@ -286,6 +288,40 @@ void Dlss::ReleaseFeature() {
     }
 }
 
+bool Dlss::FgAvailable() const {
+    return impl->available && impl->api->FgAvailable();
+}
+
+bool Dlss::FgCreate(vk::CommandBuffer command, u32 width, u32 height, vk::Format format) {
+    return impl->available &&
+           impl->api->FgCreate(command, width, height, static_cast<VkFormat>(format));
+}
+
+bool Dlss::FgEvaluate(vk::CommandBuffer command, const FgFrame& frame) {
+    if (!impl->available) {
+        return false;
+    }
+    const auto image = [](const Resource& r) {
+        const vk::ImageSubresourceRange range{r.aspect, 0, 1, 0, 1};
+        return TlgDlssImage{r.image,
+                           r.view,
+                           static_cast<VkImageSubresourceRange>(range),
+                           static_cast<VkFormat>(r.format),
+                           r.width,
+                           r.height};
+    };
+    const TlgDlssFgEvaluate parameters{image(frame.backbuffer), image(frame.depth),
+                                      image(frame.motion),     image(frame.output),
+                                      frame.reset ? 1 : 0,     frame.hdr ? 1 : 0};
+    return impl->api->FgEvaluate(command, &parameters) != 0;
+}
+
+void Dlss::FgRelease() {
+    if (impl->api) {
+        impl->api->FgRelease();
+    }
+}
+
 void Dlss::Shutdown() {
     impl->available = false;
     impl->feature.reset();
@@ -323,6 +359,16 @@ bool Dlss::Evaluate(vk::CommandBuffer, const Frame&) {
     return false;
 }
 void Dlss::ReleaseFeature() {}
+bool Dlss::FgAvailable() const {
+    return false;
+}
+bool Dlss::FgCreate(vk::CommandBuffer, u32, u32, vk::Format) {
+    return false;
+}
+bool Dlss::FgEvaluate(vk::CommandBuffer, const FgFrame&) {
+    return false;
+}
+void Dlss::FgRelease() {}
 
 #endif
 

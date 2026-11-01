@@ -67,6 +67,17 @@ public:
     bool Evaluate(vk::CommandBuffer command, const Frame& frame);
     void ReleaseFeature();
 
+    /// Frame generation (setting frame_generation, TLG_FG): one extra image between two finished frames.
+    struct FgFrame {
+        Resource backbuffer, depth, motion, output;
+        bool reset;
+        bool hdr;
+    };
+    [[nodiscard]] bool FgAvailable() const;
+    bool FgCreate(vk::CommandBuffer command, u32 width, u32 height, vk::Format format);
+    bool FgEvaluate(vk::CommandBuffer command, const FgFrame& frame);
+    void FgRelease();
+
 private:
     Dlss();
     struct Impl;

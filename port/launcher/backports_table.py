@@ -63,6 +63,12 @@ MENU = [
     _menu('Image', 'dlaa', 'bool', '1', ('DLAA anti-aliasing', 'Anti-aliasing DLAA'),
           ("NVIDIA RTX: stable foliage edges; F8 switches to the game's own SMAA.",
            'NVIDIA RTX: bordas estáveis na folhagem; F8 troca para o SMAA do próprio jogo.')),
+    _menu('Image', 'frame_generation', 'choice', '0', ('Frame generation', 'Geração de quadros'),
+          ('Shows one made-up image between two game frames: smoother motion, a little more input delay. '
+           'DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
+           'Mostra uma imagem gerada entre dois quadros do jogo: movimento mais suave, um pouco mais de atraso de entrada. '
+           'DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
+          choices=(('0', 'Off', 'Desligado'), ('1', 'DLSS', 'DLSS'), ('2', 'FSR 3.1', 'FSR 3.1'))),
     _menu('Image', 'hdr', 'bool', '1', ('HDR', 'HDR'),
           ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
            'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '

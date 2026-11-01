@@ -74,6 +74,11 @@ It replaces the game's SMAA and removes most of the shimmer on foliage, feathers
 default on RTX cards. **FSR 3.1 Native AA** does the same with AMD FSR on any card. F8 switches
 between the chosen anti-aliasing and the original SMAA. See [docs/dlaa.md](docs/dlaa.md).
 
+**Frame generation.** DLSS frame generation (NVIDIA RTX 40 or newer) or FSR 3.1 frame generation
+(not tied to one brand) adds one generated image per game frame, which doubles the frames shown.
+Off by default; switch it in the launcher or the in-game menu. Tested on an RTX 5090 on Windows
+only. Turning DLSS frame generation off while playing can crash the game, so restart to turn it off.
+
 **Any resolution and aspect ratio.** The game renders at the window's resolution, including 21:9
 and 32:9. At 21:9 the menus, hints and subtitles are laid out for the wider screen instead of
 being stretched. 32:9 is experimental: the game runs, but some overlays sit to the left and parts
@@ -202,7 +207,7 @@ well (`build_dlss.sh`).
   [DirectXTex](https://github.com/microsoft/DirectXTex) for texture compression.
 - NVIDIA DLSS, under the NVIDIA DLSS license.
 - [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
-  FSR 4 on Vulkan, which FSR 3.1 Native AA runs on. Thank you!
+  FSR 4 on Vulkan, which FSR 3.1 Native AA and FSR frame generation run on. Thank you!
 - Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
   another program's DLL already sits in the PS4 address range
   ([SpartanPort #1076](https://github.com/FelipePrado0/SpartanPort/pull/1076)). Thank you!

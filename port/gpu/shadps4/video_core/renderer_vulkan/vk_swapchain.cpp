@@ -248,7 +248,8 @@ void Swapchain::FindPresentMode() {
 }
 
 void Swapchain::UpdateVsync() {
-    if (TlgSettings::Get().vsync == vsync) {
+    const bool fg_wanted = TlgSettings::Get().frame_generation != 0;
+    if (TlgSettings::Get().vsync == vsync && fg_wanted == fg_images) {
         return;
     }
     {
@@ -256,7 +257,7 @@ void Swapchain::UpdateVsync() {
         // submit on.
         const auto queue_lock = Scheduler::LockQueue();
         if (const auto result = instance.GetDevice().waitIdle(); result != vk::Result::eSuccess) {
-            LOG_WARNING(Render_Vulkan, "Failed to wait for the device before a VSync change: {}",
+            LOG_WARNING(Render_Vulkan, "Failed to wait for the device before a swapchain change: {}",
                         vk::to_string(result));
         }
     }
@@ -280,6 +281,11 @@ void Swapchain::SetSurfaceProperties() {
 
     // Select number of images in swap chain, we prefer one buffer in the background to work on
     image_count = capabilities.minImageCount + 1;
+    // tlg: frame generation presents two images per game frame.
+    fg_images = TlgSettings::Get().frame_generation != 0;
+    if (fg_images) {
+        image_count += 2;
+    }
     if (capabilities.maxImageCount > 0) {
         image_count = std::min(image_count, capabilities.maxImageCount);
     }

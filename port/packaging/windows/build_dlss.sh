@@ -25,6 +25,6 @@ cp -r /clang64/include/vulkan /clang64/include/vk_video out/vkinclude/
 "$cmake" -S gpu/dlss_bridge -B out/dlss-bridge -G "$generator" -A x64 \
     -DDLSS_SDK_ROOT="$(cygpath -m "$sdk")" -DVULKAN_INCLUDE="$(cygpath -m "$PWD/out/vkinclude")"
 "$cmake" --build out/dlss-bridge --config Release
-cp out/dlss-bridge/Release/tlg_dlss.dll "$sdk/lib/Windows_x86_64/rel/nvngx_dlss.dll" out/
+cp out/dlss-bridge/Release/tlg_dlss.dll "$sdk/lib/Windows_x86_64/rel/nvngx_dlss.dll" "$sdk/lib/Windows_x86_64/rel/nvngx_dlssg.dll" out/
 cp "$sdk/LICENSE.txt" out/NVIDIA-DLSS-LICENSE.txt
-echo "DLSS bridge ready: out/tlg_dlss.dll, out/nvngx_dlss.dll"
+echo "DLSS bridge ready: out/tlg_dlss.dll, out/nvngx_dlss.dll, out/nvngx_dlssg.dll"

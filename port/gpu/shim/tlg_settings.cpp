@@ -181,6 +181,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 0.75f : f);
     } else if (key == "frames_queued") {
         v.frames_queued = TlgGraphics::ParseFramesQueued(value.empty() ? -1 : i);
+    } else if (key == "frame_generation") {
+        v.frame_generation = i >= 0 && i <= 2 ? i : 0;
     } else if (key == "readback_batch") {
         v.readback_batch = TlgGraphics::ParseReadbackBatch(value.empty() ? 0 : i);
     } else if (key == "texture_cleanup") {
@@ -324,7 +326,7 @@ void Load() {
         {"TLG_SMAA", "smaa"},                        {"TLG_DLAA", "dlaa"},
         {"TLG_LEVEL_SELECT", "level_select"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
-        {"TLG_HDR", "hdr"},
+        {"TLG_HDR", "hdr"},                          {"TLG_FG", "frame_generation"},
     };
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env); value && value[0]) {
@@ -473,6 +475,7 @@ void Save() {
                  v.readback_batch.load(), int(v.texture_cleanup.load()), TlgGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
+    std::fprintf(file, "frame_generation=%d\n", v.frame_generation.load());
     std::fprintf(file,
                  "mouse_enabled=%d\nmouse_sensitivity=%.2f\nmouse_invert_y=%d\nmouse_smoothing=%.2f\n"
                  "mouse_accel=%.2f\nmouse_deadzone=%.2f\nkey_map=%s\n",
