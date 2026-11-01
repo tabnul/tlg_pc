@@ -1,6 +1,6 @@
 # Local changes to gpu/third_party/fsr-vulkan
 
-The submodule points at upstream FireBurn/FSR-Vulkan (`c64f093`). `build.sh` applies the
+The submodule points at upstream FireBurn/UniversalScalers-Vulkan (`c64f093`). `build.sh` applies the
 patches here to its working tree when they are not applied yet:
 
 - `0001-...`: `TLG_FSR4_PROFILE` (GPU time per FSR 4 pass) and `TLG_FSR4_STATS` (driver

@@ -4,7 +4,7 @@ DLAA is NVIDIA's DLSS anti-aliasing at native resolution. The port feeds it the 
 vectors and uses it instead of the game's SMAA: foliage, feathers and fences stop shimmering.
 
 FSR 3.1 Native AA is the same with AMD FSR 3.1 (through
-[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by @FireBurn): it runs on any card and needs
+[UniversalScalers-Vulkan](https://github.com/FireBurn/UniversalScalers-Vulkan) by @FireBurn): it runs on any card and needs
 no extra files. On an RTX card both are available; pick the one you like.
 
 ## Playing
