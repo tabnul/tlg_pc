@@ -125,6 +125,12 @@ struct Buffer {
     /// tlg: scheduler tick of the last recorded GPU write per 64 KiB of a sparse arena, so a
     /// readback can tell whether every write to its data already finished (DownloadMemory).
     static constexpr u64 WriteTickShift = 16;
+    /// tlg: gives the tables their full size up front. Faulting threads read them (see
+    /// BufferCache::WaitForWriter), so they must not move once the arena is in use.
+    void PresizeWriteTicks() const {
+        write_ticks.resize(((size_bytes - 1) >> WriteTickShift) + 1);
+        downloaded_ticks.resize(write_ticks.size());
+    }
     void NoteWrite(u64 offset, u64 size, u64 tick) const {
         if (size == 0) {
             return;

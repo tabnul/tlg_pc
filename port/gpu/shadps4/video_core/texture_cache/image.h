@@ -10,6 +10,8 @@
 #include "video_core/texture_cache/image_info.h"
 #include "video_core/texture_cache/image_view.h"
 
+#include <atomic>
+#include <cstdlib>
 #include <deque>
 #include <optional>
 #include <boost/container/small_vector.hpp>
@@ -145,6 +147,28 @@ public:
     // tlg: fields every binding of the image reads, together ahead of the large ImageInfo
     // (they were spread over several cache lines: one miss each per texture per draw).
     ImageFlagBits flags = ImageFlagBits::Dirty;
+    // tlg: the fault handlers change `flags` under the texture cache mutex, the GPU thread also
+    // without it (per draw), so a plain read-modify-write can undo the other side's change: a lost
+    // CpuDirty is a stale texture, a Picked brought back is a freeze (ForEachImageInRegion).
+    // TLG_IMAGE_FLAGS_FIX=0 restores plain updates and the shared Picked mark.
+    static bool FlagsFixEnabled() {
+        static const bool on = [] { const char* e = std::getenv("TLG_IMAGE_FLAGS_FIX"); return !e || *e != '0'; }();
+        return on;
+    }
+    void SetFlags(ImageFlagBits bits) {
+        if (FlagsFixEnabled()) {
+            std::atomic_ref<u32>(reinterpret_cast<u32&>(flags)).fetch_or(static_cast<u32>(bits), std::memory_order_relaxed);
+        } else {
+            flags |= bits;
+        }
+    }
+    void ClearFlags(ImageFlagBits bits) {
+        if (FlagsFixEnabled()) {
+            std::atomic_ref<u32>(reinterpret_cast<u32&>(flags)).fetch_and(~static_cast<u32>(bits), std::memory_order_relaxed);
+        } else {
+            flags &= ~bits;
+        }
+    }
     struct {
         u32 is_bound : 1;
         u32 is_target : 1;

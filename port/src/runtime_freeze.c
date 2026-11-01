@@ -181,6 +181,10 @@ typedef struct {
     unsigned frames;
     uintptr_t chain[MAX_FRAMES];
     char name[64];
+    /* Short-stop snapshots: thread CPU time, and host code addresses found on the stack. */
+    uint64_t cpu_ms;
+    unsigned words;
+    uintptr_t word[24];
 } Capture;
 
 static uint64_t own_tid(void) {
@@ -245,6 +249,40 @@ static void capture(Capture *c) {
 }
 #else
 typedef HRESULT (WINAPI *GetDescription)(HANDLE, PWSTR *);
+/* The host exe's executable sections: host code has no reliable frame chain, so a stop snapshot
+   lists the code addresses on the stack instead. */
+static struct { uintptr_t start, end; } host_code[8];
+static unsigned host_code_count;
+static void find_host_code(void) {
+    if (host_code_count) return;
+    const uint8_t *base = (const uint8_t *)GetModuleHandleA(NULL);
+    const IMAGE_NT_HEADERS *nt = (const IMAGE_NT_HEADERS *)(base + ((const IMAGE_DOS_HEADER *)base)->e_lfanew);
+    const IMAGE_SECTION_HEADER *section = IMAGE_FIRST_SECTION(nt);
+    for (unsigned i = 0; i < nt->FileHeader.NumberOfSections && host_code_count < 8; ++i) {
+        if (!(section[i].Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+        host_code[host_code_count].start = (uintptr_t)base + section[i].VirtualAddress;
+        host_code[host_code_count].end = host_code[host_code_count].start + section[i].Misc.VirtualSize;
+        ++host_code_count;
+    }
+}
+static void scan_stack(Capture *c) {
+    static uintptr_t buffer[4096 / sizeof(uintptr_t)];
+    uintptr_t address = c->rsp & ~(uintptr_t)7;
+    for (unsigned page = 0; page < 5 && c->words < 24; ++page) {
+        const size_t bytes = 4096 - (address & 4095);
+        SIZE_T got = 0;
+        if (!ReadProcessMemory(GetCurrentProcess(), (const void *)address, buffer, bytes, &got) || !got) return;
+        for (size_t i = 0; i < got / sizeof(uintptr_t) && c->words < 24; ++i) {
+            for (unsigned s = 0; s < host_code_count; ++s) {
+                if (buffer[i] >= host_code[s].start && buffer[i] < host_code[s].end) {
+                    c->word[c->words++] = buffer[i];
+                    break;
+                }
+            }
+        }
+        address += bytes;
+    }
+}
 static size_t list_threads(Capture *out, size_t max) {
     size_t n = 0;
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
@@ -281,8 +319,14 @@ static void capture(Capture *c) {
             c->rip = (uintptr_t)context.Rip; c->rsp = (uintptr_t)context.Rsp; c->rbp = (uintptr_t)context.Rbp;
             c->frames = walk_frames(c->rbp, c->chain, MAX_FRAMES);
             c->captured = 1;
+            scan_stack(c);
         }
         ResumeThread(thread);
+    }
+    FILETIME created, exited, kernel, user;
+    if (GetThreadTimes(thread, &created, &exited, &kernel, &user)) {
+        c->cpu_ms = (((uint64_t)kernel.dwHighDateTime << 32 | kernel.dwLowDateTime) +
+                     ((uint64_t)user.dwHighDateTime << 32 | user.dwLowDateTime)) / 10000;
     }
     CloseHandle(thread);
 }
@@ -308,6 +352,15 @@ static void add_thread(Text *t, const Capture *c, const RuntimeThreadInfo *info,
         add(t, "      now at %s, rsp=0x%llx", where, (unsigned long long)c->rsp);
         if (c->frames) { add(t, "; frames: "); add_chain(t, c->chain, c->frames); }
         add(t, "\n");
+        if (c->cpu_ms) add(t, "      cpu %llu ms\n", (unsigned long long)c->cpu_ms);
+        if (c->words) {
+            add(t, "      stack words:");
+            for (unsigned i = 0; i < c->words; ++i) {
+                describe_address(where, sizeof(where), c->word[i]);
+                add(t, " %s", where);
+            }
+            add(t, "\n");
+        }
     } else {
         add(t, "      registers not captured (the thread did not answer)\n");
     }
@@ -361,7 +414,8 @@ void runtime_freeze_report(FILE *out, const char *head) {
             if (guest == (pass == 0)) add_thread(&t, &caps[i], info, now_ms, infos, records);
         }
     }
-    add(&t, "FREEZE: end of report (%zu threads; the game keeps running)\n", threads);
+    add(&t, "%s: end of report (%zu threads; the game keeps running)\n",
+        strncmp(head, "STOP", 4) ? "FREEZE" : "STOP", threads);
     if (t.data) { fwrite(t.data, 1, t.length, out); fflush(out); }
     free(t.data); free(caps); free(infos);
     pthread_mutex_unlock(&report_lock);
@@ -405,6 +459,35 @@ static void *monitor(void *argument) {
     return NULL;
 }
 
+/* TLG_STOP_REPORT_MS: thread snapshots at short stops, at the limit and at 2, 4 and 8 times it. */
+static void *stop_monitor(void *argument) {
+    const uint64_t limit = (uint64_t)(uintptr_t)argument;
+#ifndef _WIN32
+    pthread_setname_np(pthread_self(), "tlg:stop");
+#endif
+    uint64_t last_shown = 0, last_change = 0, next = limit;
+    for (;;) {
+        sleep_ms(10);
+        TlgGpuFrameCounters now;
+        tlggpu_frame_counters(&now);
+        const uint64_t ms = runtime_wait_now_ms();
+        if (now.shown != last_shown) {
+            if (last_shown && next != limit) {
+                printf("STOP: frames resumed after %llu ms\n", (unsigned long long)(ms - last_change));
+                fflush(stdout);
+            }
+            last_shown = now.shown; last_change = ms; next = limit;
+            counters_at_last_frame = now;
+        } else if (last_shown && next <= limit * 8 && ms - last_change >= next) {
+            char head[96];
+            snprintf(head, sizeof(head), "STOP: no frame for %llu ms; threads:\n", (unsigned long long)(ms - last_change));
+            runtime_freeze_report(stdout, head);
+            next *= 2;
+        }
+    }
+    return NULL;
+}
+
 static void gpu_wait_begin(const char *kind, const void *object, const char *name, uintptr_t frame) {
     runtime_wait_begin(kind, object, name, NULL, frame);
 }
@@ -419,6 +502,18 @@ void runtime_freeze_start(uintptr_t image, uint64_t image_size, unsigned seconds
     sigemptyset(&action.sa_mask);
     sigaction(SIGURG, &action, NULL);
 #endif
+    const char *stop_env = getenv("TLG_STOP_REPORT_MS");
+    const unsigned stop_ms = stop_env ? (unsigned)strtoul(stop_env, NULL, 10) : 0;
+    if (stop_ms) {
+#ifdef _WIN32
+        find_host_code();
+#endif
+        pthread_t stop_thread;
+        if (!pthread_create(&stop_thread, NULL, stop_monitor, (void *)(uintptr_t)stop_ms)) {
+            pthread_detach(stop_thread);
+            printf("Stop report: after %u ms without a new frame (TLG_STOP_REPORT_MS)\n", stop_ms);
+        }
+    }
     if (!seconds) return;
     static FreezeMonitor state;
     state = (FreezeMonitor){.seconds = seconds};

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #ifndef _WIN32
+#include "tlg_freeze.h"
 #include <dlfcn.h>
 #endif
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <tsl/robin_set.h>
 #include <xxhash.h>
 #include "video_core/renderer_vulkan/ui_composition.h"
 #include "tlg_settings.h"
@@ -351,6 +353,20 @@ struct JitterControl {
 
 /// Meshes (index address, count) drawn jittered into a scene depth since the sky pass.
 std::vector<std::pair<VAddr, u32>> jittered_meshes;
+/// The same list as a hash set. Busy scenes reach thousands per frame, and the linear search per
+/// draw took 5-14% of the recording thread (profile 2026-10-29). TLG_MESH_SET=0: the list.
+struct MeshHash {
+    size_t operator()(const std::pair<VAddr, u32>& mesh) const noexcept {
+        u64 h = mesh.first ^ (u64(mesh.second) << 44) ^ (u64(mesh.second) >> 20);
+        h = (h ^ (h >> 33)) * 0xff51afd7ed558ccdull;
+        return h ^ (h >> 33);
+    }
+};
+tsl::robin_set<std::pair<VAddr, u32>, MeshHash> jittered_mesh_set;
+const bool mesh_set_on = [] {
+    const char* env = std::getenv("TLG_MESH_SET");
+    return !env || *env != '0';
+}();
 
 /// tlg debug (TLG_JITTER_DEBUG=1): scene depths a jittered draw wrote since the sky pass, and the
 /// pixel shaders that disagree with them: each logged once when first seen, counted, listed at F6.
@@ -414,6 +430,7 @@ void ReadJitterControl() {
     const u32 count = control.index;
     control.index = 0;
     jittered_meshes.clear(); // a new frame
+    jittered_mesh_set.clear();
     jittered_depths.clear();
     // F6: a draw map of this frame and the suspects so far, most frequent first.
     const bool mark = TlgSettings::Get().jitter_mark.exchange(false);
@@ -1458,10 +1475,18 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     if (scene_depth && is_indexed && !jitter_control.no_mesh) {
         const std::pair mesh{regs.index_base_address.Address<VAddr>() +
                                  u64(index_offset) * 4, regs.num_indices};
-        const bool known = std::find(jittered_meshes.begin(), jittered_meshes.end(), mesh) !=
-                           jittered_meshes.end();
+        const bool known = mesh_set_on
+                               ? jittered_mesh_set.contains(mesh)
+                               : std::find(jittered_meshes.begin(), jittered_meshes.end(), mesh) !=
+                                     jittered_meshes.end();
         if (draw_jitter[0] != 0.0f || draw_jitter[1] != 0.0f) {
-            if (!known && regs.depth_control.depth_write_enable) jittered_meshes.push_back(mesh);
+            if (!known && regs.depth_control.depth_write_enable) {
+                if (mesh_set_on) {
+                    jittered_mesh_set.insert(mesh);
+                } else {
+                    jittered_meshes.push_back(mesh);
+                }
+            }
         } else if (known) {
             draw_jitter = upscaler->Jitter();
         }
@@ -1741,8 +1766,22 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
         return;
     }
 
+    // tlg: on real GCN consecutive dispatches overlap unless the guest syncs. So between two sync
+    // packets a barrier that only exists because of earlier compute writes is not needed, and a
+    // sync packet always becomes one. The game binds one 5 MiB buffer for writing in hundreds of
+    // tiny dispatches per frame, all seen as overlapping. Skipped writes stay tracked: draws,
+    // copies and the next submit still flush them. TLG_BARRIER_GUEST_SYNC=0: a barrier per overlap.
+    static const bool guest_sync_only = EmulatorSettingsImpl::Flag("TLG_BARRIER_GUEST_SYNC", true);
+    if (guest_sync_only) {
+        if (guest_sync_pending) {
+            needs_barrier |= runtime.HasPendingBarrier();
+        } else if (!gds_barrier && runtime.OnlyComputeWrites()) {
+            needs_barrier = false;
+        }
+    }
     if (needs_barrier) {
         runtime.FlushBarriers();
+        guest_sync_pending = false;
     }
 
     scheduler.EndRendering();
@@ -1838,6 +1877,23 @@ void Rasterizer::FlushForFence(TlgStats::FenceSite site) {
         (site != TlgStats::FenceEop && TlgToggle::Disabled2(TlgToggle::FenceFlushMore)) ||
         runtime.LastArenaWriteTick() != scheduler.CurrentTick()) {
         return;
+    }
+    // Busy scenes reach ~100 of these per frame, and every submit costs the GPU thread and the
+    // card time. At the fences other than end-of-pipe at most one per TLG_FENCE_FLUSH_MIN_US
+    // microseconds (0 = no limit): a read of unsubmitted work submits it itself (WaitForWriter).
+    static const u64 min_flush_ns = [] {
+        const char* env = std::getenv("TLG_FENCE_FLUSH_MIN_US");
+        return (env ? std::strtoull(env, nullptr, 10) : u64{4000}) * 1000;
+    }();
+    if (min_flush_ns && site != TlgStats::FenceEop) {
+        static thread_local u64 last_flush_ns = 0;
+        const u64 now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
+        if (now - last_flush_ns < min_flush_ns) {
+            return;
+        }
+        last_flush_ns = now;
     }
     scheduler.Flush();
     TlgStats::fence_flushes[site].fetch_add(1, std::memory_order_relaxed);
@@ -2322,6 +2378,7 @@ void Rasterizer::ResetBindings(bool is_compute) {
     bound_images.clear();
     bound_buffers.clear();
     needs_barrier = false;
+    gds_barrier = false;
 }
 
 bool Rasterizer::IsComputeMetaClear(const Pipeline* pipeline) {
@@ -2497,7 +2554,8 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
             if (desc.buffer_type == Shader::BufferType::GdsBuffer) {
                 const auto* gds_buf = buffer_cache.GetGdsBuffer();
                 buffer_infos.emplace_back(gds_buf->Handle(), 0, gds_buf->SizeBytes());
-                needs_barrier |= runtime.IsBufferAccessed(gds_buf, 0, gds_buf->SizeBytes());
+                gds_barrier |= runtime.IsBufferAccessed(gds_buf, 0, gds_buf->SizeBytes());
+                needs_barrier |= gds_barrier;
             } else if (desc.buffer_type == Shader::BufferType::Flatbuf) {
                 auto& vk_buffer = buffer_cache.GetStreamBuffer();
                 const u32 ubo_size = stage.FlatUserData().size() * sizeof(u32);
@@ -3631,8 +3689,17 @@ bool Rasterizer::InvalidateMemory(VAddr addr, u64 size, bool assume_locks) {
     return true;
 }
 
+std::string Rasterizer::DescribeFaultState(VAddr addr) {
+    return fmt::format("GPU mapped: {}\n{}\n{}", IsMapped(addr, 8),
+                       buffer_cache.DescribeFaultState(addr),
+                       texture_cache.DescribeFaultState(addr));
+}
+
 bool Rasterizer::OnWriteFault(VAddr addr, bool assume_locks) {
-    DrainDrawPipe();
+    {
+        TlgFreeze::SlowScope slow{"write fault: drain draws", addr};
+        DrainDrawPipe();
+    }
     if (!InvalidateMemory(addr, 8, assume_locks)) {
         return false;
     }
@@ -3641,7 +3708,10 @@ bool Rasterizer::OnWriteFault(VAddr addr, bool assume_locks) {
 }
 
 bool Rasterizer::ReadMemory(VAddr addr, u64 size, bool assume_locks) {
-    DrainDrawPipe();
+    {
+        TlgFreeze::SlowScope slow{"read fault: drain draws", addr};
+        DrainDrawPipe();
+    }
     if (!IsMapped(addr, size)) {
         // Not GPU mapped memory, can skip invalidation logic entirely.
         return false;
