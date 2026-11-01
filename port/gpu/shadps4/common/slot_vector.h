@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include <mutex>
 #include <numeric>
 #include <utility>
 #include <vector>
 #include "common/assert.h"
 #include "common/types.h"
+#include "tlg_freeze.h"
 
 namespace Common {
 
@@ -26,9 +28,20 @@ struct SlotId {
     u32 index = INVALID_INDEX;
 };
 
+// tlg: shim/slot_storage.cpp.
+namespace SlotStorage {
+void* Reserve(std::size_t bytes);
+void Commit(void* base, std::size_t bytes);
+void Release(void* base, std::size_t bytes);
+bool StableEnabled(); // TLG_SLOT_STABLE=0: the block moves when the list grows (the old way)
+bool LockEnabled();   // TLG_SLOT_LOCK=0: no lock around the free list and the bits (the old way)
+} // namespace SlotStorage
+
 template <class T>
 class SlotVector {
     constexpr static std::size_t InitialCapacity = 2048;
+    // tlg: address space only (texture cache high so far: 26k images in 30 s).
+    constexpr static std::size_t MaxCapacity = std::size_t(1) << 21;
 
 public:
     template <typename ValueType, typename Pointer, typename Reference>
@@ -89,6 +102,14 @@ public:
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     SlotVector() {
+        stable = SlotStorage::StableEnabled();
+        if (stable) {
+            // tlg: the block, the bits and the free list never move, so references and unlocked
+            // reads stay good while the list grows.
+            values = static_cast<Entry*>(SlotStorage::Reserve(MaxCapacity * sizeof(Entry)));
+            stored_bitset.reserve((MaxCapacity + 63) / 64);
+            free_list.reserve(MaxCapacity);
+        }
         Reserve(InitialCapacity);
     }
 
@@ -102,7 +123,11 @@ public:
             }
             index += 64;
         }
-        delete[] values;
+        if (stable) {
+            SlotStorage::Release(values, MaxCapacity * sizeof(Entry));
+        } else {
+            delete[] values;
+        }
     }
 
     [[nodiscard]] T& operator[](SlotId id) noexcept {
@@ -121,8 +146,13 @@ public:
 
     template <typename... Args>
     SlotId insert(Args&&... args) noexcept {
-        const u32 index = FreeValueIndex();
+        u32 index;
+        {
+            const auto lock = ListLock();
+            index = FreeValueIndex();
+        }
         new (&values[index].object) T(std::forward<Args>(args)...);
+        const auto lock = ListLock();
         SetStorageBit(index);
 
         return SlotId{index};
@@ -130,6 +160,7 @@ public:
 
     void erase(SlotId id) noexcept {
         values[id.index].object.~T();
+        const auto lock = ListLock();
         free_list.push_back(id.index);
         ResetStorageBit(id.index);
     }
@@ -199,6 +230,17 @@ private:
         T object;
     };
 
+    // tlg: insert and erase run on different threads: the erase comes from a deferred operation,
+    // which holds no texture cache lock. T's constructor and destructor stay outside.
+    [[nodiscard]] std::unique_lock<std::mutex> ListLock() noexcept {
+        std::unique_lock<std::mutex> lock{list_mutex, std::defer_lock};
+        if (SlotStorage::LockEnabled() && !lock.try_lock()) {
+            TlgFreeze::SlowScope slow{"image list lock"};
+            lock.lock();
+        }
+        return lock;
+    }
+
     void SetStorageBit(u32 index) noexcept {
         stored_bitset[index / 64] |= u64(1) << (index % 64);
     }
@@ -228,6 +270,25 @@ private:
     }
 
     void Reserve(std::size_t new_capacity) noexcept {
+        if (stable) {
+            ASSERT_MSG(new_capacity <= MaxCapacity, "SlotVector full at {} entries", values_capacity);
+            SlotStorage::Commit(values, new_capacity * sizeof(Entry));
+        } else {
+            MoveTo(new_capacity);
+        }
+
+        stored_bitset.resize((new_capacity + 63) / 64);
+
+        const std::size_t old_free_size = free_list.size();
+        free_list.resize(old_free_size + (new_capacity - values_capacity));
+        const std::size_t new_free_size = free_list.size();
+        std::iota(free_list.rbegin(), free_list.rbegin() + new_free_size - old_free_size,
+                  static_cast<u32>(values_capacity));
+
+        values_capacity = new_capacity;
+    }
+
+    void MoveTo(std::size_t new_capacity) noexcept {
         Entry* const new_values = new Entry[new_capacity];
         std::size_t index = 0;
         for (u64 bits : stored_bitset) {
@@ -242,18 +303,8 @@ private:
             }
             index += 64;
         }
-
-        stored_bitset.resize((new_capacity + 63) / 64);
-
-        const std::size_t old_free_size = free_list.size();
-        free_list.resize(old_free_size + (new_capacity - values_capacity));
-        const std::size_t new_free_size = free_list.size();
-        std::iota(free_list.rbegin(), free_list.rbegin() + new_free_size - old_free_size,
-                  static_cast<u32>(values_capacity));
-
         delete[] values;
         values = new_values;
-        values_capacity = new_capacity;
     }
 
     Entry* values = nullptr;
@@ -261,6 +312,9 @@ private:
 
     std::vector<u64> stored_bitset;
     std::vector<u32> free_list;
+
+    std::mutex list_mutex;
+    bool stable = false;
 };
 
 } // namespace Common

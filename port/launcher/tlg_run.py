@@ -179,11 +179,20 @@ DEFAULT_ENV = {
     'TLG_PIPELINE_BINARIES': '0',  # VK_KHR_pipeline_binary crashes on the NVIDIA 595 driver
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
-    'TLG_GC_BUDGET_MB': '5000',    # texture cache budget; higher only piles up old textures (#104)
+    'TLG_GC_BUDGET_MB': '7000',    # texture cache budget; higher only piles up old textures (#104)
     # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
     'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
     'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
+}
+# The launcher's "Advanced logging", for bug reports. Off the write path only: no TLG_WRITE_LOG=1,
+# which changes the timing of the writes it logs.
+DEBUG_LOG_ENV = {
+    'TLG_GPU_LOG': 'info',         # the GPU emulation's own messages (default: warnings only)
+    'TLG_STOP_REPORT_MS': '250',   # what every thread does when a frame takes this long
+    'TLG_PAGE_HISTORY': '1',       # the latest page tracking changes, for a FAULT LOOP report
+    'TLG_PERF_DIAG': '1',          # where the GPU waits go
+    'TLG_WRITE_LOG': '2',          # the latest GPU writes to game memory, for a crash report
 }
 
 DEFAULT_SETTINGS = {
@@ -199,7 +208,8 @@ DEFAULT_SETTINGS = {
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
     'level_select': False,         # tlg.ini; tlg_lua.cpp
-    'vram_budget_mb': 5000,
+    'debug_logging': False,        # DEBUG_LOG_ENV
+    'vram_budget_mb': 7000,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
     'mouse_enabled': True,
@@ -281,8 +291,8 @@ def load_settings():
     if not settings.get('readback_defaults_2026_10'):
         settings.pop('deferred_readback', None)
         settings['readback_defaults_2026_10'] = True
-    # Once (issue #104): a budget above the default, stored before 5000 became the advice
-    # (2026-10-29), only lets old textures pile up; it goes back to 5000. A lower one (a small card)
+    # Once (issue #104): a budget above the default, stored before 2026-10-29, only lets old textures
+    # pile up; it goes back to the default. A lower one (a small card)
     # stays. The marker is saved with the next save, so a later choice stays.
     if not settings.get('budget_default_2026_10'):
         budget = DEFAULT_SETTINGS['vram_budget_mb']
@@ -291,6 +301,16 @@ def load_settings():
         except (TypeError, ValueError):
             settings['vram_budget_mb'] = budget
         settings['budget_default_2026_10'] = True
+    # Once (2026-11): 5000 was the default until 0.2.0 and throws textures away all the time, so it
+    # moves to 7000 like a new install; a card under 8 GB gets its own value. Any other stored budget
+    # was somebody's choice and stays, and so does a later choice.
+    if not settings.get('budget_default_2026_11'):
+        if settings.get('vram_budget_mb') in (5000, DEFAULT_SETTINGS['vram_budget_mb']):
+            import gfxlogic
+            vram = gfxlogic.detect_vram_mb()
+            settings['vram_budget_mb'] = (gfxlogic.suggested_budget_mb(vram / 1024) if vram
+                                          else DEFAULT_SETTINGS['vram_budget_mb'])
+        settings['budget_default_2026_11'] = True
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
     ini = read_ini(user_dir() / 'tlg.ini')
     try:
@@ -752,6 +772,9 @@ def build_env(settings, extra=None):
     # 60 FPS and unlocked.
     if applied_frame_rate in ('60', 'unlocked'):
         env.setdefault('TLG_BUFFER_READBACK_STATS', '1')
+    if settings.get('debug_logging'):
+        for key, value in DEBUG_LOG_ENV.items():
+            env.setdefault(key, value)
     if extra:
         env.update(extra)
     return env
@@ -865,6 +888,8 @@ def launch(settings, seconds=0, extra_env=None, detached=False, header=()):
     raise_open_file_limit()
     with open(log, 'wb') as out:   # the child keeps its own copy of the descriptor
         out.write(''.join(line + '\n' for line in header).encode('utf-8'))
+        if settings.get('debug_logging'):
+            out.write(b'Advanced logging: on\n')
         out.flush()
         process = subprocess.Popen(cmd, cwd=str(data), env=build_env(settings, extra_env),
                                    stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,

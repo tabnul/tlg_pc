@@ -104,6 +104,17 @@ public:
 
     void FlushBarriers();
 
+    /// tlg: something waits to be flushed.
+    [[nodiscard]] bool HasPendingBarrier() const {
+        return memory_barrier.srcStageMask != vk::PipelineStageFlagBits2::eNone ||
+               !image_barriers.empty();
+    }
+    /// tlg: nothing but compute shaders since the last barrier, and no image to transition.
+    [[nodiscard]] bool OnlyComputeWrites() const {
+        return memory_barrier.srcStageMask == vk::PipelineStageFlagBits2::eComputeShader &&
+               image_barriers.empty();
+    }
+
     /// tlg: runs before this thread changes image state (layouts, pending image
     /// barriers): the rasterizer joins its texture binding helper there (BindHelper).
     void SetImageAccessHook(void (*hook)(void*), void* context) {

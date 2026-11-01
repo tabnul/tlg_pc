@@ -303,6 +303,8 @@ public:
 
     /// Runs the garbage collector.
     void RunGarbageCollector();
+    /// tlg: the images and readbacks on one page, for the fault-loop report.
+    std::string DescribeFaultState(VAddr addr);
 
     template <typename Func>
     void ForEachImageInRegion(VAddr cpu_addr, size_t size, Func&& func) {
@@ -310,7 +312,15 @@ public:
         static constexpr bool BOOL_BREAK = std::is_same_v<FuncReturn, bool>;
         ImageIds images;
         u64 candidates = 0;
-        ForEachPage(cpu_addr, size, [this, &images, &candidates, cpu_addr, size, func](u64 page) {
+        // tlg: no mark in the shared flags here. With one, a walk skipped images
+        // another thread was walking (FindImageFromRange and the stencil lookup run on the GPU
+        // thread without the mutex), and a plain flags update from the other side could bring a
+        // cleared mark back for good: every write fault on that image's pages then did nothing,
+        // the page stayed closed and the thread faulted forever.
+        const bool shared_mark = !Image::FlagsFixEnabled();
+        const u64 first_page = cpu_addr >> Traits::PageBits;
+        ForEachPage(cpu_addr, size, [this, &images, &candidates, cpu_addr, size, func, shared_mark,
+                                     first_page](u64 page) {
             const auto it = page_table.find(page);
             if (it == nullptr) {
                 if constexpr (BOOL_BREAK) {
@@ -322,13 +332,21 @@ public:
             candidates += it->size();
             for (const ImageId image_id : *it) {
                 Image& image = slot_images[image_id];
-                if (image.flags & ImageFlagBits::Picked) {
+                if (shared_mark && (image.flags & ImageFlagBits::Picked)) {
                     continue;
                 }
                 if (!image.Overlaps(cpu_addr, size)) {
                     continue;
                 }
-                image.flags |= ImageFlagBits::Picked;
+                // An image is listed on every page it covers, so on a later page of this walk only
+                // an image that starts there is new; the rest were visited on an earlier page.
+                if (!shared_mark && page != first_page &&
+                    (image.info.guest_address >> Traits::PageBits) != page) {
+                    continue;
+                }
+                if (shared_mark) {
+                    image.SetFlags(ImageFlagBits::Picked);
+                }
                 images.push_back(image_id);
                 if constexpr (BOOL_BREAK) {
                     if (func(image_id, image)) {
@@ -342,8 +360,10 @@ public:
                 return false;
             }
         });
-        for (const ImageId image_id : images) {
-            slot_images[image_id].flags &= ~ImageFlagBits::Picked;
+        if (shared_mark) {
+            for (const ImageId image_id : images) {
+                slot_images[image_id].ClearFlags(ImageFlagBits::Picked);
+            }
         }
         if (TlgStats::enabled) {
             TlgStats::region_lookups.fetch_add(1, std::memory_order_relaxed);

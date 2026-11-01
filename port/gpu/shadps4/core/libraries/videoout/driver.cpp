@@ -356,6 +356,7 @@ void VideoOutDriver::Flip(const Request& req) {
                                  TlgStats::sync_recording_ns.load(), TlgStats::host_copies_wait_ns.load(),
                                  u64(Vulkan::g_tlg_compile_ns.load()), u64(Vulkan::g_tlg_compiles.load()),
                                  TlgStats::t_gc.load()};
+        const auto stall_print_start = Clock::now();
         if (stall) {
             std::printf("Stall: %.1f ms frame; waits: readback %.1f ms, GPU ticks %.1f ms, "
                         "recorder %.1f ms, host copies %.1f ms; %llu compiles %.1f ms; GC %.1f ms\n",
@@ -369,6 +370,11 @@ void VideoOutDriver::Flip(const Request& req) {
             std::printf("       fault handlers: %llu read faults %.1f ms, write faults %.1f ms\n",
                         static_cast<unsigned long long>(rf - last_rf), (trf - last_trf) / 1e6,
                         (twf - last_twf) / 1e6);
+            const double print_ms = std::chrono::duration<double, std::milli>(
+                                        Clock::now() - stall_print_start).count();
+            if (print_ms >= 50.0) {
+                TlgFreeze::NoteSlow("Stall printf", 0, print_ms);
+            }
         }
         last_rf = rf;
         last_trf = trf;

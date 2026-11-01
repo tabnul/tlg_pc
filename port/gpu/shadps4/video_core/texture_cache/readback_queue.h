@@ -70,6 +70,15 @@ public:
     std::uint64_t Bytes() const { return bytes; }
     bool Empty() const { return entries.empty(); }
 
+    /// tlg: how many entries hold a read watcher on the range, for the fault-loop report.
+    std::uint64_t WatchedOn(std::uint64_t address, std::uint64_t size) const {
+        std::uint64_t count = 0;
+        for (const auto& entry : entries) {
+            if (entry.watched && OverlapsPage(entry, address, size)) ++count;
+        }
+        return count;
+    }
+
 private:
     static bool OverlapsPage(const Entry& entry, std::uint64_t address, std::uint64_t size) {
         if (!size) return false;

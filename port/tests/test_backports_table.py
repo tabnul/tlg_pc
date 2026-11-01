@@ -137,10 +137,16 @@ class TableTest(unittest.TestCase):
         from unittest import mock
         with tempfile.TemporaryDirectory() as tmp,                 mock.patch.dict(os.environ, {'APPDATA': tmp, 'TLG_USER_DIR': tmp}):
             tlg_run.config_path().parent.mkdir(parents=True)
-            for stored, loaded in ((21500, 5000), (5600, 5000), (3700, 3700)):
+            for stored, loaded in ((21500, 7000), (5600, 5600), (3700, 3700)):
                 tlg_run.config_path().write_text(json.dumps({'vram_budget_mb': stored}), encoding='utf-8')
-                self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
-            settings = tlg_run.load_settings()
+                with mock.patch('gfxlogic.detect_vram_mb', return_value=8192):
+                    self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
+            for vram, loaded in ((8192, 7000), (6144, 5600), (None, 7000)):   # the old default moves up once
+                tlg_run.config_path().write_text(json.dumps({'vram_budget_mb': 5000, 'budget_default_2026_10': True}), encoding='utf-8')
+                with mock.patch('gfxlogic.detect_vram_mb', return_value=vram):
+                    self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
+            with mock.patch('gfxlogic.detect_vram_mb', return_value=8192):
+                settings = tlg_run.load_settings()
             settings['vram_budget_mb'] = 8000          # a later choice in the launcher stays
             tlg_run.save_settings(settings)
             self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], 8000)
@@ -173,9 +179,9 @@ class PresetTest(unittest.TestCase):
 
     def test_budget_follows_the_tk_advice(self):
         self.assertEqual(gfxlogic.suggested_budget_mb(4), 3700)
-        self.assertEqual(gfxlogic.suggested_budget_mb(6), 5000)
-        self.assertEqual(gfxlogic.suggested_budget_mb(8), 5000)
-        self.assertEqual(gfxlogic.suggested_budget_mb(24), 5000)
+        self.assertEqual(gfxlogic.suggested_budget_mb(6), 5600)
+        self.assertEqual(gfxlogic.suggested_budget_mb(8), 7000)
+        self.assertEqual(gfxlogic.suggested_budget_mb(24), 7000)
         self.assertEqual(tlg_run.DEFAULT_SETTINGS['vram_budget_mb'], gfxlogic.BUDGET_DEFAULT)
         self.assertFalse(gfxlogic.budget_is_too_high(5600, 6144))
         self.assertTrue(gfxlogic.budget_is_too_high(6000, 6144))

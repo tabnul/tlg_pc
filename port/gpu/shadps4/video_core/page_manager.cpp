@@ -8,6 +8,10 @@
 #include <chrono>
 #include <algorithm>
 #include <unordered_map>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
+#include <mutex>
 #include <cstring>
 #include <string>
 #include <boost/container/small_vector.hpp>
@@ -51,6 +55,9 @@
 #include "common/spin_lock.h"
 #endif
 
+extern "C" void runtime_memory_gpu_protect(uintptr_t address, uint64_t size, int read, int write);
+extern "C" void runtime_memory_describe(uintptr_t address, char* out, size_t size);
+
 namespace VideoCore {
 
 constexpr size_t PM_PAGE_SIZE = 4_KB;
@@ -63,8 +70,15 @@ struct PageManager::Impl {
     static constexpr size_t NUM_ADDRESS_PAGES = 1ULL << (40 - PM_PAGE_BITS);
     static constexpr size_t NUM_ADDRESS_LOCKS = NUM_ADDRESS_PAGES / PAGES_PER_LOCK;
     inline static Vulkan::Rasterizer* rasterizer;
+    inline static Impl* instance;
 
-    Impl() = default;
+    Impl() {
+        instance = this;
+        if (const char* e = std::getenv("TLG_PAGE_HISTORY"); e && *e == '1') {
+            history = static_cast<HistoryEntry*>(std::calloc(HISTORY_SIZE, sizeof(HistoryEntry)));
+            std::printf("GPU: page tracking history on\n");
+        }
+    }
     virtual ~Impl() = default;
 
     virtual void OnMap(VAddr address, size_t size) {
@@ -161,13 +175,230 @@ struct PageManager::Impl {
 #endif
     }
 
+    // tlg: a guest access that keeps faulting on one page: each fault reports "handled" while the
+    // page stays closed, so the thread never moves on and the game freezes. Only the fault count
+    // gives it away. The report below says why the page stayed closed; then two steps try to get
+    // the game going again, and what they change tells the cause (TLG_FAULT_LOOP_HEAL=0: report only).
+    static constexpr u64 FAULT_LOOP_REPORT = 20'000;     // about 30 ms
+    static constexpr u64 FAULT_LOOP_REAPPLY = 100'000; // about 150 ms
+    static constexpr u64 FAULT_LOOP_OPEN = 400'000;    // about 600 ms
+    static constexpr u64 FAULT_LOOP_LAST = 500'000;
+
+    static void DumpFaultLoop(void* context, VAddr addr, u64 count, const char* stage) {
+        static std::mutex mutex;
+        std::scoped_lock lock{mutex};
+        const VAddr page_addr = addr & ~u64(PM_PAGE_SIZE - 1);
+        const size_t page = page_addr >> PM_PAGE_BITS;
+        std::printf("FAULT LOOP: %s: %llu faults in a row on %#llx, %s access\n", stage,
+                    static_cast<unsigned long long>(count), static_cast<unsigned long long>(addr),
+                    Common::IsWriteError(context) ? "write" : "read or execute");
+#ifdef _WIN64
+        const auto* info = static_cast<EXCEPTION_POINTERS*>(context);
+        const CONTEXT* cpu = info->ContextRecord;
+        const EXCEPTION_RECORD* rec = info->ExceptionRecord;
+        std::printf("FAULT LOOP: exception %#lx, access kind %llu, thread %lu, at %s\n",
+                    rec->ExceptionCode,
+                    static_cast<unsigned long long>(rec->ExceptionInformation[0]),
+                    GetCurrentThreadId(), DescribeCode(cpu->Rip).c_str());
+        u8 code[16]{};
+        SIZE_T got = 0;
+        ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(cpu->Rip), code,
+                          sizeof(code), &got);
+        std::string bytes;
+        for (SIZE_T i = 0; i < got; ++i) {
+            bytes += fmt::format("{:02x} ", code[i]);
+        }
+        std::printf("FAULT LOOP: code %s\n", bytes.c_str());
+        std::printf("FAULT LOOP: rax %llx rbx %llx rcx %llx rdx %llx rsi %llx rdi %llx rbp %llx rsp %llx\n",
+                    cpu->Rax, cpu->Rbx, cpu->Rcx, cpu->Rdx, cpu->Rsi, cpu->Rdi, cpu->Rbp, cpu->Rsp);
+        std::printf("FAULT LOOP: r8 %llx r9 %llx r10 %llx r11 %llx r12 %llx r13 %llx r14 %llx r15 %llx\n",
+                    cpu->R8, cpu->R9, cpu->R10, cpu->R11, cpu->R12, cpu->R13, cpu->R14, cpu->R15);
+        u64 stack[128]{};
+        got = 0;
+        ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(cpu->Rsp), stack,
+                          sizeof(stack), &got);
+        std::string callers;
+        int shown = 0;
+        for (size_t i = 0; i < got / sizeof(u64) && shown < 16; ++i) {
+            const u64 base = TlgFreeze::guest_base.load(std::memory_order_relaxed);
+            if (base && stack[i] - base < TlgFreeze::guest_size.load(std::memory_order_relaxed)) {
+                callers += fmt::format("{} ", DescribeCode(stack[i]));
+                ++shown;
+            }
+        }
+        std::printf("FAULT LOOP: code addresses on the stack: %s\n", callers.c_str());
+        MEMORY_BASIC_INFORMATION mem{};
+        if (VirtualQuery(reinterpret_cast<const void*>(addr), &mem, sizeof(mem))) {
+            std::printf("FAULT LOOP: OS: base %p size %#llx allocated-protect %#lx protect %#lx state %#lx type %#lx\n",
+                        mem.BaseAddress, static_cast<unsigned long long>(mem.RegionSize),
+                        mem.AllocationProtect, mem.Protect, mem.State, mem.Type);
+        }
+#else
+        const auto* uc = static_cast<ucontext_t*>(context);
+        std::printf("FAULT LOOP: at %s\n",
+                    DescribeCode(static_cast<u64>(uc->uc_mcontext.gregs[REG_RIP])).c_str());
+#endif
+        char guest[256];
+        runtime_memory_describe(addr, guest, sizeof(guest));
+        std::printf("FAULT LOOP: guest memory: %s\n", guest);
+        const PageState state = instance->cached_pages[page];
+        std::printf("FAULT LOOP: page tracking: %u write watchers, %u read watchers, wanted protection %u\n",
+                    state.num_write_watchers, state.num_read_watchers,
+                    static_cast<u32>(state.Perms()));
+        const std::string caches = rasterizer->DescribeFaultState(addr);
+        for (size_t at = 0; at < caches.size();) {
+            const size_t end = std::min(caches.find('\n', at), caches.size());
+            std::printf("FAULT LOOP: %s\n", caches.substr(at, end - at).c_str());
+            at = end + 1;
+        }
+        DumpHistory(page);
+        std::fflush(stdout);
+    }
+
+    static void WatchFaultLoop(void* context, VAddr addr) {
+        static const bool heal = [] { const char* e = std::getenv("TLG_FAULT_LOOP_HEAL"); return !e || *e != '0'; }();
+        thread_local u64 loop_page = 0;
+        thread_local u64 loop_count = 0;
+        thread_local std::chrono::steady_clock::time_point loop_start{};
+        const VAddr page_addr = addr & ~u64(PM_PAGE_SIZE - 1);
+        if (page_addr != loop_page) [[likely]] {
+            if (loop_count >= FAULT_LOOP_REPORT) {
+                std::printf("FAULT LOOP: ended on %#llx after %llu faults (%.1f s)\n",
+                            static_cast<unsigned long long>(loop_page),
+                            static_cast<unsigned long long>(loop_count),
+                            std::chrono::duration<double>(std::chrono::steady_clock::now() - loop_start).count());
+                std::fflush(stdout);
+            }
+            loop_page = page_addr;
+            loop_count = 1;
+            loop_start = std::chrono::steady_clock::now();
+            return;
+        }
+        ++loop_count;
+        if (loop_count < FAULT_LOOP_REPORT) [[likely]] {
+            return;
+        }
+        if (loop_count == FAULT_LOOP_REPORT) {
+            // A page the game legitimately hits once in a while, with no other page between, is no loop.
+            if (std::chrono::steady_clock::now() - loop_start > std::chrono::seconds(2)) {
+                loop_count = 1;
+                loop_start = std::chrono::steady_clock::now();
+                return;
+            }
+            DumpFaultLoop(context, addr, loop_count, "started");
+        } else if (loop_count == FAULT_LOOP_REAPPLY && heal) {
+            // If this ends the loop the OS protection and our counts disagreed.
+            const size_t page = page_addr >> PM_PAGE_BITS;
+            std::scoped_lock lk(instance->locks[page / PAGES_PER_LOCK]);
+            std::printf("FAULT LOOP: step 1: applying the wanted protection to the page again\n");
+            std::fflush(stdout);
+            instance->Protect(page_addr, PM_PAGE_SIZE, instance->cached_pages[page].Perms());
+        } else if (loop_count == FAULT_LOOP_OPEN) {
+            DumpFaultLoop(context, addr, loop_count, "still looping");
+            if (heal) {
+                std::printf("FAULT LOOP: step 2: opening the page by force\n");
+                std::fflush(stdout);
+                runtime_memory_gpu_protect(page_addr, PM_PAGE_SIZE, 1, 1);
+            }
+        } else if (loop_count == FAULT_LOOP_LAST) {
+            DumpFaultLoop(context, addr, loop_count, "still looping with the page open");
+        }
+    }
+
+    // tlg: TLG_PAGE_HISTORY=1 keeps the latest page tracking changes for the report above (who
+    // closed this page and never opened it). Costs 256 MB and holds about 2 minutes; off in benches.
+    static constexpr u64 HISTORY_SIZE = u64{1} << 23;
+    static constexpr u16 HIST_TRACK = 1, HIST_READ = 2, HIST_REGION = 4, HIST_PROTECT = 8;
+    struct HistoryEntry {
+        u64 page;
+        u64 caller;
+        u64 ns;
+        u32 pages;
+        u16 flags; ///< HIST_*; bits 8+ the protection of a HIST_PROTECT entry
+        u16 tid;
+    };
+    inline static HistoryEntry* history = nullptr;
+    inline static std::atomic<u64> history_next{0};
+    inline static thread_local u64 history_caller = 0;
+    inline static thread_local bool history_region = false;
+
+    static u64 HistoryNow() {
+        return static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+
+    static void NoteHistory(u64 page, u64 pages, u16 flags) {
+        if (!history) [[likely]] {
+            return;
+        }
+#ifdef _WIN64
+        const auto tid = static_cast<u16>(GetCurrentThreadId());
+#else
+        const auto tid = static_cast<u16>(syscall(SYS_gettid));
+#endif
+        HistoryEntry& e = history[history_next.fetch_add(1, std::memory_order_relaxed) & (HISTORY_SIZE - 1)];
+        e = {page, history_caller, HistoryNow(), static_cast<u32>(pages), flags, tid};
+    }
+
+    static void DumpHistory(size_t page) {
+        if (!history) {
+            std::printf("FAULT LOOP: no page history (TLG_PAGE_HISTORY=1 keeps one)\n");
+            return;
+        }
+        const u64 next = history_next.load(std::memory_order_relaxed);
+        const u64 oldest = next > HISTORY_SIZE ? next - HISTORY_SIZE : 0;
+        const u64 now = HistoryNow();
+        std::vector<const HistoryEntry*> hits;
+        s64 net_write = 0, net_read = 0;
+        for (u64 i = next; i > oldest; --i) {
+            const HistoryEntry& e = history[(i - 1) & (HISTORY_SIZE - 1)];
+            if (e.page > page || page >= e.page + e.pages) {
+                continue;
+            }
+            if (!(e.flags & HIST_PROTECT)) {
+                (e.flags & HIST_READ ? net_read : net_write) += e.flags & HIST_TRACK ? 1 : -1;
+            }
+            if (hits.size() < 60) {
+                hits.push_back(&e);
+            }
+        }
+        const double span = next ? (now - history[(oldest) & (HISTORY_SIZE - 1)].ns) / 1e9 : 0.0;
+        std::printf("FAULT LOOP: history of this page: holds %.1f s, net in it %lld write, %lld read watchers; latest changes, oldest first:\n",
+                    span, static_cast<long long>(net_write), static_cast<long long>(net_read));
+        for (auto it = hits.rbegin(); it != hits.rend(); ++it) {
+            const HistoryEntry& e = **it;
+            if (e.flags & HIST_PROTECT) {
+                std::printf("FAULT LOOP:   -%.3f s thread %u protect %u pages from %#llx to %u, by %s\n",
+                            (now - e.ns) / 1e9, e.tid, e.pages,
+                            static_cast<unsigned long long>(e.page << PM_PAGE_BITS), e.flags >> 8,
+                            DescribeCode(e.caller).c_str());
+            } else {
+                std::printf("FAULT LOOP:   -%.3f s thread %u %s %s watcher, %u pages from %#llx, %s, by %s\n",
+                            (now - e.ns) / 1e9, e.tid, e.flags & HIST_TRACK ? "add" : "remove",
+                            e.flags & HIST_READ ? "read" : "write", e.pages,
+                            static_cast<unsigned long long>(e.page << PM_PAGE_BITS),
+                            e.flags & HIST_REGION ? "buffer" : "image or readback",
+                            DescribeCode(e.caller).c_str());
+            }
+        }
+    }
+
     static bool GuestFaultSignalHandler(void* context, void* fault_address) {
         const auto start = std::chrono::steady_clock::now();
         const auto addr = reinterpret_cast<VAddr>(fault_address);
         const bool handled = HandleGuestFault(context, addr);
+        {
+            const double ms = std::chrono::duration<double, std::milli>(
+                                  std::chrono::steady_clock::now() - start).count();
+            if (ms >= 50.0) {
+                TlgFreeze::NoteSlow(Common::IsWriteError(context) ? "whole write fault" : "whole read fault",
+                                    addr, ms);
+            }
+        }
         ProfileFault(context, addr, Common::IsWriteError(context),
                      static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                          std::chrono::steady_clock::now() - start).count()));
+        WatchFaultLoop(context, addr);
         return handled;
     }
 
@@ -188,12 +419,35 @@ struct PageManager::Impl {
         return false;
     }
 
+    // tlg: watcher counts are 8 bit: a wrap leaves a closed page with a count of 0.
+    static void NoteWatcherCount(size_t page, u8 count, bool is_read) {
+        static std::atomic<u32> highest{31};
+        static std::atomic<u32> wraps{0};
+        if (count == 0) {
+            if (wraps.fetch_add(1, std::memory_order_relaxed) >= 20) {
+                return;
+            }
+            std::printf("WATCHER COUNT: wrapped on page %#llx (%s watchers)\n",
+                        static_cast<unsigned long long>(page << PM_PAGE_BITS), is_read ? "read" : "write");
+        } else {
+            u32 seen = highest.load(std::memory_order_relaxed);
+            if (count <= seen || !highest.compare_exchange_strong(seen, count, std::memory_order_relaxed)) {
+                return;
+            }
+            std::printf("WATCHER COUNT: new highest %u on page %#llx (%s watchers)\n", count,
+                        static_cast<unsigned long long>(page << PM_PAGE_BITS), is_read ? "read" : "write");
+        }
+        std::fflush(stdout);
+    }
+
     template <bool track, bool is_read>
     void UpdatePageWatchers(VAddr addr, u64 size) {
         RENDERER_TRACE;
 
         size_t page = addr >> PM_PAGE_BITS;
         const u64 page_end = Common::DivCeil(addr + size, PM_PAGE_SIZE);
+        const u16 history_kind = (track ? HIST_TRACK : 0) | (is_read ? HIST_READ : 0) |
+                                 (history_region ? HIST_REGION : 0);
 
         // Acquire locks for the range of pages
         const auto lock_start = locks.begin() + (page / PAGES_PER_LOCK);
@@ -209,6 +463,8 @@ struct PageManager::Impl {
             if (range_bytes > 0) {
                 RENDERER_TRACE;
                 // Perform pending (un)protect action
+                NoteHistory(range_begin, range_bytes >> PM_PAGE_BITS,
+                            HIST_PROTECT | static_cast<u16>(static_cast<u32>(perms) << 8));
                 Protect(range_begin << PM_PAGE_BITS, range_bytes, perms);
                 range_bytes = 0;
                 potential_range_bytes = 0;
@@ -224,11 +480,15 @@ struct PageManager::Impl {
                         aligned_addr, aligned_end);
         }
 
+        NoteHistory(page, page_end - page, history_kind);
         for (; page != page_end; ++page) {
             PageState& state = cached_pages[page];
 
             // Apply the change to the page state
             const u8 new_count = state.AddDelta<track ? 1 : -1, is_read>();
+            if (track && (new_count == 0 || new_count >= 32)) [[unlikely]] {
+                NoteWatcherCount(page, new_count, is_read);
+            }
 
             if (auto new_perms = state.Perms(); new_perms != perms) [[unlikely]] {
                 // If the protection changed add pending (un)protect action
@@ -271,6 +531,21 @@ struct PageManager::Impl {
         size_t base_page = (base_addr >> PM_PAGE_BITS);
         ASSERT(base_page % PAGES_PER_LOCK == 0);
         std::scoped_lock lk(locks[base_page / PAGES_PER_LOCK]);
+        if (history) [[unlikely]] {
+            for (size_t page = start_range.first; page < end_range.second;) {
+                if (!mask.Get(page)) {
+                    ++page;
+                    continue;
+                }
+                size_t run = page;
+                while (run < end_range.second && mask.Get(run)) {
+                    ++run;
+                }
+                NoteHistory(base_page + page, run - page,
+                            (track ? HIST_TRACK : 0) | (is_read ? HIST_READ : 0) | HIST_REGION);
+                page = run;
+            }
+        }
         auto perms = cached_pages[base_page + start_range.first].Perms();
         u64 range_begin = 0;
         u64 range_bytes = 0;
@@ -280,6 +555,8 @@ struct PageManager::Impl {
             if (range_bytes > 0) {
                 RENDERER_TRACE;
                 // Perform pending (un)protect action
+                NoteHistory(range_begin, range_bytes >> PM_PAGE_BITS,
+                            HIST_PROTECT | static_cast<u16>(static_cast<u32>(perms) << 8));
                 Protect((range_begin << PM_PAGE_BITS), range_bytes, perms);
                 range_bytes = 0;
                 potential_range_bytes = 0;
@@ -294,6 +571,9 @@ struct PageManager::Impl {
             // Apply the change to the page state
             const u8 new_count =
                 update ? state.AddDelta<track ? 1 : -1, is_read>() : state.AddDelta<0, is_read>();
+            if (track && update && (new_count == 0 || new_count >= 32)) [[unlikely]] {
+                NoteWatcherCount(base_page + page, new_count, is_read);
+            }
 
             if (auto new_perms = state.Perms(); new_perms != perms) [[unlikely]] {
                 // If the protection changed add pending (un)protect action
@@ -522,11 +802,15 @@ void PageManager::OnGpuUnmap(VAddr address, size_t size) {
 
 template <bool track, bool is_read>
 void PageManager::UpdatePageWatchers(VAddr addr, u64 size) const {
+    Impl::history_caller = reinterpret_cast<u64>(__builtin_return_address(0));
+    Impl::history_region = false;
     impl->UpdatePageWatchers<track, is_read>(addr, size);
 }
 
 template <bool track, bool is_read>
 void PageManager::UpdatePageWatchersForRegion(VAddr base_addr, RegionBits& mask) const {
+    Impl::history_caller = reinterpret_cast<u64>(__builtin_return_address(0));
+    Impl::history_region = true;
     impl->UpdatePageWatchersForRegion<track, is_read>(base_addr, mask);
 }
 

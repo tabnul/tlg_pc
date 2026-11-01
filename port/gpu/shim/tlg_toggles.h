@@ -6,6 +6,9 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <mutex>
+#include <string>
+#include <string_view>
 #ifdef _WIN32
 // tlg (Windows): no signals. The loader's exception handler resumes the faulting thread
 // in tlg_longjmp (src/compat_win.c: no unwinding through the faulting frames).
@@ -128,6 +131,35 @@ inline const bool enabled = [] {
     const char* env = std::getenv("TLG_FRAME_STATS");
     return env && env[0] == '1';
 }();
+/// Write attribution (TLG_WRITE_ATTRIB=1): which shaders mark the most guest memory
+/// GPU-modified, and how much of what a readback brings back the GPU really changed. It takes
+/// a lock per written binding (hundreds a frame) and compares every downloaded byte, so it has
+/// its own flag: benchmarks run with TLG_FRAME_STATS=1 and must never pay this.
+inline const bool write_attrib = [] {
+    const char* env = std::getenv("TLG_WRITE_ATTRIB");
+    return env && env[0] == '1';
+}();
+/// Downloaded bytes compared against the guest memory they replaced, and those that differed.
+inline std::atomic<std::uint64_t> download_compared_bytes{0}, download_changed_bytes{0};
+/// The scene the attribution belongs to. tlg_lua.cpp bumps the epoch at every mission scene
+/// (its "mission" marker), so a report covers one scene instead of a 5 s slice of two.
+inline std::atomic<std::uint64_t> scene_epoch{0};
+inline std::mutex scene_label_mutex;
+inline std::string scene_label{"(boot)"};
+inline void SetScene(std::string_view label) {
+    if (!write_attrib) {
+        return;
+    }
+    {
+        std::scoped_lock lock{scene_label_mutex};
+        scene_label.assign(label);
+    }
+    scene_epoch.fetch_add(1, std::memory_order_release);
+}
+inline std::string SceneLabel() {
+    std::scoped_lock lock{scene_label_mutex};
+    return scene_label;
+}
 struct Timer {
     std::atomic<std::uint64_t>& total;
     std::chrono::steady_clock::time_point start =

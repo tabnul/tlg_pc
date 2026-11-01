@@ -67,6 +67,8 @@ public:
 
     void DispatchDirect();
     void DispatchIndirect(VAddr address, u32 offset, u32 size);
+    /// tlg: the guest sent a sync packet since the last barrier in front of a dispatch.
+    bool guest_sync_pending = true;
 
     void ScopeMarker(fmt::string_view fmt, fmt::format_args args, auto&& func) {
         if (host_markers_enabled) {
@@ -136,6 +138,8 @@ public:
     bool IsGpuSideThreadId(u32 tid) const;
     /// A guest write hit a protected page.
     bool OnWriteFault(VAddr addr, bool assume_locks);
+    /// tlg: the state of one page in both caches, for the fault-loop report.
+    std::string DescribeFaultState(VAddr addr);
     bool ReadMemory(VAddr addr, u64 size, bool assume_locks = false);
     void ProcessDownloadImages();
     bool IsMapped(VAddr addr, u64 size);
@@ -479,6 +483,7 @@ private:
     bool fault_process_pending{};
     bool attachment_feedback_loop{};
     bool needs_barrier{};
+    bool gds_barrier{}; // tlg: this dispatch overlaps earlier GDS access, it keeps its barrier
     // tlg: two-stage draw pipeline (stage B state; the thread is the last member so it
     // stops first).
     static inline thread_local const AmdGpu::Regs* stage_regs = nullptr;

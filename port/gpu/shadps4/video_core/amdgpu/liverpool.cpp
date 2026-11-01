@@ -249,6 +249,38 @@ bool PipelinedOpcode(PM4ItOpcode opcode) {
 } // namespace
 
 namespace {
+void MarkGuestSync(Vulkan::Rasterizer& rasterizer, const u8*) {
+    rasterizer.guest_sync_pending = true;
+}
+
+// tlg: a sync packet in the stream gets the next dispatch its barrier (DispatchRecord).
+void NoteGuestSync(PM4ItOpcode opcode, const PM4Header* header, Vulkan::Rasterizer* rasterizer) {
+    switch (opcode) {
+    case PM4ItOpcode::EventWrite: {
+        const auto type = reinterpret_cast<const PM4CmdEventWrite*>(header)->event_type.Value();
+        if (type == EventType::ZpassDone || type == EventType::SoVgtStreamoutFlush) {
+            return;
+        }
+        break;
+    }
+    case PM4ItOpcode::AcquireMem:
+    case PM4ItOpcode::SurfaceSync:
+    case PM4ItOpcode::PfpSyncMe:
+    case PM4ItOpcode::EventWriteEos:
+    case PM4ItOpcode::EventWriteEop:
+    case PM4ItOpcode::ReleaseMem:
+    case PM4ItOpcode::WaitRegMem:
+    case PM4ItOpcode::MemSemaphore:
+        break;
+    default:
+        return;
+    }
+    if (rasterizer) {
+        const u8 none = 0;
+        rasterizer->RunInOrder(&MarkGuestSync, &none, sizeof(none));
+    }
+}
+
 void SignalEop(const PM4CmdEventWriteEop& eop) {
     eop.SignalFence(
         [](void* address, u64 data, u32 num_bytes) {
@@ -765,6 +797,7 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
         case 3:
             const u32 count = header->type3.NumWords();
             const PM4ItOpcode opcode = header->type3.opcode;
+            NoteGuestSync(opcode, header, rasterizer);
             ApplyGraphicsRegisterPacket(regs, header, gfx_reg_checksum, &pipe_dirty);
             // DmaData to 0x3022C does nothing here (skipped below): no need to wait.
             if (rasterizer && !PipelinedOpcode(opcode) &&
@@ -1423,6 +1456,7 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         }
 
         const PM4ItOpcode opcode = header->type3.opcode;
+        NoteGuestSync(opcode, header, rasterizer);
 
         const auto* it_body = reinterpret_cast<const u32*>(header) + 1;
         switch (opcode) {

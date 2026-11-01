@@ -33,6 +33,20 @@
 #include "sdl_window.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 
+#ifdef _WIN32
+extern "C" __declspec(dllimport) unsigned long __stdcall GetCurrentThreadId();
+#endif
+void TlgFreeze::NoteSlow(const char* what, std::uintptr_t address, double ms) {
+#ifdef _WIN32
+    const unsigned long thread = GetCurrentThreadId();
+#else
+    const unsigned long thread = 0;
+#endif
+    std::printf("SLOW: %.1f ms %s at %#llx, thread %lu\n", ms, what,
+                static_cast<unsigned long long>(address), thread);
+    std::fflush(stdout);
+}
+
 extern "C" {
 // runtime_memory.c
 int runtime_memory_is_mapped(uintptr_t address, uint64_t size);

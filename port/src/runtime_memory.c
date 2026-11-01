@@ -950,6 +950,23 @@ int runtime_memory_region(uintptr_t address, uintptr_t *start, uintptr_t *end, i
     read_unlock();
     return found;
 }
+/* What the guest memory map says about one address, for the GPU fault-loop report. */
+void runtime_memory_describe(uintptr_t address, char *out, size_t size) {
+    read_lock();
+    size_t i=vma_index(address);
+    int used=(i<vma_count && vmas[i].start<=address)
+        ? snprintf(out,size,"vma %#llx-%#llx kind %d guest protection %#x type %d",(unsigned long long)vmas[i].start,(unsigned long long)vmas[i].end,vmas[i].kind,vmas[i].prot,vmas[i].type)
+        : snprintf(out,size,"no vma");
+#ifdef _WIN32
+    size_t r=region_index(address);
+    if (used>0 && (size_t)used<size && r<region_count && regions[r].start<=address)
+        snprintf(out+used,size-used,", host region %#llx-%#llx mapped %d",(unsigned long long)regions[r].start,(unsigned long long)regions[r].end,regions[r].mapped);
+#else
+    (void)used;
+#endif
+    read_unlock();
+}
+
 /* GPU page tracking: restrict host access, never beyond the guest's own protection. */
 void runtime_memory_gpu_protect(uintptr_t address, uint64_t size, int read, int write) {
     read_lock();
@@ -959,7 +976,17 @@ void runtime_memory_gpu_protect(uintptr_t address, uint64_t size, int read, int 
         uintptr_t b=vmas[i].end<address+size ? vmas[i].end : address+size;
         int guest=host_prot(vmas[i].prot);
         int want=(read ? PROT_READ : 0)|(write ? PROT_WRITE|PROT_READ : 0)|(guest & PROT_EXEC);
-        host_protect(a,b-a,guest & want);
+        if (host_protect(a,b-a,guest & want)) {
+            static int failures;
+            if (failures++<20) {
+#ifdef _WIN32
+                unsigned long why=GetLastError();
+#else
+                unsigned long why=errno;
+#endif
+                fprintf(stderr,"Runtime: GPU page protect failed at %#llx size %#llx protection %d (error %lu)\n",(unsigned long long)a,(unsigned long long)(b-a),guest & want,why);
+            }
+        }
     }
     read_unlock();
 }

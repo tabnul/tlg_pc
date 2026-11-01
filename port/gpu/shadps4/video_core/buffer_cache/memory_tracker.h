@@ -35,6 +35,15 @@ public:
             });
     }
 
+    /// tlg: the tracking bits of one page, for the fault-loop report.
+    std::string DescribeFaultState(VAddr address) {
+        std::string out = "buffer tracking: no region";
+        IteratePages<false>(address, 1, [&out](RegionManager* manager, u64 offset, size_t) {
+            out = manager->DescribeBits(offset);
+        });
+        return out;
+    }
+
     /// Returns true if a region has been modified from the GPU
     bool IsRegionGpuModified(VAddr query_cpu_addr, u64 query_size) noexcept {
         return IteratePages<false>(

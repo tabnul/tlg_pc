@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <cstdlib>
+#include <string>
 #include <xxhash.h>
+#include <fmt/format.h>
 #include "video_core/amdgpu/liverpool.h"
 
 #include "tlg_settings.h"
@@ -158,7 +161,7 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
         }
         if (diag) readback_sources.Record(source, waited, wait_ns, size);
     };
-    TlgFreeze::WaitScope wait{"GPU readback", reinterpret_cast<const void*>(address)}; // tlg
+    TlgFreeze::SlowScope wait{"GPU readback", address}; // tlg
     if (assume_locks) resolve();
     else liverpool->SendCommand<true>(resolve);
     return true;
@@ -469,8 +472,8 @@ bool TextureCache::CommitAliasWriter(AliasState& state) {
 void TextureCache::CopyAlias(ImageId src_id, ImageId dst_id, const Extent3D& extent) {
     Image& dst = slot_images[dst_id];
     runtime.CopyAliasImage(&slot_images[src_id], &dst, {extent.width, extent.height, extent.depth});
-    dst.flags |= ImageFlagBits::GpuModified;
-    dst.flags &= ~ImageFlagBits::Dirty;
+    dst.SetFlags(ImageFlagBits::GpuModified);
+    dst.ClearFlags(ImageFlagBits::Dirty);
 }
 
 void TextureCache::PublishAliasWrite(ImageId image_id) {
@@ -531,8 +534,43 @@ void TextureCache::MarkAsMaybeDirty(ImageId image_id, Image& image) {
             runtime_fault_recover = outer_recover;
         }
     }
-    image.flags |= ImageFlagBits::MaybeCpuDirty;
+    image.SetFlags(ImageFlagBits::MaybeCpuDirty);
     UntrackImage(image_id);
+}
+
+std::string TextureCache::DescribeFaultState(VAddr addr) {
+    const VAddr page = PageManager::GetPageAddr(addr);
+    std::string out = fmt::format("readbacks: pending {}", has_pending_readbacks.load());
+    {
+        std::unique_lock readbacks{readback_mutex, std::try_to_lock};
+        if (readbacks) {
+            out += fmt::format(", required tick {}, {} hold a read watcher on the page",
+                               pending_readbacks.RequiredTick(page, u64{4096}),
+                               pending_readbacks.WatchedOn(page, u64{4096}));
+        } else {
+            out += ", lock busy";
+        }
+    }
+    std::unique_lock lock{mutex, std::try_to_lock};
+    if (!lock) {
+        return out + "\nimages: lock busy";
+    }
+    // All images, not only those the page table finds: a tracked image it lost is a suspect too.
+    u64 overlapping = 0, tracking = 0;
+    std::string list;
+    for (Image& image : slot_images) {
+        const bool overlaps = image.Overlaps(page, u64{4096});
+        const bool tracks = image.IsTracked() && image.track_addr < page + u64{4096} &&
+                            page < image.track_addr_end;
+        overlapping += overlaps;
+        tracking += tracks;
+        if ((overlaps || tracks) && overlapping + tracking <= 80) {
+            list += fmt::format("\nimage {:#x} size {:#x} tracked {:#x}-{:#x} flags {:#x} overlaps {} tracks {}",
+                                image.info.guest_address, image.info.guest_size, image.track_addr,
+                                image.track_addr_end, static_cast<u32>(image.flags), overlaps, tracks);
+        }
+    }
+    return out + fmt::format("\nimages: {} on the page, {} with a write watcher on it", overlapping, tracking) + list;
 }
 
 void TextureCache::InvalidateMemory(VAddr addr, size_t size) {
@@ -546,7 +584,7 @@ void TextureCache::InvalidateMemory(VAddr addr, size_t size) {
             // Modified region overlaps image, so the image was definitely accessed by this fault.
             // Untrack the image, so that the range is unprotected and the guest can write freely.
             InvalidateAlias(image);
-            image.flags |= ImageFlagBits::CpuDirty;
+            image.SetFlags(ImageFlagBits::CpuDirty);
             UntrackImage(image_id);
         } else if (pages_end < image_end) {
             // This page access may or may not modify the image.
@@ -579,7 +617,7 @@ void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {
         }
         // Ensure image is reuploaded when accessed again.
         InvalidateAlias(image);
-        image.flags |= ImageFlagBits::GpuDirty;
+        image.SetFlags(ImageFlagBits::GpuDirty);
     });
 }
 
@@ -650,7 +688,7 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
         // Inherit image usage
         auto& new_image = slot_images[new_image_id];
         new_image.usage = cache_image.usage;
-        new_image.flags &= ~ImageFlagBits::Dirty;
+        new_image.ClearFlags(ImageFlagBits::Dirty);
         // When creating a depth buffer through overlap resolution don't clear it on first use.
         new_image.info.meta_info.htile_clear_mask = 0;
         runtime.CopyColorAndDepth(&cache_image, &new_image);
@@ -1039,7 +1077,7 @@ ImageView& TextureCache::FindTexture(ImageId image_id, const ImageDesc& desc, Vi
                                      bool refresh) {
     Image& image = slot_images[image_id];
     if (desc.type == BindingType::Storage) {
-        image.flags |= ImageFlagBits::GpuModified;
+        image.SetFlags(ImageFlagBits::GpuModified);
         if (readback_linear_images && (!image.info.props.is_tiled || image.info.size.width <= 8) &&
             image.info.guest_address != 0) {
             std::unique_lock lk{download_images_mutex};
@@ -1071,7 +1109,7 @@ ImageView& TextureCache::FindTexture(ImageId image_id, const ImageDesc& desc, Vi
 
 ImageView& TextureCache::FindRenderTarget(ImageId image_id, const ImageDesc& desc) {
     Image& image = slot_images[image_id];
-    image.flags |= ImageFlagBits::GpuModified;
+    image.SetFlags(ImageFlagBits::GpuModified);
     if (readback_linear_images && (!image.info.props.is_tiled || image.info.size.width <= 8)) {
         std::unique_lock lk{download_images_mutex};
         download_images.emplace(image_id);
@@ -1097,9 +1135,17 @@ ImageView& TextureCache::FindRenderTarget(ImageId image_id, const ImageDesc& des
     return image.FindView(desc.view_info, false);
 }
 
+static bool StencilLockEnabled() {
+    static const bool enabled = [] {
+        const char* env = std::getenv("TLG_STENCIL_LOCK");
+        return !env || env[0] != '0';
+    }();
+    return enabled;
+}
+
 ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc) {
     Image& image = slot_images[image_id];
-    image.flags |= ImageFlagBits::GpuModified;
+    image.SetFlags(ImageFlagBits::GpuModified);
     image.usage.depth_target = 1u;
     UpdateImage(image_id);
 
@@ -1113,6 +1159,12 @@ ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc
 
     // If there is a stencil attachment, link depth and stencil.
     if (desc.info.stencil_addr != 0) {
+        // tlg: this walks and registers on the GPU thread, next to walks on fault threads.
+        std::unique_lock lock{mutex, std::defer_lock};
+        if (StencilLockEnabled() && !lock.try_lock()) {
+            TlgFreeze::SlowScope slow{"stencil lock"};
+            lock.lock();
+        }
         ImageId stencil_id{};
         ForEachImageInRegion(desc.info.stencil_addr, desc.info.stencil_size,
                              [&](ImageId image_id, Image& image) {
@@ -1130,10 +1182,11 @@ ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc
         }
         Image& stencil_image = slot_images[stencil_id];
         TouchImage(stencil_image);
-        stencil_image.AssociateDepth(image_id, image.image_uid);
+        // tlg: the insert above can move the list when TLG_SLOT_STABLE=0.
+        stencil_image.AssociateDepth(image_id, slot_images[image_id].image_uid);
     }
 
-    return image.FindView(desc.view_info, false);
+    return slot_images[image_id].FindView(desc.view_info, false);
 }
 
 void TextureCache::RefreshImage(Image& image) {
@@ -1172,7 +1225,7 @@ void TextureCache::RefreshImage(Image& image) {
         }
         const u64 hash = XXH3_64bits(src, size);
         if (image.hash == hash) {
-            image.flags &= ~ImageFlagBits::MaybeCpuDirty;
+            image.ClearFlags(ImageFlagBits::MaybeCpuDirty);
             return;
         }
         image.hash = hash;
@@ -1231,7 +1284,7 @@ void TextureCache::RefreshImage(Image& image) {
     }
 
     if (image_copies.empty()) {
-        image.flags &= ~ImageFlagBits::Dirty;
+        image.ClearFlags(ImageFlagBits::Dirty);
         return;
     }
 
@@ -1275,7 +1328,7 @@ void TextureCache::RegisterImage(ImageId image_id) {
     Image& image = slot_images[image_id];
     ASSERT_MSG(False(image.flags & ImageFlagBits::Registered),
                "Trying to register an already registered image");
-    image.flags |= ImageFlagBits::Registered;
+    image.SetFlags(ImageFlagBits::Registered);
     ++registry_generation;
     total_used_memory += Common::AlignUp(image.info.guest_size, 1024);
     image.lru_id = lru_cache.Insert(image_id, gc_tick);
@@ -1291,14 +1344,14 @@ void TextureCache::RegisterImage(ImageId image_id) {
             inserted = result.second;
         }
         ++aliases;
-        candidate.flags |= ImageFlagBits::Aliased;
+        candidate.SetFlags(ImageFlagBits::Aliased);
         if (!IsLiveImage(state->backing, state->backing_uid) ||
             slot_images[state->backing].alias_generation < candidate.alias_generation) {
             state->backing = candidate_id, state->backing_uid = candidate.image_uid;
         }
     });
     if (state) {
-        image.flags |= ImageFlagBits::Aliased;
+        image.SetFlags(ImageFlagBits::Aliased);
         state->members = inserted ? aliases + 1 : state->members + 1;
     }
 
@@ -1310,7 +1363,7 @@ void TextureCache::UnregisterImage(ImageId image_id) {
     Image& image = slot_images[image_id];
     ASSERT_MSG(True(image.flags & ImageFlagBits::Registered),
                "Trying to unregister an already unregistered image");
-    image.flags &= ~ImageFlagBits::Registered;
+    image.ClearFlags(ImageFlagBits::Registered);
     ++registry_generation;
     lru_cache.Free(image.lru_id);
     total_used_memory -= Common::AlignUp(image.info.guest_size, 1024);
@@ -1878,7 +1931,7 @@ void TextureCache::DeleteImage(ImageId image_id) {
         }
         if (state.members <= 2) {
             ForEachAlias(image, [](ImageId, Image& candidate) {
-                candidate.flags &= ~ImageFlagBits::Aliased;
+                candidate.ClearFlags(ImageFlagBits::Aliased);
             });
             alias_states.erase(alias_it);
         } else {

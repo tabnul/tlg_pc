@@ -6,6 +6,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 
 namespace TlgFreeze {
@@ -43,5 +44,31 @@ public:
 
 private:
     bool active = false;
+};
+
+/// tlg: prints a SLOW: line for a wait of 50 ms or more (tlggpu.cpp).
+void NoteSlow(const char* what, std::uintptr_t address, double ms);
+
+/// A marked wait that also reports itself when it took long. Diagnostics.
+class SlowScope {
+public:
+    explicit SlowScope(const char* what_, std::uintptr_t address_ = 0)
+        : wait{what_, reinterpret_cast<const void*>(address_)}, what{what_}, address{address_},
+          start{std::chrono::steady_clock::now()} {}
+    ~SlowScope() {
+        const double ms = std::chrono::duration<double, std::milli>(
+                              std::chrono::steady_clock::now() - start).count();
+        if (ms >= 50.0) {
+            NoteSlow(what, address, ms);
+        }
+    }
+    SlowScope(const SlowScope&) = delete;
+    SlowScope& operator=(const SlowScope&) = delete;
+
+private:
+    WaitScope wait;
+    const char* what;
+    std::uintptr_t address;
+    std::chrono::steady_clock::time_point start;
 };
 } // namespace TlgFreeze

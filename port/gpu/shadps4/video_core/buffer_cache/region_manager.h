@@ -6,7 +6,9 @@
 #include <array>
 #include <chrono>
 #include <cstdlib>
+#include <string>
 
+#include <fmt/format.h>
 #include "tlg_toggles.h"
 #include "common/div_ceil.h"
 #include "common/logging/log.h"
@@ -51,6 +53,14 @@ public:
 
     VAddr GetCpuAddr() const {
         return cpu_addr;
+    }
+
+    /// tlg: one page's tracking bits, for the fault-loop report.
+    std::string DescribeBits(u64 offset) {
+        const size_t page = offset / TRACKER_BYTES_PER_PAGE;
+        return fmt::format("buffer tracking: page {} of region {:#x}: cpu {} gpu {} writeable {} readable {}",
+                           page, cpu_addr, cpu.Get(page), gpu.Get(page), writeable.Get(page),
+                           readable.Get(page));
     }
 
     static constexpr size_t SanitizeAddress(size_t address) {
