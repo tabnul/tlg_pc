@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "Przełącznik testowy ze zgłoszenia #79: oddaje sterownikowi graficznemu bloki pamięci zastąpione większym blokiem. Na awarie „out of memory” krótko po wczytaniu. Domyślnie wyłączone.",
     "launcher.flag_granule": "Grupuj pamięć buforów",
     "launcher.flag_granule_hint": "Poprawka issue #79: pobiera pamięć buforów od sterownika grafiki w większych kawałkach zamiast w wielu małych. Bez niej starsze karty AMD w Windows mogą się zawieszać z błędem „out of memory”. Domyślnie włączone.",
+    "launcher.flag_sema_fast": "Szybsze sygnały między wątkami gry",
+    "launcher.flag_sema_fast_hint": "Poprawka dla issue #41: wątki gry mniej na siebie czekają, kilka procent więcej FPS, najwięcej na wolniejszych procesorach. Domyślnie włączone.",
     "launcher.flag_vk_validation": "Walidacja Vulkan",
     "launcher.flag_vk_validation_hint": "Sprawdza każde wywołanie grafiki. Bardzo wolne i działa tylko z zainstalowanym Vulkan SDK. Dla programistów.",
     "launcher.flags_game": "Eksperymentalne poprawki gry",

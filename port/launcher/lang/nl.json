@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "Testschakelaar uit issue #79: geeft geheugenblokken die door een groter blok zijn vervangen terug aan het grafische stuurprogramma. Voor crashes met \"out of memory\" kort na het laden. Standaard uit.",
     "launcher.flag_granule": "Buffergeheugen bundelen",
     "launcher.flag_granule_hint": "Fix voor issue #79: haalt buffergeheugen in grotere stukken bij de grafische driver in plaats van in veel kleine. Oudere AMD-kaarten op Windows kunnen zonder deze fix crashen met \"out of memory\". Standaard aan.",
+    "launcher.flag_sema_fast": "Snellere signalen tussen gamethreads",
+    "launcher.flag_sema_fast_hint": "Fix voor issue #41: de threads van de game wachten minder op elkaar, een paar procent meer FPS, het meest op tragere CPU's. Standaard aan.",
     "launcher.flag_vk_validation": "Vulkan-validatie",
     "launcher.flag_vk_validation_hint": "Controleert elke grafische aanroep. Erg traag, en werkt alleen met de Vulkan SDK geïnstalleerd. Voor ontwikkelaars.",
     "launcher.flags_game": "Experimentele gamefixes",

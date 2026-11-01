@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "来自问题 #79 的测试开关：将被更大块替换的内存块归还给显卡驱动。用于加载后不久出现的“out of memory”崩溃。默认关闭。",
     "launcher.flag_granule": "合并缓冲区内存",
     "launcher.flag_granule_hint": "修复 issue #79：以较大的块而不是大量小块向显卡驱动申请缓冲区内存。关闭后，Windows 上较旧的 AMD 显卡可能因 \"out of memory\" 崩溃。默认开启。",
+    "launcher.flag_sema_fast": "更快的游戏线程信号",
+    "launcher.flag_sema_fast_hint": "issue #41 修复：游戏线程之间的等待减少，FPS 提高几个百分点，CPU 越慢效果越明显。默认开启。",
     "launcher.flag_vk_validation": "Vulkan 验证",
     "launcher.flag_vk_validation_hint": "检查每个图形调用。非常慢,且仅在安装了 Vulkan SDK 时可用。供开发者使用。",
     "launcher.flags_game": "实验性游戏修复",

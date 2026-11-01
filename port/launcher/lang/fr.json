@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "Option de test du ticket #79 : rend au pilote graphique les blocs de mémoire remplacés par un bloc plus grand. Pour les plantages « out of memory » peu après le chargement. Désactivé par défaut.",
     "launcher.flag_granule": "Regrouper la mémoire tampon",
     "launcher.flag_granule_hint": "Correctif de l'issue #79 : demande la mémoire tampon au pilote graphique en gros morceaux plutôt qu'en nombreux petits. Sans lui, les anciennes cartes AMD sous Windows peuvent planter avec « out of memory ». Activé par défaut.",
+    "launcher.flag_sema_fast": "Signaux plus rapides entre threads du jeu",
+    "launcher.flag_sema_fast_hint": "Correctif de l'issue #41 : les threads du jeu s'attendent moins les uns les autres, quelques pour cent de FPS en plus, surtout sur les processeurs plus lents. Activé par défaut.",
     "launcher.flag_vk_validation": "Validation Vulkan",
     "launcher.flag_vk_validation_hint": "Vérifie chaque appel graphique. Très lent, et ne fonctionne qu’avec le Vulkan SDK installé. Pour les développeurs.",
     "launcher.flags_game": "Correctifs de jeu expérimentaux",

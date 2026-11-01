@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "Opção de teste da issue #79: devolve ao driver gráfico os blocos de memória substituídos por um maior. Para travamentos \"out of memory\" logo após o carregamento. Desativado por padrão.",
     "launcher.flag_granule": "Agrupar memória de buffer",
     "launcher.flag_granule_hint": "Correção da issue #79: pega a memória de buffer do driver gráfico em pedaços maiores em vez de muitos pequenos. Sem ela, placas AMD mais antigas no Windows podem fechar com \"out of memory\". Ligado por padrão.",
+    "launcher.flag_sema_fast": "Sinais mais rápidos entre threads do jogo",
+    "launcher.flag_sema_fast_hint": "Correção da issue #41: as threads do jogo esperam menos umas pelas outras, alguns por cento a mais de FPS, principalmente em CPUs mais lentas. Ligado por padrão.",
     "launcher.flag_vk_validation": "Validação Vulkan",
     "launcher.flag_vk_validation_hint": "Verifica cada chamada gráfica. Muito lento, e só funciona com o Vulkan SDK instalado. Para desenvolvedores.",
     "launcher.flags_game": "Correções experimentais do jogo",

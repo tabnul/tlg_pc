@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "Sorun #79 için test anahtarı: daha büyüğüyle değiştirilen bellek bloklarını grafik sürücüsüne geri verir. Yüklemeden kısa süre sonraki \"out of memory\" çökmeleri için. Varsayılan olarak kapalı.",
     "launcher.flag_granule": "Arabellek belleğini grupla",
     "launcher.flag_granule_hint": "Issue #79 düzeltmesi: arabellek belleğini grafik sürücüsünden çok sayıda küçük parça yerine büyük parçalar halinde alır. Bu olmadan Windows'taki eski AMD kartlar \"out of memory\" ile çökebilir. Varsayılan olarak açık.",
+    "launcher.flag_sema_fast": "Oyun iş parçacıkları arasında daha hızlı sinyaller",
+    "launcher.flag_sema_fast_hint": "Issue #41 düzeltmesi: oyunun iş parçacıkları birbirini daha az bekler, yüzde birkaç daha fazla FPS, en çok yavaş işlemcilerde. Varsayılan olarak açık.",
     "launcher.flag_vk_validation": "Vulkan doğrulaması",
     "launcher.flag_vk_validation_hint": "Her grafik çağrısını denetler. Çok yavaştır ve yalnızca Vulkan SDK kuruluyken çalışır. Geliştiriciler için.",
     "launcher.flags_game": "Deneysel oyun düzeltmeleri",

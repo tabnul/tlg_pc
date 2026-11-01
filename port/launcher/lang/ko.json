@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "이슈 #79의 테스트 스위치: 더 큰 블록으로 교체된 메모리 블록을 그래픽 드라이버에 반환합니다. 로딩 직후 \"out of memory\" 충돌용. 기본값은 꺼짐.",
     "launcher.flag_granule": "버퍼 메모리 묶기",
     "launcher.flag_granule_hint": "Issue #79 수정: 버퍼 메모리를 작은 조각 여러 개 대신 큰 조각으로 그래픽 드라이버에서 가져옵니다. 이것이 없으면 Windows의 구형 AMD 카드에서 \"out of memory\"로 충돌할 수 있습니다. 기본값 켜짐.",
+    "launcher.flag_sema_fast": "게임 스레드 간 더 빠른 신호",
+    "launcher.flag_sema_fast_hint": "issue #41 수정: 게임 스레드끼리 서로 기다리는 시간이 줄어 FPS가 몇 퍼센트 오릅니다. 느린 CPU일수록 효과가 큽니다. 기본값 켜짐.",
     "launcher.flag_vk_validation": "Vulkan 검증",
     "launcher.flag_vk_validation_hint": "모든 그래픽 호출을 검사합니다. 매우 느리며 Vulkan SDK가 설치된 경우에만 작동합니다. 개발자용입니다.",
     "launcher.flags_game": "실험적 게임 수정",

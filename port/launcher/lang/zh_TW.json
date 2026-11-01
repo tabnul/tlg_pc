@@ -57,6 +57,8 @@
     "launcher.flag_arena_free_hint": "來自問題 #79 的測試開關：將被更大區塊取代的記憶體區塊歸還給顯示卡驅動程式。用於載入後不久出現的「out of memory」當機。預設關閉。",
     "launcher.flag_granule": "合併緩衝區記憶體",
     "launcher.flag_granule_hint": "修正 issue #79：以較大的區塊而非大量小區塊向顯示卡驅動程式取得緩衝區記憶體。關閉後，Windows 上較舊的 AMD 顯示卡可能因 \"out of memory\" 當機。預設開啟。",
+    "launcher.flag_sema_fast": "更快的遊戲執行緒訊號",
+    "launcher.flag_sema_fast_hint": "issue #41 修正：遊戲執行緒之間的等待減少，FPS 提高幾個百分點，CPU 越慢效果越明顯。預設開啟。",
     "launcher.flag_vk_validation": "Vulkan 驗證",
     "launcher.flag_vk_validation_hint": "檢查每個圖形呼叫。非常慢,且僅在安裝了 Vulkan SDK 時可用。供開發者使用。",
     "launcher.flags_game": "實驗性遊戲修正",

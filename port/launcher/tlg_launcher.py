@@ -112,6 +112,8 @@ TEXT = {
     'rdna_sem_spin_hint': 'Waits a moment actively before the game thread sleeps, for faster wake-ups. May help RDNA2 systems. Within noise on our test PCs. By @YsraEstudos. Off by default.',
     'rdna_submit_draws': 'Early draw submit',
     'rdna_submit_draws_hint': 'Sends work to the graphics card after every 1024 draws instead of once per frame. AMD cards only. May help RDNA2 cards. By @YsraEstudos. Off by default.',
+    'flag_sema_fast': 'Faster game thread signals',
+    'flag_sema_fast_hint': "Fix for issue #41: the game's threads wait less for each other, a few percent more FPS, most on slower CPUs. On by default.",
     'flag_vk_validation': 'Vulkan validation',
     'flag_vk_validation_hint': 'Checks every graphics call. Very slow, and only works with the Vulkan SDK installed. For developers.',
     'home_soundtrack': 'Soundtrack',
