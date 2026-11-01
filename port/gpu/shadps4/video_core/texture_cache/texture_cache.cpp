@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <atomic>
+#include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <xxhash.h>
@@ -523,16 +526,41 @@ void TextureCache::MarkAsMaybeDirty(ImageId image_id, Image& image) {
         // draw pipe and the draw pipe for this lock (route pulse, 2026-10-27). The read gives up on
         // such a fault instead (runtime_fault_recover); the hash stays 0, so the next refresh
         // uploads the image.
-        const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
+        // TLG_TEST_HASH_FAULT forces that fault: 1 with the unblock below, 2 without it (crashes
+        // on Linux, the bug of issue #25).
+        static const char* const test_fault = std::getenv("TLG_TEST_HASH_FAULT");
+        const u8* addr = test_fault ? nullptr : std::bit_cast<u8*>(image.info.guest_address);
+#ifndef _WIN32
+        // Linux blocks SIGSEGV while its handler runs, and this usually runs inside that handler:
+        // without the unblock the fault kills the process before the recover point is reached.
+        sigset_t fault_signals, old_signals;
+        sigemptyset(&fault_signals);
+        sigaddset(&fault_signals, SIGSEGV);
+        sigaddset(&fault_signals, SIGBUS);
+        if (!test_fault || test_fault[0] != '2') {
+            pthread_sigmask(SIG_UNBLOCK, &fault_signals, &old_signals);
+        } else {
+            pthread_sigmask(SIG_BLOCK, nullptr, &old_signals);
+        }
+#endif
         sigjmp_buf* outer_recover = runtime_fault_recover;
         sigjmp_buf recover;
         if (sigsetjmp(recover, 0)) {
             runtime_fault_recover = outer_recover;
+            static std::atomic<u32> gave_up{0};
+            const u32 count = gave_up.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (count <= 5 || count % 1000 == 0) {
+                std::printf("Texture cache: change check gave up on a fault (%u times)
+", count);
+            }
         } else {
             runtime_fault_recover = &recover;
             image.hash = XXH3_64bits(addr, image.info.guest_size);
             runtime_fault_recover = outer_recover;
         }
+#ifndef _WIN32
+        pthread_sigmask(SIG_SETMASK, &old_signals, nullptr);
+#endif
     }
     image.SetFlags(ImageFlagBits::MaybeCpuDirty);
     UntrackImage(image_id);
