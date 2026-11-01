@@ -95,6 +95,9 @@ TEXT = {
     'aa_off': ('Off', 'Desligado'),
     'aa_dlaa': ('DLAA (NVIDIA RTX)', 'DLAA (NVIDIA RTX)'),
     'aa_fsr3': ('FSR 3.1 Native AA', 'FSR 3.1 AA nativo'),
+    'fg_mode': ('Frame generation', 'Geração de quadros'),
+    'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
+                'Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
     'aa_no_dlss': ('No DLSS on this GPU: DLAA runs as FSR 3.1 Native AA',
                    'Sem DLSS nesta GPU: o DLAA roda como FSR 3.1 AA nativo'),
     'smaa_hint': ('Not recommended: DLAA and FSR 3.1 already smooth the edges; SMAA on top blurs the image and the HUD.',
@@ -380,6 +383,11 @@ INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '1', 'rcas_strength': '75', 'ca
 AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3'))]
 
 
+def fg_mode_of(ini):
+    value = ini.get('frame_generation', '0')
+    return int(value) if value in ('1', '2') else 0
+
+
 def dlss_unsupported(ini):
     # The game writes its DLSS check (dlss_supported); without DLSS, DLAA runs as FSR 3.1.
     return ini.get('dlss_supported') == '0'
@@ -607,6 +615,13 @@ class Launcher:
         self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground='#777', wraplength=320)
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
         self.update_aa_note(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini'))
+        ttk.Label(video, text=self.t('fg_mode')).grid(row=11, column=0, sticky='w', pady=(6, 0))
+        self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS 2x', 'FSR 2x'], state='readonly', width=20)
+        self.fg_box.current(fg_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
+        self.fg_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        ttk.Label(video, text=self.t('fg_hint'), foreground='#777', wraplength=320).grid(
+            row=12, column=0, columnspan=2, sticky='w')
         image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
         image.grid(row=2, column=2, sticky='new', **pad)
         image.columnconfigure(1, weight=1)
@@ -772,6 +787,7 @@ class Launcher:
         self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
         self.update_strength(ini)
         self.aa_box.current(aa_mode_of(ini))
+        self.fg_box.current(fg_mode_of(ini))
         self.update_aa_note(ini)
         if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
             self.graphics_window.destroy()  # its sliders show the old values
@@ -828,6 +844,7 @@ class Launcher:
     def filters_changed(self):
         values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
+        values['frame_generation'] = max(self.fg_box.current(), 0)
         aa = self.aa_box.current()
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         self.update_aa_note(current_ini)

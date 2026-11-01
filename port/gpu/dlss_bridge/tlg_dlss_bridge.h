@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-#define TLG_DLSS_BRIDGE_ABI 1
+#define TLG_DLSS_BRIDGE_ABI 2
 
 typedef void (*TlgDlssLogFn)(int warning, const char* message);
 
@@ -51,6 +51,15 @@ typedef struct TlgDlssEvaluate {
     float sharpness; // 0..1; 0 leaves the output unsharpened
 } TlgDlssEvaluate;
 
+typedef struct TlgDlssFgEvaluate {
+    TlgDlssImage backbuffer; // sampled, the finished frame
+    TlgDlssImage depth;      // sampled, hardware depth
+    TlgDlssImage motion;     // sampled, pixels, current to previous
+    TlgDlssImage output;     // storage, general layout, same size and format as backbuffer
+    int32_t reset;
+    int32_t hdr;
+} TlgDlssFgEvaluate;
+
 typedef struct TlgDlssApi {
     uint32_t abi;
     // UTF-16 paths: the directory with nvngx_dlss.dll, and a writable data directory.
@@ -68,6 +77,12 @@ typedef struct TlgDlssApi {
     // The caller must have waited for the GPU work that used the feature.
     void (*ReleaseFeature)(void);
     void (*Shutdown)(void);
+    // Frame generation (nvngx_dlssg). FgRequest goes before the extension queries.
+    void (*FgRequest)(int32_t wanted);
+    int32_t (*FgAvailable)(void);
+    int32_t (*FgCreate)(VkCommandBuffer command, uint32_t width, uint32_t height, VkFormat format);
+    int32_t (*FgEvaluate)(VkCommandBuffer command, const TlgDlssFgEvaluate* evaluate);
+    void (*FgRelease)(void);
 } TlgDlssApi;
 
 typedef const TlgDlssApi* (*TlgDlssGetApiFn)(void);

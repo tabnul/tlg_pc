@@ -74,8 +74,8 @@ echo "Packaged $(find "$dest/out" -maxdepth 1 -iname '*.dll' | wc -l) DLLs from 
 # (the DLSS SDK license allows shipping nvngx_dlss.dll inside an application). Without them the
 # DLAA setting is greyed out and the game keeps its own anti-aliasing.
 if [[ -f out/tlg_dlss.dll && -f out/nvngx_dlss.dll && -f out/NVIDIA-DLSS-LICENSE.txt ]]; then
-    cp out/tlg_dlss.dll out/nvngx_dlss.dll out/NVIDIA-DLSS-LICENSE.txt "$dest/out/"
-    echo "Packaged DLSS: tlg_dlss.dll, nvngx_dlss.dll"
+    cp out/tlg_dlss.dll out/nvngx_dlss.dll out/nvngx_dlssg.dll out/NVIDIA-DLSS-LICENSE.txt "$dest/out/"
+    echo "Packaged DLSS: tlg_dlss.dll, nvngx_dlss.dll, nvngx_dlssg.dll"
 elif [[ -n ${TLG_REQUIRE_DLSS:-} ]]; then
     echo 'TLG_REQUIRE_DLSS is set but out/tlg_dlss.dll or out/nvngx_dlss.dll is missing: run build_dlss.sh' >&2
     exit 1

@@ -3,9 +3,13 @@
 
 #pragma once
 
+#include <chrono>
+
 #include <deque>
 
 #include <condition_variable>
+
+#include <memory>
 
 #include "core/libraries/videoout/buffer.h"
 #include "video_core/renderer_vulkan/host_passes/fsr_pass.h"
@@ -27,6 +31,8 @@ struct Liverpool;
 
 namespace Vulkan {
 
+class FsrFrameGen;
+
 struct Frame {
     u32 width;
     u32 height;
@@ -39,7 +45,11 @@ struct Frame {
     bool is_hdr{false};
     vk::Format format{}; ///< tlg: FrameFormat() at creation
     u8 id{};
-
+    // tlg: frame generation (setting frame_generation, TLG_FG): the image shown before this frame, made on first use.
+    VmaAllocation fg_allocation{};
+    vk::Image fg_image{};
+    vk::ImageView fg_view{};
+    bool fg_ready{false};
 };
 
 enum SchedulerType {
@@ -110,6 +120,13 @@ private:
 
     void RecreateFrame(Frame* frame, u32 width, u32 height);
 
+    void DestroyFgImage(Frame* frame);
+    /// tlg: records the generated image for a finished frame, when frame generation is on.
+    void RecordFrameGeneration(Frame* frame);
+    /// tlg: blits source to the next swapchain image and presents it. Only the frame's last
+    /// present signals present_done. False: skipped, the swapchain is being rebuilt.
+    bool PresentImage(Frame* frame, vk::Image source, bool last);
+
     void SetExpectedGameSize(s32 width, s32 height);
 
 private:
@@ -129,6 +146,15 @@ private:
     HostPasses::PostFxTimer postfx_timer; ///< tlg: TLG_POSTFX_PROFILE=1
     AmdGpu::Liverpool* liverpool;
     Scheduler draw_scheduler;
+    int fg_state{-1}; ///< tlg: DLSS frame generation: -1 not checked yet, 0 not available, 1 available
+    int fg_active{}, fg_failed{}; ///< tlg: the mode as last seen; the mode that failed
+    bool fg_restart{}; ///< tlg: next evaluate starts over
+    std::unique_ptr<FsrFrameGen> fsr_frame_gen;
+    u32 fg_width{}, fg_height{};
+    vk::Format fg_format{};
+    u64 fg_presented{};
+    std::chrono::steady_clock::time_point fg_last_flip{};
+    float fg_interval_ms{16.6f};
     std::deque<u64> recent_frame_ticks; ///< tlg: TLG_FRAMES_AHEAD bound (PrepareFrame)
     Scheduler present_scheduler;
     Scheduler flip_scheduler;

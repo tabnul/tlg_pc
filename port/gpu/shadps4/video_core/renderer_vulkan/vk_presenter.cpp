@@ -15,6 +15,10 @@
 #include "tlg_overlay.h"
 #include "tlg_settings.h"
 #include "tlg_graphics.h"
+#include <thread>
+
+#include "video_core/renderer_vulkan/vk_dlss.h"
+#include "video_core/renderer_vulkan/vk_fsr_frame_gen.h"
 #include "video_core/renderer_vulkan/vk_temporal_upscaler.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 #include "video_core/renderer_vulkan/vk_warmup_inbox.h"
@@ -221,6 +225,7 @@ Presenter::~Presenter() {
     draw_scheduler.Finish();
     present_scheduler.Finish();
     flip_scheduler.Finish();
+    fsr_frame_gen.reset();
     Check(draw_scheduler.CommandBuffer().reset());
     Check(present_scheduler.CommandBuffer().reset());
     Check(flip_scheduler.CommandBuffer().reset());
@@ -229,6 +234,7 @@ Presenter::~Presenter() {
     for (auto& frame : present_frames) {
         vmaDestroyImage(instance.GetAllocator(), frame.image, frame.allocation);
         device.destroyImageView(frame.image_view);
+        DestroyFgImage(&frame);
         device.destroyFence(frame.present_done);
     }
 }
@@ -237,8 +243,167 @@ bool Presenter::IsVideoOutSurface(const AmdGpu::ColorBuffer& color_buffer) const
     return std::ranges::find(vo_buffers_addr, color_buffer.Address()) != vo_buffers_addr.cend();
 }
 
+void Presenter::DestroyFgImage(Frame* frame) {
+    if (frame->fg_view) {
+        instance.GetDevice().destroyImageView(frame->fg_view);
+        frame->fg_view = nullptr;
+    }
+    if (frame->fg_image) {
+        vmaDestroyImage(instance.GetAllocator(), frame->fg_image, frame->fg_allocation);
+        frame->fg_image = nullptr;
+    }
+}
+
+void Presenter::RecordFrameGeneration(Frame* frame) {
+    if (fg_state < 0) {
+        Dlss* dlss = Dlss::Get();
+        fg_state = dlss && dlss->FgAvailable() ? 1 : 0;
+        std::printf("Frame generation: %s\n", fg_state ? "available" : "not available");
+    }
+    TemporalUpscaler::FgInputs inputs{};
+    const bool have_inputs = rasterizer->GetUpscaler().TakeFgInputs(inputs);
+    // Live switch. A change frees the old data; on starts without the old frames. A failed mode
+    // stays off until the setting changes.
+    const int setting = TlgSettings::Get().frame_generation;
+    if (setting != fg_failed) {
+        fg_failed = 0;
+    }
+    const int mode = setting == fg_failed || (setting == 1 && !fg_state) ? 0 : setting;
+    if (mode != fg_active) {
+        static constexpr const char* names[] = {"off", "DLSS", "FSR"};
+        std::printf("Frame generation: %s\n", names[mode]);
+        fg_active = mode;
+        fg_restart = mode != 0;
+        if (fg_width || fsr_frame_gen) {
+            draw_scheduler.EndRendering();
+            draw_scheduler.Finish();
+            if (fg_width) {
+                Dlss::Get()->FgRelease();
+                fg_width = 0;
+            }
+            fsr_frame_gen.reset();
+        }
+    }
+    if (!have_inputs || !mode) {
+        return;
+    }
+    // Storage writes need a format without sRGB: the default 10-bit frame qualifies.
+    if (frame->format != vk::Format::eA2B10G10R10UnormPack32) {
+        std::printf("Frame generation: off, needs the 10-bit frame format\n");
+        fg_failed = mode;
+        return;
+    }
+    if (!frame->fg_image) {
+        const vk::ImageCreateInfo image_info = {
+            .imageType = vk::ImageType::e2D,
+            .format = frame->format,
+            .extent = {frame->width, frame->height, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = vk::SampleCountFlagBits::e1,
+            .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc |
+                     vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        };
+        const VmaAllocationCreateInfo alloc_info = {
+            .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT,
+            .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        };
+        VkImage image{};
+        const VkImageCreateInfo unsafe_info = static_cast<VkImageCreateInfo>(image_info);
+        if (vmaCreateImage(instance.GetAllocator(), &unsafe_info, &alloc_info, &image,
+                           &frame->fg_allocation, nullptr) != VK_SUCCESS) {
+            std::printf("Frame generation: off, no memory for the generated image\n");
+            fg_failed = mode;
+            return;
+        }
+        frame->fg_image = vk::Image{image};
+        frame->fg_view = Check<"create generated frame view">(instance.GetDevice().createImageView({
+            .image = frame->fg_image,
+            .viewType = vk::ImageViewType::e2D,
+            .format = frame->format,
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        }));
+    }
+    draw_scheduler.EndRendering();
+    Dlss* dlss = Dlss::Get();
+    if (mode == 2) {
+        if (!fsr_frame_gen) {
+            fsr_frame_gen = std::make_unique<FsrFrameGen>(instance, draw_scheduler);
+        }
+    } else if (fg_width != frame->width || fg_height != frame->height ||
+               fg_format != frame->format) {
+        draw_scheduler.Finish();
+        if (!dlss->FgCreate(draw_scheduler.CommandBuffer(), frame->width, frame->height,
+                            frame->format)) {
+            std::printf("Frame generation: off, NVIDIA refused to create it\n");
+            fg_failed = mode;
+            return;
+        }
+        fg_width = frame->width;
+        fg_height = frame->height;
+        fg_format = frame->format;
+    }
+    const auto cmdbuf = draw_scheduler.CommandBuffer();
+    const auto all = vk::PipelineStageFlagBits2::eAllCommands;
+    const std::array barriers{
+        vk::ImageMemoryBarrier2{
+            .srcStageMask = all,
+            .srcAccessMask = vk::AccessFlagBits2::eMemoryWrite,
+            .dstStageMask = all,
+            .dstAccessMask = vk::AccessFlagBits2::eMemoryRead,
+            .oldLayout = vk::ImageLayout::eGeneral,
+            .newLayout = vk::ImageLayout::eGeneral,
+            .image = frame->image,
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        },
+        vk::ImageMemoryBarrier2{
+            .srcStageMask = all,
+            .srcAccessMask = vk::AccessFlagBits2::eNone,
+            .dstStageMask = all,
+            .dstAccessMask = vk::AccessFlagBits2::eMemoryWrite,
+            .oldLayout = vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eGeneral,
+            .image = frame->fg_image,
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        },
+    };
+    cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = u32(barriers.size()),
+                             .pImageMemoryBarriers = barriers.data()});
+    const auto color = vk::ImageAspectFlagBits::eColor;
+    const Dlss::FgFrame fg_frame{
+        {frame->image, frame->image_view, frame->format, color, frame->width, frame->height},
+        {inputs.depth, inputs.depth_view, inputs.depth_format, vk::ImageAspectFlagBits::eDepth,
+         inputs.width, inputs.height},
+        {inputs.motion, inputs.motion_view, inputs.motion_format, color, inputs.width,
+         inputs.height},
+        {frame->fg_image, frame->fg_view, frame->format, color, frame->width, frame->height},
+        inputs.reset || fg_restart,
+        frame->is_hdr,
+    };
+    if (mode == 2) {
+        if (!fsr_frame_gen->Record(frame->image, frame->fg_image, frame->width, frame->height,
+                                   inputs, inputs.reset || fg_restart, frame->is_hdr,
+                                   fg_interval_ms)) {
+            fg_failed = mode;
+            return;
+        }
+    } else if (!dlss->FgEvaluate(cmdbuf, fg_frame)) {
+        std::printf("Frame generation: off, evaluation failed\n");
+        fg_failed = mode;
+        return;
+    }
+    const vk::MemoryBarrier2 done{.srcStageMask = all,
+                                  .srcAccessMask = vk::AccessFlagBits2::eMemoryWrite,
+                                  .dstStageMask = all,
+                                  .dstAccessMask = vk::AccessFlagBits2::eMemoryRead};
+    cmdbuf.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &done});
+    frame->fg_ready = !inputs.reset && !fg_restart;
+    fg_restart = false;
+}
+
 void Presenter::RecreateFrame(Frame* frame, u32 width, u32 height) {
     const vk::Device device = instance.GetDevice();
+    DestroyFgImage(frame);
     if (frame->image_view) {
         device.destroyImageView(frame->image_view);
     }
@@ -611,6 +776,8 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
         ++frame_dump_index;
     }
 
+    RecordFrameGeneration(frame);
+
     // Flush frame creation commands.
     frame->ready_semaphore = draw_scheduler.GetWorkSemaphore()->Handle();
     frame->ready_tick = draw_scheduler.CurrentTick();
@@ -768,46 +935,25 @@ void Presenter::PresentLoadingFrame() {
     present_scheduler.Finish();
 }
 
-void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame) {
-    // Free the frame for reuse
-    const auto free_frame = [&] {
-        if (!is_reusing_frame) {
-            last_submit_frame = frame;
-            std::scoped_lock fl{free_mutex};
-            free_queue.push(frame);
-            free_cv.notify_one();
-        }
-    };
-
-    // tlg: a minimized window has no pixels on Windows (0x0); keep the swapchain and skip
-    // presenting until the window is restored.
-    if (window.GetWidth() == 0 || window.GetHeight() == 0) {
-        free_frame();
-        return;
-    }
-
-    // Recreate the swapchain if the window was resized.
-    swapchain.UpdateVsync();
-    if (window.GetWidth() != swapchain.GetWidth() || window.GetHeight() != swapchain.GetHeight()) {
-        swapchain.Recreate(window.GetWidth(), window.GetHeight());
-    }
-
+bool Presenter::PresentImage(Frame* frame, vk::Image source, bool last) {
     if (!swapchain.AcquireNextImage()) {
         swapchain.Recreate(window.GetWidth(), window.GetHeight());
         if (!swapchain.AcquireNextImage()) {
             // User resizes the window too fast and GPU can't keep up. Skip this frame.
             LOG_WARNING(Render_Vulkan, "Skipping frame!");
-            free_frame();
-            return;
+            return false;
         }
     }
 
     // Reset fence for queue submission. Do it here instead of GetRenderFrame() because we may
     // skip frame because of slow swapchain recreation. If a frame skip occurs, we skip signal
     // the frame's present fence and future GetRenderFrame() call will hang waiting for this frame.
-    const auto reset_result = instance.GetDevice().resetFences(frame->present_done);
-    ASSERT_MSG(reset_result == vk::Result::eSuccess,
-               "Unexpected error resetting present done fence: {}", vk::to_string(reset_result));
+    if (last) {
+        const auto reset_result = instance.GetDevice().resetFences(frame->present_done);
+        ASSERT_MSG(reset_result == vk::Result::eSuccess,
+                   "Unexpected error resetting present done fence: {}",
+                   vk::to_string(reset_result));
+    }
 
     // tlg: the game frame is blitted (letterboxed) straight into the swapchain image.
     const vk::Image swapchain_image = swapchain.Image();
@@ -848,7 +994,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                 .newLayout = vk::ImageLayout::eTransferSrcOptimal,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = frame->image,
+                .image = source,
                 .subresourceRange = color_range,
             },
         };
@@ -874,7 +1020,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
             cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
                                    vk::DependencyFlagBits::eByRegion, clear_done, {}, {});
         }
-        cmdbuf.blitImage(frame->image, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
+        cmdbuf.blitImage(source, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
                          vk::ImageLayout::eTransferDstOptimal,
                          MakeImageBlit(frame->width, frame->height, fit.extent.width,
                                        fit.extent.height, fit.offset.x, fit.offset.y),
@@ -902,7 +1048,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                 .newLayout = vk::ImageLayout::eGeneral,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = frame->image,
+                .image = source,
                 .subresourceRange = color_range,
             },
         };
@@ -936,7 +1082,9 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     info.AddWait(swapchain.GetImageAcquiredSemaphore());
     info.AddWait(frame->ready_semaphore, frame->ready_tick);
     info.AddSignal(swapchain.GetPresentReadySemaphore());
-    info.AddSignal(frame->present_done);
+    if (last) {
+        info.AddSignal(frame->present_done);
+    }
     scheduler.Flush(info);
 
     // Present to swapchain.
@@ -948,6 +1096,62 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     if (recreate) {
         // Out of date: rebuild outside the present lock (Create takes the queue lock itself).
         swapchain.Recreate(window.GetWidth(), window.GetHeight());
+    }
+    return true;
+}
+
+void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame) {
+    // Free the frame for reuse
+    const auto free_frame = [&] {
+        if (!is_reusing_frame) {
+            last_submit_frame = frame;
+            std::scoped_lock fl{free_mutex};
+            free_queue.push(frame);
+            free_cv.notify_one();
+        }
+    };
+
+    // tlg: a minimized window has no pixels on Windows (0x0); keep the swapchain and skip
+    // presenting until the window is restored.
+    if (window.GetWidth() == 0 || window.GetHeight() == 0) {
+        free_frame();
+        return;
+    }
+
+    // Recreate the swapchain if the window was resized.
+    swapchain.UpdateVsync();
+    if (window.GetWidth() != swapchain.GetWidth() || window.GetHeight() != swapchain.GetHeight()) {
+        swapchain.Recreate(window.GetWidth(), window.GetHeight());
+    }
+
+    // tlg: frame generation: the generated image now, the real frame half a frame later.
+    const auto flip_time = std::chrono::steady_clock::now();
+    if (frame->fg_ready && !is_reusing_frame) {
+        const float gap_ms =
+            std::chrono::duration<float, std::milli>(flip_time - fg_last_flip).count();
+        if (gap_ms > 0.0f && gap_ms < 100.0f) {
+            fg_interval_ms += (gap_ms - fg_interval_ms) * 0.1f;
+        }
+        if (PresentImage(frame, frame->fg_image, false)) {
+            const auto target = std::chrono::steady_clock::now() +
+                                std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                    std::chrono::duration<float, std::milli>(fg_interval_ms * 0.5f));
+            while (std::chrono::steady_clock::now() < target) {
+                std::this_thread::yield();
+            }
+            if (++fg_presented % 600 == 0) {
+                std::printf("Frame generation: %llu generated, %.1f ms per game frame\n",
+                            static_cast<unsigned long long>(fg_presented), fg_interval_ms);
+            }
+        }
+    }
+    if (!is_reusing_frame) {
+        fg_last_flip = flip_time;
+    }
+
+    if (!PresentImage(frame, frame->image, true)) {
+        free_frame();
+        return;
     }
 
     free_frame();
@@ -976,6 +1180,8 @@ Frame* Presenter::GetRenderFrame() {
         result = device.waitForFences(frame->present_done, false, std::numeric_limits<u64>::max());
         return result;
     };
+
+    frame->fg_ready = false;
 
     // Wait for the presentation to be finished so all frame resources are free
     while (wait() != vk::Result::eSuccess) {

@@ -50,7 +50,7 @@ done
 # setting is greyed out and the game keeps its own anti-aliasing.
 if [[ -f out/libtlg_dlss.so && -f out/NVIDIA-DLSS-LICENSE.txt ]] && compgen -G 'out/libnvidia-ngx-dlss.so.*' >/dev/null; then
     strip -o "$dest/out/libtlg_dlss.so" out/libtlg_dlss.so
-    cp out/libnvidia-ngx-dlss.so.* out/NVIDIA-DLSS-LICENSE.txt "$dest/out/"
+    cp out/libnvidia-ngx-dlss.so.* out/libnvidia-ngx-dlssg.so.* out/NVIDIA-DLSS-LICENSE.txt "$dest/out/"
     echo "Packaged DLSS: libtlg_dlss.so, $(cd out && echo libnvidia-ngx-dlss.so.*)"
 elif [[ -n ${TLG_REQUIRE_DLSS:-} ]]; then
     echo 'TLG_REQUIRE_DLSS is set but the DLSS bridge is missing from out/: run build_dlss.sh' >&2

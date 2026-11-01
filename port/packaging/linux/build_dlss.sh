@@ -10,6 +10,6 @@ cmake -S gpu/dlss_bridge -B out/dlss-bridge -G Ninja -DCMAKE_BUILD_TYPE=Release 
     -DDLSS_SDK_ROOT="$sdk" -DVULKAN_INCLUDE="$(pkg-config --variable=includedir vulkan)"
 cmake --build out/dlss-bridge
 cp out/dlss-bridge/libtlg_dlss.so out/
-cp "$sdk"/lib/Linux_x86_64/rel/libnvidia-ngx-dlss.so.* out/
+cp "$sdk"/lib/Linux_x86_64/rel/libnvidia-ngx-dlss.so.* "$sdk"/lib/Linux_x86_64/rel/libnvidia-ngx-dlssg.so.* out/
 cp "$sdk/LICENSE.txt" out/NVIDIA-DLSS-LICENSE.txt
 echo "DLSS bridge ready: out/libtlg_dlss.so, $(cd out && echo libnvidia-ngx-dlss.so.*)"

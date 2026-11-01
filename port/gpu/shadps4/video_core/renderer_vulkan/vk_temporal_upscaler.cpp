@@ -1095,6 +1095,32 @@ bool TemporalUpscaler::RecordReactive(vk::ImageView color_view) {
     return true;
 }
 
+bool TemporalUpscaler::TakeFgInputs(FgInputs& inputs) {
+    if (!std::exchange(fg_pending, false)) {
+        return false;
+    }
+    auto& depth = texture_cache.GetImage(fg_depth);
+    scheduler.EndRendering();
+    runtime.Transit(&depth, vk::ImageLayout::eGeneral, vk::PipelineStageFlagBits2::eAllCommands,
+                    vk::AccessFlagBits2::eShaderRead);
+    runtime.FlushBarriers();
+    const float sign = TlgToggle::Disabled(1u << 26) ? -1.0f : 1.0f;
+    inputs = {depth.GetImage(),
+              CachedView(depth, depth.info.pixel_format, vk::ImageAspectFlagBits::eDepth),
+              depth.info.pixel_format,
+              vk::Image(motion_image),
+              *motion_view,
+              vk::Format::eR16G16Sfloat,
+              depth.info.size.width,
+              depth.info.size.height,
+              fg_reset,
+              sign * fg_jitter[0],
+              sign * fg_jitter[1],
+              CameraValue(camera_motion.Near(), 0.1f),
+              CameraValue(camera_motion.VerticalFov(), 1.0f, 3.0f)};
+    return true;
+}
+
 void TemporalUpscaler::RunGameMotion() {
     auto& color = texture_cache.GetImage(game_frame.scene);
     auto& motion = texture_cache.GetImage(game_frame.motion);
@@ -1188,6 +1214,10 @@ void TemporalUpscaler::RunGameMotion() {
     } else {
         ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
     }
+    fg_pending = true;
+    fg_reset = reset;
+    fg_jitter = game_frame.jitter;
+    fg_depth = game_frame.depth;
     reset = false;
     game_reset = false;
     last_game_motion = now;
