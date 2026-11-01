@@ -206,7 +206,7 @@ well (`build_dlss.sh`).
   upscale model (CC BY-NC-SA 4.0), and Microsoft's
   [DirectXTex](https://github.com/microsoft/DirectXTex) for texture compression.
 - NVIDIA DLSS, under the NVIDIA DLSS license.
-- [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
+- [UniversalScalers-Vulkan](https://github.com/FireBurn/UniversalScalers-Vulkan) (formerly FSR-Vulkan) by Mike Lothian (@FireBurn), AMD FSR 3.1 and
   FSR 4 on Vulkan, which FSR 3.1 Native AA and FSR frame generation run on. Thank you!
 - Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
   another program's DLL already sits in the PS4 address range

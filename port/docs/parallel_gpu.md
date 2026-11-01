@@ -230,7 +230,7 @@ State after this work, standing still, `TLG_FPS_LIMIT=0`, FSR 4: 82–85 FPS; GP
 
 ## LTO and PGO (2026-09-30)
 
-`build.sh` builds `libtlggpu` with LTO (`-flto=auto`, also for sirit and FSR-Vulkan linked
+`build.sh` builds `libtlggpu` with LTO (`-flto=auto`, also for sirit and UniversalScalers-Vulkan linked
 into it) and, when `pgo/` holds a profile, with `-fprofile-use` (`-fprofile-partial-training
 -fprofile-correction`; functions changed since the profile compile without it). No `-march`:
 the same build runs on the Steam Deck.

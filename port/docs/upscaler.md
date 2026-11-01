@@ -127,7 +127,7 @@ The previous frame's matrices are not in the frame; the port has to keep them.
 
 - Camera motion vectors: verified by reprojecting the previous frame (`TLG_DEBUG_MOTION=1`,
   toggles 1<<22 reprojected frame, 1<<23 error map): static geometry matches.
-- FSR 3.1 (`TLG_UPSCALER=fsr3`, FireBurn/FSR-Vulkan submodule): scene color before the
+- FSR 3.1 (`TLG_UPSCALER=fsr3`, FireBurn/UniversalScalers-Vulkan submodule): scene color before the
   post-processing combine (compute shader 9a9cf8a9), 1:1, RGB written back (the game keeps data
   in the alpha). Toggle 1<<24 switches it off at run time.
 - Jitter: viewport offset of scene geometry (drawn with the scene depth, not full-screen

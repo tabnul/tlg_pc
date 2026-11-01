@@ -15,7 +15,7 @@ namespace Vulkan {
 class Instance;
 class Scheduler;
 
-/// tlg: AMD FSR 3 frame generation, through FSR-Vulkan by @FireBurn. It only takes 16-bit color and
+/// tlg: AMD FSR 3 frame generation, through UniversalScalers-Vulkan by @FireBurn. It only takes 16-bit color and
 /// float depth, so the frame and the depth pass through copies owned here.
 class FsrFrameGen {
 public:
