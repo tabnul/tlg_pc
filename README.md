@@ -74,6 +74,11 @@ It replaces the game's SMAA and removes most of the shimmer on foliage, feathers
 default on RTX cards. **FSR 3.1 Native AA** does the same with AMD FSR on any card. F8 switches
 between the chosen anti-aliasing and the original SMAA. See [docs/dlaa.md](docs/dlaa.md).
 
+**Frame generation.** DLSS frame generation (NVIDIA RTX 40 or newer) or FSR 3.1 frame generation
+(not tied to one brand) adds one generated image per game frame, which doubles the frames shown.
+Off by default; switch it in the launcher or the in-game menu. Tested on an RTX 5090 on Windows
+only. Turning DLSS frame generation off while playing can crash the game, so restart to turn it off.
+
 **Any resolution and aspect ratio.** The game renders at the window's resolution, including 21:9
 and 32:9. At 21:9 the menus, hints and subtitles are laid out for the wider screen instead of
 being stretched. 32:9 is experimental: the game runs, but some overlays sit to the left and parts

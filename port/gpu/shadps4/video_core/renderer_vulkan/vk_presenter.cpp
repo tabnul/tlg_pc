@@ -270,7 +270,7 @@ void Presenter::RecordFrameGeneration(Frame* frame) {
     }
     const int mode = setting == fg_failed || (setting == 1 && !fg_state) ? 0 : setting;
     if (mode != fg_active) {
-        static constexpr const char* names[] = {"off", "DLSS", "FSR"};
+        static constexpr const char* names[] = {"off", "DLSS", "FSR 3.1"};
         std::printf("Frame generation: %s\n", names[mode]);
         fg_active = mode;
         fg_restart = mode != 0;

@@ -68,7 +68,7 @@ MENU = [
            'DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
            'Mostra uma imagem gerada entre dois quadros do jogo: movimento mais suave, um pouco mais de atraso de entrada. '
            'DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
-          choices=(('0', 'Off', 'Desligado'), ('1', 'DLSS 2x', 'DLSS 2x'), ('2', 'FSR 2x', 'FSR 2x'))),
+          choices=(('0', 'Off', 'Desligado'), ('1', 'DLSS', 'DLSS'), ('2', 'FSR 3.1', 'FSR 3.1'))),
     _menu('Image', 'hdr', 'bool', '1', ('HDR', 'HDR'),
           ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
            'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '

@@ -616,7 +616,7 @@ class Launcher:
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
         self.update_aa_note(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini'))
         ttk.Label(video, text=self.t('fg_mode')).grid(row=11, column=0, sticky='w', pady=(6, 0))
-        self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS 2x', 'FSR 2x'], state='readonly', width=20)
+        self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS', 'FSR 3.1'], state='readonly', width=20)
         self.fg_box.current(fg_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
         self.fg_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
