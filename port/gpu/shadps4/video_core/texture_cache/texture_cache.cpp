@@ -550,8 +550,7 @@ void TextureCache::MarkAsMaybeDirty(ImageId image_id, Image& image) {
             static std::atomic<u32> gave_up{0};
             const u32 count = gave_up.fetch_add(1, std::memory_order_relaxed) + 1;
             if (count <= 5 || count % 1000 == 0) {
-                std::printf("Texture cache: change check gave up on a fault (%u times)
-", count);
+                std::printf("Texture cache: change check gave up on a fault (%u times)\n", count);
             }
         } else {
             runtime_fault_recover = &recover;
