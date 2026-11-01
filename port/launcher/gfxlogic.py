@@ -94,10 +94,10 @@ def matching_preset(settings, states):
 
 
 # --------------------------------------------------------------------------------- VRAM budget
-# The Tk launcher's advice (#104): 5000 MB for every card with 6 GB or more. A higher budget is not
-# faster: the texture cache is only cleaned when it gets full, so old textures pile up and slow the
-# game down over a long session. Smaller cards follow the old 6 GB = 5600 line (4 GB: 3700).
-BUDGET_DEFAULT = 5000
+# The Tk launcher's advice: 7000 MB for every card with 8 GB or more. A lower budget throws textures
+# away all the time; a higher one is not faster, because the texture cache is only cleaned when it
+# gets full. Smaller cards follow the old 6 GB = 5600 line (4 GB: 3700).
+BUDGET_DEFAULT = 7000
 BUDGET_MIN, BUDGET_MAX = 2000, 24000      # the Tk spin box range
 
 

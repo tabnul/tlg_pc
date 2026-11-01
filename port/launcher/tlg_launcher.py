@@ -63,25 +63,30 @@ TEXT = {
     'skip_logos': ('Skip the boot logos', 'Pular os logotipos de abertura'),
     'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
     'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),
+    'debug_logging': ('Advanced logging (for bug reports)', 'Registro avançado (para relatar erros)'),
+    'debug_logging_hint': ('Can cost some FPS and makes the log bigger. Turn it on, make the problem happen, close the game, '
+                           'send the newest file from the Logs folder, then turn it off again.',
+                           'Pode reduzir um pouco o FPS e deixa o log maior. Ligue, faça o problema acontecer, feche o jogo, '
+                           'envie o arquivo mais recente da Pasta de logs e depois desligue.'),
     'debug_hint': ('Level select: hold L1 while the title menu closes (Continue/New Game). QA menu: in game, hold L1 and press L3. '
                    'GoldHEN patches by illusionyy and DanielSvoboda.',
                    'Seleção de fases: segure L1 enquanto o menu inicial fecha (Continuar/Novo jogo). Menu de QA: no jogo, segure L1 e aperte L3. '
                    'Patches GoldHEN de illusionyy e DanielSvoboda.'),
     'show_fps': ('Show FPS overlay at start (F10 toggles)', 'Mostrar overlay de FPS ao iniciar (F10 alterna)'),
     'vram': ('Texture cache budget (MB of VRAM)', 'Orçamento do cache de texturas (MB de VRAM)'),
-    'vram_hint': ('5000 suits every card with 6 GB or more: keep it there, also on a big card. Do not set it higher: the cache is only cleaned when it gets full, '
+    'vram_hint': ('7000 suits every card with 8 GB or more: keep it there, also on a big card. A low budget throws textures away all the time; higher is not faster: the cache is only cleaned when it gets full, '
                   'so a high budget lets old textures pile up and slows the game down over a long session. '
-                  'Only lower it if your card needs it: less than 6 GB of VRAM (4 GB card: 3700). This is video card memory (VRAM), not RAM.',
-                  '5000 serve para toda placa com 6 GB ou mais: deixe assim, também numa placa grande. Não aumente: o cache só é limpo quando enche, '
+                  'Only lower it if your card has less than 8 GB of VRAM (6 GB: 5600, 4 GB: 3700). This is video card memory (VRAM), not RAM.',
+                  '7000 serve para toda placa com 8 GB ou mais: deixe assim, também numa placa grande. Um orçamento baixo descarta texturas o tempo todo; mais alto não é mais rápido: o cache só é limpo quando enche, '
                   'então um orçamento alto deixa texturas antigas se acumularem e deixa o jogo mais lento numa sessão longa. '
-                  'Só diminua se a sua placa precisar: menos de 6 GB de VRAM (placa de 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
+                  'Só diminua se a sua placa tiver menos de 8 GB de VRAM (6 GB: 5600, 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
     'texture_cleanup': ('Clean up textures after each load',
                         'Limpar texturas após cada carregamento'),
     'texture_cleanup_hint': ('Frees the textures of earlier stages all at once after each stage or checkpoint load. Not needed any more: since the texture cache '
-                             'cleanup was fixed (issue #104), old textures no longer pile up with the budget at 5000. It can cause a short stutter after a load, '
+                             'cleanup was fixed (issue #104), old textures no longer pile up. It can cause a short stutter after a load, '
                              'so it is off by default. Also in the in-game menu (Insert → Performance).',
                              'Libera de uma vez as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Não é mais necessário: desde que a limpeza '
-                             'do cache de texturas foi corrigida (issue #104), texturas antigas não se acumulam mais com o orçamento em 5000. Pode causar um breve travamento '
+                             'do cache de texturas foi corrigida (issue #104), texturas antigas não se acumulam mais. Pode causar um breve travamento '
                              'após um carregamento, então vem desligado. Também no menu do jogo (Insert → Desempenho).'),
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
@@ -612,6 +617,9 @@ class Launcher:
         self.check(debug, 0, 'level_select')
         ttk.Label(debug, text=self.t('debug_hint'), foreground='#777', wraplength=360, justify='left').grid(
             row=1, column=0, columnspan=3, sticky='w')
+        self.check(debug, 2, 'debug_logging')
+        ttk.Label(debug, text=self.t('debug_logging_hint'), foreground='#777', wraplength=360, justify='left').grid(
+            row=3, column=0, columnspan=3, sticky='w')
 
         log_frame = ttk.LabelFrame(main, text='Log', padding=4)
         log_frame.grid(row=2, column=3, sticky='nsew', **pad)
