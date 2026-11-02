@@ -170,6 +170,10 @@ MENU = [
            'não usa. Desligado por padrão por enquanto: ajuda quando as texturas se acumulam, mas o jogo ainda '
            'fica mais lento após muitos carregamentos (issue #20). Desligado é o comportamento original do '
            'emulador.')),
+    _menu('Performance', 'keep_gpu_textures', 'bool', '1',
+          ('Keep GPU-only textures', 'Manter texturas só na GPU'),
+          ('Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often.',
+           'Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência.')),
     _menu('Overlay', 'overlay_fps', 'bool', '1', ('Overlay: FPS', 'Overlay: FPS'),
           ('Shows the frame rate in the performance overlay.', 'Mostra os quadros por segundo no overlay.')),
     _menu('Overlay', 'overlay_frametime', 'bool', '1', ('Overlay: frame time', 'Overlay: tempo de quadro'),

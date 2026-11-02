@@ -187,6 +187,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.readback_batch = TlgGraphics::ParseReadbackBatch(value.empty() ? 0 : i);
     } else if (key == "texture_cleanup") {
         v.texture_cleanup = value.empty() || i != 0;
+    } else if (key == "keep_gpu_textures") {
+        v.keep_gpu_textures = value.empty() || i != 0;
     } else if (key == "render_resolution") {
         v.render_resolution = TlgGraphics::ParseResolution(value);
     } else if (key == "engine_fps") {
@@ -476,6 +478,7 @@ void Save() {
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     std::fprintf(file, "frame_generation=%d\n", v.frame_generation.load());
+    std::fprintf(file, "keep_gpu_textures=%d\n", int(v.keep_gpu_textures.load()));
     std::fprintf(file,
                  "mouse_enabled=%d\nmouse_sensitivity=%.2f\nmouse_invert_y=%d\nmouse_smoothing=%.2f\n"
                  "mouse_accel=%.2f\nmouse_deadzone=%.2f\nkey_map=%s\n",

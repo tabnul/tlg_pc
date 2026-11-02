@@ -84,6 +84,19 @@ TextureCache::TextureCache(const Vulkan::Instance& instance_, Vulkan::Scheduler&
     critical_gc_memory = static_cast<u64>(
         std::max<u64>(std::min(device_local_memory - min_vacancy_critical, min_spacing_critical),
                       DEFAULT_CRITICAL_GC_MEMORY));
+    // spartanport: below an 8 GiB budget, leave textures more room before pressure GC, capped at
+    // critical. tlg: off unless TLG_GC_PRESSURE_PERCENT=N is set (clamped to 10-75; SpartanPort
+    // uses 60 by default); our collector (TLG_GC_FIX, launcher budget) covers this otherwise.
+    static const s64 percent = [] {
+        const char* env = std::getenv("TLG_GC_PRESSURE_PERCENT");
+        return env && *env ? std::clamp<s64>(std::strtoll(env, nullptr, 10), 10, 75) : 0;
+    }();
+    if (percent != 0 && device_local_memory < TARGET_GC_THRESHOLD) {
+        pressure_gc_memory =
+            std::min(std::max<u64>(pressure_gc_memory,
+                                   static_cast<u64>(device_local_memory / 100 * percent)),
+                     critical_gc_memory);
+    }
     trigger_gc_memory = static_cast<u64>((device_local_memory - mem_threshold) / 2);
 }
 
@@ -646,7 +659,8 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
     const bool bpp_match = requested_info.num_bits == cache_image.info.num_bits;
 
     // If an image in the cache has less slices we need to expand it
-    bool recreate = cache_image.info.resources < requested_info.resources;
+    // spartanport: recreate if either dimension is too small for the requested subresources.
+    bool recreate = !cache_image.info.resources.Contains(requested_info.resources);
 
     switch (binding) {
     case BindingType::Texture:
@@ -680,18 +694,27 @@ ImageId TextureCache::ResolveDepthOverlap(const ImageInfo& requested_info, Bindi
 
     if (recreate) {
         auto new_info = requested_info;
-        new_info.resources = std::max(requested_info.resources, cache_image.info.resources);
+        // spartanport: take the larger count per dimension; the ordered max could keep the cached
+        // image's extra mips and still drop a requested layer.
+        new_info.resources = {
+            .levels = std::max(requested_info.resources.levels, cache_image.info.resources.levels),
+            .layers = std::max(requested_info.resources.layers, cache_image.info.resources.layers),
+        };
         new_info.UpdateSize();
         const auto new_image_id = slot_images.insert(instance, runtime, slot_image_views, new_info);
         RegisterImage(new_image_id);
 
+        // spartanport: reacquire the old image after insert before inheriting or copying it
+        // (the insert can move the list when TLG_SLOT_STABLE=0).
+        auto& old_image = slot_images[cache_image_id];
+
         // Inherit image usage
         auto& new_image = slot_images[new_image_id];
-        new_image.usage = cache_image.usage;
+        new_image.usage = old_image.usage;
         new_image.ClearFlags(ImageFlagBits::Dirty);
         // When creating a depth buffer through overlap resolution don't clear it on first use.
         new_image.info.meta_info.htile_clear_mask = 0;
-        runtime.CopyColorAndDepth(&cache_image, &new_image);
+        runtime.CopyColorAndDepth(&old_image, &new_image);
 
         // Free the cache image.
         FreeImage(cache_image_id);
@@ -738,17 +761,19 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
             return {ExpandImage(image_info, cache_image_id), -1, -1};
         }
 
-        const bool pow2_padding_only =
-            image_info.props.is_pow2 != cache_image.info.props.is_pow2 &&
+        // spartanport: reuse identical single-level surfaces when only tiler padding differs.
+        const bool padding_only =
             image_info.tile_mode == cache_image.info.tile_mode &&
             image_info.size == cache_image.info.size &&
             image_info.pitch == cache_image.info.pitch && image_info.resources.levels == 1 &&
             cache_image.info.resources.levels == 1 && image_info.resources.layers == 1 &&
-            cache_image.info.resources.layers == 1;
+            cache_image.info.resources.layers == 1 &&
+            (image_info.props.is_pow2 != cache_image.info.props.is_pow2 ||
+             image_info.type == cache_image.info.type);
 
         // Size and resources are less than or equal, use image view.
         if (image_info.pixel_format != cache_image.info.pixel_format ||
-            image_info.guest_size <= cache_image.info.guest_size || pow2_padding_only) {
+            image_info.guest_size <= cache_image.info.guest_size || padding_only) {
             auto result_id = merged_image_id ? merged_image_id : cache_image_id;
             const auto& result_image = slot_images[result_id];
             const bool is_compatible =
@@ -757,8 +782,9 @@ std::tuple<ImageId, int, int> TextureCache::ResolveOverlap(const ImageInfo& imag
         }
 
         // Size and resources are greater, expand the image.
+        // spartanport: expand if either dimension is missing, regardless of mip ordering.
         if (image_info.type == cache_image.info.type &&
-            image_info.resources > cache_image.info.resources) {
+            !cache_image.info.resources.Contains(image_info.resources)) {
             return {ExpandImage(image_info, cache_image_id), -1, -1};
         }
 
@@ -904,6 +930,26 @@ ImageId TextureCache::ExpandImage(const ImageInfo& info, ImageId image_id) {
     return new_image_id;
 }
 
+// spartanport: clamp views to the resolved image to prevent invalid views and barrier asserts.
+static void ClampViewRange(TextureCache::ImageDesc& desc, const Image& image) {
+    auto& range = desc.view_info.range;
+    const auto requested = range;
+    if (!range.ClampTo(image.info.resources)) {
+        return;
+    }
+    static std::atomic<u32> reported{0};
+    if (reported.fetch_add(1, std::memory_order_relaxed) < 8) {
+        std::printf("Texture cache: view mips %u+%u layers %u+%u clamped to image %#llx "
+                    "(%u mips, %u layers, %s; requested %s)\n",
+                    requested.base.level, requested.extent.levels, requested.base.layer,
+                    requested.extent.layers, (unsigned long long)image.info.guest_address,
+                    std::max(image.info.resources.levels, 1u),
+                    std::max(image.info.resources.layers, 1u),
+                    vk::to_string(image.info.pixel_format).c_str(),
+                    vk::to_string(desc.info.pixel_format).c_str());
+    }
+}
+
 ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
     const auto& info = desc.info;
     ASSERT(info.guest_address != 0);
@@ -945,6 +991,8 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
         if (cached.view_slice > 0) {
             desc.view_info.range.base.layer = cached.view_slice;
         }
+        // spartanport: cached images must also bound descriptor mip and layer ranges.
+        ClampViewRange(desc, image);
         return cached.image_id;
     }
 
@@ -1000,8 +1048,8 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
         if (exact_fmt && info.pixel_format != image_resolved.info.pixel_format) {
             // Cannot reuse this image as we need the exact requested format.
             image_id = {};
-        } else if (image_resolved.info.resources < info.resources) {
-            // The image was clearly picked up wrong.
+        } else if (!image_resolved.info.resources.Contains(info.resources)) {
+            // spartanport: reject images missing mips or layers before creating an invalid view.
             FreeImage(image_id);
             image_id = {};
             LOG_WARNING(Render_Vulkan, "Image overlap resolve failed");
@@ -1024,6 +1072,9 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
     if (view_slice > 0) {
         desc.view_info.range.base.layer = view_slice;
     }
+
+    // spartanport: overlap offsets can leave the view past the resolved image.
+    ClampViewRange(desc, image);
 
     cached = FindImageCacheEntry{
         .address = info.guest_address,
@@ -1590,6 +1641,18 @@ void TextureCache::GarbageCollectImages() {
                          ReadbackSource::CacheCleanup);
         const bool download = image.SafeToDownload();
         const bool tiled = image.info.IsTiled();
+        // spartanport (@maze1377): a neighbouring CPU write can leave the only valid contents on
+        // the GPU; keep such images below critical. GPU-dirty ones are not kept, their data is in
+        // the buffer cache. tlg: setting keep_gpu_textures (default on, live).
+        const bool gpu_contents_unresolved =
+            TlgSettings::Get().keep_gpu_textures && True(image.flags & ImageFlagBits::GpuModified) &&
+            !download && False(image.flags & ImageFlagBits::GpuDirty) &&
+            False(image.flags & ImageFlagBits::CpuDirty) && total_used_memory < critical_gc_memory;
+        if (gpu_contents_unresolved) {
+            ++gc_kept_gpu;
+            lru_cache.Touch(image.lru_id, gc_tick);
+            return false;
+        }
         if (tiled && download) {
             // This is a workaround for now. We can't handle non-linear image downloads.
             ++gc_skip_tiled;
@@ -1717,13 +1780,14 @@ void TextureCache::ReportMemory() {
         }
     };
     Group all, written, unevictable, tracked, old, old_written;
-    u64 passes, walked, skip_tiled, skip_unpressured, freed;
+    u64 passes, walked, skip_tiled, skip_unpressured, kept_gpu, freed;
     {
         std::scoped_lock lock{mutex};
         passes = std::exchange(gc_passes, 0);
         walked = std::exchange(gc_walked, 0);
         skip_tiled = std::exchange(gc_skip_tiled, 0);
         skip_unpressured = std::exchange(gc_skip_unpressured, 0);
+        kept_gpu = std::exchange(gc_kept_gpu, 0);
         freed = std::exchange(gc_freed, 0);
         const auto host_bytes = [](const Image& image) {
             u64 bytes = 0;
@@ -1780,9 +1844,10 @@ void TextureCache::ReportMemory() {
     const u64 lookups = TlgStats::region_lookups.exchange(0, std::memory_order_relaxed);
     const u64 candidates = TlgStats::region_candidates.exchange(0, std::memory_order_relaxed);
     std::printf("Collector (5 s): %llu passes, %llu images walked, %llu skipped (tiled GPU-written), "
-                "%llu skipped (write-back waits for pressure), %llu freed; image lookups %llu, "
+                "%llu skipped (write-back waits for pressure), %llu kept (only copy on the GPU), "
+                "%llu freed; image lookups %llu, "
                 "images looked at %llu (%.1f per lookup)\n",
-                num(passes), num(walked), num(skip_tiled), num(skip_unpressured), num(freed),
+                num(passes), num(walked), num(skip_tiled), num(skip_unpressured), num(kept_gpu), num(freed),
                 num(lookups), num(candidates),
                 lookups ? static_cast<double>(candidates) / static_cast<double>(lookups) : 0.0);
 }
@@ -1810,7 +1875,10 @@ void TextureCache::GarbageCollectSamplers() {
             return true;
         }
         --num_deletions;
-        const size_t lru_id = samplers.at(hash).lru_id;
+        // spartanport: keep evicted samplers alive until the GPU completes their recorded work.
+        auto& sampler = samplers.at(hash);
+        const size_t lru_id = sampler.lru_id;
+        scheduler.DeferOperation([retired = std::move(sampler)] { (void)retired; });
         samplers.erase(hash);
         sampler_lru_cache.Free(lru_id);
         return false;
