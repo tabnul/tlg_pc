@@ -33,6 +33,7 @@
 #include "video_core/renderer_vulkan/vk_draw_prep.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_pipeline_serialization.h"
+#include "video_core/renderer_vulkan/shader_recipe.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
 
@@ -47,6 +48,7 @@ struct AsyncShaderCompilation {
     Shader::Info info;
     Shader::RuntimeInfo runtime{};
     std::vector<u32> code, user_data, geometry_code, binary;
+    std::vector<u8> recipe; // tlg: shader_recipe.h
     std::unique_ptr<Shader::Pools> pools;
     CompilerPool<Shader::Pools>* pool_cache{};
     std::optional<Shader::IR::Program> ir;
@@ -507,10 +509,13 @@ bool PipelineCache::QueueShader(Program& program, HwStage stage, SwStage l_stage
         // (InjectClipDistanceAttributes adds a fragment input), and a key made after that never
         // matches again, so every draw queued a new permutation (inFAMOUS: 32768 of one shader).
         const Shader::RuntimeInfo lookup_runtime = build->runtime;
+        ShaderRecipe::Begin();
         build->ir.emplace(Shader::TranslateProgram(build->code, *build->pools, build->info,
                                                    build->runtime, profile));
         build->spec = Shader::StageSpecialization(build->info, lookup_runtime, profile, binding);
         build->fetch.Capture(build->info);
+        build->recipe =
+            ShaderRecipe::Take(build->info, build->code, lookup_runtime, binding, build->permutation);
     };
     // tlg: the capture worker reads guest memory (fetch shader, resource descriptors). A page
     // the GPU wrote is protected under precise readbacks, and its readback needs this (the GPU
@@ -610,6 +615,7 @@ void PipelineCache::PublishShaders(bool wait) {
         Vulkan::SetObjectName(instance.GetDevice(), build->module,
                              GetShaderName(build->info.hw_stage, hash, build->permutation));
         RegisterShaderBinary(std::move(build->binary), hash, build->permutation);
+        ShaderRecipe::Save(hash, build->permutation, std::move(build->recipe));
         {
             std::unique_lock lock{programs_mutex};
             if (build->initial) {
@@ -1216,7 +1222,12 @@ vk::ShaderModule PipelineCache::CompileModule(Shader::Info& info, Shader::Runtim
     DumpShader(code, info.pgm_hash, info.hw_stage, perm_idx, "bin");
     CompileTimer timer;
 
+    const auto lookup_runtime = runtime_info;
+    const auto start = binding;
+    ShaderRecipe::Begin();
     const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
+    ShaderRecipe::Save(info.pgm_hash, perm_idx,
+                       ShaderRecipe::Take(info, code, lookup_runtime, start, perm_idx));
     auto spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);
     DumpShader(spv, info.pgm_hash, info.hw_stage, perm_idx, "spv");
 

@@ -19,6 +19,7 @@
 #include "common/serdes.h"
 #include "common/scope_exit.h"
 #include "video_core/renderer_vulkan/vk_pipeline_serialization.h"
+#include "video_core/renderer_vulkan/shader_recipe.h"
 #include "common/thread.h"
 #include "tlg_overlay.h"
 #include "core/emulator_settings.h"
@@ -591,7 +592,13 @@ void RegisterShaderMeta(const Shader::Info& info,
     if (!Storage::DataBase::Instance().IsOpened()) {
         return;
     }
+    Storage::DataBase::Instance().Save(Storage::BlobType::ShaderMeta,
+                                       fmt::format("{:#018x}", perm_hash),
+                                       EncodeShaderMeta(info, spec, perm_hash, perm_idx));
+}
 
+std::vector<u8> EncodeShaderMeta(const Shader::Info& info, const Shader::StageSpecialization& spec,
+                                 size_t perm_hash, size_t perm_idx) {
     Serialization::Archive ar;
     Serialization::Writer meta{ar};
 
@@ -604,8 +611,7 @@ void RegisterShaderMeta(const Shader::Info& info,
     spec.Serialize(ar);
     info.Serialize(ar);
 
-    Storage::DataBase::Instance().Save(Storage::BlobType::ShaderMeta,
-                                       fmt::format("{:#018x}", perm_hash), ar.TakeOff());
+    return ar.TakeOff();
 }
 
 void RegisterShaderBinary(std::vector<u32>&& spv, u64 pgm_hash, size_t perm_idx) {
@@ -884,6 +890,15 @@ bool PipelineCache::CheckCacheProfile() {
     }
 
     Storage::DataBase::Instance().Open();
+    // tlg: once per session, before anything reads the cache: the shader recipe child translates
+    // what the cache lacks (shader_recipe.h). True when it ran, so a fresh cache warms up too.
+    const auto ImportRecipes = [] {
+        static bool done = false;
+        if (std::exchange(done, true)) {
+            return false;
+        }
+        return ShaderRecipe::ImportMissing(Storage::GameCacheDir());
+    };
 
     // Check if cache is compatible
     std::vector<u8> profile_data{};
@@ -896,7 +911,7 @@ bool PipelineCache::CheckCacheProfile() {
         Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
                                            std::move(profile_data));
         OnColdCache();
-        return false;
+        return ImportRecipes();
     }
     if (profile_data.size() != sizeof(Shader::Profile)) {
         LOG_WARNING(Render, "Pipeline cache profile has unexpected size ({} != {})",
@@ -918,8 +933,9 @@ bool PipelineCache::CheckCacheProfile() {
         Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
                                            std::move(profile_data));
         OnColdCache();
-        return false;
+        return ImportRecipes();
     }
+    ImportRecipes();
     return true;
 }
 

@@ -25,6 +25,12 @@ struct Archive;
 
 namespace Shader {
 
+/// tlg: shader recipes (video_core/renderer_vulkan/shader_recipe.h). While set, every guest memory
+/// read of the compiler on this thread is reported (size 0: a program, its length found by
+/// decoding), and a set replay_flat replaces the walk of the resource tables.
+inline thread_local void (*guest_read_hook)(const void* address, size_t size) = nullptr;
+inline thread_local const std::vector<u32>* replay_flat = nullptr;
+
 enum class Qualifier : u8 {
     None,
     Smooth,
@@ -240,6 +246,9 @@ struct Info : InfoPersistent {
                    sizeof(T) > (ud.size() - dword_offset) * sizeof(u32)) {
             return data;
         }
+        if (guest_read_hook && ptr_index != IR::NumScalarRegs) [[unlikely]] {
+            guest_read_hook(base + dword_offset, sizeof(T));
+        }
         std::memcpy(&data, base + dword_offset, sizeof(T));
         return data;
     }
@@ -262,6 +271,11 @@ struct Info : InfoPersistent {
     }
 
     void RefreshFlatBuf() {
+        if (replay_flat) [[unlikely]] {
+            flattened_ud_buf = *replay_flat;
+            flattened_ud_buf.resize(srt_info.flattened_bufsize_dw);
+            return;
+        }
         flattened_ud_buf.resize(srt_info.flattened_bufsize_dw);
         ASSERT(user_data.size() <= NUM_USER_DATA_REGS);
         std::memcpy(flattened_ud_buf.data(), user_data.data(), user_data.size_bytes());
@@ -275,6 +289,10 @@ struct Info : InfoPersistent {
         auto buf = ReadUdReg<AmdGpu::Buffer>(static_cast<u32>(tess_consts_ptr_base),
                                              static_cast<u32>(tess_consts_dword_offset));
         VAddr tess_constants_addr = buf.base_address;
+        if (guest_read_hook) [[unlikely]] {
+            guest_read_hook(reinterpret_cast<const void*>(tess_constants_addr),
+                            sizeof(tess_constants));
+        }
         memcpy(&tess_constants,
                reinterpret_cast<TessellationDataConstantBuffer*>(tess_constants_addr),
                sizeof(tess_constants));

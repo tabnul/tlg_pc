@@ -90,6 +90,9 @@ static bool IsTypedBufferLoad(const Gcn::GcnInst& inst) {
 const u32* GetFetchShaderCode(const Info& info, u32 sgpr_base) {
     const u32* code;
     std::memcpy(&code, &info.UserData()[sgpr_base], sizeof(code));
+    if (guest_read_hook) [[unlikely]] {
+        guest_read_hook(code, 0);
+    }
     return code;
 }
 
