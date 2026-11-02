@@ -93,6 +93,7 @@ enum : std::uint64_t {
     FenceFlushMore = 8,    ///< the same at EOS, label WRITE_DATA and compute RELEASE_MEM
     ImageHashBacking = 32, ///< texture change hashes read through the backing view
     Frame10Bit = 64,       ///< the 10-bit frame image (bit set: 8-bit, as before; live A/B)
+    GpuWriteSubresourceOff = 128, ///< #24: GPU writes into the middle of an image no longer dirty it
 };
 inline bool Disabled2(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations2, __ATOMIC_RELAXED) & bit) != 0;
@@ -116,6 +117,7 @@ inline std::atomic<std::int64_t> hot_pages{0};
 /// Stall diagnostics (TLG_FRAME_STATS): per-frame deltas printed for frames over 40 ms.
 inline std::atomic<std::uint64_t> images_registered{0};
 inline std::atomic<std::uint64_t> image_upload_bytes{0};
+inline std::atomic<std::uint64_t> gpu_subresource_writes{0};
 inline std::atomic<std::uint64_t> buffer_upload_bytes{0};
 inline std::atomic<int> gpu_thread_clock{-1}; ///< clockid_t of the GPU command thread
 inline std::atomic<unsigned long> gpu_thread_id{0}; ///< Windows thread id of the GPU command thread

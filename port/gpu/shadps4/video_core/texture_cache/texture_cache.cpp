@@ -626,7 +626,14 @@ void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {
         // Only consider images that match base address.
         // TODO: Maybe also consider subresources
         if (image.info.guest_address != address) {
-            return;
+            // tlg #24: a GPU write into the middle of an image (e.g. one cube of the environment
+            // cube array) left the cached image stale, so areas were lit with an old probe. Such
+            // writes dirty the image too. Toggle file, second mask bit 128 turns it off (A/B).
+            if (!image.Overlaps(address, max_size) ||
+                TlgToggle::Disabled2(TlgToggle::GpuWriteSubresourceOff)) {
+                return;
+            }
+            TlgStats::gpu_subresource_writes.fetch_add(1, std::memory_order_relaxed);
         }
         // Ensure image is reuploaded when accessed again.
         InvalidateAlias(image);
@@ -1850,6 +1857,8 @@ void TextureCache::ReportMemory() {
                 num(passes), num(walked), num(skip_tiled), num(skip_unpressured), num(kept_gpu), num(freed),
                 num(lookups), num(candidates),
                 lookups ? static_cast<double>(candidates) / static_cast<double>(lookups) : 0.0);
+    std::printf("Subresource GPU writes (5 s): %llu\n",
+                num(TlgStats::gpu_subresource_writes.exchange(0, std::memory_order_relaxed)));
 }
 
 void TextureCache::GarbageCollectSamplers() {
