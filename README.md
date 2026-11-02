@@ -79,6 +79,13 @@ between the chosen anti-aliasing and the original SMAA. See [docs/dlaa.md](docs/
 Off by default; switch it in the launcher or the in-game menu. Tested on an RTX 5090 on Windows
 only. Turning DLSS frame generation off while playing can crash the game, so restart to turn it off.
 
+**Smooth, high frame rates, no shader stutter.** Play at 30, 60 or unlocked: on an RTX 5090 the
+game runs at about 90-120 FPS unlocked, with no freezes in play. Updates and new drivers no longer
+bring the stutter back: in our tests 75% fewer hitches and worst freezes cut from 630 ms to about
+160 ms right after the shader cache was cleared. Shaders are prepared in under a second at start,
+thanks to the shader recipes from [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
+by @deadinside28.
+
 **Any resolution and aspect ratio.** The game renders at the window's resolution, including 21:9
 and 32:9. At 21:9 the menus, hints and subtitles are laid out for the wider screen instead of
 being stretched. 32:9 is experimental: the game runs, but some overlays sit to the left and parts

@@ -90,6 +90,7 @@ void PruneOtherRevisions(const std::filesystem::path& cache_path) {
         // revision: switching the option keeps both caches.
         const std::string base = serial + "-" + TLG_SHADER_CACHE_KEY;
         if (entry.is_directory(ec) && other != name && other.rfind(base, 0) != 0 &&
+            other != serial + "-recipes" &&
             (other == serial || other.rfind(serial + "-", 0) == 0)) {
             LOG_INFO(Render, "Removing shader cache of another recompiler revision: {}", other);
             std::filesystem::remove_all(entry.path(), ec);
@@ -113,6 +114,16 @@ std::filesystem::path GameCacheDir() {
 #else
     return Common::FS::GetUserPath(Common::FS::PathType::CacheDir) / serial;
 #endif
+}
+
+std::filesystem::path RecipeDir() {
+    const char* env = std::getenv("TLG_SHADER_RECIPES");
+    if ((env && *env == '0') || EmulatorSettings.IsPipelineCacheArchived() ||
+        EmulatorSettings.IsDirectMemoryAccessEnabled()) {
+        return {};
+    }
+    return Common::FS::GetUserPath(Common::FS::PathType::CacheDir) /
+           (std::string{Common::ElfInfo::Instance().GameSerial()} + "-recipes");
 }
 
 void ProcessIO(const std::stop_token& stoken) {
@@ -155,6 +166,9 @@ constexpr std::string GetBlobFileExtension(BlobType type) {
     case BlobType::ShaderProfile: {
         return "bin";
     }
+    case BlobType::ShaderInput: {
+        return "in";
+    }
     default:
         UNREACHABLE();
     }
@@ -195,6 +209,13 @@ void DataBase::Open() {
             LOG_WARNING(Render, "Shader cache unavailable at {}: {}", cache_path.string(),
                         error.message());
             return;
+        }
+        recipe_path = RecipeDir();
+        if (!recipe_path.empty()) {
+            std::filesystem::create_directories(recipe_path, error);
+            if (error) {
+                recipe_path.clear();
+            }
         }
     }
 
@@ -305,6 +326,13 @@ void LoadVector(BlobType type, std::filesystem::path& path, std::vector<T>& v) {
 bool DataBase::Save(BlobType type, const std::string& name, std::vector<u8>&& data) {
     if (!opened) {
         return false;
+    }
+    if (type == BlobType::ShaderInput) {
+        return !recipe_path.empty() && WriteVector(type, recipe_path / name, std::move(data));
+    }
+    if (type == BlobType::PipelineKey && !recipe_path.empty()) {
+        auto copy = data;
+        WriteVector(type, recipe_path / name, std::move(copy));
     }
 
     auto path = EmulatorSettings.IsPipelineCacheArchived() ? std::filesystem::path{name}
