@@ -18,6 +18,9 @@ typedef struct {
 void tlggpu_register_kernel(void);
 /* Creates window, Vulkan device, presenter and GPU command processor. */
 int tlggpu_init(const TlgGpuConfig *config);
+/* Unless TLG_CACHE_FLUSH_ON_EXIT=0: waits at most two seconds for queued shader-cache writes
+ * before window close or restart skips destructors (from SpartanPort, @maze1377). */
+void tlggpu_flush_cache(void);
 /* Function for an imported NID ("NID#lib#mod"), or 0 when the GPU library does not provide it. */
 uintptr_t tlggpu_resolve(const char *scoped_nid);
 /* Called first by the loader's SIGSEGV handler: 1 when a GPU page-tracking fault was handled. */

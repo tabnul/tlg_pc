@@ -463,8 +463,10 @@ private:
     u64 total_used_memory = 0;
     u64 gc_evictions = 0, gc_downloads = 0; ///< tlg: pressure report
     /// tlg: collector counters for the memory report (TLG_FRAME_STATS): passes past the trigger,
-    /// images walked, skipped (tiled GPU-written; write-back waits for pressure) and freed.
-    u64 gc_passes = 0, gc_walked = 0, gc_skip_tiled = 0, gc_skip_unpressured = 0, gc_freed = 0;
+    /// images walked, skipped (tiled GPU-written; write-back waits for pressure), kept (only copy
+    /// on the GPU, keep_gpu_textures) and freed.
+    u64 gc_passes = 0, gc_walked = 0, gc_skip_tiled = 0, gc_skip_unpressured = 0, gc_kept_gpu = 0,
+        gc_freed = 0;
     std::chrono::steady_clock::time_point gc_report_time{};
     std::chrono::steady_clock::time_point memory_report_time{}; ///< tlg: ReportMemory
     /// tlg: texture_cleanup (CleanUpAfterLoad): the gc tick and time the last stage load ended.
