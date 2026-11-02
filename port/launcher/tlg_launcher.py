@@ -82,6 +82,9 @@ TEXT = {
                   'Só diminua se a sua placa tiver menos de 8 GB de VRAM (6 GB: 5600, 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
     'texture_cleanup': ('Clean up textures after each load',
                         'Limpar texturas após cada carregamento'),
+    'keep_gpu_textures': ('Keep GPU-only textures', 'Manter texturas só na GPU'),
+    'keep_gpu_textures_hint': ('Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often. Also in the in-game menu (Insert → Performance).',
+                               'Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência. Também no menu do jogo (Insert → Desempenho).'),
     'texture_cleanup_hint': ('Frees the textures of earlier stages all at once after each stage or checkpoint load. Not needed any more: since the texture cache '
                              'cleanup was fixed (issue #104), old textures no longer pile up. It can cause a short stutter after a load, '
                              'so it is off by default. Also in the in-game menu (Insert → Performance).',
@@ -625,6 +628,16 @@ class Launcher:
         ttk.Checkbutton(memory, text=self.t('texture_cleanup'), variable=cleanup, command=cleanup_toggled).grid(
             row=1, column=0, sticky='w', pady=(4, 0))
         self.hint(memory, 1, 1, 'texture_cleanup_hint')
+        keep_gpu = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('keep_gpu_textures', '1') != '0')
+
+        def keep_gpu_toggled():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'keep_gpu_textures': '1' if keep_gpu.get() else '0'})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        ttk.Checkbutton(memory, text=self.t('keep_gpu_textures'), variable=keep_gpu, command=keep_gpu_toggled).grid(
+            row=2, column=0, sticky='w', pady=(4, 0))
+        self.hint(memory, 2, 1, 'keep_gpu_textures_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))

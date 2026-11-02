@@ -149,6 +149,13 @@ MENU = [
            'Limita os quadros apresentados (nunca acima da taxa de quadros do jogo escolhida acima).'),
           choices=(('30', '30', '30'), ('60', '60', '60'), ('120', '120', '120'), ('240', '240', '240'),
                    ('0', 'Unlimited', 'Sem limite'))),
+    _menu('Performance', 'credits_fps', 'choice', '30', ('End credits frame rate', 'Taxa de quadros dos créditos'),
+          ('The end credits run at this rate whatever the limit above says. 30 is advised: the PS4 runs them '
+           'at 30, and above 30 they hitch at every cut.',
+           'Os créditos finais rodam nesta taxa, seja qual for o limite acima. 30 é o recomendado: o PS4 os '
+           'roda a 30 e, acima de 30, eles travam a cada corte.'),
+          choices=(('30', '30 (advised)', '30 (recomendado)'), ('60', '60', '60'),
+                   ('0', 'Unlimited', 'Sem limite'))),
     _menu('Performance', 'frames_queued', 'choice', '1', ('Frames queued', 'Quadros na fila'),
           ('More frames queued: steadier FPS, slower response to input.',
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
@@ -170,6 +177,10 @@ MENU = [
            'não usa. Desligado por padrão por enquanto: ajuda quando as texturas se acumulam, mas o jogo ainda '
            'fica mais lento após muitos carregamentos (issue #20). Desligado é o comportamento original do '
            'emulador.')),
+    _menu('Performance', 'keep_gpu_textures', 'bool', '1',
+          ('Keep GPU-only textures', 'Manter texturas só na GPU'),
+          ('Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often.',
+           'Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência.')),
     _menu('Overlay', 'overlay_fps', 'bool', '1', ('Overlay: FPS', 'Overlay: FPS'),
           ('Shows the frame rate in the performance overlay.', 'Mostra os quadros por segundo no overlay.')),
     _menu('Overlay', 'overlay_frametime', 'bool', '1', ('Overlay: frame time', 'Overlay: tempo de quadro'),

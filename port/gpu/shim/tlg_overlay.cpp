@@ -775,6 +775,10 @@ void PerformanceTab() {
                     "ainda ficou mais lento após muitos carregamentos (issue #20), então por enquanto vem desligado. "
                     "Desligado é o comportamento original do emulador."),
                  d.texture_cleanup);
+        CheckRow(TL("Keep GPU-only textures", "Manter texturas só na GPU"), s.keep_gpu_textures,
+                 TL("Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often.",
+                    "Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência."),
+                 d.keep_gpu_textures);
         ImGui::EndTable();
     }
 }

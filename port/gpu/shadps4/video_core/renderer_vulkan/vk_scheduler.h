@@ -608,7 +608,8 @@ public:
     /// Raw storage in the chunk for a command's variable-length data; null when full.
     void* Allocate(size_t bytes, size_t align) {
         const size_t offset = (used + align - 1) & ~(align - 1);
-        if (offset + bytes > Capacity) {
+        // spartanport: reject oversized inline allocations without overflowing the size check.
+        if (offset > Capacity || bytes > Capacity - offset) {
             return nullptr;
         }
         used = offset + bytes;
@@ -760,11 +761,18 @@ public:
             return;
         }
         if (!record_chunk->Push(std::forward<Func>(func))) {
-            full_chunks.push_back(std::move(record_chunk));
-            record_chunk = AcquireChunk();
+            // spartanport: replace before retiring so recording storage stays valid.
+            RetireChunk();
             const bool pushed = record_chunk->Push(std::forward<Func>(func));
             ASSERT(pushed);
         }
+    }
+
+    // spartanport: acquire the replacement first so reentrant recording during acquisition
+    // still finds a valid chunk, including guest memory faults handled on this thread.
+    void RetireChunk() {
+        auto next = AcquireChunk();
+        full_chunks.push_back(std::exchange(record_chunk, std::move(next)));
     }
 
     /// True when Record() defers commands (and RecordData() copies into chunks).
@@ -790,8 +798,8 @@ public:
             return;
         }
         if (RecordChunk::Capacity - record_chunk->Size() < bytes + 1024) {
-            full_chunks.push_back(std::move(record_chunk));
-            record_chunk = AcquireChunk();
+            // spartanport: replace before retiring so recording storage stays valid.
+            RetireChunk();
         }
     }
 

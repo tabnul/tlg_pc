@@ -113,6 +113,12 @@ struct Values {
     /// CleanUpAfterLoad). Off: as the emulator does it, they stay until VRAM runs short. Live.
     /// Off by default: the game still gets slower over many loads with it on (issue #20).
     std::atomic<bool> texture_cleanup{false};
+    /// Texture cache cleanup keeps GPU-written images whose only valid copy is on the GPU (a CPU
+    /// write next to them blocks the copy back) until VRAM is critical, instead of freeing them
+    /// and losing that picture. From SpartanPort (@maze1377). Live. Off: freed as before.
+    std::atomic<bool> keep_gpu_textures{true};
+    /// End credits frame rate (tlg.ini credits_fps, env TLG_CREDITS_FPS=30|60|unlocked wins): 30, 60, 0 = unlimited.
+    std::atomic<int> credits_fps{30};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: run.py turns them into patches and environment variables; "Apply and restart".

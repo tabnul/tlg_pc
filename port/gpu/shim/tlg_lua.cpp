@@ -414,9 +414,16 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                 TlgStats::SetScene(scene);
                 // The credits (s18_Ending *_Ending_StaffRoll*) hitch at every cut above 30 FPS,
                 // the rate the PS4 game runs them at. The next real scene ends the lock.
-                TlgSettings::Get().credits_fps_lock =
-                    scene.starts_with("s18_Ending ") &&
-                    scene.find("_Ending_StaffRoll") != std::string_view::npos;
+                // TLG_CREDITS_FPS=30|60|unlocked (benchmarks) wins over tlg.ini credits_fps.
+                static const char* credits_env = std::getenv("TLG_CREDITS_FPS");
+                const std::uint32_t credits_fps =
+                    !credits_env ? std::uint32_t(TlgSettings::Get().credits_fps.load())
+                    : std::strcmp(credits_env, "unlocked") == 0 ? 0u
+                    : std::strcmp(credits_env, "60") == 0      ? 60u
+                                                                : 30u;
+                const bool credits = scene.starts_with("s18_Ending ") &&
+                                     scene.find("_Ending_StaffRoll") != std::string_view::npos;
+                TlgSettings::Get().credits_fps_lock = credits ? credits_fps : 0u;
             }
         }
         return original(L, options, Empty.data(), Empty.size(), name);

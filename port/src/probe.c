@@ -987,6 +987,7 @@ static void apply_patches(const char *path, Segment *segments, uint64_t ns, cons
  * applied at start). Descriptors are closed first so the old GPU device and its memory are
  * released before the new process opens its own. */
 void runtime_restart(void) {
+    tlggpu_flush_cache();
     fflush(NULL);
 #ifdef _WIN32
     /* run.py sets TLG_RESTART_COMMAND: the launch command line, started again (new patches). */

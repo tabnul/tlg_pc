@@ -31,6 +31,7 @@
 #include "core/memory.h"
 #include "core/signals.h"
 #include "sdl_window.h"
+#include "video_core/cache_storage.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 
 #ifdef _WIN32
@@ -259,6 +260,23 @@ bool TlgHdrStartup() {
     return TlgSettings::Get().startup_hdr;
 }
 
+extern "C" void tlggpu_flush_cache(void) {
+    const char* env = std::getenv("TLG_CACHE_FLUSH_ON_EXIT");
+    static const bool enabled = !(env && env[0] == '0');
+    auto& cache = Storage::DataBase::Instance();
+    if (!enabled || !cache.IsOpened()) {
+        return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const bool done = cache.Flush(std::chrono::seconds(2));
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start)
+                        .count();
+    std::printf("Shader cache: %s at exit in %lld ms\n",
+                done ? "queue drained" : "queued writes NOT finished",
+                static_cast<long long>(ms));
+}
+
 extern "C" int tlggpu_init(const TlgGpuConfig* config) {
     TlgSettings::Load();
 #ifdef TLG_PGO_GENERATE
@@ -287,6 +305,7 @@ extern "C" int tlggpu_init(const TlgGpuConfig* config) {
         }
         LOG_INFO(Frontend, "Window closed by user");
         runtime_report();
+        tlggpu_flush_cache();
         std::fflush(stdout);
         std::_Exit(0);
     });
