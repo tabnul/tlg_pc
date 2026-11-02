@@ -47,6 +47,9 @@ static uintptr_t guest_code_end; /* end of the image and its stub areas (emulati
 #endif
 static void isa_report_hook(void) { isa_rewrite_report(isa_table, stdout); }
 int vulkan_smoke(void);
+/* tlg: shader recipes, gpu/shadps4/video_core/renderer_vulkan/shader_recipe.cpp */
+int tlg_import_shaders(const char *cache_dir, const char *recipe_dir);
+int tlg_compare_meta(const char *dir_a, const char *dir_b);
 
 static void fail(const char *message) { fprintf(stderr, "ERROR: %s\n", message); exit(1); }
 static uint64_t read64(FILE *f) {
@@ -1051,6 +1054,8 @@ int main(int argc, char **argv) {
     mallopt(M_MMAP_THRESHOLD,32*1024*1024);
 #endif
     if (argc == 2 && !strcmp(argv[1], "--vulkan-only")) return vulkan_smoke();
+    if (argc == 4 && !strcmp(argv[1], "--import-shaders")) return tlg_import_shaders(argv[2], argv[3]);
+    if (argc == 4 && !strcmp(argv[1], "--compare-meta")) return tlg_compare_meta(argv[2], argv[3]);
     char missing[128];
     if (argc == 2 && !strcmp(argv[1], "--cpu-features")) {
         if (!cpu_supported(missing, sizeof missing)) return 20;

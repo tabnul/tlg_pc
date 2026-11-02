@@ -21,11 +21,16 @@ enum class BlobType : u32 {
     ShaderBinary,
     PipelineKey,
     ShaderProfile,
+    ShaderInput, // tlg: shader recipe (renderer_vulkan/shader_recipe.h), in RecipeDir()
 };
 
 /// tlg: this game's shader cache folder: <gpu user>/cache/<serial>-<recompiler key>
 /// (TLG_SHADER_CACHE_KEY), or <serial> without a key. Pipeline binaries go in it too.
 [[nodiscard]] std::filesystem::path GameCacheDir();
+/// tlg: this game's shader recipes: <gpu user>/cache/<serial>-recipes. Kept when the shader cache
+/// is rebuilt, so a new build or GPU translates them again at start; pipeline keys are copied
+/// there too. Empty when recipes are off (archived cache, direct memory access, TLG_SHADER_RECIPES=0).
+[[nodiscard]] std::filesystem::path RecipeDir();
 
 class DataBase {
 public:
@@ -64,6 +69,7 @@ public:
 private:
     std::jthread io_worker{};
     std::filesystem::path cache_path{};
+    std::filesystem::path recipe_path{}; // tlg: RecipeDir() once opened, empty when off
     // spartanport: publish initialization safely to an exit hook on another thread.
     std::atomic<bool> opened{};
 };

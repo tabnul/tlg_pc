@@ -45,5 +45,8 @@ void RegisterShaderMeta(const Shader::Info& info,
                         const std::optional<Shader::Gcn::FetchShaderData>& fetch_shader_data,
                         const Shader::StageSpecialization& spec, size_t perm_hash, size_t perm_idx);
 void RegisterShaderBinary(std::vector<u32>&& spv, u64 pgm_hash, size_t perm_idx);
+/// tlg: a .meta blob as RegisterShaderMeta stores it (shader recipe import writes it too).
+std::vector<u8> EncodeShaderMeta(const Shader::Info& info, const Shader::StageSpecialization& spec,
+                                 size_t perm_hash, size_t perm_idx);
 
 } // namespace Vulkan
