@@ -761,6 +761,12 @@ def build_env(settings, extra=None):
             env['LD_LIBRARY_PATH'] = libraries
         else:
             env.pop('LD_LIBRARY_PATH', None)
+        # The game restarts through this launcher (TLG_RESTART_COMMAND, also after the end credits).
+        # With these it counts as a child of the running launcher and skips setting up its library
+        # path: tkinter then fails on libBLT.2.5.so.8.6 (issue #25).
+        env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+        for key in [key for key in env if key.startswith('_PYI_')]:
+            del env[key]
     # Shaders and pipelines beside the saves (the GPU reads it when it starts; before, Linux used
     # shadPS4's ~/.local/share/shadPS4 and Windows <saves>/user).
     env['TLG_GPU_USER_DIR'] = str(gpu_user_dir())
