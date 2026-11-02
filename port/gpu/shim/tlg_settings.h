@@ -83,6 +83,8 @@ struct Values {
     std::atomic<int> display_mode{0};
     std::atomic<bool> vsync{true};
     std::atomic<int> fps_limit{0};
+    /// The end credits run at 30 FPS whatever fps_limit says (tlg_lua.cpp); not in tlg.ini or a menu.
+    std::atomic<bool> credits_fps_lock{false};
     /// Off: an async compile skips the draw, and a skipped exposure pass right after a load left the
     /// condor scene overexposed (2026-10-27). Not in tlg.ini or any menu; TLG_ASYNC_SHADERS=1 for tests.
     std::atomic<bool> async_shaders{false};

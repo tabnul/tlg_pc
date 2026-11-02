@@ -163,13 +163,25 @@ static ABI __attribute__((noreturn)) void stack_fail(void) {
     fputs("STOP: guest stack protector detected corruption\n", stderr);
     exit(22);
 }
+extern void tlggpu_discard_overwrite(void *dst, uint64_t size);
+/* Pages the guest overwrites completely need no readback of what the GPU left there (load dips and
+   scene changes). TLG_MEMSET_DISCARD=0 turns it off. */
+static void discard_overwrite(void *dst, size_t size) {
+    static int discard=-1;
+    if (size<4096) return;
+    if (discard<0) { const char *e=getenv("TLG_MEMSET_DISCARD"); discard=!(e&&e[0]=='0'); }
+    if (discard) tlggpu_discard_overwrite(dst,size);
+}
 static ABI void *guest_memset(void *dst, int value, size_t size) {
+    discard_overwrite(dst,size);
     atomic_fetch_add_explicit(&memory_calls,1,memory_order_relaxed); return memset(dst, value, size);
 }
 static ABI void *guest_memcpy(void *dst, const void *src, size_t size) {
+    discard_overwrite(dst,size);
     atomic_fetch_add_explicit(&memory_calls,1,memory_order_relaxed); return memcpy(dst, src, size);
 }
 static ABI void *guest_memmove(void *dst, const void *src, size_t size) {
+    if ((const char*)src+size<=(const char*)dst || (const char*)dst+size<=(const char*)src) discard_overwrite(dst,size);
     atomic_fetch_add_explicit(&memory_calls,1,memory_order_relaxed); return memmove(dst, src, size);
 }
 static ABI int guest_memcmp(const void *a, const void *b, size_t size) {

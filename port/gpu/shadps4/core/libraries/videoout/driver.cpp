@@ -705,6 +705,7 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
     const auto current_limit = [&] {
         const auto& s = TlgSettings::Get();
         if (fixed_limit) return EmulatorSettings.GetFrameLimit();
+        if (s.credits_fps_lock) return 30u;
         const u32 limit = u32(TlgGraphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
         if (limit) return limit;
         if (fast_vblank) return EmulatorSettings.GetFrameLimit();

@@ -421,6 +421,31 @@ EFFECTS = {'ssao': (100, 0, 400), 'bloom': (100, 0, 400), 'ssr': (100, 0, 400), 
            'fov': (70, 50, 110, '°')}
 
 
+def add_tooltip(widget, text):
+    """Shows text in a small window next to the pointer while it is over the widget."""
+    tip = []
+
+    def hide(_=None):
+        while tip:
+            tip.pop().destroy()
+
+    def show(event):
+        hide()
+        win = tk.Toplevel(widget)
+        win.overrideredirect(True)
+        tk.Label(win, text=text, background='#ffffe0', foreground='#000', relief='solid', borderwidth=1,
+                 wraplength=360, justify='left', padx=6, pady=4).pack()
+        win.update_idletasks()
+        x = min(event.x_root + 14, widget.winfo_screenwidth() - win.winfo_reqwidth() - 4)
+        y = min(event.y_root + 14, widget.winfo_screenheight() - win.winfo_reqheight() - 4)
+        win.geometry(f'+{x}+{y}')
+        tip.append(win)
+
+    widget.bind('<Enter>', show, add='+')
+    widget.bind('<Leave>', hide, add='+')
+    widget.bind('<Destroy>', hide, add='+')
+
+
 def art_path(settings, name):
     """Official art from the user's own dump (sce_sys); never shipped with the port."""
     for folder in (Path(settings['game_dir']) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
@@ -558,8 +583,7 @@ class Launcher:
         sens_spin.grid(row=2, column=1, sticky='w', padx=6, pady=(4, 0))
         sens_spin.bind('<FocusOut>', lambda _: self.changed())
         ttk.Button(controls, text=self.t('remap'), command=self.remap_dialog).grid(row=2, column=2, sticky='e', pady=(4, 0))
-        ttk.Label(controls, text=self.t('mouse_hint'), foreground='#777', wraplength=420, justify='left').grid(
-            row=3, column=0, columnspan=3, sticky='w', pady=(2, 0))
+        self.hint(controls, 0, 3, 'mouse_hint')
 
         middle = ttk.Frame(main)
         middle.grid(row=2, column=1, sticky='nsew', **pad)
@@ -579,8 +603,7 @@ class Launcher:
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
         self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'))
-        ttk.Label(video, text=self.t('fps_hint'), foreground='#777', wraplength=320).grid(
-            row=6, column=0, columnspan=2, sticky='w')
+        self.hint(video, 5, 2, 'fps_hint')
         ttk.Label(video, text=self.t('vram'), wraplength=220).grid(row=3, column=0, sticky='w', pady=(6, 0))
         vram = tk.IntVar(value=int(self.settings['vram_budget_mb']))
         self.vars['vram_budget_mb'] = vram
@@ -590,7 +613,7 @@ class Launcher:
         spin.bind('<FocusOut>', lambda _: self.changed())
         memory = ttk.Frame(video)
         memory.grid(row=4, column=0, columnspan=2, sticky='w')
-        ttk.Label(memory, text=self.t('vram_hint'), foreground='#777', wraplength=360).grid(row=0, column=0, sticky='w')
+        self.hint(video, 3, 2, 'vram_hint')
         # The in-game menu's texture cleanup (tlg.ini, applies at once).
         cleanup = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_cleanup', '0') != '0')
 
@@ -601,11 +624,9 @@ class Launcher:
 
         ttk.Checkbutton(memory, text=self.t('texture_cleanup'), variable=cleanup, command=cleanup_toggled).grid(
             row=1, column=0, sticky='w', pady=(4, 0))
-        ttk.Label(memory, text=self.t('texture_cleanup_hint'), foreground='#777', wraplength=360).grid(
-            row=2, column=0, sticky='w')
+        self.hint(memory, 1, 1, 'texture_cleanup_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
-        ttk.Label(video, text=self.t('resolution_hint'), foreground='#777', wraplength=320).grid(
-            row=8, column=0, columnspan=2, sticky='w')
+        self.hint(video, 7, 2, 'resolution_hint')
         ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))
         self.aa_box = ttk.Combobox(video, values=[self.t(label) for label, _ in AA_MODES],
                                    state='readonly', width=20)
@@ -620,8 +641,7 @@ class Launcher:
         self.fg_box.current(fg_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
         self.fg_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        ttk.Label(video, text=self.t('fg_hint'), foreground='#777', wraplength=320).grid(
-            row=12, column=0, columnspan=2, sticky='w')
+        self.hint(video, 11, 2, 'fg_hint')
         image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
         image.grid(row=2, column=2, sticky='new', **pad)
         image.columnconfigure(1, weight=1)
@@ -630,11 +650,9 @@ class Launcher:
         debug = ttk.LabelFrame(middle, text=self.t('debug'), padding=8)
         debug.grid(sticky='ew', pady=(8, 0))
         self.check(debug, 0, 'level_select')
-        ttk.Label(debug, text=self.t('debug_hint'), foreground='#777', wraplength=360, justify='left').grid(
-            row=1, column=0, columnspan=3, sticky='w')
+        self.hint(debug, 0, 3, 'debug_hint')
         self.check(debug, 2, 'debug_logging')
-        ttk.Label(debug, text=self.t('debug_logging_hint'), foreground='#777', wraplength=360, justify='left').grid(
-            row=3, column=0, columnspan=3, sticky='w')
+        self.hint(debug, 2, 3, 'debug_logging_hint')
 
         log_frame = ttk.LabelFrame(main, text='Log', padding=4)
         log_frame.grid(row=2, column=3, sticky='nsew', **pad)
@@ -695,9 +713,10 @@ class Launcher:
             self.ini_vars[key] = var
             cell = ttk.Frame(parent)
             cell.grid(row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
-            ttk.Checkbutton(cell, text=self.t(key), variable=var, command=self.filters_changed).pack(anchor='w')
+            box = ttk.Checkbutton(cell, text=self.t(key), variable=var, command=self.filters_changed)
+            box.pack(side='left')
             if key == 'smaa':
-                ttk.Label(cell, text=self.t('smaa_hint'), foreground='#777', wraplength=360).pack(anchor='w', padx=(20, 0))
+                self.hint_mark(cell, 'smaa_hint', box).pack(side='left', padx=(4, 0))
         ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 3, column=0, sticky='w')
         cell = ttk.Frame(parent)
         cell.grid(row=row + 3, column=1, sticky='w', padx=6, pady=2)
@@ -749,15 +768,13 @@ class Launcher:
             self.refresh_preset()
 
         ttk.Button(save, text=self.t('preset_save_button'), command=save_preset).pack(side='left', padx=(6, 0))
-        ttk.Label(parent, text=self.t('graphics_preset_hint'), foreground='#777', wraplength=360,
-                  justify='left').grid(row=row + 3, column=0, columnspan=2, sticky='w')
+        self.hint(parent, row + 1, 2, 'graphics_preset_hint')
         # Texture pack: tlg.ini texture_pack (a pack folder's name or off), the in-game Image row.
         ttk.Label(parent, text=self.t('texture_pack')).grid(row=row + 4, column=0, sticky='w', pady=(6, 0))
         self.pack_box = ttk.Combobox(parent, state='readonly', width=24)
         self.pack_box.grid(row=row + 4, column=1, sticky='w', padx=6, pady=(6, 2))
         self.pack_box.bind('<<ComboboxSelected>>', lambda _: self.texture_pack_picked())
-        ttk.Label(parent, text=self.t('texture_pack_hint'), foreground='#777', wraplength=360,
-                  justify='left').grid(row=row + 5, column=0, columnspan=2, sticky='w')
+        self.hint(parent, row + 4, 2, 'texture_pack_hint')
         self.refresh_preset()
         self.refresh_texture_pack()
         self.ini_stamp = self.ini_files_stamp()
@@ -1302,6 +1319,16 @@ class Launcher:
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=lambda: [reset() for reset in resets]).pack(side='left')
         ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
+
+    def hint(self, parent, row, column, key):
+        """A small question mark in that cell; the text shows on the mark and on the row's name."""
+        self.hint_mark(parent, key, *parent.grid_slaves(row=row, column=0)).grid(row=row, column=column, sticky='w', padx=(4, 0))
+
+    def hint_mark(self, parent, key, *also):
+        mark = ttk.Label(parent, text='?', foreground='#777', cursor='question_arrow')
+        for widget in (mark, *also):
+            add_tooltip(widget, self.t(key))
+        return mark
 
     def check(self, parent, row, key):
         var = tk.BooleanVar(value=bool(self.settings[key]))
