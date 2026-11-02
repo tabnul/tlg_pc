@@ -149,6 +149,13 @@ MENU = [
            'Limita os quadros apresentados (nunca acima da taxa de quadros do jogo escolhida acima).'),
           choices=(('30', '30', '30'), ('60', '60', '60'), ('120', '120', '120'), ('240', '240', '240'),
                    ('0', 'Unlimited', 'Sem limite'))),
+    _menu('Performance', 'credits_fps', 'choice', '30', ('End credits frame rate', 'Taxa de quadros dos créditos'),
+          ('The end credits run at this rate whatever the limit above says. 30 is advised: the PS4 runs them '
+           'at 30, and above 30 they hitch at every cut.',
+           'Os créditos finais rodam nesta taxa, seja qual for o limite acima. 30 é o recomendado: o PS4 os '
+           'roda a 30 e, acima de 30, eles travam a cada corte.'),
+          choices=(('30', '30 (advised)', '30 (recomendado)'), ('60', '60', '60'),
+                   ('0', 'Unlimited', 'Sem limite'))),
     _menu('Performance', 'frames_queued', 'choice', '1', ('Frames queued', 'Quadros na fila'),
           ('More frames queued: steadier FPS, slower response to input.',
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
