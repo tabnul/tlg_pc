@@ -267,6 +267,11 @@ void BufferCache::InvalidateMemory(VAddr device_addr, u64 size, bool assume_lock
     });
 }
 
+void BufferCache::DiscardForOverwrite(VAddr device_addr, u64 size) {
+    memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
+    memory_tracker->MarkRegionAsCpuModified(device_addr, size);
+}
+
 // tlg: the game fills its per-frame buffers (constants, skinning output) sequentially and
 // every 4 KiB page cost a protection fault (~110k/s in the test scene, a fifth of each
 // render worker's time in the kernel). A fault unprotects the aligned window around it instead;

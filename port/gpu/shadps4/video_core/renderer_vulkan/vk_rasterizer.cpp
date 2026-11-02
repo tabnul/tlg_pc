@@ -3689,6 +3689,23 @@ bool Rasterizer::InvalidateMemory(VAddr addr, u64 size, bool assume_locks) {
     return true;
 }
 
+// tlg: the guest is about to overwrite these whole pages: what the GPU left there is worthless, so
+// no readback for it, which is what stalls the scene changes (s18_Ending _030_Ending_StaffRoll).
+bool Rasterizer::DiscardForOverwrite(VAddr addr, u64 size) {
+    DrainDrawPipe();
+    if (!IsMapped(addr, size) || !buffer_cache.IsRegionGpuModified(addr, size)) {
+        return false;
+    }
+    texture_cache.ResolveReadbacks(addr, size, false, VideoCore::ReadbackSource::CpuWrite);
+    buffer_cache.DiscardForOverwrite(addr, size);
+    texture_cache.InvalidateMemory(addr, size);
+    return true;
+}
+
+bool Rasterizer::HasGpuData(VAddr addr, u64 size) {
+    return IsMapped(addr, size) && buffer_cache.IsRegionGpuModified(addr, size);
+}
+
 std::string Rasterizer::DescribeFaultState(VAddr addr) {
     return fmt::format("GPU mapped: {}\n{}\n{}", IsMapped(addr, 8),
                        buffer_cache.DescribeFaultState(addr),

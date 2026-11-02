@@ -103,8 +103,25 @@ public:
     }
 };
 
+static std::atomic<Vulkan::Rasterizer*> g_discard_rasterizer{nullptr};
+// The guest is about to overwrite this range (memset, memcpy): skip what the GPU left in the whole
+// pages inside it.
+extern "C" void tlggpu_discard_overwrite(void* dst, std::uint64_t size) {
+    auto* r = g_discard_rasterizer.load(std::memory_order_acquire);
+    if (!r) {
+        return;
+    }
+    const std::uint64_t addr = reinterpret_cast<std::uint64_t>(dst);
+    const std::uint64_t first = (addr + 4095) & ~std::uint64_t{4095};
+    const std::uint64_t last = (addr + size) & ~std::uint64_t{4095};
+    if (last > first && r->HasGpuData(first, last - first)) {
+        r->DiscardForOverwrite(first, last - first);
+    }
+}
+
 void MemoryManager::SetRasterizer(Vulkan::Rasterizer* rasterizer_) {
     rasterizer = rasterizer_;
+    g_discard_rasterizer.store(rasterizer_, std::memory_order_release);
     // Existing guest mappings are replayed by the runtime when hooks are installed.
     runtime_memory_set_gpu_hooks(
         [](uintptr_t address, uint64_t size) {
