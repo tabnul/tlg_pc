@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -49,9 +50,17 @@ struct State {
     std::vector<VkExtensionProperties> device_extensions;
     NVSDK_NGX_Parameter* fg_parameters{};
     NVSDK_NGX_Handle* fg_feature{};
+    // TLG_DLSSNR=1 test: DLSS 5 neural rendering (nvngx_dlssnr.dll, feature 18, not in the
+    // public SDK) instead of the DLSS evaluation, colour straight to output.
+    bool nr_wanted{};
+    bool nr_logged{};
+    NVSDK_NGX_Parameter* nr_parameters{};
+    NVSDK_NGX_Handle* nr_feature{};
     bool configured{};
     bool initialized{};
 } state;
+
+constexpr auto FeatureNeuralRendering = static_cast<NVSDK_NGX_Feature>(18);
 
 template <typename... Args>
 void Log(int warning, const char* format, Args... args) {
@@ -90,6 +99,8 @@ int32_t Configure(const wchar_t* dll_directory, const wchar_t* data_directory, T
     state.discovery.FeatureInfo = &state.common;
     state.fg_discovery = state.discovery;
     state.fg_discovery.FeatureID = NVSDK_NGX_Feature_FrameGeneration;
+    const char* nr = std::getenv("TLG_DLSSNR");
+    state.nr_wanted = nr && nr[0] == '1';
     state.configured = true;
     return 1;
 }
@@ -206,7 +217,52 @@ int32_t Initialize(VkInstance instance, VkPhysicalDevice physical, VkDevice devi
     return 1;
 }
 
+void NrRelease() {
+    if (state.nr_feature) {
+        NVSDK_NGX_VULKAN_ReleaseFeature(state.nr_feature);
+        state.nr_feature = nullptr;
+    }
+    if (state.nr_parameters) {
+        NVSDK_NGX_VULKAN_DestroyParameters(state.nr_parameters);
+        state.nr_parameters = nullptr;
+    }
+}
+
+void NrCreate(VkCommandBuffer command, const TlgDlssFeature* desc) {
+    if (!Check("DLSS 5 parameter allocation",
+               NVSDK_NGX_VULKAN_AllocateParameters(&state.nr_parameters)))
+        return;
+    auto* p = state.nr_parameters;
+    NVSDK_NGX_Parameter_SetUI(p, NVSDK_NGX_Parameter_Width, desc->output_width);
+    NVSDK_NGX_Parameter_SetUI(p, NVSDK_NGX_Parameter_Height, desc->output_height);
+    NVSDK_NGX_Parameter_SetUI(p, "DLSSNR.Width", desc->output_width);
+    NVSDK_NGX_Parameter_SetUI(p, "DLSSNR.Height", desc->output_height);
+    NVSDK_NGX_Parameter_SetF(p, "DLSSNR.ScalingRatio", 1.0f);
+    NVSDK_NGX_Parameter_SetUI(p, "DLSSNR.Hint.Render.Preset", 0);
+    NVSDK_NGX_Parameter_SetI(p, "DLSSNR.Enabled", 1);
+    NVSDK_NGX_Parameter_SetI(p, "DLSSNR.DepthInverted", desc->depth_inverted ? 1 : 0);
+    const auto result =
+        NVSDK_NGX_VULKAN_CreateFeature1(state.device, command, FeatureNeuralRendering, p,
+                                        &state.nr_feature);
+    if (!Check("DLSS 5 feature creation", result) || !state.nr_feature) {
+        state.nr_feature = nullptr;
+        return;
+    }
+    Log(0, "DLSS 5 (neural rendering) %ux%u on Vulkan", desc->output_width, desc->output_height);
+}
+
+void SetImage(NVSDK_NGX_Parameter* p, const std::string& name, NVSDK_NGX_Resource_VK* resource) {
+    NVSDK_NGX_Parameter_SetVoidPointer(p, ("DLSSNR." + name).c_str(), resource);
+    NVSDK_NGX_Parameter_SetUI(p, ("DLSSNR." + name + "SubrectBaseX").c_str(), 0);
+    NVSDK_NGX_Parameter_SetUI(p, ("DLSSNR." + name + "SubrectBaseY").c_str(), 0);
+    NVSDK_NGX_Parameter_SetUI(p, ("DLSSNR." + name + "SubrectWidth").c_str(),
+                              resource->Resource.ImageViewInfo.Width);
+    NVSDK_NGX_Parameter_SetUI(p, ("DLSSNR." + name + "SubrectHeight").c_str(),
+                              resource->Resource.ImageViewInfo.Height);
+}
+
 void ReleaseFeature() {
+    NrRelease();
     if (state.feature) {
         NVSDK_NGX_VULKAN_ReleaseFeature(state.feature);
         state.feature = nullptr;
@@ -252,6 +308,8 @@ int32_t CreateFeature(VkCommandBuffer command, const TlgDlssFeature* desc) {
         return 0;
     }
     state.feature_desc = *desc;
+    if (state.nr_wanted)
+        NrCreate(command, desc);
     Log(0, "DLSS %ux%u -> %ux%u, quality %d, preset %u%s", desc->input_width, desc->input_height,
         desc->output_width, desc->output_height, desc->quality, desc->preset,
         desc->hdr == 1 ? ", HDR input" : desc->hdr ? ", HDR input, fixed exposure" : "");
@@ -271,6 +329,25 @@ int32_t Evaluate(VkCommandBuffer command, const TlgDlssEvaluate* evaluate) {
     auto depth = Wrap(evaluate->depth, false);
     auto motion = Wrap(evaluate->motion, false);
     auto output = Wrap(evaluate->output, true);
+    if (state.nr_feature) {
+        auto* p = state.nr_parameters;
+        SetImage(p, "Color", &color);
+        SetImage(p, "Depth", &depth);
+        SetImage(p, "MVec", &motion);
+        SetImage(p, "Output", &output);
+        NVSDK_NGX_Parameter_SetF(p, "DLSSNR.MVecScaleX", 1.0f);
+        NVSDK_NGX_Parameter_SetF(p, "DLSSNR.MVecScaleY", 1.0f);
+        NVSDK_NGX_Parameter_SetF(p, "DLSSNR.Intensity", 1.0f);
+        NVSDK_NGX_Parameter_SetI(p, "DLSSNR.Reset", evaluate->reset);
+        const auto result = NVSDK_NGX_VULKAN_EvaluateFeature(command, state.nr_feature, p);
+        if (!state.nr_logged || NVSDK_NGX_FAILED(result)) {
+            Log(NVSDK_NGX_FAILED(result), "DLSS 5 evaluation: 0x%08x",
+                static_cast<unsigned>(result));
+            state.nr_logged = true;
+        }
+        if (!NVSDK_NGX_FAILED(result))
+            return 1;
+    }
     NVSDK_NGX_VK_DLSS_Eval_Params parameters{};
     parameters.Feature.pInColor = &color;
     parameters.Feature.pInOutput = &output;
