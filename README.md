@@ -126,9 +126,7 @@ launcher has the same settings, so you can set things up before starting.
 - **Colour:** brightness, contrast, saturation and gamma of the final image.
 - **Output:** HDR10 output through the game's own HDR path.
 - **Performance:** frame rate limit, frame queue depth and background shader compilation.
-- **Frame rate:** 30 (as on PS4), 60 or unlocked. Unlocked lowers the base frame rate by about
-  10 FPS against 60 at the same spot (about 57 vs 48 FPS in our test), so pick 60 unless your PC
-  runs well above 60.
+- **Frame rate:** 30 (as on PS4), 60 or unlocked. 
 - **Menu buttons:** [Cross/Circle confirmation](docs/menu-buttons.md), without swapping gameplay
   buttons. The in-game menu conversion requires the verified EU 01.03 executable.
 - **Japanese text (experimental):** on EU CUSA03745 update 01.03, choose **日本語 (EU 1.03 text
