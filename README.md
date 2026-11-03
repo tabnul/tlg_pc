@@ -193,6 +193,9 @@ The launcher's background is the picture from your own game files (`sce_sys/pic1
 another one, save it as `launcher_background.png` (or `.jpg`) in the `user/` folder; it is
 fitted to the window. Example: [the game's cover art](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
+The old launcher (before v0.5.0) is still built in: **Switch to legacy menu** in Settings, or
+start `The Last Guardian.exe --legacy`. It will be phased out in a later release.
+
 ## Building
 
 ```bash
