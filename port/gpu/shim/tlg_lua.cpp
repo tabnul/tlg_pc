@@ -385,6 +385,24 @@ bool GameEdits(std::string& patched, std::string_view name) {
         patched.insert(at, "--");
         return true;
     }
+    // Tail catch fix: the same freeze on the falling bridge (s06_FallingBridge, mission
+    // FB_e02_Demo_003, cutscenes fb_050 action_3 + fb_110 action_1, issue #39). The jump to
+    // Trico's tail starts slow motion (15%); above 30 FPS it is choppy and the catch can be
+    // missed, so the game waits forever. Skipped only when the engine runs above 30 FPS (60 or
+    // unlocked); at 30 the original slow motion stays (smooth there, no freeze).
+    static constexpr std::string_view TailJump = "game/stages/s06_FallingBridge/demo/fb_110', 'action_1')";
+    static constexpr std::string_view TailSlowMotion = "MS.SetGameSpeed(0.15, 0.25)";
+    if (s.applied_engine_fps.load() > 30 &&
+        name == "data_trico/game/scripts/stages/s06_FallingBridge/missionScript.lua") {
+        const size_t jump = patched.find(TailJump);
+        const size_t at = jump == std::string::npos ? jump : patched.find(TailSlowMotion, jump);
+        if (at == std::string::npos) {
+            return false;
+        }
+        patched.insert(at, "--");
+        std::printf("Lua: tail catch fix (slow motion skipped above 30 FPS)\n");
+        return true;
+    }
     return false;
 }
 } // namespace
