@@ -75,14 +75,26 @@ static uint8_t connected_count;
 
 static uint64_t now_us(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000u+(uint64_t)t.tv_nsec/1000u; }
 /* TLG_STICK_DEADZONE (0..0.5, default 0.10): stick values inside it read as centered, the rest
- * is rescaled, so worn sticks (drift) don't move the character or camera. */
-static float stick_deadzone(void) {
-    static float zone=-1;
-    if (zone<0) { const char *e=getenv("TLG_STICK_DEADZONE"); zone=e && *e ? (float)atof(e) : 0.10f; if (zone<0) zone=0; if (zone>0.5f) zone=0.5f; }
-    return zone;
+ * is rescaled, so worn sticks (drift) don't move the character or camera. TLG_STICK_DEADZONE_RIGHT
+ * sets the right stick apart (default: the same as the left). */
+static float env_fraction(const char *name, float fallback, float max) {
+    const char *e=getenv(name);
+    float v=e && *e ? (float)atof(e) : fallback;
+    return v<0 ? 0 : v>max ? max : v;
 }
-static uint8_t axis(int16_t v) {
-    float f=(float)v/32767.f, zone=stick_deadzone();
+static float stick_deadzone(int right) {
+    static float zone[2]={-1,-1};
+    if (zone[0]<0) { zone[0]=env_fraction("TLG_STICK_DEADZONE",0.10f,0.5f); zone[1]=env_fraction("TLG_STICK_DEADZONE_RIGHT",zone[0],0.5f); }
+    return zone[right];
+}
+/* TLG_TRIGGER_THRESHOLD (0.02..0.9, default 0.12): how far L2/R2 go down before they count as pressed. */
+static int trigger_threshold(void) {
+    static int t=-1;
+    if (t<0) { float f=env_fraction("TLG_TRIGGER_THRESHOLD",30.f/255.f,0.9f); t=(int)lroundf((f<0.02f ? 0.02f : f)*255.f); }
+    return t;
+}
+static uint8_t axis(int16_t v, int right) {
+    float f=(float)v/32767.f, zone=stick_deadzone(right);
     if (f>1) f=1;
     if (f<-1) f=-1;
     f=fabsf(f)<=zone ? 0.f : (f>0 ? f-zone : f+zone)/(1.f-zone);
@@ -136,6 +148,16 @@ static int gamepad_active(SDL_Gamepad *g) {
     for (int a=0;a<SDL_GAMEPAD_AXIS_COUNT;++a) if (abs(SDL_GetGamepadAxis(g,(SDL_GamepadAxis)a))>16000) return 1;
     return 0;
 }
+/* TLG_PAD_GUID=<SDL GUID> (the launcher's Controller page): only that controller is read; others
+ * stay open but ignored. Unset or "auto": the one used last. */
+static int gamepad_allowed(SDL_Gamepad *g) {
+    static const char *pin; static int checked;
+    if (!checked) { pin=getenv("TLG_PAD_GUID"); if (pin && (!*pin || !SDL_strcasecmp(pin,"auto"))) pin=NULL; checked=1; }
+    if (!pin) return 1;
+    char guid[64];
+    SDL_GUIDToString(SDL_GetJoystickGUIDForID(SDL_GetGamepadID(g)),guid,sizeof(guid));
+    return !SDL_strcasecmp(guid,pin);
+}
 static SDL_Gamepad *current_gamepad(void) {
     static uint64_t last_scan;
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
@@ -163,7 +185,7 @@ static SDL_Gamepad *current_gamepad(void) {
         SDL_free(ids);
     }
     for (int i=0;i<MAX_GAMEPADS;++i)
-        if (gamepads[i] && gamepads[i]!=gamepad && (!gamepad || gamepad_active(gamepads[i]))) {
+        if (gamepads[i] && gamepads[i]!=gamepad && gamepad_allowed(gamepads[i]) && (!gamepad || gamepad_active(gamepads[i]))) {
             if (gamepad) printf("Runtime: gamepad in use: %s\n",SDL_GetGamepadName(gamepads[i]));
             gamepad=gamepads[i];
             break;
@@ -512,11 +534,11 @@ static void sample_host(PadData *d) {
         for (size_t i=0;i<pad_map.count;++i)
             if (SDL_GetGamepadButton(g,(SDL_GamepadButton)pad_map.entries[i].source)) d->buttons|=pad_map.entries[i].ps;
         const uint32_t mapped=d->buttons;
-        d->left_x=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTX)); d->left_y=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTY));
-        d->right_x=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHTX)); d->right_y=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHTY));
+        d->left_x=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTX),0); d->left_y=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTY),0);
+        d->right_x=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHTX),1); d->right_y=axis(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHTY),1);
         d->l2=trigger(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFT_TRIGGER)); d->r2=trigger(SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
-        if (d->l2>30) d->buttons|=BTN_L2;
-        if (d->r2>30) d->buttons|=BTN_R2;
+        if (d->l2>trigger_threshold()) d->buttons|=BTN_L2;
+        if (d->r2>trigger_threshold()) d->buttons|=BTN_R2;
         if (mapped & BTN_L2) d->l2=255;
         if (mapped & BTN_R2) d->r2=255;
         if (SDL_GetNumGamepadTouchpads(g)>0) {

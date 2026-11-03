@@ -11,7 +11,7 @@ cd -- "$(dirname -- "$0")/../.."
 # shellcheck source=../port.env
 source packaging/port.env
 source ./msys2-env.sh
-[[ -f out/tlg-probe.exe && -f out/tlg-gpu-capabilities.exe && -f out/tlg-play.exe ]] || { echo 'Build first: bash build.sh' >&2; exit 1; }
+[[ -f out/tlg-probe.exe && -f out/tlg-gpu-capabilities.exe && -f out/tlg-play.exe && -f out/tlg-pad-tool.exe && -f out/tlg-music-tool.exe ]] || { echo 'Build first: bash build.sh' >&2; exit 1; }
 name=${TLG_PACKAGE_NAME:-$PORT_SLUG-windows-x86_64}
 
 python=${WINPYTHON:-}
@@ -46,7 +46,7 @@ cp -r "out/pyi-dist/$PORT_NAME/." "$dest/"
 llvm-strip -o "$dest/Play $PORT_NAME.exe" out/tlg-play.exe
 cp launcher/$PORT_ICON.ico launcher/$PORT_ICON.png "$dest/launcher/"
 # The executables without debug information, where tlg_run.py looks for them (out/).
-for exe in tlg-probe.exe tlg-gpu-capabilities.exe; do
+for exe in tlg-probe.exe tlg-gpu-capabilities.exe tlg-pad-tool.exe tlg-music-tool.exe; do
     llvm-strip --strip-debug -o "$dest/out/$exe" "out/$exe"
 done
 # Every DLL the executables load from the CLANG64 tree (SDL3, FFmpeg, Vulkan loader, ...), found by
@@ -55,7 +55,7 @@ done
 # and some packages shipped without libiconv-2.dll ("libiconv-2.dll was not found" at Play).
 # Names not in /clang64/bin are Windows' own DLLs.
 declare -A shipped=()
-queue=("$dest/out/tlg-probe.exe" "$dest/out/tlg-gpu-capabilities.exe")
+queue=("$dest/out/tlg-probe.exe" "$dest/out/tlg-gpu-capabilities.exe" "$dest/out/tlg-pad-tool.exe" "$dest/out/tlg-music-tool.exe")
 while ((${#queue[@]})); do
     binary=${queue[0]}
     queue=("${queue[@]:1}")

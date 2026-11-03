@@ -35,6 +35,8 @@ cp launcher/$PORT_ICON.png "$dest/launcher/"
 strip --strip-debug -o "$dest/out/tlg-probe" out/tlg-probe
 strip --strip-debug -o "$dest/out/gpu/libtlggpu.so" out/gpu/libtlggpu.so
 [[ -f out/tlg-gpu-capabilities ]] && strip -o "$dest/out/tlg-gpu-capabilities" out/tlg-gpu-capabilities
+[[ -f out/tlg-pad-tool ]] && strip -o "$dest/out/tlg-pad-tool" out/tlg-pad-tool
+[[ -f out/tlg-music-tool ]] && strip -o "$dest/out/tlg-music-tool" out/tlg-music-tool
 # Libraries to bundle: everything the two ELF files load except the base system (glibc, the C++
 # runtime, the Vulkan loader and drivers, X11/Wayland, audio servers), which must come from the
 # player's distribution to match its drivers.

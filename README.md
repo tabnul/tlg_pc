@@ -189,6 +189,10 @@ Controllers (DualSense, DualShock 4, Xbox) work through SDL3, motion sensor incl
 keyboard work too and can be remapped. More in
 [port/packaging/README-player.md](port/packaging/README-player.md).
 
+The launcher's background is the picture from your own game files (`sce_sys/pic1.png`). To use
+another one, save it as `launcher_background.png` (or `.jpg`) in the `user/` folder; it is
+fitted to the window. Example: [the game's cover art](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
+
 ## Building
 
 ```bash

@@ -204,6 +204,7 @@ DEFAULT_SETTINGS = {
     'texpack_dir': '',             # texture packs folder; empty = texpack_dir()'s default
     'ui_language': 'en_US',        # auto (system language) | pt_BR | en_US
     'show_fps': False,
+    'menu_music': True,            # the launcher plays the game's own menu tune (sce_sys/snd0.at9)
     'skip_logos': False,           # scripts/tlg_patches.py --skip-logos; TLG_SKIP_LOGOS=1 too
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
@@ -221,6 +222,10 @@ DEFAULT_SETTINGS = {
     'resolution': '1920x1080',     # WxH (scripts/tlg_patches.py; TLG_RESOLUTION wins)
     'gpu_readbacks': '2',          # TLG_READBACKS: 2 precise (the game reads GPU compute results), 0 fast
     'stick_deadzone': 10,          # percent; runtime_pad.c TLG_STICK_DEADZONE
+    'stick_deadzone_right': 10,    # percent; TLG_STICK_DEADZONE_RIGHT
+    'trigger_threshold': 12,       # percent L2/R2 travel before a press; TLG_TRIGGER_THRESHOLD
+    'pad_guid': 'auto',            # SDL GUID of the one controller to use; TLG_PAD_GUID
+    'pad_map': {},                 # PS4 button -> SDL gamepad button name(s); TLG_PAD_MAP
     'close_on_play': True,         # Qt launcher: close about 2 s after the game starts
     'reopen_launcher': True,       # ... and open again when the game exits
 }
@@ -621,6 +626,47 @@ def probe_env():
     return env
 
 
+def pad_tool():
+    """out/tlg-pad-tool(.exe): the launcher's Controller page reads controllers through it; None if absent."""
+    path = OUT_DIR / ('tlg-pad-tool.exe' if os.name == 'nt' else 'tlg-pad-tool')
+    return path if path.is_file() else None
+
+
+def play_command():
+    """The command that starts the game with the saved launcher settings and no launcher window, as
+    one line to paste in Steam ("Add a Non-Steam Game", then Properties > Target / Launch options)."""
+    if FROZEN:
+        parts = [str(Path(sys.executable).resolve()), '--play']
+    else:
+        parts = [str(Path(sys.executable).resolve()), str(Path(__file__).resolve().parent / 'tlg_launcher.py'), '--play']
+    if os.name == 'nt':
+        return subprocess.list2cmdline(parts)
+    import shlex
+    return shlex.join(parts)
+
+
+def music_tool():
+    """out/tlg-music-tool(.exe): plays the launcher's menu music; None if absent."""
+    path = OUT_DIR / ('tlg-music-tool.exe' if os.name == 'nt' else 'tlg-music-tool')
+    return path if path.is_file() else None
+
+
+def menu_music_file(settings):
+    """The game's own menu tune, the one the PS4 home screen and shadPS4's game list play; None
+    when the game folder is not set or has none (the launcher then stays silent)."""
+    game = settings.get('game_dir')
+    path = Path(game) / 'sce_sys' / 'snd0.at9' if game else None
+    return path if path and path.is_file() else None
+
+
+def pad_tool_env():
+    env = probe_env()
+    toolchain = Path(os.environ.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'
+    if os.name == 'nt' and not FROZEN and toolchain.is_dir():
+        env['PATH'] = str(toolchain) + os.pathsep + env.get('PATH', '')
+    return env
+
+
 def cpu_missing_sets(log=print):
     """Instruction sets `tlg-probe --cpu-features` reports missing ([] when complete); None when the
     probe could not tell (it did not start: the table is then built anyway, see isa_table). A CPU
@@ -719,6 +765,14 @@ def build_env(settings, extra=None):
     env['TLG_MENU_CONFIRM'] = menu_confirm(settings)
     env['TLG_STICK_DEADZONE'] = os.environ.get(
         'TLG_STICK_DEADZONE', f"{int(settings.get('stick_deadzone', 10)) / 100:.2f}")
+    env['TLG_STICK_DEADZONE_RIGHT'] = os.environ.get(
+        'TLG_STICK_DEADZONE_RIGHT', f"{int(settings.get('stick_deadzone_right', settings.get('stick_deadzone', 10))) / 100:.2f}")
+    env['TLG_TRIGGER_THRESHOLD'] = os.environ.get(
+        'TLG_TRIGGER_THRESHOLD', f"{int(settings.get('trigger_threshold', 12)) / 100:.2f}")
+    env.setdefault('TLG_PAD_GUID', str(settings.get('pad_guid') or 'auto'))
+    pad_map = settings.get('pad_map') or {}
+    if pad_map:
+        env.setdefault('TLG_PAD_MAP', ','.join(f'{button}={names}' for button, names in pad_map.items()))
     env.update(game_language_environment(settings))
     if settings.get('ui_language', 'en_US') != 'auto':
         env['TLG_UI_LANG'] = settings['ui_language']

@@ -75,6 +75,7 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 - Saves: `user/savedata/`, ao lado do executável (guarde essa pasta ao atualizar)
 - Logs: `out/logs/` (`out/last_run.log` é o da última sessão; mande ele junto se reportar um problema)
 - Configurações do launcher: `~/.config/tlg-launcher/` (Linux) ou `%APPDATA%\tlg-launcher` (Windows). Se você escolher outra pasta de dados em **Saves e dados**, o caminho fica em `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` no Windows)
+- Fundo do launcher: por padrão a imagem dos seus arquivos do jogo (`sce_sys/pic1.png`). Para usar outra, salve-a como `launcher_background.png` (ou `.jpg`) na pasta `user/`; ela é ajustada à janela. Exemplo: [a arte da capa do jogo](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
 ### Problemas
 
@@ -151,6 +152,7 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 - Saves: `user/savedata/` next to the executable (keep this folder when updating)
 - Logs: `out/logs/` (`out/last_run.log` is the latest session; attach it to bug reports)
 - Launcher settings: `~/.config/tlg-launcher/` (Linux) or `%APPDATA%\tlg-launcher` (Windows). If you pick another data folder in **Saves & data**, its path is kept in `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` on Windows)
+- Launcher background: by default the picture from your own game files (`sce_sys/pic1.png`). To use another one, save it as `launcher_background.png` (or `.jpg`) in the `user/` folder; it is fitted to the window. Example: [the game's cover art](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
 ### Problems
 
