@@ -324,6 +324,13 @@ if (WIN32)
     target_link_options(memory-reserve-test PRIVATE -Wl,--disable-high-entropy-va)
     add_executable(tlg-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tlg-gpu-capabilities.rc)
     target_link_libraries(tlg-gpu-capabilities PRIVATE Vulkan::Vulkan)
+    # The launcher's Controller page reads the controllers through this helper (same SDL3 as the game).
+    add_executable(tlg-pad-tool ../tools/pad_tool.c)
+    target_link_libraries(tlg-pad-tool PRIVATE PkgConfig::SDL3)
+    # The launcher's menu music (the game's own sce_sys/snd0.at9) plays through this helper.
+    add_executable(tlg-music-tool ../tools/music_tool.c)
+    target_include_directories(tlg-music-tool PRIVATE ../third_party/LibAtrac9/C/src)
+    target_link_libraries(tlg-music-tool PRIVATE atrac9 PkgConfig::SDL3)
     # "Play The Last Guardian.exe": the game with the launcher's saved settings, no launcher window.
     add_executable(tlg-play WIN32 ../packaging/windows/play.c ../packaging/windows/play.rc)
     target_compile_options(tlg-play PRIVATE -municode)

@@ -1,0 +1,20 @@
+{
+  "_comment": "Known problems by hardware, shown on the Support screen (local table, nothing is fetched). match: every condition named must hold. os: windows|linux. vendor: NVIDIA|AMD|Intel. gpu: regexes on the Vulkan device name. driver: regex on 'driverName driverInfo'. vram_gb_max / vram_gb_min: device-local memory in GiB (discrete GPUs). issues: GitHub issue numbers.",
+  "issues": [
+    {
+      "id": "vram-4gb",
+      "match": {
+        "vram_gb_max": 4.5
+      },
+      "title": {
+        "en": "GPU with 4 GB of VRAM: texture memory runs out",
+        "pt": "GPU com 4 GB de VRAM: a memória de textura estoura"
+      },
+      "what": {
+        "en": "Texture memory can run out. Keep the VRAM budget (Graphics) well below your card's memory.",
+        "pt": "A memória de textura pode estourar. Mantenha o orçamento de VRAM (Gráficos) bem abaixo da memória da placa."
+      },
+      "issues": []
+    }
+  ]
+}

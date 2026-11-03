@@ -20,11 +20,48 @@ from tkinter import filedialog, messagebox, ttk
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backports_table  # noqa: E402
 import logtail  # noqa: E402
+import pad_page  # noqa: E402
 import preset_share  # noqa: E402
 import tlg_run  # noqa: E402
 
+# Colors: warm dark with one gold accent (the home screen fades the art into BG).
+BG, PANEL, FIELD, LINE = '#16140f', '#201d17', '#0f0e0b', '#3a352b'
+TEXT_COLOR, MUTED, DIM, ACCENT = '#efe9dd', '#a9a394', '#8a8476', '#e2b878'
+SERIF = 'Georgia' if sys.platform == 'win32' else 'serif'
+HOME_SIZE = (1100, 620)
+BACKGROUND_NAMES = ('launcher_background.png', 'launcher_background.jpg')
+
 TEXT = {
     'title': ('The Last Guardian — PC', 'The Last Guardian — PC'),
+    'home_settings': ('Settings', 'Configurações'),
+    'home_graphics': ('Graphics', 'Gráficos'),
+    'home_advanced': ('Advanced', 'Avançado'),
+    'home_controller': ('Controller', 'Controle'),
+    'home_keys': ('Keys & mouse', 'Teclas e mouse'),
+    'home_mods': ('Mods & cheats', 'Mods e cheats'),
+    'home_video': ('Video', 'Vídeo'),
+    'home_controls': ('Controls', 'Controles'),
+    'mouse_section': ('Mouse', 'Mouse'),
+    'memory': ('Video memory', 'Memória de vídeo'),
+    'display': ('Display', 'Tela'),
+    'launcher_section': ('Launcher', 'Launcher'),
+    'scene_section': ('Display, shadows and textures', 'Tela, sombras e texturas'),
+    'home_logs': ('Logs', 'Logs'),
+    'home_quit': ('Quit', 'Sair'),
+    'legacy_menu': ('Switch to legacy menu', 'Mudar para o menu antigo'),
+    'home_back': ('‹  Back', '‹  Voltar'),
+    'home_picture': ('Background picture…', 'Imagem de fundo…'),
+    'home_picture_reset': ('Default picture', 'Imagem padrão'),
+    'home_cache': ('Clear shader cache', 'Limpar cache de shaders'),
+    'copy_command_tip': ('Copies the command that starts the game with the current settings, without this '
+                         'launcher (for use in, for instance, Steam: Add a Non-Steam Game).',
+                         'Copia o comando que inicia o jogo com as configurações atuais, sem este launcher '
+                         '(para usar, por exemplo, no Steam: Adicionar jogo não-Steam).'),
+    'copy_command': ('Start command copied: paste it in Steam (Add a Non-Steam Game > Properties > Target).',
+                     'Comando de início copiado: cole no Steam (Adicionar jogo não-Steam > Propriedades > Destino).'),
+    'home_music_on': ('♪ Music on', '♪ Música ligada'),
+    'home_music_off': ('♪ Music off', '♪ Música desligada'),
+    'home_running': ('Running', 'Rodando'),
     'game': ('Game', 'Jogo'),
     'game_dir': ('Game folder', 'Pasta do jogo'),
     'system_lib_dir': ('Console system modules', 'Módulos do sistema do console'),
@@ -168,6 +205,32 @@ TEXT = {
     'play': ('Play', 'Jogar'),
     'saves': ('Saves folder', 'Pasta de saves'),
     'logs': ('Logs folder', 'Pasta de logs'),
+    'report_issue': ('Report a problem on GitHub', 'Relatar um problema no GitHub'),
+    'rep_unknown': ('unknown', 'desconhecido'),
+    'rep_yes': ('yes', 'sim'),
+    'rep_no': ('no', 'não'),
+    'rep_row_version': ('Port version', 'Versão do port'),
+    'rep_row_game': ('Game', 'Jogo'),
+    'rep_row_os': ('System', 'Sistema'),
+    'rep_row_cpu': ('CPU', 'CPU'),
+    'rep_row_ram': ('RAM', 'RAM'),
+    'rep_row_gpu': ('GPU', 'GPU'),
+    'rep_row_driver': ('Driver', 'Driver'),
+    'rep_gpu_none': ('not detected (vulkaninfo missing or no Vulkan driver)', 'não detectada (sem vulkaninfo ou sem driver Vulkan)'),
+    'rep_h_hw': ('Hardware and version', 'Hardware e versão'),
+    'rep_h_log': ('Log summary', 'Resumo do log'),
+    'rep_h_known': ('Known problems for this GPU', 'Problemas conhecidos para esta GPU'),
+    'rep_no_log': ('No log attached.', 'Nenhum log anexado.'),
+    'rep_footer': ('Report generated locally by the launcher; user names in paths were replaced by <user>.', 'Relatório gerado localmente pelo launcher; nomes de usuário em caminhos foram trocados por <user>.'),
+    'rep_attach_zip': ('The full report is long: please attach the .zip saved by the launcher to this issue.', 'O relatório completo é longo: anexe a esta issue o .zip salvo pelo launcher.'),
+    'rep_fps': ('FPS: average {avg} (lowest {lo}, highest {hi}; {n} samples)', 'FPS: média {avg} (mínimo {lo}, máximo {hi}; {n} amostras)'),
+    'rep_worst': ('Worst frame: {ms} ms', 'Pior quadro: {ms} ms'),
+    'rep_no_fps': ('FPS: no "Frame stats" lines in this log', 'FPS: este log não tem linhas "Frame stats"'),
+    'rep_no_events': ('No Fault:, STOP: or FREEZE: lines in this log.', 'Nenhuma linha Fault:, STOP: ou FREEZE: neste log.'),
+    'rep_issue_title': ('Problem report: {gpu}', 'Relato de problema: {gpu}'),
+    'report_busy': ('Collecting the report…', 'Coletando o relatório…'),
+    'report_done': ('Issue form opened in the browser. Attach {zip} from the logs folder (log with user names removed).',
+                    'Formulário aberto no navegador. Anexe {zip} da pasta de logs (log sem nomes de usuário).'),
     'clear_cache': ('Clear shader cache', 'Limpar cache de shaders'),
     'clear_cache_ask': ('This deletes the compiled shaders ({size}); the next start takes longer to load and '
                         'may stutter at first. Continue?',
@@ -436,7 +499,7 @@ def add_tooltip(widget, text):
         hide()
         win = tk.Toplevel(widget)
         win.overrideredirect(True)
-        tk.Label(win, text=text, background='#ffffe0', foreground='#000', relief='solid', borderwidth=1,
+        tk.Label(win, text=text, background=PANEL, foreground=TEXT_COLOR, relief='solid', borderwidth=1,
                  wraplength=360, justify='left', padx=6, pady=4).pack()
         win.update_idletasks()
         x = min(event.x_root + 14, widget.winfo_screenwidth() - win.winfo_reqwidth() - 4)
@@ -447,6 +510,61 @@ def add_tooltip(widget, text):
     widget.bind('<Enter>', show, add='+')
     widget.bind('<Leave>', hide, add='+')
     widget.bind('<Destroy>', hide, add='+')
+
+
+def help_mark(parent, text, *also):
+    """A small "?" that shows the help text while the pointer is over it (or over also)."""
+    mark = tk.Label(parent, text='?', foreground=ACCENT, background=PANEL, cursor='question_arrow',
+                    font=('TkDefaultFont', 8, 'bold'), padx=5, pady=0, relief='flat',
+                    highlightthickness=1, highlightbackground=LINE)
+    for widget in (mark, *also):
+        add_tooltip(widget, text)
+    return mark
+
+
+def section(parent, text, help_text=None, padding=8):
+    """A titled box; with help_text a "?" sits next to the title."""
+    box = ttk.LabelFrame(parent, padding=padding)
+    title = ttk.Frame(box)
+    ttk.Label(title, text=text, style='TLabelframe.Label').pack(side='left')
+    if help_text:
+        help_mark(title, help_text).pack(side='left', padx=(6, 0))
+    box.configure(labelwidget=title)
+    return box
+
+
+def scroll_area(parent, padding=12):
+    """A frame inside a canvas: scroll bars show only when the content does not fit. The mouse
+    wheel reaches it through the window-wide handler (Launcher.wheel)."""
+    holder = ttk.Frame(parent)
+    holder.pack(fill='both', expand=True)
+    holder.rowconfigure(0, weight=1)
+    holder.columnconfigure(0, weight=1)
+    canvas = tk.Canvas(holder, background=BG, highlightthickness=0, bd=0, yscrollincrement=24,
+                       xscrollincrement=24)
+    ybar = ttk.Scrollbar(holder, orient='vertical', command=canvas.yview)
+    xbar = ttk.Scrollbar(holder, orient='horizontal', command=canvas.xview)
+    canvas.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
+    canvas.grid(row=0, column=0, sticky='nsew')
+    inner = ttk.Frame(canvas, padding=padding)
+    item = canvas.create_window(0, 0, window=inner, anchor='nw')
+
+    def fit(_=None):
+        cw, ch = canvas.winfo_width(), canvas.winfo_height()
+        rw, rh = inner.winfo_reqwidth(), inner.winfo_reqheight()
+        canvas.itemconfigure(item, width=max(cw, rw), height=max(ch, rh))
+        canvas.configure(scrollregion=(0, 0, max(cw, rw), max(ch, rh)))
+        for bar, need, cell in ((ybar, rh > ch, {'row': 0, 'column': 1, 'sticky': 'ns'}),
+                                (xbar, rw > cw, {'row': 1, 'column': 0, 'sticky': 'ew'})):
+            if need:
+                bar.grid(**cell)
+            else:
+                bar.grid_remove()
+
+    inner.bind('<Configure>', fit, add='+')
+    canvas.bind('<Configure>', fit, add='+')
+    canvas.scroll_inner = inner   # marks it for the wheel handler
+    return inner
 
 
 def art_path(settings, name):
@@ -468,14 +586,173 @@ def system_is_portuguese():
         return False
 
 
+def apply_theme(root):
+    """Dark warm ttk look on top of clam, for the settings page and every dialog."""
+    style = ttk.Style(root)
+    try:
+        style.theme_use('clam')
+    except tk.TclError:
+        return
+    style.configure('.', background=BG, foreground=TEXT_COLOR, fieldbackground=FIELD, bordercolor=LINE,
+                    lightcolor=PANEL, darkcolor=BG, troughcolor=FIELD, insertcolor=TEXT_COLOR,
+                    selectbackground=ACCENT, selectforeground=BG, arrowcolor=ACCENT)
+    style.map('.', foreground=[('disabled', DIM)], background=[('active', PANEL)])
+    style.configure('TLabelframe', background=BG, bordercolor=LINE)
+    style.configure('TLabelframe.Label', background=BG, foreground=ACCENT, font=(SERIF, 11))
+    style.configure('TButton', background=PANEL, foreground=TEXT_COLOR, bordercolor=LINE, padding=(10, 4))
+    style.map('TButton', background=[('pressed', FIELD), ('active', LINE)], bordercolor=[('active', ACCENT)])
+    style.configure('TCheckbutton', background=BG, indicatorbackground=FIELD, indicatorforeground=BG)
+    style.map('TCheckbutton', indicatorbackground=[('selected', ACCENT)], background=[('active', BG)])
+    style.configure('TRadiobutton', background=BG, indicatorbackground=FIELD)
+    style.map('TRadiobutton', indicatorbackground=[('selected', ACCENT)], background=[('active', BG)])
+    for name in ('TCombobox', 'TSpinbox', 'TEntry'):
+        style.configure(name, fieldbackground=FIELD, foreground=TEXT_COLOR, background=PANEL)
+        style.map(name, fieldbackground=[('readonly', FIELD)], foreground=[('readonly', TEXT_COLOR)],
+                  selectbackground=[('readonly', FIELD)], selectforeground=[('readonly', TEXT_COLOR)])
+    style.configure('TNotebook', background=BG, bordercolor=LINE)
+    style.configure('TNotebook.Tab', background=PANEL, foreground=MUTED, padding=(12, 4))
+    style.map('TNotebook.Tab', background=[('selected', BG)], foreground=[('selected', ACCENT)])
+    style.configure('Treeview', background=FIELD, fieldbackground=FIELD, foreground=TEXT_COLOR)
+    style.configure('Treeview.Heading', background=PANEL, foreground=MUTED)
+    style.configure('Back.TLabel', foreground=MUTED, font=(SERIF, 12))
+    style.configure('Play.TButton', font=(SERIF, 13), foreground=ACCENT, bordercolor=ACCENT)
+    root.configure(background=BG)
+    root.option_add('*Toplevel.background', BG)
+    root.option_add('*TCombobox*Listbox.background', FIELD)
+    root.option_add('*TCombobox*Listbox.foreground', TEXT_COLOR)
+    root.option_add('*TCombobox*Listbox.selectBackground', ACCENT)
+    root.option_add('*TCombobox*Listbox.selectForeground', BG)
+    root.option_add('*Text.background', FIELD)
+    root.option_add('*Text.foreground', MUTED)
+    root.option_add('*Listbox.background', FIELD)
+    root.option_add('*Listbox.foreground', TEXT_COLOR)
+
+
+def background_source(settings):
+    """The home screen picture: the player's own pick in the user folder, else pic1/pic0 from their dump.
+    Nothing is shipped with the port."""
+    for name in BACKGROUND_NAMES:
+        if (tlg_run.USER_DIR / name).is_file():
+            return tlg_run.USER_DIR / name
+    return art_path(settings, 'pic1.png') or art_path(settings, 'pic0.png')
+
+
+def home_background(source, size, faded=False):
+    """The picture cover-fitted to size, softened and faded into BG on the left and bottom (Pillow);
+    faded: blurred and darker, behind an open page. Without Pillow a plain Tk copy; None when
+    there is no picture."""
+    width, height = size
+    try:
+        from PIL import Image, ImageEnhance, ImageFilter, ImageTk
+    except ImportError:
+        if source is None:
+            return None
+        try:
+            return tk.PhotoImage(file=str(source))
+        except tk.TclError:
+            return None
+    dark = tuple(int(BG[i:i + 2], 16) for i in (1, 3, 5))
+    if source is None:
+        img = Image.new('RGB', size, dark)
+    else:
+        try:
+            img = Image.open(source).convert('RGB')
+        except OSError:
+            return None
+        if img.width < img.height * 1.4:
+            # Square key art (icon0.png): a blurred, stretched copy fills the window and the sharp
+            # picture sits on the right at full height, its left edge melting into the blur.
+            sharp = img.resize((round(img.width * height / img.height), height), Image.LANCZOS)
+            back = img.resize((width, round(img.height * width / img.width)), Image.BILINEAR)
+            back = back.crop((0, (back.height - height) // 2, width, (back.height - height) // 2 + height))
+            back = ImageEnhance.Brightness(back.filter(ImageFilter.GaussianBlur(28))).enhance(0.85)
+            edge = Image.new('L', (sharp.width, 1))
+            feather = sharp.width * 0.35
+            edge.putdata([int(255 * min(1.0, x / feather)) for x in range(sharp.width)])
+            back.paste(sharp, (width - sharp.width, 0), edge.resize(sharp.size))
+            img = back
+        else:
+            scale = max(width / img.width, height / img.height)
+            img = img.resize((max(width, round(img.width * scale)), max(height, round(img.height * scale))),
+                             Image.LANCZOS)
+            img = img.crop((0, (img.height - height) // 2, width, (img.height - height) // 2 + height))
+        img = ImageEnhance.Color(img).enhance(0.9)
+        img = ImageEnhance.Brightness(img).enhance(0.92)
+        img = Image.blend(img, Image.new('RGB', size, (226, 220, 204)), 0.10)
+    if faded:
+        img = img.filter(ImageFilter.GaussianBlur(6))
+        img = ImageEnhance.Color(img).enhance(0.55)
+        img = ImageEnhance.Brightness(img).enhance(0.6)
+        left = Image.new('L', (width, 1))
+        left.putdata([int(255 * 0.95 * max(0.0, 1 - x / (width * 0.3)) ** 1.2) for x in range(width)])
+        return ImageTk.PhotoImage(Image.composite(Image.new('RGB', size, dark), img, left.resize(size)))
+    # Fade: strong at the left (menu side) and the bottom (status line), built from two 1-D ramps.
+    left = Image.new('L', (width, 1))
+    left.putdata([int(255 * 0.95 * max(0.0, 1 - x / (width * 0.5)) ** 1.3) for x in range(width)])
+    bottom = Image.new('L', (1, height))
+    bottom.putdata([int(255 * 0.85 * max(0.0, (y - height * 0.7) / (height * 0.3)) ** 1.6) for y in range(height)])
+    from PIL import ImageChops
+    mask = ImageChops.add(left.resize(size), bottom.resize(size))
+    img = Image.composite(Image.new('RGB', size, dark), img, mask)
+    return ImageTk.PhotoImage(img)
+
+
+class Page(ttk.Frame):
+    """A launcher page in the main window, standing in for what used to be a pop-up window:
+    the window calls the pages make (title, transient, protocol, ...) are accepted and ignored."""
+
+    def __init__(self, app, name):
+        super().__init__(app.panel, padding=12)
+        self.app, self.name = app, name
+
+    def title(self, text, help_text=None):
+        header = ttk.Frame(self)
+        header.pack(fill='x', padx=12, pady=(4, 0))
+        ttk.Label(header, text=text, font=(SERIF, 18)).pack(side='left')
+        if help_text:
+            help_mark(header, help_text).pack(side='left', padx=(8, 0), pady=(6, 0))
+        return header
+
+    def ignored(self, *_):
+        pass
+
+    transient = protocol = minsize = ignored
+
+    def lift(self, *_):
+        self.app.show_page(self.name)
+
+    def destroy(self):
+        current = self.app.page == self.name and self.winfo_ismapped()
+        super().destroy()
+        if current and not self.app.building:
+            self.app.show_page('home')
+
+
 class Launcher:
     def __init__(self, root):
         self.root = root
         self.settings = tlg_run.load_settings()
         self.process = None
         self.lines = queue.Queue()
+        for sequence in ('<MouseWheel>', '<Button-4>', '<Button-5>', '<Shift-MouseWheel>'):
+            root.bind_all(sequence, self.wheel, add='+')
         self.build()
         self.root.after(100, self.pump)
+
+    def wheel(self, event):
+        """The mouse wheel scrolls the scroll area under the pointer (lists and text scroll themselves)."""
+        widget = self.root.winfo_containing(event.x_root, event.y_root)
+        if widget is None or widget.winfo_class() in ('Text', 'Listbox', 'TCombobox', 'Treeview'):
+            return
+        while widget is not None and not hasattr(widget, 'scroll_inner'):
+            widget = widget.master
+        if widget is None:
+            return
+        steps = -1 if event.num == 4 else 1 if event.num == 5 else (-1 if event.delta > 0 else 1)
+        if event.state & 1:   # Shift: sideways
+            widget.xview_scroll(steps, 'units')
+        else:
+            widget.yview_scroll(steps, 'units')
 
     # -- language ---------------------------------------------------------------------------
     def pt(self):
@@ -527,36 +804,61 @@ class Launcher:
 
     # -- window -----------------------------------------------------------------------------
     def build(self):
-        """Horizontal layout: banner on top; Game + Audio | Language + Video | game log; buttons below."""
+        """The home screen (art, menu, Play) and the pages that open over it: Settings, Video,
+        Graphics, Controls and Logs are made here; Advanced and Mods when first opened. Rebuilt on a
+        language change."""
+        if getattr(self, 'home_job', None):
+            self.root.after_cancel(self.home_job)
+            self.home_job = None
+        if getattr(self, 'controller', None):   # its widgets go with the rebuild
+            self.controller.stop()
+            self.controller = None
+        self.building = True
         for child in self.root.winfo_children():
             child.destroy()
+        self.building = False
         root = self.root
         root.title(self.t('title'))
-        root.minsize(1120, 680)
-        pad = {'padx': 6, 'pady': 4}
-        main = ttk.Frame(root, padding=12)
-        main.pack(fill='both', expand=True)
-        for column, weight in enumerate((3, 3, 3, 4)):
-            main.columnconfigure(column, weight=weight, uniform='cols' if column < 3 else '')
-        main.rowconfigure(2, weight=1)
-
-        header = ttk.Frame(main)
-        header.grid(row=0, column=0, columnspan=4, sticky='ew', pady=(0, 8))
         self.load_art()
-        if self.banner:
-            ttk.Label(header, image=self.banner).pack(side='left', padx=(0, 14))
-        titles = ttk.Frame(header)
-        titles.pack(side='left', fill='y')
-        ttk.Label(titles, text='The Last Guardian', font=('TkDefaultFont', 22, 'bold')).pack(anchor='w')
-        ttk.Label(titles, text='PC — CUSA03627 v1.03', foreground='#777').pack(anchor='w')
-        self.status = ttk.Label(titles, text='', foreground='#555', wraplength=420, justify='left')
-        self.status.pack(anchor='w', pady=(10, 0))
-
+        self.home = tk.Canvas(root, highlightthickness=0, bd=0, background=BG,
+                              width=HOME_SIZE[0], height=HOME_SIZE[1])
+        self.home.pack(fill='both', expand=True)
+        self.panel = tk.Frame(self.home, background=BG, highlightthickness=1, highlightbackground=LINE)
         self.vars = {}
-        left = ttk.Frame(main)
-        left.grid(row=2, column=0, sticky='nsew', **pad)
+        # Play and Clear-cache state for the home screen's canvas buttons (never shown themselves).
+        self.play_button = ttk.Button(self.panel, command=self.play)
+        self.cache_button = ttk.Button(self.panel, command=self.clear_cache)
+        self.status = ttk.Label(self.panel, text='')
+        self.build_settings()
+        self.build_video()
+        self.build_logs()
+        self.graphics_window = Page(self, 'graphics')
+        self.graphics_window.title(self.t('graphics_title'),
+                                   self.t('graphics_hint') + '\n\n' + self.t('graphics_keys') + '\n\n' + self.t('menu_note'))
+        self.graphics_body = scroll_area(self.graphics_window)
+        self.build_graphics()
+        self.build_controls()
+        self.home_items = {}
+        self.home.bind('<Configure>', lambda _: self.schedule_home())
+        page = getattr(self, 'page', 'home')
+        self.show_page(page if page in ('home', 'settings', 'video', 'graphics', 'controls', 'logs') else 'home')
+        self.refresh_status()
+
+    def build_settings(self):
+        """Settings: Game + Audio | Language + Launcher + Debug."""
+        win = self.settings_window = Page(self, 'settings')
+        win.title(self.t('home_settings'))
+        ttk.Label(win, text='PC — CUSA03627 v1.03', foreground=DIM).pack(anchor='w', padx=12)
+        main = scroll_area(win)
+        for column in (0, 1):
+            main.columnconfigure(column, weight=1, uniform='cols')
+        pad = {'padx': 6, 'pady': 4}
+        left, right = ttk.Frame(main), ttk.Frame(main)
+        left.grid(row=0, column=0, sticky='new', **pad)
+        right.grid(row=0, column=1, sticky='new', **pad)
         left.columnconfigure(0, weight=1)
-        game = ttk.LabelFrame(left, text=self.t('game'), padding=8)
+        right.columnconfigure(0, weight=1)
+        game = section(left, self.t('game'))
         game.grid(sticky='ew', pady=(0, 8))
         game.columnconfigure(0, weight=1)
         for row, key in enumerate(('game_dir', 'system_lib_dir', 'texpack_dir')):
@@ -568,30 +870,11 @@ class Launcher:
             ttk.Button(game, text=self.t('browse'), command=lambda k=key: self.browse(k)).grid(
                 row=row * 2 + 1, column=1, padx=(6, 0), pady=(0, 6))
         self.vars['texpack_dir'].trace_add('write', lambda *_: self.refresh_texture_pack())
-        audio = ttk.LabelFrame(left, text=self.t('audio'), padding=8)
-        audio.grid(sticky='ew', pady=(0, 8))
+        audio = section(left, self.t('audio'))
+        audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
-        controls = ttk.LabelFrame(left, text=self.t('controls'), padding=8)
-        controls.grid(sticky='ew')
-        controls.columnconfigure(1, weight=1)
-        self.check(controls, 0, 'mouse_enabled')
-        self.check(controls, 1, 'mouse_invert_y')
-        self.combo(controls, 4, 'menu_confirm', ['cross', 'circle'],
-                   lambda k: 'Cross (X / A)' if k == 'cross' else 'Circle (O / B)')
-        ttk.Label(controls, text=self.t('mouse_sensitivity')).grid(row=2, column=0, sticky='w', pady=(4, 0))
-        sens = tk.DoubleVar(value=float(self.settings.get('mouse_sensitivity', 1.0)))
-        self.vars['mouse_sensitivity'] = sens
-        sens_spin = ttk.Spinbox(controls, from_=0.1, to=5.0, increment=0.1, format='%.2f', textvariable=sens,
-                                width=6, command=self.changed)
-        sens_spin.grid(row=2, column=1, sticky='w', padx=6, pady=(4, 0))
-        sens_spin.bind('<FocusOut>', lambda _: self.changed())
-        ttk.Button(controls, text=self.t('remap'), command=self.remap_dialog).grid(row=2, column=2, sticky='e', pady=(4, 0))
-        self.hint(controls, 0, 3, 'mouse_hint')
 
-        middle = ttk.Frame(main)
-        middle.grid(row=2, column=1, sticky='nsew', **pad)
-        middle.columnconfigure(0, weight=1)
-        lang = ttk.LabelFrame(middle, text=self.t('language'), padding=8)
+        lang = section(right, self.t('language'))
         lang.grid(sticky='ew', pady=(0, 8))
         lang.columnconfigure(1, weight=1)
         self.game_lang_box = None
@@ -599,98 +882,345 @@ class Launcher:
         self.combo(lang, 1, 'ui_language', UI_LANGUAGES,
                    lambda k: self.t('auto') if k == 'auto' else UI_LANGUAGE_NAMES[k], on_change=self.build)
         self.check(lang, 2, 'skip_logos')
-        video = ttk.LabelFrame(middle, text=self.t('video'), padding=8)
-        video.grid(sticky='ew')
+        launcher = section(right, self.t('launcher_section'))
+        launcher.grid(sticky='ew', pady=(0, 8))
+        ttk.Button(launcher, text=self.t('home_picture'), command=self.pick_background).pack(side='left')
+        ttk.Button(launcher, text=self.t('home_picture_reset'), command=self.reset_background).pack(
+            side='left', padx=(6, 0))
+        ttk.Button(launcher, text=self.t('legacy_menu'), command=self.switch_menu).pack(side='left', padx=(6, 0))
+        debug = section(right, self.t('debug'))
+        debug.grid(sticky='ew')
+        self.check(debug, 0, 'level_select')
+        self.hint(debug, 0, 3, 'debug_hint')
+        self.check(debug, 2, 'debug_logging')
+        self.hint(debug, 2, 3, 'debug_logging_hint')
+
+    def build_video(self):
+        """Video: display, frame rate, resolution, anti-aliasing, frame generation | video memory."""
+        win = self.video_window = Page(self, 'video')
+        win.title(self.t('home_video'))
+        main = scroll_area(win)
+        for column in (0, 1):
+            main.columnconfigure(column, weight=1, uniform='cols')
+        video = section(main, self.t('display'))
+        video.grid(row=0, column=0, sticky='new', padx=6, pady=4)
         video.columnconfigure(1, weight=1)
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
         self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'))
         self.hint(video, 5, 2, 'fps_hint')
-        ttk.Label(video, text=self.t('vram'), wraplength=220).grid(row=3, column=0, sticky='w', pady=(6, 0))
-        vram = tk.IntVar(value=int(self.settings['vram_budget_mb']))
-        self.vars['vram_budget_mb'] = vram
-        spin = ttk.Spinbox(video, from_=2000, to=24000, increment=200, textvariable=vram, width=8,
-                           command=self.changed)
-        spin.grid(row=3, column=1, sticky='w', padx=6, pady=(6, 0))
-        spin.bind('<FocusOut>', lambda _: self.changed())
-        memory = ttk.Frame(video)
-        memory.grid(row=4, column=0, columnspan=2, sticky='w')
-        self.hint(video, 3, 2, 'vram_hint')
-        # The in-game menu's texture cleanup (tlg.ini, applies at once).
-        cleanup = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('texture_cleanup', '0') != '0')
-
-        def cleanup_toggled():
-            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
-            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'texture_cleanup': '1' if cleanup.get() else '0'})
-            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
-
-        ttk.Checkbutton(memory, text=self.t('texture_cleanup'), variable=cleanup, command=cleanup_toggled).grid(
-            row=1, column=0, sticky='w', pady=(4, 0))
-        self.hint(memory, 1, 1, 'texture_cleanup_hint')
-        keep_gpu = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('keep_gpu_textures', '1') != '0')
-
-        def keep_gpu_toggled():
-            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
-            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'keep_gpu_textures': '1' if keep_gpu.get() else '0'})
-            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
-
-        ttk.Checkbutton(memory, text=self.t('keep_gpu_textures'), variable=keep_gpu, command=keep_gpu_toggled).grid(
-            row=2, column=0, sticky='w', pady=(4, 0))
-        self.hint(memory, 2, 1, 'keep_gpu_textures_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))
         self.aa_box = ttk.Combobox(video, values=[self.t(label) for label, _ in AA_MODES],
                                    state='readonly', width=20)
-        self.aa_box.current(aa_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
+        self.aa_box.current(aa_mode_of(ini))
         self.aa_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
         self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground='#777', wraplength=320)
+        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=DIM, wraplength=320)
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
-        self.update_aa_note(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini'))
+        self.update_aa_note(ini)
         ttk.Label(video, text=self.t('fg_mode')).grid(row=11, column=0, sticky='w', pady=(6, 0))
         self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS', 'FSR 3.1'], state='readonly', width=20)
-        self.fg_box.current(fg_mode_of(tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')))
+        self.fg_box.current(fg_mode_of(ini))
         self.fg_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 11, 2, 'fg_hint')
-        image = ttk.LabelFrame(main, text=self.t('image'), padding=8)
-        image.grid(row=2, column=2, sticky='new', **pad)
-        image.columnconfigure(1, weight=1)
-        self.build_filters(image, 0)
-        self.build_preset(image, 20)
-        debug = ttk.LabelFrame(middle, text=self.t('debug'), padding=8)
-        debug.grid(sticky='ew', pady=(8, 0))
-        self.check(debug, 0, 'level_select')
-        self.hint(debug, 0, 3, 'debug_hint')
-        self.check(debug, 2, 'debug_logging')
-        self.hint(debug, 2, 3, 'debug_logging_hint')
+        self.hdr_var = tk.BooleanVar(value=ini.get('hdr', '1') != '0')
 
-        log_frame = ttk.LabelFrame(main, text='Log', padding=4)
-        log_frame.grid(row=2, column=3, sticky='nsew', **pad)
-        self.log = tk.Text(log_frame, wrap='none', font=('TkFixedFont', 9), state='disabled', width=48)
-        scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
-        self.log.configure(yscrollcommand=scroll.set)
-        self.log.pack(side='left', fill='both', expand=True)
-        scroll.pack(side='right', fill='y')
+        def hdr_toggled():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'hdr': int(self.hdr_var.get())})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+            self.refresh_preset()
+        ttk.Checkbutton(video, text='HDR', variable=self.hdr_var, command=hdr_toggled).grid(
+            row=13, column=0, columnspan=2, sticky='w', pady=(6, 0))
+        self.hint(video, 13, 2, 'hdr_hint')
 
-        buttons = ttk.Frame(main)
-        buttons.grid(row=3, column=0, columnspan=4, sticky='ew', pady=(10, 0))
-        ttk.Button(buttons, text=self.t('quit'), command=self.quit).pack(side='left')
-        ttk.Label(buttons, text=self.t('menu_note'), foreground='#555', wraplength=300).pack(side='left', padx=12)
-        style = ttk.Style()
-        style.configure('Play.TButton', font=('TkDefaultFont', 13, 'bold'))
-        self.play_button = ttk.Button(buttons, text=self.t('play'), style='Play.TButton', command=self.play)
-        self.play_button.pack(side='right', ipadx=30, ipady=8)
-        ttk.Button(buttons, text=self.t('logs'), command=lambda: self.open(tlg_run.LOG_DIR)).pack(side='right', padx=6)
-        ttk.Button(buttons, text=self.t('mods'), command=self.mods_dialog).pack(side='right', padx=6)
-        ttk.Button(buttons, text=self.t('graphics'), command=self.graphics_dialog).pack(side='right', padx=(6, 0))
-        ttk.Button(buttons, text=self.t('advanced'), command=self.advanced_dialog).pack(side='right', padx=(6, 0))
-        ttk.Button(buttons, text=self.t('saves'), command=lambda: self.open(tlg_run.USER_DIR / 'savedata')).pack(side='right')
-        self.cache_button = ttk.Button(buttons, text=self.t('clear_cache'), command=self.clear_cache)
-        self.cache_button.pack(side='right', padx=(0, 6))
-        self.refresh_status()
+        memory = section(main, self.t('memory'))
+        memory.grid(row=0, column=1, sticky='new', padx=6, pady=4)
+        ttk.Label(memory, text=self.t('vram')).grid(row=0, column=0, sticky='w')
+        vram = tk.IntVar(value=int(self.settings['vram_budget_mb']))
+        self.vars['vram_budget_mb'] = vram
+        spin = ttk.Spinbox(memory, from_=2000, to=24000, increment=200, textvariable=vram, width=8,
+                           command=self.changed)
+        spin.grid(row=0, column=1, sticky='w', padx=6)
+        spin.bind('<FocusOut>', lambda _: self.changed())
+        self.hint(memory, 0, 2, 'vram_hint')
+
+        def ini_check(row, key, default, hint_key):
+            # The in-game menu's switches (tlg.ini, apply at once).
+            var = tk.BooleanVar(value=ini.get(key, default) != '0')
+
+            def toggled():
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
+                self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+            ttk.Checkbutton(memory, text=self.t(key), variable=var, command=toggled).grid(
+                row=row, column=0, columnspan=2, sticky='w', pady=(4, 0))
+            self.hint(memory, row, 2, hint_key)
+
+        ini_check(1, 'texture_cleanup', '0', 'texture_cleanup_hint')
+        ini_check(2, 'keep_gpu_textures', '1', 'keep_gpu_textures_hint')
+
+    def build_logs(self):
+        """Logs: the game log as it runs, and the logs folder."""
+        win = self.logs_window = Page(self, 'logs')
+        header = win.title(self.t('home_logs'))
+        ttk.Button(header, text=self.t('logs'), command=lambda: self.open(tlg_run.LOG_DIR)).pack(
+            side='right', pady=(6, 0))
+        ttk.Button(header, text=self.t('report_issue'), command=self.report_issue).pack(
+            side='right', padx=(0, 6), pady=(6, 0))
+        frame = ttk.Frame(win, padding=12)
+        frame.pack(fill='both', expand=True)
+        self.log = tk.Text(frame, wrap='none', font=('TkFixedFont', 9), state='disabled',
+                           background=FIELD, foreground=MUTED, insertbackground=TEXT_COLOR,
+                           highlightthickness=0, relief='flat')
+        yscroll = ttk.Scrollbar(frame, command=self.log.yview)
+        xscroll = ttk.Scrollbar(frame, orient='horizontal', command=self.log.xview)
+        self.log.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+        frame.rowconfigure(0, weight=1)
+        frame.columnconfigure(0, weight=1)
+        self.log.grid(row=0, column=0, sticky='nsew')
+        yscroll.grid(row=0, column=1, sticky='ns')
+        xscroll.grid(row=1, column=0, sticky='ew')
+        for line in getattr(self, 'log_lines', []):   # kept over a language change
+            self.append(line, keep=False)
+
+    def build_controls(self):
+        """Controls: a Controller tab (pad_page.py) and a Keyboard & mouse tab. The game reads both at once."""
+        win = self.controls_window = Page(self, 'controls')
+        win.title(self.t('home_controls'))
+        tabs = self.controls_tabs = ttk.Notebook(win)
+        tabs.pack(fill='both', expand=True, padx=12, pady=(6, 12))
+        pad_tab, keys_tab = ttk.Frame(tabs), ttk.Frame(tabs)
+        tabs.add(pad_tab, text=self.t('home_controller'))
+        tabs.add(keys_tab, text=self.t('home_keys'))
+        self.controller = pad_page.ControllerPage(self, scroll_area(pad_tab, padding=0),
+                                                  (BG, LINE, TEXT_COLOR, MUTED, ACCENT, FIELD))
+        tabs.bind('<<NotebookTabChanged>>', lambda _: self.update_controller())
+        frame = scroll_area(keys_tab)
+        mouse = section(frame, self.t('mouse_section'), self.t('mouse_hint'))
+        mouse.grid(row=0, column=0, sticky='nw', pady=(0, 8))
+        mouse.columnconfigure(1, weight=1)
+        self.check(mouse, 0, 'mouse_enabled')
+        self.check(mouse, 1, 'mouse_invert_y')
+        ttk.Label(mouse, text=self.t('mouse_sensitivity')).grid(row=2, column=0, sticky='w', pady=(4, 0))
+        sens = tk.DoubleVar(value=float(self.settings.get('mouse_sensitivity', 1.0)))
+        self.vars['mouse_sensitivity'] = sens
+        sens_spin = ttk.Spinbox(mouse, from_=0.1, to=5.0, increment=0.1, format='%.2f', textvariable=sens,
+                                width=6, command=self.changed)
+        sens_spin.grid(row=2, column=1, sticky='w', padx=6, pady=(4, 0))
+        sens_spin.bind('<FocusOut>', lambda _: self.changed())
+        self.combo(mouse, 4, 'menu_confirm', ['cross', 'circle'],
+                   lambda k: 'Cross (X / A)' if k == 'cross' else 'Circle (O / B)')
+        keys = section(frame, self.t('remap_title'), self.t('remap_help'))
+        keys.grid(row=1, column=0, sticky='nw')
+        self.build_remap(keys, win)
+
+    def update_controller(self):
+        # The helper reads the pads only while the Controller tab shows.
+        controller = getattr(self, 'controller', None)
+        if not controller:
+            return
+        if self.page == 'controls' and self.controls_tabs.index('current') == 0:
+            controller.start()
+        else:
+            controller.stop()
+
+    # -- home screen ------------------------------------------------------------------------
+    def show_page(self, page):
+        """'home' is the full picture; any other page opens in the panel over the faded picture."""
+        self.page = page
+        if not getattr(self, 'sized', False):
+            # Always 16:9: 70% of the screen height (at least 1280x720), the width from that.
+            self.sized = True
+            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            h = max(720, int(sh * 0.7))
+            w = h * 16 // 9
+            if w > sw:
+                w, h = sw, sw * 9 // 16
+            self.root.geometry(f'{w}x{h}+{max(0, (sw - w) // 2)}+{max(0, (sh - h) // 3)}')
+            self.root.minsize(min(1280, sw), min(720, sh))
+            self.root.aspect(16, 9, 16, 9)
+        for child in self.panel.pack_slaves():
+            child.pack_forget()
+        if page != 'home':
+            getattr(self, page + '_window').pack(fill='both', expand=True)
+        self.update_controller()
+        self.draw_home()
+
+    def schedule_home(self):
+        # Redraw once the window stops changing size (the fade is rendered per size).
+        if getattr(self, 'home_job', None):
+            self.root.after_cancel(self.home_job)
+        self.home_job = self.root.after(120, self.draw_home)
+
+    def draw_home(self):
+        self.home_job = None
+        c = self.home
+        width, height = c.winfo_width(), c.winfo_height()
+        if width <= 1:
+            width, height = 1280, 760
+        home = self.page == 'home'
+        c.delete('all')
+        self.home_items = {}
+        self.home_art = home_background(background_source(self.settings), (width, height), faded=not home)
+        if self.home_art is not None:
+            c.create_image(0, 0, image=self.home_art, anchor='nw')
+        left = 64 if home else 48
+        top = 92 if home else 56
+        c.create_text(left, top, text='T H E   L A S T', anchor='w', fill=MUTED,
+                      font=(SERIF, 14 if home else 11), tags='title')
+        c.create_text(left, top + (44 if home else 30), text='G U A R D I A N', anchor='w', fill=TEXT_COLOR,
+                      font=(SERIF, 34 if home else 22), tags='title')
+        line_y = top + (84 if home else 56)
+        c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
+        if home:
+            c.create_text(left, 198, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
+                          fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11))
+        else:
+            c.tag_bind('title', '<Button-1>', lambda _: self.show_page('home'))
+            c.tag_bind('title', '<Enter>', lambda _: c.configure(cursor='hand2'))
+            c.tag_bind('title', '<Leave>', lambda _: c.configure(cursor=''))
+        items = [('home_settings', 'settings', lambda: self.show_page('settings')),
+                 ('home_video', 'video', lambda: self.show_page('video')),
+                 ('home_graphics', 'graphics', self.graphics_dialog),
+                 ('home_controls', 'controls', self.controller_dialog),
+                 ('home_advanced', 'advanced', self.advanced_dialog),
+                 ('home_logs', 'logs', lambda: self.show_page('logs')),
+                 ('home_quit', None, self.quit)]
+        first = 250 if home else 170
+        step = min(38 if home else 36, max(28, (height - first - 120) // len(items)))
+        for index, (key, page, action) in enumerate(items):
+            y = first + index * step
+            on = page is not None and page == self.page
+            item = c.create_text(left + (16 if on else 0), y, text=self.t(key), anchor='w',
+                                 fill=TEXT_COLOR if on else MUTED,
+                                 font=(SERIF, 14 if on else 13 if home else 12))
+            if on:
+                c.create_oval(left, y - 3, left + 6, y + 3, fill=ACCENT, outline='')
+                continue
+            dot = c.create_oval(left - 16, y - 3, left - 10, y + 3, fill=ACCENT, outline='', state='hidden')
+            c.tag_bind(item, '<Enter>', lambda _, i=item, d=dot: (c.itemconfig(i, fill=TEXT_COLOR),
+                                                                  c.itemconfig(d, state='normal'),
+                                                                  c.configure(cursor='hand2')))
+            c.tag_bind(item, '<Leave>', lambda _, i=item, d=dot: (c.itemconfig(i, fill=MUTED),
+                                                                  c.itemconfig(d, state='hidden'),
+                                                                  c.configure(cursor='')))
+            c.tag_bind(item, '<Button-1>', lambda _, a=action: a())
+        play_text = ' '.join(self.t('play').upper())
+        if home:
+            status_y, cache_y, status_width = height - 60, height - 34, max(200, width - 360)
+            right, mid = width - 64, height - 60
+            box = c.create_rectangle(right - 190, mid - 24, right, mid + 24, outline=ACCENT, width=1, fill='')
+            label = c.create_text(right - 95, mid, text=play_text, fill=ACCENT, font=(SERIF, 15))
+        else:
+            status_y, cache_y, status_width = height - 100, height - 76, 230
+            box = c.create_rectangle(left, height - 56, left + 190, height - 16, outline=ACCENT, width=1,
+                                     fill=ACCENT)
+            label = c.create_text(left + 95, height - 36, text=play_text, fill=BG, font=(SERIF, 13))
+            c.create_window(300, 40, window=self.panel, anchor='nw', width=width - 340, height=height - 80)
+        self.home_items['status'] = c.create_text(left, status_y, text='', anchor='w', fill=MUTED,
+                                                  font=(SERIF, 11 if home else 10, 'italic'), width=status_width)
+        c.create_text(left, cache_y, text=self.t('home_cache'), anchor='w', fill=DIM, font=(SERIF, 9),
+                      tags='cache')
+        c.tag_bind('cache', '<Button-1>', lambda _: self.clear_cache())
+        # Menu music on/off, next to the cache link (saved at once).
+        music = c.create_text(left + 150, cache_y, anchor='w', fill=DIM, font=(SERIF, 9), tags='music',
+                              text=self.t('home_music_on' if self.settings.get('menu_music', True) else 'home_music_off'))
+        c.tag_bind('music', '<Enter>', lambda _: (c.itemconfig(music, fill=ACCENT), c.configure(cursor='hand2')))
+        c.tag_bind('music', '<Leave>', lambda _: (c.itemconfig(music, fill=DIM), c.configure(cursor='')))
+        c.tag_bind('music', '<Button-1>', lambda _: self.toggle_music(music))
+        self.home_items.update(play_box=box, play_label=label)
+        # A small square next to PLAY copies the start command (Steam, SteamOS).
+        if home:
+            x0, y0 = right - 190 - 54, mid - 24
+        else:
+            x0, y0 = left + 198, height - 56
+        size = 48 if home else 40
+        c.create_rectangle(x0, y0, x0 + size, y0 + size, outline=DIM, width=1, fill='', tags='copycmd')
+        c.create_text(x0 + size / 2, y0 + size / 2, text='⧉', fill=MUTED, font=(SERIF, 14 if home else 12),
+                      tags=('copycmd', 'copycmd_glyph'))
+        tip = []
+
+        def enter(event):
+            c.itemconfig('copycmd_glyph', fill=ACCENT)
+            c.configure(cursor='hand2')
+            if not tip:
+                win = tk.Toplevel(c)
+                win.overrideredirect(True)
+                tk.Label(win, text=self.t('copy_command_tip'), background=PANEL, foreground=TEXT_COLOR,
+                         relief='solid', borderwidth=1, wraplength=320, justify='left', padx=6, pady=4).pack()
+                win.update_idletasks()
+                x = min(event.x_root + 14, c.winfo_screenwidth() - win.winfo_reqwidth() - 4)
+                win.geometry(f'+{x}+{event.y_root - win.winfo_reqheight() - 10}')
+                tip.append(win)
+
+        def leave(_):
+            c.itemconfig('copycmd_glyph', fill=MUTED)
+            c.configure(cursor='')
+            while tip:
+                tip.pop().destroy()
+        c.tag_bind('copycmd', '<Enter>', enter)
+        c.tag_bind('copycmd', '<Leave>', leave)
+        c.tag_bind('copycmd', '<Button-1>', lambda _: self.copy_command())
+        for tag in (box, label):
+            c.tag_bind(tag, '<Enter>', lambda _: self.hover_play(True))
+            c.tag_bind(tag, '<Leave>', lambda _: self.hover_play(False))
+            c.tag_bind(tag, '<Button-1>', lambda _: self.play() if self.play_ready() else None)
+        self.refresh_home()
+
+    def play_ready(self):
+        return str(self.play_button.cget('state')) == 'normal'
+
+    def hover_play(self, on):
+        ready = self.play_ready()
+        on = on and ready
+        if self.page != 'home':
+            self.home.itemconfig(self.home_items['play_box'], fill='#f0cc93' if on else ACCENT if ready else LINE)
+        else:
+            self.home.itemconfig(self.home_items['play_box'], fill=ACCENT if on else '')
+            self.home.itemconfig(self.home_items['play_label'], fill=BG if on else ACCENT if ready else DIM)
+        self.home.configure(cursor='hand2' if on else '')
+
+    def refresh_home(self):
+        if (not getattr(self, 'home_items', None) or 'status' not in self.home_items
+                or not self.status.winfo_exists() or not self.home.winfo_exists()):
+            return
+        text = self.status.cget('text')
+        if self.process:
+            text = f"{self.t('home_running')}  ·  {text}"
+        self.home.itemconfig(self.home_items['status'], text=text)
+        ready = self.play_ready()
+        if self.page != 'home':
+            self.home.itemconfig(self.home_items['play_box'], outline=ACCENT if ready else LINE,
+                                 fill=ACCENT if ready else LINE)
+            self.home.itemconfig(self.home_items['play_label'], fill=BG if ready else DIM)
+        else:
+            self.home.itemconfig(self.home_items['play_box'], outline=ACCENT if ready else DIM, fill='')
+            self.home.itemconfig(self.home_items['play_label'], fill=ACCENT if ready else DIM)
+
+    def pick_background(self):
+        path = filedialog.askopenfilename(title=self.t('home_picture'),
+                                          filetypes=[('Images', '*.png *.jpg *.jpeg')])
+        if not path:
+            return
+        tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+        self.reset_background(redraw=False)
+        suffix = '.jpg' if path.lower().endswith(('.jpg', '.jpeg')) else '.png'
+        target = tlg_run.USER_DIR / ('launcher_background' + suffix)
+        target.write_bytes(Path(path).read_bytes())  # a copy: the picture stays the player's own
+        self.draw_home()
+
+    def reset_background(self, redraw=True):
+        for name in BACKGROUND_NAMES:
+            (tlg_run.USER_DIR / name).unlink(missing_ok=True)
+        if redraw:
+            self.draw_home()
 
     def load_art(self):
         """Window icon (the port's tlg.png) and a 480x135 banner (a band of pic1.png from the dump, when present)."""
@@ -716,8 +1246,7 @@ class Launcher:
 
     def build_filters(self, parent, row):
         """SMAA, sharpening and color adjustments, read from and written to tlg.ini right away."""
-        ttk.Label(parent, text=self.t('filters'), foreground='#555', wraplength=360).grid(
-            row=row + 1, column=0, columnspan=2, sticky='w')
+        ttk.Separator(parent).grid(row=row + 1, column=0, columnspan=3, sticky='ew', pady=(8, 4))
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
         self.ini_vars = {}
@@ -757,7 +1286,6 @@ class Launcher:
     def build_preset(self, parent, row):
         """The in-game menu's graphics presets (preset_share.game_presets): every look setting and the
         texture pack at once, written to tlg.ini."""
-        ttk.Separator(parent).grid(row=row, column=0, columnspan=2, sticky='ew', pady=(8, 4))
         ttk.Label(parent, text=self.t('graphics_preset')).grid(row=row + 1, column=0, sticky='w')
         self.preset_box = ttk.Combobox(parent, state='readonly', width=28)
         self.preset_box.grid(row=row + 1, column=1, sticky='w', padx=6, pady=2)
@@ -811,19 +1339,19 @@ class Launcher:
     def reload_ini(self):
         """The rows that show tlg.ini values read it again."""
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        for key, var in self.ini_vars.items():
-            value = ini.get(key, INI_DEFAULTS[key])
-            var.set(value not in ('0', '') if isinstance(var, tk.BooleanVar) else value)
-        self.sharpener.current(2 if ini.get('cas', '0') not in ('0', '') else 1 if ini.get('rcas', '1') not in ('0', '') else 0)
-        self.update_strength(ini)
         self.aa_box.current(aa_mode_of(ini))
         self.fg_box.current(fg_mode_of(ini))
         self.update_aa_note(ini)
-        if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
-            self.graphics_window.destroy()  # its sliders show the old values
-            self.graphics_dialog()
-        self.refresh_preset()
-        self.refresh_texture_pack()
+        self.hdr_var.set(ini.get('hdr', '1') != '0')
+        # Its sliders show the old values; rebuilt after, not from inside one of its own events.
+        self.root.after_idle(self.rebuild_graphics)
+
+    def rebuild_graphics(self):
+        if not self.graphics_body.winfo_exists():
+            return
+        for child in self.graphics_body.winfo_children():
+            child.destroy()
+        self.build_graphics()
 
     def refresh_texture_pack(self):
         """Lists the packs in the texture packs folder and shows the one tlg.ini picks."""
@@ -946,16 +1474,15 @@ class Launcher:
             self.settings['game_language'] = current
             tlg_run.save_settings(self.settings)
 
+    def controller_dialog(self):
+        self.show_page('controls')
+
     def remap_dialog(self):
+        self.controls_tabs.select(1)
+        self.show_page('controls')
+
+    def build_remap(self, frame, win):
         """PS4 button -> keys and mouse buttons (tlg.ini key_map through tlg_run.launch)."""
-        if getattr(self, 'remap_window', None) and self.remap_window.winfo_exists():
-            self.remap_window.lift()
-            return
-        win = self.remap_window = tk.Toplevel(self.root)
-        win.title(self.t('remap_title'))
-        win.transient(self.root)
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill='both', expand=True)
         mapping = dict(self.settings.get('key_map') or {})
         entries = {}
         half = (len(PS4_BUTTONS) + 1) // 2
@@ -1008,22 +1535,14 @@ class Launcher:
             set_button.grid(row=row, column=column + 2, padx=4, pady=1)
             ttk.Label(frame, text=tlg_run.DEFAULT_KEYS[button], foreground='#888').grid(
                 row=row, column=column + 3, sticky='w', padx=(0, 18))
-        ttk.Label(frame, text=self.t('remap_help'), foreground='#555', wraplength=760, justify='left').grid(
-            row=half + 1, column=0, columnspan=8, sticky='w', pady=(10, 6))
         bottom = ttk.Frame(frame)
-        bottom.grid(row=half + 2, column=0, columnspan=8, sticky='ew')
+        bottom.grid(row=half + 2, column=0, columnspan=8, sticky='ew', pady=(10, 0))
 
         def reset():
             for entry in entries.values():
                 entry.delete(0, 'end')
             save()
-
-        def close():
-            save()
-            win.destroy()
         ttk.Button(bottom, text=self.t('reset'), command=reset).pack(side='left')
-        ttk.Button(bottom, text=self.t('close'), command=close).pack(side='right')
-        win.protocol('WM_DELETE_WINDOW', close)
 
     def mods_dialog(self):
         """Mods/cheats (shadPS4/GoldHEN XML in tlg_run.mods_dir()); toggles write mods.json
@@ -1031,21 +1550,20 @@ class Launcher:
         if getattr(self, 'mods_window', None) and self.mods_window.winfo_exists():
             self.mods_window.lift()
             return
-        win = self.mods_window = tk.Toplevel(self.root)
-        win.title(self.t('mods_title'))
-        win.transient(self.root)
-        win.minsize(560, 360)
+        win = self.mods_window = Page(self, 'mods')
+        win.title(self.t('mods_title'), self.t('mods_hint'))
         frame = ttk.Frame(win, padding=12)
         frame.pack(fill='both', expand=True)
-        ttk.Label(frame, text=self.t('mods_hint'), wraplength=520, justify='left').pack(anchor='w')
-        ttk.Label(frame, text=self.t('mods_warning'), foreground='#a33', wraplength=520, justify='left').pack(
+        self.show_page('mods')
+        ttk.Label(frame, text=self.t('mods_warning'), foreground='#d07060', wraplength=900, justify='left').pack(
             anchor='w', pady=(4, 8))
 
         list_frame = ttk.Frame(frame)
         list_frame.pack(fill='both', expand=True)
-        canvas = tk.Canvas(list_frame, highlightthickness=0)
+        canvas = tk.Canvas(list_frame, highlightthickness=0, background=BG, yscrollincrement=24)
         scroll = ttk.Scrollbar(list_frame, orient='vertical', command=canvas.yview)
         rows = ttk.Frame(canvas)
+        canvas.scroll_inner = rows
         rows.bind('<Configure>', lambda _: canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.create_window((0, 0), window=rows, anchor='nw')
         canvas.configure(yscrollcommand=scroll.set)
@@ -1064,7 +1582,7 @@ class Launcher:
                 mods = []
                 ttk.Label(rows, text=str(error), foreground='#a33').pack(anchor='w')
             if not mods:
-                ttk.Label(rows, text=self.t('mods_empty'), foreground='#777').pack(anchor='w', pady=8)
+                ttk.Label(rows, text=self.t('mods_empty'), foreground=DIM).pack(anchor='w', pady=8)
             for key, name, note, enabled in mods:
                 row = ttk.Frame(rows)
                 row.pack(fill='x', anchor='w', pady=2)
@@ -1072,7 +1590,7 @@ class Launcher:
                 ttk.Checkbutton(row, text=name or key, variable=var,
                                 command=lambda k=key, v=var: toggle(k, v)).pack(anchor='w')
                 if note:
-                    ttk.Label(row, text=note, foreground='#777', wraplength=480, justify='left').pack(
+                    ttk.Label(row, text=note, foreground=DIM, wraplength=480, justify='left').pack(
                         anchor='w', padx=(22, 0))
         populate()
 
@@ -1080,20 +1598,15 @@ class Launcher:
         bottom.pack(fill='x', pady=(10, 0))
         ttk.Button(bottom, text=self.t('mods_folder'), command=lambda: self.open(tlg_run.mods_dir())).pack(side='left')
         ttk.Button(bottom, text=self.t('mods_refresh'), command=populate).pack(side='left', padx=6)
-        ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
 
     def graphics_dialog(self):
-        """HDR, shadow resolution and the game's effect strengths (the in-game menu's, Insert),
-        written to tlg.ini right away."""
-        if getattr(self, 'graphics_window', None) and self.graphics_window.winfo_exists():
-            self.graphics_window.lift()
-            return
-        win = self.graphics_window = tk.Toplevel(self.root)
-        win.title(self.t('graphics_title'))
-        win.transient(self.root)
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill='both', expand=True)
-        frame.columnconfigure((0, 1, 2), weight=1)
+        self.show_page('graphics')
+
+    def build_graphics(self):
+        """Graphics: preset, texture pack and image filters | HDR, shadows, grass and textures on
+        top; the game's effect strengths below. All tlg.ini, applied at once (the in-game menu's, Insert)."""
+        frame = self.graphics_body
+        frame.columnconfigure((0, 1), weight=1, uniform='cols')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
 
         def number(key, default):
@@ -1108,48 +1621,81 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
             self.refresh_preset()
 
-        # Each hint starts with the row's default and, where known, its value on PS4 (same as the
-        # in-game menu).
+        # Each "?" starts with the row's default and, where known, its value on PS4 (same as the
+        # in-game menu). It sits at the end of the row above (the setting's own row).
         def hint(parent, row, key, default, ps4=None):
             marks = self.t('mark_default', value=default) + ('' if ps4 is None else f' · PS4: {ps4}')
-            ttk.Label(parent, text=marks + '\n' + self.t(key), foreground='#777', wraplength=340,
-                      justify='left').grid(row=row, column=0, columnspan=4, sticky='w', pady=(0, 6))
+            help_mark(parent, marks + '\n\n' + self.t(key)).grid(row=row - 1, column=4, sticky='w', padx=(4, 0), pady=2)
 
         on_off = lambda on: self.t('mark_on' if on else 'mark_off')
-        # Advice: tweak while playing (changes show at once), with the in-game shortcuts.
-        tips = ttk.LabelFrame(frame, text=self.t('graphics_tips'), padding=6)
-        tips.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 8))
-        ttk.Label(tips, text=self.t('graphics_hint'), wraplength=440, justify='left').pack(side='left', anchor='n')
-        ttk.Label(tips, text=self.t('graphics_keys'), justify='left',
-                  font=('TkFixedFont', 9)).pack(side='left', anchor='n', padx=(16, 0))
-        # Three columns: display, shadows, grass and textures on the left; the effects in the other two.
-        left, middle, right = ttk.Frame(frame), ttk.Frame(frame), ttk.Frame(frame)
-        for index, column in enumerate((left, middle, right)):
-            column.grid(row=1, column=index, sticky='nsew', padx=(0 if index == 0 else 10, 0 if index == 2 else 10))
-            column.columnconfigure(1, weight=1)
-        hdr = tk.BooleanVar(value=number('hdr', 1) != 0)
-        ttk.Checkbutton(left, text='HDR', variable=hdr, command=lambda: write({'hdr': int(hdr.get())})).grid(
-            row=1, column=0, columnspan=4, sticky='w')
-        hint(left, 2, 'hdr_hint', on_off(True))
-        ttk.Label(left, text=self.t('shadow_scale')).grid(row=3, column=0, sticky='w')
-        shadow = ttk.Combobox(left, values=[self.t('shadow_game'), '4096', '8192'], state='readonly', width=14)
+        image = section(frame, self.t('image'), self.t('filters'))
+        image.grid(row=0, column=0, sticky='nsew', padx=(0, 8), pady=(0, 8))
+        image.columnconfigure(1, weight=1)
+        self.build_preset(image, 0)
+        self.build_filters(image, 10)
+
+        scene = section(frame, self.t('scene_section'))
+        scene.grid(row=0, column=1, sticky='nsew', padx=(8, 0), pady=(0, 8))
+        scene.columnconfigure(1, weight=1)
+        ttk.Label(scene, text=self.t('shadow_scale')).grid(row=3, column=0, sticky='w')
+        shadow = ttk.Combobox(scene, values=[self.t('shadow_game'), '4096', '8192'], state='readonly', width=14)
         scale = number('shadow_scale', 1)
         shadow.current(2 if scale >= 4 else 1 if scale >= 2 else 0)
-        shadow.grid(row=3, column=1, sticky='w', padx=6)
+        shadow.grid(row=3, column=1, sticky='w', padx=6, pady=2)
         shadow.bind('<<ComboboxSelected>>', lambda _: write({'shadow_scale': SHADOW_SCALES[shadow.current()]}))
-        hint(left, 4, 'shadow_hint', self.t('shadow_game'), self.t('shadow_game'))
+        hint(scene, 4, 'shadow_hint', self.t('shadow_game'), self.t('shadow_game'))
         grass = tk.BooleanVar(value=number('grass_smooth', 1) != 0)
-        ttk.Checkbutton(left, text=self.t('grass_smooth'), variable=grass,
+        ttk.Checkbutton(scene, text=self.t('grass_smooth'), variable=grass,
                         command=lambda: write({'grass_smooth': int(grass.get())})).grid(
             row=5, column=0, columnspan=4, sticky='w')
-        hint(left, 6, 'grass_hint', on_off(True), on_off(False))
-        ttk.Label(middle, text=self.t('effects'), foreground='#555').grid(row=0, column=0, columnspan=4, sticky='w')
-        half = (len(EFFECTS) + 1) // 2
+        hint(scene, 6, 'grass_hint', on_off(True), on_off(False))
+        # Textures (the in-game menu's Image tab): LOD bias, anisotropic filtering.
+        row = 7
+        ttk.Separator(scene).grid(row=row, column=0, columnspan=5, sticky='ew', pady=(8, 4))
+        ttk.Label(scene, text=self.t('textures'), foreground=MUTED).grid(row=row + 1, column=0, columnspan=4, sticky='w')
+        bias_text = lambda quarters: f'{quarters * 0.25:+.2f}'
+        ttk.Label(scene, text=self.t('lod_bias')).grid(row=row + 2, column=0, sticky='w')
+        bias = min(max(number('lod_bias', LOD_BIAS_DEFAULT), -12), 4)
+        bias_shown = ttk.Label(scene, text=bias_text(bias), width=5)
+        bias_shown.grid(row=row + 2, column=2, sticky='e')
 
+        def bias_moved(raw, current={'value': bias}):
+            step = int(round(float(raw)))
+            bias_shown.configure(text=bias_text(step))
+            if step != current['value']:
+                current['value'] = step
+                write({'lod_bias': step})
+
+        bias_slider = ttk.Scale(scene, from_=-12, to=4, value=bias, length=160, command=bias_moved)
+        bias_slider.grid(row=row + 2, column=1, sticky='ew', padx=6)
+        buttons = ttk.Frame(scene)
+        buttons.grid(row=row + 2, column=3, sticky='e')
+        for text, value in ((self.t('mark_default_button'), LOD_BIAS_DEFAULT), ('PS4', 0)):
+            ttk.Button(buttons, text=text, width=len(text) + 2,
+                       command=lambda value=value: (bias_slider.set(value), bias_moved(value))).pack(side='left', padx=(2, 0))
+        hint(scene, row + 3, 'lod_bias_hint', bias_text(LOD_BIAS_DEFAULT), bias_text(0))
+        ttk.Label(scene, text=self.t('aniso')).grid(row=row + 4, column=0, sticky='w')
+        aniso_labels = [self.t('aniso_game'), '2x', '4x', '8x', '16x']
+        aniso = ttk.Combobox(scene, values=aniso_labels, state='readonly', width=14)
+        level = number('aniso', 16)
+        aniso.current(max(i for i, v in enumerate(ANISO_LEVELS) if v <= level) if level > 0 else 0)
+        aniso.grid(row=row + 4, column=1, sticky='w', padx=6, pady=2)
+        aniso.bind('<<ComboboxSelected>>', lambda _: write({'aniso': ANISO_LEVELS[aniso.current()]}))
+        hint(scene, row + 5, 'aniso_hint', '16x', aniso_labels[0])
+
+        # The game's effects, in two columns below.
+        effects = section(frame, self.t('effects'))
+        effects.grid(row=1, column=0, columnspan=2, sticky='ew')
+        effects.columnconfigure((0, 1), weight=1, uniform='fx')
+        columns = ttk.Frame(effects), ttk.Frame(effects)
+        for index, column in enumerate(columns):
+            column.grid(row=0, column=index, sticky='nsew', padx=(0, 16) if index == 0 else (16, 0))
+            column.columnconfigure(1, weight=1)
+        half = (len(EFFECTS) + 1) // 2
         sliders = {}
         for index, (key, (default, low, high, *unit)) in enumerate(EFFECTS.items()):
             unit = unit[0] if unit else '%'
-            parent = middle if index < half else right
+            parent = columns[0 if index < half else 1]
             row = 1 + index % half * 2
             value = min(max(number(key, default), low), high)
             ttk.Label(parent, text=self.t('effect_' + key)).grid(row=row, column=0, sticky='w')
@@ -1163,8 +1709,8 @@ class Launcher:
                     current['value'] = step
                     write({key: step})
 
-            slider = ttk.Scale(parent, from_=low, to=high, value=value, length=180, command=moved)
-            slider.grid(row=row, column=1, sticky='ew', padx=6)
+            slider = ttk.Scale(parent, from_=low, to=high, value=value, length=160, command=moved)
+            slider.grid(row=row, column=1, sticky='ew', padx=6, pady=3)
             sliders[key] = (slider, moved)
             # Default and PS4 buttons, as in the in-game menu (the effects' defaults are as shipped).
             buttons = ttk.Frame(parent)
@@ -1175,60 +1721,11 @@ class Launcher:
                                slider.set(default), moved(default))).pack(side='left', padx=(2, 0))
             hint(parent, row + 1, 'effect_' + key + '_hint', f'{default}{unit}', f'{default}{unit}')
 
-        # Textures (the in-game menu's Image tab): LOD bias, anisotropic filtering, texture pack.
-        row = 7
-        ttk.Separator(left).grid(row=row, column=0, columnspan=4, sticky='ew', pady=4)
-        ttk.Label(left, text=self.t('textures'), foreground='#555').grid(row=row + 1, column=0, columnspan=4, sticky='w')
-        bias_text = lambda quarters: f'{quarters * 0.25:+.2f}'
-        ttk.Label(left, text=self.t('lod_bias')).grid(row=row + 2, column=0, sticky='w')
-        bias = min(max(number('lod_bias', LOD_BIAS_DEFAULT), -12), 4)
-        bias_shown = ttk.Label(left, text=bias_text(bias), width=5)
-        bias_shown.grid(row=row + 2, column=2, sticky='e')
-
-        def bias_moved(raw, current={'value': bias}):
-            step = int(round(float(raw)))
-            bias_shown.configure(text=bias_text(step))
-            if step != current['value']:
-                current['value'] = step
-                write({'lod_bias': step})
-
-        bias_slider = ttk.Scale(left, from_=-12, to=4, value=bias, length=260, command=bias_moved)
-        bias_slider.grid(row=row + 2, column=1, sticky='ew', padx=6)
-        buttons = ttk.Frame(left)
-        buttons.grid(row=row + 2, column=3, sticky='e')
-        for text, value in ((self.t('mark_default_button'), LOD_BIAS_DEFAULT), ('PS4', 0)):
-            ttk.Button(buttons, text=text, width=len(text) + 2,
-                       command=lambda value=value: (bias_slider.set(value), bias_moved(value))).pack(side='left', padx=(2, 0))
-        hint(left, row + 3, 'lod_bias_hint', bias_text(LOD_BIAS_DEFAULT), bias_text(0))
-        ttk.Label(left, text=self.t('aniso')).grid(row=row + 4, column=0, sticky='w')
-        aniso_labels = [self.t('aniso_game'), '2x', '4x', '8x', '16x']
-        aniso = ttk.Combobox(left, values=aniso_labels, state='readonly', width=14)
-        level = number('aniso', 16)
-        aniso.current(max(i for i, v in enumerate(ANISO_LEVELS) if v <= level) if level > 0 else 0)
-        aniso.grid(row=row + 4, column=1, sticky='w', padx=6)
-        aniso.bind('<<ComboboxSelected>>', lambda _: write({'aniso': ANISO_LEVELS[aniso.current()]}))
-        hint(left, row + 5, 'aniso_hint', '16x', aniso_labels[0])
-        ttk.Label(left, text=self.t('texture_pack')).grid(row=row + 6, column=0, sticky='w')
-        packs = tlg_run.texture_packs(tlg_run.texpack_dir(self.settings))
-        pack = ttk.Combobox(left, values=[self.t('texture_pack_off'), *packs], state='readonly', width=24)
-        chosen = ini.get('texture_pack', 'off')
-        pack.current(packs.index(chosen) + 1 if chosen in packs else 0)
-        pack.grid(row=row + 6, column=1, sticky='w', padx=6)
-
-        def pack_picked():
-            write({'texture_pack': packs[pack.current() - 1] if pack.current() > 0 else 'off'})
-            self.refresh_texture_pack()
-
-        pack.bind('<<ComboboxSelected>>', lambda _: pack_picked())
-        hint(left, row + 7, 'texture_pack_dialog_hint', self.t('mark_off'), self.t('mark_off'))
-
         def reset():
-            hdr.set(True)
             shadow.current(0)
             grass.set(True)
             aniso.current(len(ANISO_LEVELS) - 1)
-            pack.current(0)
-            write({'hdr': 1, 'shadow_scale': 1, 'grass_smooth': 1, 'aniso': 16, 'texture_pack': 'off'})
+            write({'shadow_scale': 1, 'grass_smooth': 1, 'aniso': 16, 'texture_pack': 'off'})
             self.refresh_texture_pack()
             bias_slider.set(LOD_BIAS_DEFAULT)
             bias_moved(LOD_BIAS_DEFAULT)
@@ -1237,9 +1734,8 @@ class Launcher:
                 moved(EFFECTS[key][0])
 
         bottom = ttk.Frame(frame)
-        bottom.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(10, 0))
+        bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=reset).pack(side='left')
-        ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
 
     def advanced_dialog(self):
         """The GPU readback switches (backports_table.READBACK, the readback mode, the in-game
@@ -1247,14 +1743,11 @@ class Launcher:
         if getattr(self, 'advanced_window', None) and self.advanced_window.winfo_exists():
             self.advanced_window.lift()
             return
-        win = self.advanced_window = tk.Toplevel(self.root)
-        win.title(self.t('advanced_title'))
-        win.transient(self.root)
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill='both', expand=True)
+        win = self.advanced_window = Page(self, 'advanced')
+        win.title(self.t('advanced_title'), self.t('advanced_hint'))
+        frame = scroll_area(win)
+        self.show_page('advanced')
         lang = int(self.pt())
-        ttk.Label(frame, text=self.t('advanced_hint'), wraplength=740, justify='left').grid(
-            row=0, column=0, columnspan=2, sticky='w', pady=(0, 8))
         columns = ttk.Frame(frame), ttk.Frame(frame)
         for index, column in enumerate(columns):
             column.grid(row=1, column=index, sticky='nw', padx=(0 if index == 0 else 10, 0 if index == 1 else 10))
@@ -1265,9 +1758,8 @@ class Launcher:
             return columns[column], rows[column] - 2
 
         def note(parent, row, what, default, why):
-            text = what + '\n' + self.t('mark_default', value=default) + ' — ' + why
-            ttk.Label(parent, text=text, foreground='#777', wraplength=360, justify='left').grid(
-                row=row + 1, column=0, columnspan=2, sticky='w', pady=(0, 6))
+            text = what + '\n\n' + self.t('mark_default', value=default) + ' — ' + why
+            help_mark(parent, text).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
 
         def save(key, value, default):
             # A value equal to the default is not stored, so a later change of the default reaches it.
@@ -1331,17 +1823,13 @@ class Launcher:
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=lambda: [reset() for reset in resets]).pack(side='left')
-        ttk.Button(bottom, text=self.t('close'), command=win.destroy).pack(side='right')
 
     def hint(self, parent, row, column, key):
         """A small question mark in that cell; the text shows on the mark and on the row's name."""
         self.hint_mark(parent, key, *parent.grid_slaves(row=row, column=0)).grid(row=row, column=column, sticky='w', padx=(4, 0))
 
     def hint_mark(self, parent, key, *also):
-        mark = ttk.Label(parent, text='?', foreground='#777', cursor='question_arrow')
-        for widget in (mark, *also):
-            add_tooltip(widget, self.t(key))
-        return mark
+        return help_mark(parent, self.t(key), *also)
 
     def check(self, parent, row, key):
         var = tk.BooleanVar(value=bool(self.settings[key]))
@@ -1371,6 +1859,7 @@ class Launcher:
         self.status.configure(text=f'{text}  {audio}')
         self.play_button.configure(state='disabled' if problems or self.process else 'normal')
         self.cache_button.configure(state='disabled' if self.process else 'normal')
+        self.refresh_home()
 
     def browse(self, key):
         path = filedialog.askdirectory(initialdir=self.vars[key].get() or str(Path.home()))
@@ -1407,7 +1896,9 @@ class Launcher:
             messagebox.showinfo(self.t('clear_cache'), message)
         self.append(message)
 
-    def append(self, line):
+    def append(self, line, keep=True):
+        if keep:   # kept for the rebuild on a language change
+            self.log_lines = (getattr(self, 'log_lines', []) + [line])[-2000:]
         self.log.configure(state='normal')
         self.log.insert('end', line if line.endswith('\n') else line + '\n')
         if int(self.log.index('end-1c').split('.')[0]) > 2000:
@@ -1423,6 +1914,7 @@ class Launcher:
         self.append(self.t('preparing'))
         self.play_button.configure(state='disabled')
         self.cache_button.configure(state='disabled')
+        self.stop_music()
         threading.Thread(target=self.run_game, daemon=True).start()
 
     def run_game(self):
@@ -1465,9 +1957,110 @@ class Launcher:
                     self.append(item)
         except queue.Empty:
             pass
+        self.sync_music()   # starts again once the game has closed
         self.root.after(100, self.pump)
 
+    def switch_menu(self):
+        # main() starts the other menu once this window is closed.
+        self.settings['legacy_menu'] = not self.settings.get('legacy_menu')
+        tlg_run.save_settings(self.settings)
+        self.menu_switch = True
+        self.quit()
+
     def quit(self):
+        # Clicked from the sidebar: destroying the window inside its own click handler leaves Tk
+        # finishing that click on freed memory ("alloc: invalid block"), so close just after.
+        self.root.after(50, self.close)
+
+    def report_issue(self):
+        # Upstream's report (report.py, @HayatoG): system + GPU, a summary of the newest log and the
+        # known problems for this GPU, user names removed. The issue form opens filled in; the full
+        # report + redacted log go in a .zip in the logs folder (opened) to attach.
+        import threading
+        import report
+        import savemanager
+        self.status.configure(text=self.t('report_busy'))
+
+        def work():
+            names = report.own_names()
+            logs = report.list_logs(tlg_run.LOG_DIR)
+            log_text, log_name = (report.read_log(logs[0])[0], logs[0].name) if logs else (None, '')
+            try:
+                info = report.gather((tlg_run.PORT_DIR, tlg_run.REPO_DIR), tlg_run.LOG_DIR,
+                                     self.settings.get('game_dir', ''), savemanager.read_sfo,
+                                     {'cpu': lambda: report.cpu_info(lambda: tlg_run.cpu_missing_sets(lambda line: None))})
+            except Exception:   # the report still goes out, with fewer rows
+                info = None
+            rows = report.hardware_rows(info, self.t) if info else []
+            summary = report.summary_lines(report.summarize_log(log_text), self.t) if log_text else []
+            gpu = info.get('gpu') if info else None
+            known = report.known_for(report.load_known_issues(), gpu)
+            for k in known:
+                k['title'] = k['title']['pt' if self.pt() else 'en']
+            full = report.redact(report.markdown_report(rows, summary, log_name, known, '', self.t), names)[0]
+            short = report.redact(report.short_report(rows, summary, self.t), names)[0]
+            title = self.t('rep_issue_title', gpu=gpu['name'] if gpu else self.t('rep_unknown'))
+            url = report.issue_url(title, full, short)[0]
+            zip_name = 'report-' + time.strftime('%Y%m%d-%H%M%S') + '.zip'
+            clean_log = report.redact(log_text, names)[0] if log_text else None
+            if not report.leftover_home_paths((clean_log or '') + full, names):   # never save a leak
+                try:
+                    report.write_zip(tlg_run.LOG_DIR / zip_name, full, clean_log, log_name)
+                except OSError:
+                    pass
+            self.root.after(0, lambda: (self.open(tlg_run.LOG_DIR), tlg_run.open_external(url),
+                                        self.status.configure(text=self.t('report_done', zip=zip_name))))
+        threading.Thread(target=work, daemon=True).start()
+
+    def copy_command(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(tlg_run.play_command())
+        self.home.itemconfig(self.home_items['status'], text=self.t('copy_command'))
+
+    def toggle_music(self, item):
+        on = not self.settings.get('menu_music', True)
+        self.settings['menu_music'] = on
+        tlg_run.save_settings(self.settings)
+        self.home.itemconfig(item, text=self.t('home_music_on' if on else 'home_music_off'))
+        self.sync_music()
+
+    def sync_music(self):
+        """The game's menu tune plays while the launcher is open and the game is not running, as
+        in shadPS4's game list (which plays the same file, sce_sys/snd0.at9)."""
+        path = tlg_run.menu_music_file(self.settings)
+        wanted = bool(self.settings.get('menu_music', True)) and not self.process and path is not None
+        music = getattr(self, 'music', None)
+        if music and (not wanted or music.poll() is not None or getattr(self, 'music_path', None) != path):
+            self.stop_music()
+            music = None
+        if wanted and not music and getattr(self, 'music_failed', None) != path:
+            tool = tlg_run.music_tool()
+            try:
+                self.music = subprocess.Popen([str(tool), str(path), '60'], stdin=subprocess.PIPE,
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                              env=tlg_run.pad_tool_env(), text=True,
+                                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)) if tool else None
+                self.music_path = path
+            except OSError:
+                self.music = None
+            if not self.music:
+                self.music_failed = path   # silent; tried again when the game folder changes
+
+    def stop_music(self):
+        music, self.music = getattr(self, 'music', None), None
+        if not music:
+            return
+        try:
+            music.stdin.write('quit\n')
+            music.stdin.flush()
+            music.wait(1)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            music.kill()
+
+    def close(self):
+        self.stop_music()
+        if getattr(self, 'controller', None):
+            self.controller.stop()
         if self.process:
             self.process.terminate()
         self.root.destroy()
@@ -1483,13 +2076,19 @@ def main():
         sys.exit(tlg_run.main(args))
     if args[:1] == ['--play']:
         sys.exit(tlg_run.main(args[1:]))
-    root = tk.Tk(className='tlg-pc')  # matches StartupWMClass in the desktop entry
-    try:
-        ttk.Style().theme_use('clam')
-    except tk.TclError:
-        pass
-    Launcher(root)
-    root.mainloop()
+    # The legacy menu (the launcher before the 2026-11 redesign) as a fallback: --legacy, or the
+    # switch in its Settings (saved as legacy_menu). The switch closes one menu and opens the other.
+    import tlg_launcher_legacy
+    legacy = '--legacy' in args or bool(tlg_run.load_settings().get('legacy_menu'))
+    while True:
+        module = tlg_launcher_legacy if legacy else sys.modules[__name__]
+        root = tk.Tk(className='tlg-pc')  # matches StartupWMClass in the desktop entry
+        module.apply_theme(root)
+        app = module.Launcher(root)
+        root.mainloop()
+        if not getattr(app, 'menu_switch', False):
+            break
+        legacy = not legacy
 
 
 if __name__ == '__main__':

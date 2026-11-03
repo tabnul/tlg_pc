@@ -47,11 +47,11 @@ MINGW*|MSYS*)
         echo "Built $PWD/out/tlg-probe-pgogen.exe (instrumented)"
         exit 0
     fi
-    if ! ninja -C out/gpu tlg-probe tlg-gpu-capabilities tlg-play > out/gpu-build.log 2>&1; then
+    if ! ninja -C out/gpu tlg-probe tlg-gpu-capabilities tlg-play tlg-pad-tool tlg-music-tool > out/gpu-build.log 2>&1; then
         grep -v '^\[' out/gpu-build.log | tail -40 >&2
         echo 'Build failed (full log: out/gpu-build.log)' >&2; exit 1
     fi
-    cp out/gpu/tlg-probe.exe out/gpu/tlg-gpu-capabilities.exe out/gpu/tlg-play.exe out/
+    cp out/gpu/tlg-probe.exe out/gpu/tlg-gpu-capabilities.exe out/gpu/tlg-play.exe out/gpu/tlg-pad-tool.exe out/gpu/tlg-music-tool.exe out/
     echo "Built $PWD/out/tlg-probe.exe"
     exit 0
     ;;
@@ -117,6 +117,10 @@ fi
 echo "Built $PWD/out/tlg-probe"
 # GPU check for run.sh (live_resolution=auto): links only the Vulkan loader.
 "$CC" -std=c11 -O2 -Wall -Wextra -Werror tools/gpu_capabilities.c "${libraries[@]}" -o out/tlg-gpu-capabilities
+# Controller helper for the launcher's Controller page: links only SDL3.
+"$CC" -std=c11 -O2 -Wall -Wextra -Werror "${includes[@]}" tools/pad_tool.c "${libraries[@]}" -o out/tlg-pad-tool
+# Menu music helper for the launcher (the game's own snd0.at9): SDL3 and LibAtrac9.
+"$CC" -std=c11 -O2 -Wall -Wextra -Werror "${includes[@]}" -Ithird_party/LibAtrac9/C/src tools/music_tool.c out/libatrac9.a "${libraries[@]}" -lm -o out/tlg-music-tool
 if [[ ${1:-} == --test ]]; then
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_pad.c "${libraries[@]}" -lm -o out/pad-test
     out/pad-test
