@@ -156,17 +156,21 @@ MENU = [
            'roda a 30 e, acima de 30, eles travam a cada corte.'),
           choices=(('30', '30 (advised)', '30 (recomendado)'), ('60', '60', '60'),
                    ('0', 'Unlimited', 'Sem limite'))),
-    _menu('Performance', 'slow_motion', 'choice', '0', ('Slow motion above 30 FPS', 'Câmera lenta acima de 30 FPS'),
-          ('Two slow-motion moments only work at 30 FPS: the jump to Trico\'s tail (s06_FallingBridge, '
-           'mission FB_e02_Demo_003, cutscene fb_110) and the collapsing bridge (s10_Pit, mission '
-           's10_06_Destroyed_Bridge_Gate_001, cutscene pi_160_p04_A). Advised: drop to 30 FPS while they '
-           'play. Or skip the slow motion.',
-           'Dois momentos em câmera lenta só funcionam a 30 FPS: o pulo na cauda do Trico (s06_FallingBridge, '
-           'missão FB_e02_Demo_003, cena fb_110) e a ponte que desaba (s10_Pit, missão '
-           's10_06_Destroyed_Bridge_Gate_001, cena pi_160_p04_A). Recomendado: cair para 30 FPS enquanto '
-           'tocam. Ou pular a câmera lenta.'),
-          choices=(('0', '30 FPS during it (advised)', '30 FPS durante (recomendado)'),
-                   ('1', 'Skip it', 'Pular'))),
+    _menu('Performance', 'slow_motion', 'choice', '0', ('Slow-motion freeze fix (60 FPS / unlocked)', 'Correção do travamento em câmera lenta (60 FPS / sem limite)'),
+          ('Fixes a known bug of the game at 60 FPS and unlocked: two slow-motion moments turn choppy and '
+           'can freeze the game (the boy misses the catch and nothing happens). It is the same bug that made '
+           'the PS4 60 FPS patches freeze here. The moments: the jump to Trico\'s tail (s06_FallingBridge, '
+           'mission FB_e02_Demo_003, cutscene fb_110; issues #39, #40) and the collapsing bridge (s10_Pit, '
+           'mission s10_06_Destroyed_Bridge_Gate_001, cutscene pi_160_p04_A). Advised: drop to 30 FPS '
+           'only while the slow motion plays, then back. Or skip the slow motion. At 30 FPS nothing changes.',
+           'Corrige um bug conhecido do jogo a 60 FPS e sem limite: dois momentos em câmera lenta ficam '
+           'travados e podem congelar o jogo (o menino erra o agarrão e nada acontece). É o mesmo bug que fazia '
+           'os patches de 60 FPS do PS4 congelarem aqui. Os momentos: o pulo na cauda do Trico '
+           '(s06_FallingBridge, missão FB_e02_Demo_003, cena fb_110; issues #39, #40) e a ponte que desaba '
+           '(s10_Pit, missão s10_06_Destroyed_Bridge_Gate_001, cena pi_160_p04_A). Recomendado: cair para '
+           '30 FPS só enquanto a câmera lenta toca, depois voltar. Ou pular a câmera lenta. A 30 FPS nada muda.'),
+          choices=(('0', '30 FPS during slow motion (advised)', '30 FPS na câmera lenta (recomendado)'),
+                   ('1', 'Skip the slow motion', 'Pular a câmera lenta'))),
     _menu('Performance', 'frames_queued', 'choice', '1', ('Frames queued', 'Quadros na fila'),
           ('More frames queued: steadier FPS, slower response to input.',
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
