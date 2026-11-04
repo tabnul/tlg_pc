@@ -1636,12 +1636,36 @@ void TextureCache::GarbageCollectImages() {
         evicting_bytes = evicting_downloads = 0;
     };
 
+    const auto gc_now = std::chrono::steady_clock::now();
+    u64 cutoff_tick = 0;
     const auto configure = [&](bool allow_aggressive) {
         pressured = used_memory() >= pressure_gc_memory;
         aggresive = allow_aggressive && used_memory() >= critical_gc_memory;
         ticks_to_destroy = aggresive ? 160 : pressured ? 80 : 16;
         ticks_to_destroy = std::min(ticks_to_destroy, gc_tick);
         num_deletions = aggresive ? 40 : pressured ? 20 : 10;
+        // tlg (#38): 80-160 submissions are 0.1-0.3 s. Over the 6 GB budget of an 8 GB card the
+        // buffer arenas (~2.2 GB of game data the collector cannot free) kept the driver figure
+        // above the pressure mark for good, and the collector threw out ~2400 small images per
+        // second that the next frames created and uploaded again: ~10% FPS lost after the first
+        // stages, memory not lower. Images used in the last TLG_GC_MIN_AGE_MS (default 5000) stay;
+        // above critical, those of the last TLG_GC_CRITICAL_AGE_MS (default 1000). 0: old rule.
+        static const u32 min_age_ms = [] {
+            const char* env = std::getenv("TLG_GC_MIN_AGE_MS");
+            return env ? u32(std::strtoul(env, nullptr, 10)) : 5000u;
+        }();
+        static const u32 critical_age_ms = [] {
+            const char* env = std::getenv("TLG_GC_CRITICAL_AGE_MS");
+            return env ? u32(std::strtoul(env, nullptr, 10)) : 1000u;
+        }();
+        cutoff_tick = gc_tick - ticks_to_destroy;
+        if (const u32 age = aggresive ? critical_age_ms : min_age_ms; age != 0) {
+            const u64 floor = GcCutoffTick(gc_now, age);
+            if (floor < cutoff_tick) {
+                cutoff_tick = floor;
+                ++gc_floor_skips;
+            }
+        }
     };
     // tlg: TLG_GC_FIX bit 2: an image the pass cannot free no longer counts against its budget
     // and moves to the back of the queue, so the next pass reaches images it can free. Before,
@@ -1739,14 +1763,14 @@ void TextureCache::GarbageCollectImages() {
     // Try to remove anything old enough and not high priority.
     configure(false);
     ++gc_passes;
-    lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
+    lru_cache.ForEachItemBelow(cutoff_tick, clean_up);
 
     if (used_memory() >= critical_gc_memory) {
         // If we are still over the critical limit, run an aggressive GC
         configure(true);
         visited = 0;
         ++gc_passes;
-        lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
+        lru_cache.ForEachItemBelow(cutoff_tick, clean_up);
     }
     evict();
     // tlg: evictions under memory pressure, at most every 5 s (TLG_FRAME_STATS or not).
@@ -1754,13 +1778,15 @@ void TextureCache::GarbageCollectImages() {
         const auto now = std::chrono::steady_clock::now();
         if (now - gc_report_time >= std::chrono::seconds(5)) {
             std::printf("Texture cache: memory pressure, %llu of %llu MiB (critical %llu): "
-                        "%llu images evicted, %llu written back since the last report\n",
+                        "%llu images evicted, %llu written back since the last report, %llu "
+                        "passes held by the age floor\n",
                         (unsigned long long)(total_used_memory >> 20),
                         (unsigned long long)(pressure_gc_memory >> 20),
                         (unsigned long long)(critical_gc_memory >> 20),
-                        (unsigned long long)gc_evictions, (unsigned long long)gc_downloads);
+                        (unsigned long long)gc_evictions, (unsigned long long)gc_downloads,
+                        (unsigned long long)gc_floor_skips);
             gc_report_time = now;
-            gc_evictions = gc_downloads = 0;
+            gc_evictions = gc_downloads = gc_floor_skips = 0;
         }
     }
 }
@@ -1832,6 +1858,67 @@ void TextureCache::ReportMemory() {
                 tracked.Add(bytes);
             }
         }
+        // tlg (#38 diag): which pages hold the most images, and what those images are.
+        static const bool page_diag = std::getenv("TLG_GC_PAGE_DIAG") != nullptr;
+        if (page_diag) {
+            std::unordered_map<u64, u32> per_page;
+            std::unordered_map<VAddr, u32> per_addr;
+            u64 small = 0;
+            for (Image& image : slot_images) {
+                ++per_addr[image.info.guest_address];
+                if (image.info.guest_size <= 4096) {
+                    ++small;
+                }
+                ForEachPage(image.info.guest_address, std::max<u32>(image.info.guest_size, 1),
+                            [&](u64 page) { ++per_page[page]; });
+            }
+            const auto top = [](auto& map) {
+                std::vector<std::pair<typename std::decay_t<decltype(map)>::key_type, u32>> v(map.begin(), map.end());
+                const size_t n = std::min<size_t>(v.size(), 4);
+                std::partial_sort(v.begin(), v.begin() + n, v.end(),
+                                  [](auto& a, auto& b) { return a.second > b.second; });
+                v.resize(n);
+                return v;
+            };
+            std::string line;
+            for (auto [page, count] : top(per_page)) {
+                line += fmt::format(" page {:#x}: {}", page << Traits::PageBits, count);
+            }
+            for (auto [addr, count] : top(per_addr)) {
+                line += fmt::format(" | addr {:#x}: {}", addr, count);
+            }
+            std::printf("Page diag: %zu pages, %llu images <=4 KiB;%s\n", per_page.size(),
+                        (unsigned long long)small, line.c_str());
+            // The most crowded page: a sample of its images.
+            const auto busiest = top(per_page);
+            if (!busiest.empty()) {
+                const VAddr page_addr = busiest[0].first << Traits::PageBits;
+                std::string sample;
+                u32 shown = 0;
+                std::unordered_map<std::string, u32> kinds;
+                for (Image& image : slot_images) {
+                    if (!image.Overlaps(page_addr, 1u << Traits::PageBits)) {
+                        continue;
+                    }
+                    ++kinds[fmt::format("{}x{}x{} {} m{} a{} t{} sz{}", image.info.size.width,
+                                        image.info.size.height, image.info.resources.layers,
+                                        vk::to_string(image.info.pixel_format),
+                                        image.info.resources.levels, int(image.info.array_mode),
+                                        int(image.info.tile_mode), image.info.guest_size)];
+                    if (shown < 6) {
+                        sample += fmt::format(" [{:#x} age {}]", image.info.guest_address,
+                                              gc_tick - image.tick_accessed_last);
+                        ++shown;
+                    }
+                }
+                std::string kind_line;
+                for (auto [k, c] : top(kinds)) {
+                    kind_line += fmt::format(" {{{}}}: {}", k, c);
+                }
+                std::printf("Page diag busiest %#llx: kinds%s; sample%s\n",
+                            (unsigned long long)page_addr, kind_line.c_str(), sample.c_str());
+            }
+        }
         lru_cache.ForEachItemBelow(load_cleanup_tick, [&](ImageId image_id) {
             const Image& image = slot_images[image_id];
             const u64 bytes = host_bytes(image);
@@ -1873,6 +1960,8 @@ void TextureCache::ReportMemory() {
                 num(passes), num(walked), num(skip_tiled), num(skip_unpressured), num(kept_gpu), num(freed),
                 num(lookups), num(candidates),
                 lookups ? static_cast<double>(candidates) / static_cast<double>(lookups) : 0.0);
+    std::printf("Small image sweep (5 s): %llu freed, %llu walked\n",
+                num(std::exchange(small_swept, 0)), num(std::exchange(small_sweep_walked, 0)));
     std::printf("Subresource GPU writes (5 s): %llu\n",
                 num(TlgStats::gpu_subresource_writes.exchange(0, std::memory_order_relaxed)));
 }
@@ -1920,14 +2009,37 @@ void TextureCache::GarbageCollectSamplers() {
     }
 }
 
+u64 TextureCache::GcCutoffTick(std::chrono::steady_clock::time_point now, u32 age_ms) const {
+    // The newest recorded tick at least age_ms old; 0 (nothing qualifies) before that.
+    const auto limit = now - std::chrono::milliseconds(age_ms);
+    for (auto it = gc_tick_times.rbegin(); it != gc_tick_times.rend(); ++it) {
+        if (it->second <= limit) {
+            return it->first;
+        }
+    }
+    return 0;
+}
+
 void TextureCache::RunGarbageCollector() {
     SCOPE_EXIT {
         ++gc_tick;
     };
+    {
+        const auto now = std::chrono::steady_clock::now();
+        if (gc_tick_times.empty() ||
+            now - gc_tick_times.back().second >= std::chrono::milliseconds(50)) {
+            gc_tick_times.emplace_back(gc_tick, now);
+        }
+        while (gc_tick_times.size() > 2 &&
+               now - gc_tick_times[1].second > std::chrono::seconds(60)) {
+            gc_tick_times.pop_front();
+        }
+    }
 
     GarbageCollectImages();
     GarbageCollectSamplers();
     CleanUpAfterLoad();
+    SweepSmallImages();
 }
 
 // tlg: setting texture_cleanup. GarbageCollectImages only runs when VRAM gets short (above 70% of
@@ -1995,6 +2107,58 @@ void TextureCache::CleanUpAfterLoad() {
                 (unsigned long long)(load_cleanup_bytes >> 20), (unsigned long long)kept,
                 (unsigned long long)load_cleanup_slices);
     std::fflush(stdout);
+}
+
+// tlg (#38): the game writes small float data blocks (4x4, 8x4, 16x16 R32Sfloat, 256 B - 1 KiB) at
+// new addresses all the time, and every one became an image that stayed until memory pressure:
+// 40-100k of them, up to 1800 on one 1 MiB page, and every image lookup on those pages walked
+// them all (5 images per lookup in the first stage, 40-50 later; FPS -15..20% after 25 stage
+// loads). Every 250 ms, free images of at most TLG_GC_SMALL_BYTES (default 4096) not used for
+// TLG_GC_SMALL_AGE_MS (default 2000; 0: off), except those holding GPU-written data. They cost a
+// few hundred bytes to upload again.
+void TextureCache::SweepSmallImages() {
+    static const u32 age_ms = [] {
+        const char* env = std::getenv("TLG_GC_SMALL_AGE_MS");
+        return env ? u32(std::strtoul(env, nullptr, 10)) : 2000u;
+    }();
+    static const u32 max_bytes = [] {
+        const char* env = std::getenv("TLG_GC_SMALL_BYTES");
+        return env ? u32(std::strtoul(env, nullptr, 10)) : 4096u;
+    }();
+    if (age_ms == 0) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now - small_sweep_time < std::chrono::milliseconds(250)) {
+        return;
+    }
+    small_sweep_time = now;
+    const u64 cutoff = GcCutoffTick(now, age_ms);
+    if (cutoff == 0) {
+        return;
+    }
+    static constexpr u64 SliceImages = 2048, SliceWalk = 32768;
+    TlgStats::Timer gc_timer{TlgStats::t_gc};
+    std::scoped_lock lock{mutex};
+    u64 freed = 0, walked = 0;
+    lru_cache.ForEachItemBelow(cutoff, [&](ImageId image_id) {
+        if (freed == SliceImages || walked == SliceWalk) {
+            return true;
+        }
+        ++walked;
+        auto& image = slot_images[image_id];
+        if (image.info.guest_size > max_bytes || image.SafeToDownload() ||
+            True(image.flags & ImageFlagBits::GpuModified)) {
+            return false;
+        }
+        ResolveReadbacks(image.info.guest_address, image.info.guest_size, true,
+                         ReadbackSource::CacheCleanup);
+        ++freed;
+        FreeImage(image_id);
+        return false;
+    });
+    small_swept += freed;
+    small_sweep_walked += walked;
 }
 
 void TextureCache::TouchImage(const Image& image) {
