@@ -156,6 +156,17 @@ MENU = [
            'roda a 30 e, acima de 30, eles travam a cada corte.'),
           choices=(('30', '30 (advised)', '30 (recomendado)'), ('60', '60', '60'),
                    ('0', 'Unlimited', 'Sem limite'))),
+    _menu('Performance', 'slow_motion', 'choice', '0', ('Slow motion above 30 FPS', 'Câmera lenta acima de 30 FPS'),
+          ('Two slow-motion moments only work at 30 FPS: the jump to Trico\'s tail (s06_FallingBridge, '
+           'mission FB_e02_Demo_003, cutscene fb_110) and the collapsing bridge (s10_Pit, mission '
+           's10_06_Destroyed_Bridge_Gate_001, cutscene pi_160_p04_A). Advised: drop to 30 FPS while they '
+           'play. Or skip the slow motion.',
+           'Dois momentos em câmera lenta só funcionam a 30 FPS: o pulo na cauda do Trico (s06_FallingBridge, '
+           'missão FB_e02_Demo_003, cena fb_110) e a ponte que desaba (s10_Pit, missão '
+           's10_06_Destroyed_Bridge_Gate_001, cena pi_160_p04_A). Recomendado: cair para 30 FPS enquanto '
+           'tocam. Ou pular a câmera lenta.'),
+          choices=(('0', '30 FPS during it (advised)', '30 FPS durante (recomendado)'),
+                   ('1', 'Skip it', 'Pular'))),
     _menu('Performance', 'frames_queued', 'choice', '1', ('Frames queued', 'Quadros na fila'),
           ('More frames queued: steadier FPS, slower response to input.',
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
