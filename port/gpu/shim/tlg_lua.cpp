@@ -383,10 +383,9 @@ bool GameEdits(std::string& patched, std::string_view name) {
         " return MS.SetGameSpeed(v,t) end ";
     // Bridge fix: the GoldHEN "Collapsing Bridge Freeze Fix" (s10_Pit, cutscene pi_160_p04_A
     // action_1). The slow motion while the bridge collapses can leave the game frozen above
-    // 30 FPS. Above 30 FPS it runs capped at 30 (start and end call only); at 30 it is skipped
-    // as before.
+    // 30 FPS. Above 30 FPS it runs capped at 30 (start and end call only); at 30 the game's own
+    // slow motion stays (it works at 30, as on PS4).
     static constexpr std::string_view SlowMotion = "MS.SetGameSpeed(0.10, 0.2)";
-    static constexpr std::string_view SlowMotionEnd = "MS.SetGameSpeed(1.0,1.0)";
     // Above 30 FPS, tlg.ini slow_motion (env TLG_SLOW_MOTION wins): 0 = cap at 30 (default),
     // 1 = skip the slow motion (the v0.5.0 behaviour).
     static const char* slow_env = std::getenv("TLG_SLOW_MOTION");
@@ -396,19 +395,19 @@ bool GameEdits(std::string& patched, std::string_view name) {
         if (at == std::string::npos) {
             return false;
         }
-        if (s.applied_engine_fps.load() <= 30 || skip_slow) {
-            patched.insert(at, "--");
-            if (s.applied_engine_fps.load() > 30) {
-                std::printf("Lua: bridge fix (slow motion skipped)\n");
-            }
-            return true;
-        }
-        const size_t end = patched.find(SlowMotionEnd, at);
-        if (end == std::string::npos) {
+        if (s.applied_engine_fps.load() <= 30) {
+            std::printf("Lua: bridge fix off at 30 FPS (game's own slow motion)\n");
             return false;
         }
-        patched.replace(end, 15, "_TLGSGS(");
-        patched.replace(at, 15, "_TLGSGS(");
+        if (skip_slow) {
+            patched.insert(at, "--");
+            std::printf("Lua: bridge fix (slow motion skipped)\n");
+            return true;
+        }
+        // Only the start call: the 30 FPS cap stays past the speed reset until the cutscene
+        // pi_160_p04_A finishes (tlg_lua_load). Back to the full rate right at the reset, the
+        // game crashed at Trico's catch (pi_160_trico action_5, fault 0x2719aa) in a test.
+        patched.replace(at, std::string_view("MS.SetGameSpeed(").size(), "_TLGSGS(");
         patched.insert(0, SlowMoWrapper);
         std::printf("Lua: bridge fix (30 FPS during slow motion)\n");
         return true;
@@ -471,6 +470,13 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
         if (text == "slowmo on" || text == "slowmo off") {
             slowmo = text == "slowmo on";
             TlgSettings::Get().credits_fps_lock = slowmo ? 30u : 0u;
+        }
+        // Bridge fix (s10): the cap ends with the slow-motion cutscene, not the speed reset.
+        if (slowmo && text.starts_with("demo game/stages/s10_Pit/demo/pi_160_p04_A ") &&
+            text.find("finish") != std::string_view::npos) {
+            slowmo = false;
+            TlgSettings::Get().credits_fps_lock = 0u;
+            std::printf("Lua: bridge fix: 30 FPS cap ends with pi_160_p04_A\n");
         }
         if (text.starts_with("mission ")) {
             const std::string_view scene = text.substr(8);
