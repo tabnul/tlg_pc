@@ -1670,6 +1670,26 @@ class Launcher:
         note(parent, row, self.t('readback_batch_hint'), batch.choices[sizes.index(batch.default)][1 + lang],
              backports_table.READBACK_WHY[batch.id][lang])
         resets.append(lambda: (size.current(sizes.index(batch.default)), size_picked()))
+        # Slow-motion freeze fix (tlg.ini slow_motion, read when a scene loads).
+        slow = next(item for item in backports_table.MENU if item.key == 'slow_motion')
+        parent, row = place(1)
+        ttk.Label(parent, text=slow.name[lang]).grid(row=row, column=0, sticky='w')
+        slow_values = [choice[0] for choice in slow.choices]
+        slow_box = ttk.Combobox(parent, values=[choice[1 + lang] for choice in slow.choices], state='readonly',
+                                width=28)
+        chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('slow_motion', slow.default)
+        slow_box.current(slow_values.index(chosen) if chosen in slow_values else slow_values.index(slow.default))
+        slow_box.grid(row=row, column=1, sticky='w', padx=6)
+
+        def slow_picked():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'slow_motion': slow_values[slow_box.current()]})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        slow_box.bind('<<ComboboxSelected>>', lambda _: slow_picked())
+        ttk.Label(parent, text=slow.what[lang], foreground=DIM, wraplength=360, justify='left').grid(
+            row=row + 1, column=0, columnspan=2, sticky='w', pady=(0, 6))
+        resets.append(lambda: (slow_box.current(slow_values.index(slow.default)), slow_picked()))
 
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
