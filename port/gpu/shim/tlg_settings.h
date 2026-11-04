@@ -119,6 +119,9 @@ struct Values {
     std::atomic<bool> keep_gpu_textures{true};
     /// End credits frame rate (tlg.ini credits_fps, env TLG_CREDITS_FPS=30|60|unlocked wins): 30, 60, 0 = unlimited.
     std::atomic<int> credits_fps{30};
+    /// Slow motion above 30 FPS (s06 tail catch, s10 collapsing bridge; tlg.ini slow_motion, env
+    /// TLG_SLOW_MOTION wins): 0 = run it capped at 30 FPS (default), 1 = skip it.
+    std::atomic<int> slow_motion{0};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: run.py turns them into patches and environment variables; "Apply and restart".

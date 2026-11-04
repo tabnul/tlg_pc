@@ -189,6 +189,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.texture_cleanup = value.empty() || i != 0;
     } else if (key == "credits_fps") {
         v.credits_fps = i == 0 ? 0 : i == 60 ? 60 : 30;
+    } else if (key == "slow_motion") {
+        v.slow_motion = i == 1 ? 1 : 0;
     } else if (key == "keep_gpu_textures") {
         v.keep_gpu_textures = value.empty() || i != 0;
     } else if (key == "render_resolution") {

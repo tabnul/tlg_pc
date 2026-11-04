@@ -374,33 +374,76 @@ bool GameEdits(std::string& patched, std::string_view name) {
                        " if f then f() end");
         return true;
     }
-    // Bridge fix (always on): the GoldHEN "Collapsing Bridge Freeze Fix". The slow motion
-    // while the bridge in the pit collapses can leave the game frozen; skip it.
+    // Slow motion at 30 FPS (s06 tail catch, s10 collapsing bridge): _TLGSGS logs "slowmo on"
+    // (speed below 1) or "slowmo off" and then sets the speed; tlg_lua_load turns that into a
+    // 30 FPS cap (the credits lock switch) until the speed is back or the stage is left.
+    static constexpr std::string_view SlowMoWrapper =
+        "local function _TLGSGS(v,t) local f=(loadstring or load)("
+        "'--TLGLOG slowmo '..((tonumber(v) or 1)<1 and 'on' or 'off')) if f then f() end"
+        " return MS.SetGameSpeed(v,t) end ";
+    // Bridge fix: the GoldHEN "Collapsing Bridge Freeze Fix" (s10_Pit, cutscene pi_160_p04_A
+    // action_1). The slow motion while the bridge collapses can leave the game frozen above
+    // 30 FPS. Above 30 FPS it runs capped at 30 (start and end call only); at 30 it is skipped
+    // as before.
     static constexpr std::string_view SlowMotion = "MS.SetGameSpeed(0.10, 0.2)";
+    static constexpr std::string_view SlowMotionEnd = "MS.SetGameSpeed(1.0,1.0)";
+    // Above 30 FPS, tlg.ini slow_motion (env TLG_SLOW_MOTION wins): 0 = cap at 30 (default),
+    // 1 = skip the slow motion (the v0.5.0 behaviour).
+    static const char* slow_env = std::getenv("TLG_SLOW_MOTION");
+    const bool skip_slow = slow_env ? std::atoi(slow_env) == 1 : s.slow_motion.load() == 1;
     if (name == "data_trico/game/scripts/stages/s10_Pit/missionScript.lua") {
         const size_t at = patched.find(SlowMotion);
         if (at == std::string::npos) {
             return false;
         }
-        patched.insert(at, "--");
+        if (s.applied_engine_fps.load() <= 30 || skip_slow) {
+            patched.insert(at, "--");
+            if (s.applied_engine_fps.load() > 30) {
+                std::printf("Lua: bridge fix (slow motion skipped)\n");
+            }
+            return true;
+        }
+        const size_t end = patched.find(SlowMotionEnd, at);
+        if (end == std::string::npos) {
+            return false;
+        }
+        patched.replace(end, 15, "_TLGSGS(");
+        patched.replace(at, 15, "_TLGSGS(");
+        patched.insert(0, SlowMoWrapper);
+        std::printf("Lua: bridge fix (30 FPS during slow motion)\n");
         return true;
     }
     // Tail catch fix: the same freeze on the falling bridge (s06_FallingBridge, mission
-    // FB_e02_Demo_003, cutscenes fb_050 action_3 + fb_110 action_1, issue #39). The jump to
-    // Trico's tail starts slow motion (15%); above 30 FPS it is choppy and the catch can be
-    // missed, so the game waits forever. Skipped only when the engine runs above 30 FPS (60 or
-    // unlocked); at 30 the original slow motion stays (smooth there, no freeze).
-    static constexpr std::string_view TailJump = "game/stages/s06_FallingBridge/demo/fb_110', 'action_1')";
-    static constexpr std::string_view TailSlowMotion = "MS.SetGameSpeed(0.15, 0.25)";
+    // FB_e02_Demo_003, cutscenes fb_050 action_3 + fb_110 action_1, issues #39/#40). The game
+    // rounds its slowed frame time to whole 1/360 s steps and parts of the scene step per frame,
+    // so its slow motion (15%) only works at 30 FPS: above that it is choppy, the catch can be
+    // missed and the game waits forever. Above 30 FPS every SetGameSpeed in this script goes
+    // through _TLGSGS, which caps the frame rate at 30 while the speed is below 1 (the same
+    // switch as the credits lock; the next mission scene also ends it).
     if (s.applied_engine_fps.load() > 30 &&
         name == "data_trico/game/scripts/stages/s06_FallingBridge/missionScript.lua") {
-        const size_t jump = patched.find(TailJump);
-        const size_t at = jump == std::string::npos ? jump : patched.find(TailSlowMotion, jump);
-        if (at == std::string::npos) {
+        if (skip_slow) {
+            static constexpr std::string_view TailJump =
+                "game/stages/s06_FallingBridge/demo/fb_110', 'action_1')";
+            static constexpr std::string_view TailSlowMotion = "MS.SetGameSpeed(0.15, 0.25)";
+            const size_t jump = patched.find(TailJump);
+            const size_t at = jump == std::string::npos ? jump : patched.find(TailSlowMotion, jump);
+            if (at == std::string::npos) {
+                return false;
+            }
+            patched.insert(at, "--");
+            std::printf("Lua: tail catch fix (slow motion skipped)\n");
+            return true;
+        }
+        static constexpr std::string_view Call = "MS.SetGameSpeed(";
+        if (patched.find(Call) == std::string::npos) {
             return false;
         }
-        patched.insert(at, "--");
-        std::printf("Lua: tail catch fix (slow motion skipped above 30 FPS)\n");
+        for (size_t at = patched.find(Call); at != std::string::npos; at = patched.find(Call, at)) {
+            patched.replace(at, Call.size(), "_TLGSGS(");
+        }
+        patched.insert(0, SlowMoWrapper);
+        std::printf("Lua: tail catch fix (30 FPS during slow motion)\n");
         return true;
     }
     return false;
@@ -423,6 +466,12 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
         // the stage's own scenes: the game also enters helper scenes all the time ("_Worker ...",
         // "_tmp ...", "<stage> sub_...") and each of those would cut the report into fragments of
         // a tenth of a second.
+        // Tail catch fix: 30 FPS while the falling bridge's slow motion runs (see PatchChunk).
+        static bool slowmo = false;
+        if (text == "slowmo on" || text == "slowmo off") {
+            slowmo = text == "slowmo on";
+            TlgSettings::Get().credits_fps_lock = slowmo ? 30u : 0u;
+        }
         if (text.starts_with("mission ")) {
             const std::string_view scene = text.substr(8);
             const size_t space = scene.find(' ');
@@ -441,7 +490,11 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                                                                 : 30u;
                 const bool credits = scene.starts_with("s18_Ending ") &&
                                      scene.find("_Ending_StaffRoll") != std::string_view::npos;
-                TlgSettings::Get().credits_fps_lock = credits ? credits_fps : 0u;
+                // The slow motion spans mission scenes; only leaving the stage ends it.
+                if (!scene.starts_with("s06_FallingBridge ") && !scene.starts_with("s10_Pit ")) {
+                    slowmo = false;
+                }
+                TlgSettings::Get().credits_fps_lock = credits ? credits_fps : slowmo ? 30u : 0u;
             }
         }
         return original(L, options, Empty.data(), Empty.size(), name);
