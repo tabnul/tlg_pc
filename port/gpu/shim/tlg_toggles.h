@@ -202,10 +202,15 @@ inline std::atomic<std::uint64_t> gpu_signal_faults{0};
 inline std::atomic<std::uint64_t> protect_calls{0}, protect_pages{0}, protect_revoke_calls{0},
     protect_revoke_pages{0};
 /// Video memory by owner, for the memory report (TLG_FRAME_STATS): Vulkan images by creator, and
-/// the device memory backing the sparse buffer arenas (made resident, never freed).
+/// the device memory backing the sparse buffer arenas (resident; given back on unmap and by cold
+/// eviction since issue #38).
 enum ImageOwner : std::uint8_t { OwnerHost, OwnerTextureCache, OwnerScene, OwnerPack, ImageOwners };
 inline std::atomic<std::int64_t> image_bytes[ImageOwners]{}, image_count[ImageOwners]{};
 inline std::atomic<std::uint64_t> arena_resident_bytes{0};
+/// tlg (issue #38): arena memory given back: on unmap (released), by cold eviction (evicted,
+/// rebound later, faulted back in by shaders = pinned, kept because unequal to guest memory).
+inline std::atomic<std::uint64_t> arena_released{0}, arena_evicted{0}, arena_rebound{0},
+    arena_pinned{0}, arena_evict_mismatch{0}, arena_evict_runs{0};
 /// Texture cache region lookups (ForEachImageInRegion) and the images they looked at, for the
 /// memory report: stale images in the page table make every lookup slower.
 inline std::atomic<std::uint64_t> region_lookups{0}, region_candidates{0};
