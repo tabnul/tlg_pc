@@ -498,6 +498,7 @@ void Save() {
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
     std::fprintf(file, "fov=%d\n", v.fov.load());
+    std::fprintf(file, "slow_motion=%d\ncredits_fps=%d\n", v.slow_motion.load(), v.credits_fps.load());
     const int pack = v.texture_pack;
     std::fprintf(file, "lod_bias=%d\naniso=%d\ntexture_pack=%s\n", v.lod_bias.load(), v.aniso.load(),
                  pack > 0 ? TexturePackNames()[pack - 1].c_str() : "off");

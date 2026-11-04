@@ -763,6 +763,20 @@ void PerformanceTab() {
                      "Quando o jogo lê memória escrita pela GPU, copia também os outros dados escritos pela GPU ao redor. "
                      "Desligado é o mais rápido (2-5 FPS a mais nos testes); 64 MB não é recomendado."),
                   d.readback_batch);
+        static const char* const slow_labels[] = {TL("30 FPS during slow motion (advised)", "30 FPS durante a câmera lenta (recomendado)"),
+                                                  TL("Skip the slow motion", "Pular a câmera lenta")};
+        static const int slow_values[] = {0, 1};
+        ChoiceRow(TL("Slow-motion freeze fix (60 FPS / unlocked)", "Correção do travamento em câmera lenta (60 FPS / sem limite)"),
+                  s.slow_motion, slow_labels, slow_values, 2,
+                  TL("Fixes a known bug of the game at 60 FPS and unlocked: two slow-motion moments turn choppy and can "
+                     "freeze the game. The same bug made the PS4 60 FPS patches freeze here. The moments: the jump to "
+                     "Trico's tail (s06_FallingBridge, cutscene fb_110) and the collapsing bridge (s10_Pit). "
+                     "Issues #39 and #40. At 30 FPS nothing changes. Applies when the scene starts.",
+                     "Corrige um bug conhecido do jogo a 60 FPS e sem limite: dois momentos em câmera lenta ficam "
+                     "travados e podem congelar o jogo. O mesmo bug fazia os patches de 60 FPS do PS4 travarem aqui. "
+                     "Os momentos: o salto para a cauda do Trico (s06_FallingBridge, cena fb_110) e a ponte que "
+                     "desaba (s10_Pit). Issues #39 e #40. A 30 FPS nada muda. Vale quando a cena começa."),
+                  d.slow_motion);
         CheckRow(TL("Texture cleanup after loads", "Limpeza de texturas após carregamentos"), s.texture_cleanup,
                  TL("After each stage or checkpoint load, frees the textures of earlier stages that the new one does "
                     "not use. Without it they stay in video memory until it runs short. In one test it kept 69 FPS "

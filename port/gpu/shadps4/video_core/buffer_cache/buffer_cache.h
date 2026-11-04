@@ -7,6 +7,9 @@
 
 #include <chrono>
 #include <deque>
+#include <optional>
+#include <span>
+#include <unordered_map>
 #include <boost/container/small_vector.hpp>
 
 #include "common/interval_set.h"
@@ -15,6 +18,7 @@
 #include "video_core/buffer_cache/fault_manager.h"
 #include "video_core/buffer_cache/range_set.h"
 #include "video_core/renderer_vulkan/vk_semaphore.h"
+#include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 
 namespace AmdGpu {
 struct Liverpool;
@@ -125,6 +129,21 @@ public:
 
     /// Commits pending sparse buffer memory binds. Must be called before every scheduler submit.
     void SubmitPendingArenaBinds(Vulkan::SubmitInfo& info);
+
+    /// tlg (issue #38): releases the arena memory backing a range the guest unmapped. From the
+    /// SotC port (@AjncSystem, @Oussama268, thanks). GPU thread only.
+    void ReleaseMemory(VAddr device_addr, u64 size);
+
+    /// tlg (issue #38): gives back arena allocations whose blocks were not bound for a while and
+    /// hold no GPU-written data, once resident arena memory passes TLG_ARENA_EVICT_MB or the
+    /// device use TLG_ARENA_EVICT_VRAM_PERCENT of the budget. A check records the read-back of
+    /// the coldest ones; a later call, once the GPU has done it, compares and unbinds. From the
+    /// SotC port (@Oussama268, @Lucas-blip-png, thanks). GPU thread, outside draws.
+    bool MaybeEvictCold(std::chrono::steady_clock::time_point now);
+
+    /// tlg: a shader reached [addr, addr + size) through a pointer and faulted: blocks of it
+    /// that MaybeEvictCold gave back stay resident from now on. Before the rebind.
+    void NoteFaultRebind(VAddr addr, u64 size);
 
 private:
     struct ArenaBinds {
@@ -302,6 +321,54 @@ private:
         }
     };
     IntervalList<Backing> resident_ranges;
+
+    // tlg (issue #38): arena memory release and cold eviction, from the SotC port.
+    /// Number of resident blocks still bound to each backing allocation, and its size.
+    std::unordered_map<VkDeviceMemory, u64> backing_blocks;
+    std::unordered_map<VkDeviceMemory, u64> backing_bytes;
+    /// Unbinds resident block ranges (zeroing their page table entries) and frees the
+    /// allocations left without blocks. The GPU must no longer use them.
+    void UnbindResident(std::span<const Backing> released);
+    /// Logs a rate-limited summary of released/evicted arena memory.
+    void ReportArenaRelease();
+    /// Per arena block, the use epoch (seconds, wrapping, 0 = never) of its last bind.
+    u16* block_last_use{};
+    /// Blocks MaybeEvictCold gave back and nothing bound again yet.
+    IntervalList<> evicted_ranges;
+    /// Evicted blocks a shader faulted back in (BDA page table); never evicted again.
+    IntervalList<> pinned_ranges;
+    /// Allocations whose read-back did not match guest memory, tried again after this.
+    std::unordered_map<VkDeviceMemory, std::chrono::steady_clock::time_point> evict_retry;
+    u16 use_epoch{1};
+    void AdvanceUseEpoch(std::chrono::steady_clock::time_point now) noexcept {
+        const auto seconds =
+            std::chrono::duration_cast<std::chrono::seconds>(now - epoch_start).count();
+        use_epoch = static_cast<u16>(seconds % 65535 + 1); // 0 = never bound
+    }
+    std::chrono::steady_clock::time_point epoch_start{};
+    std::chrono::steady_clock::time_point next_evict_check{};
+    std::chrono::steady_clock::time_point next_release_report{};
+    struct EvictPiece {
+        VAddr addr;
+        u64 size;
+        u64 offset; ///< in the download
+    };
+    struct EvictChoice {
+        VkDeviceMemory memory;
+        u64 bytes;
+        std::vector<EvictPiece> pieces;
+        boost::container::small_vector<Backing, 4> ranges;
+    };
+    struct PendingEviction {
+        std::vector<EvictChoice> chosen;
+        Vulkan::StagingBufferRef download;
+        u64 tick{};
+        std::chrono::steady_clock::time_point deadline{};
+    };
+    std::optional<PendingEviction> pending_eviction;
+    bool FinishEviction(std::chrono::steady_clock::time_point now, u16 idle_epochs, bool wait);
+    /// tlg: system-memory type for arena blocks when video memory is full (@AjncSystem).
+    std::optional<u32> arena_fallback_memory_type_index;
 
     u32 arena_memory_type_index{};
     u32 block_size{};
