@@ -54,6 +54,70 @@
 - ⚙️ **Yours to tune.** Nearly every setting changes live in game, and each one says what the game
   originally used and what we recommend.
 
+## Graphics and performance
+
+### Any resolution, ultrawide
+
+- The game renders at the window's resolution, 21:9 and 32:9 included.
+- At 21:9, menus, hints and subtitles are laid out for the wider screen instead of stretched.
+- 32:9 is experimental: some overlays sit to the left and parts of the menus are stretched.
+
+### DLAA and FSR 3.1 AA
+
+- NVIDIA's DLSS anti-aliasing at native resolution, fed with the game's own motion vectors.
+- Replaces the game's SMAA and removes most of the shimmer on foliage, feathers and fences.
+- On by default on RTX cards. **FSR 3.1 Native AA** does the same on any card.
+- **F8** switches between your choice and the original SMAA. More in [docs/dlaa.md](docs/dlaa.md).
+
+### Frame generation
+
+- DLSS frame generation (RTX 40 or newer) or FSR 3.1 frame generation (any brand).
+- Adds one generated image per game frame, so twice the frames are shown.
+- Off by default. Tested on an RTX 5090 on Windows.
+
+### Optional AI-upscaled textures
+
+- [ps4-texturepack-generator](https://github.com/tabnul/ps4-texturepack-generator) turns the
+  textures of your own copy into a 4x pack (colour textures and normal maps).
+- Loaded while the game runs, switchable live. Runs on NVIDIA, AMD/Intel or, slowly, the CPU.
+- Entirely optional. More in [docs/texture-pack.md](docs/texture-pack.md).
+
+### Smooth, no shader stutter
+
+- Play at 30, 60 or unlocked: about 90-120 FPS unlocked on an RTX 5090, with no freezes in play.
+- Updates and new drivers no longer bring the stutter back: 75% fewer hitches, and the worst
+  freezes cut from 630 ms to about 160 ms right after the shader cache was cleared.
+- Shaders are prepared in under a second at start, thanks to the shader recipes from
+  [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by @deadinside28.
+
+### Realistic wind, less flicker
+
+- The stock wind makes the boy's clothes, the trees and Trico's feathers thrash as if in a storm.
+  Set the wind separately for the boy, the trees and Trico. The recommended 50% is a breeze.
+- The game moves most grass only every 4th frame, which flickers at PC frame rates. Here it moves
+  every frame.
+
+### Live graphics menu
+
+Press **Insert** in game and change the picture while you play. The launcher has the same settings.
+
+| | |
+|---|---|
+| **Presets** | *Stock*, *Recommended* (default) and your own; share them as a `.json` file |
+| **Shadows** | 2048, 4096 or 8192 maps: far less shimmer in tree and leaf shadows |
+| **Camera** | Field of view from 50 to 110 degrees |
+| **Game effects** | Ambient occlusion, bloom, reflections, motion blur, vignette, sharpening, fog: 0-100%+ |
+| **Textures** | LOD bias, anisotropic filtering up to 16x, live texture pack switching |
+| **Scaling** | FSR 1, AMD CAS or RCAS sharpening |
+| **Colour** | Brightness, contrast, saturation, gamma; HDR10 output |
+| **Frame rate** | 30 (as on PS4), 60 or unlocked; frame queue depth |
+| **Menu buttons** | [Cross or Circle to confirm](docs/menu-buttons.md), gameplay buttons untouched |
+| **Japanese text** | Experimental, on EU CUSA03745 1.03: see [docs/japanese.md](docs/japanese.md) |
+
+Every setting shows the value the game originally used and says what we would pick and why. Settings
+that made no visible difference were left out; the evidence is in
+[docs/graphics-investigation.md](docs/graphics-investigation.md).
+
 ## The complete soundtrack
 
 The music of The Last Guardian is a masterpiece of its own. Takeshi Furukawa composed, orchestrated
@@ -178,71 +242,6 @@ full screenshot.
 
 </details>
 
-## Graphics and performance
-
-### DLAA and FSR 3.1 AA
-
-- NVIDIA's DLSS anti-aliasing at native resolution, fed with the game's own motion vectors.
-- Replaces the game's SMAA and removes most of the shimmer on foliage, feathers and fences.
-- On by default on RTX cards. **FSR 3.1 Native AA** does the same on any card.
-- **F8** switches between your choice and the original SMAA. More in [docs/dlaa.md](docs/dlaa.md).
-
-### Frame generation
-
-- DLSS frame generation (RTX 40 or newer) or FSR 3.1 frame generation (any brand).
-- Adds one generated image per game frame, so twice the frames are shown.
-- Off by default. Tested on an RTX 5090 on Windows. Turning DLSS frame generation off while
-  playing can crash the game, so restart to turn it off.
-
-### Smooth, no shader stutter
-
-- Play at 30, 60 or unlocked: about 90-120 FPS unlocked on an RTX 5090, with no freezes in play.
-- Updates and new drivers no longer bring the stutter back: 75% fewer hitches, and the worst
-  freezes cut from 630 ms to about 160 ms right after the shader cache was cleared.
-- Shaders are prepared in under a second at start, thanks to the shader recipes from
-  [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by @deadinside28.
-
-### Any resolution, ultrawide
-
-- The game renders at the window's resolution, 21:9 and 32:9 included.
-- At 21:9, menus, hints and subtitles are laid out for the wider screen instead of stretched.
-- 32:9 is experimental: some overlays sit to the left and parts of the menus are stretched.
-
-### Optional AI-upscaled textures
-
-- [ps4-texturepack-generator](https://github.com/tabnul/ps4-texturepack-generator) turns the
-  textures of your own copy into a 4x pack (colour textures and normal maps).
-- Loaded while the game runs, switchable live. Runs on NVIDIA, AMD/Intel or, slowly, the CPU.
-- Entirely optional. More in [docs/texture-pack.md](docs/texture-pack.md).
-
-### Realistic wind, less flicker
-
-- The stock wind makes the boy's clothes, the trees and Trico's feathers thrash as if in a storm.
-  Set the wind separately for the boy, the trees and Trico. The recommended 50% is a breeze.
-- The game moves most grass only every 4th frame, which flickers at PC frame rates. Here it moves
-  every frame.
-
-### Live graphics menu
-
-Press **Insert** in game and change the picture while you play. The launcher has the same settings.
-
-| | |
-|---|---|
-| **Presets** | *Stock*, *Recommended* (default) and your own; share them as a `.json` file |
-| **Shadows** | 2048, 4096 or 8192 maps: far less shimmer in tree and leaf shadows |
-| **Camera** | Field of view from 50 to 110 degrees |
-| **Game effects** | Ambient occlusion, bloom, reflections, motion blur, vignette, sharpening, fog: 0-100%+ |
-| **Textures** | LOD bias, anisotropic filtering up to 16x, live texture pack switching |
-| **Scaling** | FSR 1, AMD CAS or RCAS sharpening |
-| **Colour** | Brightness, contrast, saturation, gamma; HDR10 output |
-| **Frame rate** | 30 (as on PS4), 60 or unlocked; frame queue depth |
-| **Menu buttons** | [Cross or Circle to confirm](docs/menu-buttons.md), gameplay buttons untouched |
-| **Japanese text** | Experimental, on EU CUSA03745 1.03: see [docs/japanese.md](docs/japanese.md) |
-
-Every setting shows the value the game originally used and says what we would pick and why. Settings
-that made no visible difference were left out; the evidence is in
-[docs/graphics-investigation.md](docs/graphics-investigation.md).
-
 ## Fun
 
 Unique to this port: content the developers cut, easter eggs they left behind, and a Trico you can
@@ -263,12 +262,19 @@ in-game menu (**Insert**, the **Fun** and **Trico Tricks** tabs). Everything is 
     <td><a href="docs/fun.md#extra-tricos"><img src="docs/screenshots/fun/armored-trico.jpg" alt="An armoured Trico"></a></td>
     <td><a href="docs/fun.md#tricos-eyes"><img src="docs/screenshots/fun/eye-colour.jpg" alt="Coloured eyes"></a></td>
   </tr>
+  <tr>
+    <td><a href="docs/fun.md#tricos-toilet"><img src="docs/screenshots/fun/toilet.jpg" alt="Trico's droppings"></a></td>
+    <td><a href="docs/fun.md#tricos-toilet"><img src="docs/screenshots/fun/toilet2.jpg" alt="The boy holding a dung ball"></a></td>
+    <td><a href="docs/fun.md#trico-tricks-make-trico-move"><img src="docs/screenshots/fun/yawn.jpg" alt="Trico yawning"></a></td>
+  </tr>
 </table>
 
 - 💧 [**Trico's drool**](#spotlight-tricos-drool): cut just before release with one line of code,
   back on. Also in the launcher, on the Settings page.
 - 🐉 [**Trico Tricks**](#spotlight-trico-tricks): sneeze, roar, sit, roll, groom
   and more, plus the cut throw-up. **F12** puts the moves on a bar over the game.
+- 💩 [**Trico's toilet**](docs/fun.md#tricos-toilet): Trico relieves himself on command. In the
+  game it almost never happens where you can see it: he waits until you look away.
 - 📏 [**Trico's size**](docs/fun.md#tricos-size): from half to twice his size.
 - 🐾 [**Extra Tricos**](docs/fun.md#extra-tricos): up to 8 more, the armoured one too (**F9**).
 - 🌈 [**Trico's eyes**](docs/fun.md#tricos-eyes): disco eyes or any colour you like.

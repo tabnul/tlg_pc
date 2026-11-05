@@ -19,6 +19,7 @@ Open the in-game menu with **Insert** (or **R3 + L2** on a controller) and go to
 - [Trico's eyes](#tricos-eyes)
 - [Free camera](#free-camera)
 - [Trico Tricks: make Trico move](#trico-tricks-make-trico-move)
+- [Trico's toilet](#tricos-toilet), something you almost never get to see
 - [Jump to a place](#jump-to-a-place)
 - [Keys](#keys)
 
@@ -106,6 +107,25 @@ off a ledge.
   This brings it back.
 
 ![Trico yawning, with the Trico Tricks bar (F12)](screenshots/fun/yawn.jpg)
+
+## Trico's toilet
+
+Trico does need the toilet in the game, but the game makes sure you almost never see it. From its
+own scripts (`condorcommonactioneatable.lua`, `gamework.lua`), all of these must be true:
+
+- His stomach has emptied at least **2 times** since his last time. That happens after he eats
+  barrels: the game counts it as throwing up, even with the throw-up animation cut.
+- Then **30 minutes** of normal play pass. Cutscenes and standing in water don't count.
+- Then he waits for a moment when the boy is **more than 10 metres away**, there is room, and
+  **Trico's head is out of the camera's view for 3 seconds**. Look at him and the wait starts
+  over.
+- If that moment doesn't come within **10 minutes**, the urge passes and the count starts again.
+
+So in normal play you mostly find the result later, if at all: green dung balls on the ground. The
+boy can pick them up and carry them (second picture).
+
+**Toilet** in the Trico Tricks tab skips all of that: he does it right away, in front of you.
+
 ![Trico's droppings, green dung balls next to him](screenshots/fun/toilet.jpg)
 ![The boy holding one of Trico's dung balls](screenshots/fun/toilet2.jpg)
 
