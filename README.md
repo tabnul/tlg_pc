@@ -1,4 +1,4 @@
-<p align="center"><img src="port/packaging/icon/tlg-icon-1024.png" width="160" alt=""></p>
+<p align="center"><img src="docs/screenshots/hero.jpg" alt="Trico lifts the boy up from the collapsing bridge"></p>
 
 <h1 align="center">The Last Guardian for PC</h1>
 
