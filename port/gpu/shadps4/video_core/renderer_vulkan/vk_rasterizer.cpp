@@ -175,6 +175,9 @@ Rasterizer::Rasterizer(const Instance& instance_, Scheduler& scheduler_, Runtime
         liverpool->BindRasterizer(this);
     }
     memory->SetRasterizer(this);
+    buffer_cache.SetNoDrainHooks(
+        [this](VAddr address, u64 size) { return PendingWriteOverlaps(address, size); },
+        [this] { DrainDrawPipe(DrawPipe::ReasonCommands); });
 
     GpuProfiler::Init(instance, scheduler);
     if (DrawPipeWanted()) {

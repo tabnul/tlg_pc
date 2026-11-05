@@ -7,6 +7,8 @@
 
 #include <chrono>
 #include <deque>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <unordered_map>
@@ -99,6 +101,15 @@ public:
     /// tlg: a CPU read fault on pages with no GPU-modified data: lift the read protection on the
     /// faulting thread instead of a round trip through the GPU command thread.
     void ReleaseReadProtection(VAddr device_addr, u64 size);
+
+    /// tlg #38 (TLG_FAULT_NODRAIN=1): the rasterizer lends the checks a no-drain read-fault
+    /// download needs: "does an unrecorded draw/DMA/fence still write this range" and the
+    /// manual drain for the fallback.
+    void SetNoDrainHooks(std::function<bool(VAddr, u64)> pending_check,
+                         std::function<void()> drain) {
+        tlg_pending_write_check = std::move(pending_check);
+        tlg_drain_draws = std::move(drain);
+    }
     /// tlg: the buffer tracking of one page, for the fault-loop report.
     std::string DescribeFaultState(VAddr device_addr);
 
@@ -191,6 +202,12 @@ private:
     StreamBuffer stream_buffer;
     Buffer gds_buffer;
     RangeSet gpu_modified_ranges;
+
+    static bool TlgFaultNoDrainOn();
+    bool TryNoDrainDownload(VAddr device_addr, u64 size);
+    std::function<bool(VAddr, u64)> tlg_pending_write_check;
+    std::function<void()> tlg_drain_draws;
+    std::unique_ptr<Buffer> nodrain_buffer;
 
     // Disabled unless a launch profile opts in. When enabled, exact GPU-dirty islands in the
     // current sparse arena share one completion if their combined staging footprint fits.

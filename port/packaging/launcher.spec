@@ -14,7 +14,10 @@ icon = os.environ.get('TLG_SPEC_ICON') or None
 hidden = os.environ['TLG_SPEC_HIDDEN'].split()
 paths = [str(root / 'scripts'), str(root / 'launcher')]
 
-a = Analysis([str(root / 'launcher' / os.environ['TLG_SPEC_TK'])], pathex=paths, datas=[],
+# The benchmark's clean start save (launcher/benchmark.py reads it from _MEIPASS when frozen).
+datas = [(str(root / 'tools' / 'scene-check' / 'start.save'), 'scene-check/start.save')]
+
+a = Analysis([str(root / 'launcher' / os.environ['TLG_SPEC_TK'])], pathex=paths, datas=datas,
              hiddenimports=hidden, excludes=['PySide6', 'shiboken6'], noarchive=False)
 exe = EXE(PYZ(a.pure), a.scripts, [], exclude_binaries=True, name=name, console=False, icon=icon,
           debug=False, strip=False, upx=False)

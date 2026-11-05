@@ -51,7 +51,9 @@ TEXT = {
     'display': ('Display', 'Tela'),
     'launcher_section': ('Launcher', 'Launcher'),
     'scene_section': ('Display, shadows and textures', 'Tela, sombras e texturas'),
-    'home_logs': ('Logs', 'Logs'),
+    'home_logs': ('Debug', 'Depuração'),
+    'tab_log': ('Log', 'Log'),
+    'tab_bench': ('Benchmark', 'Benchmark'),
     'home_soundtrack': ('Soundtrack', 'Trilha sonora'),
     'soundtrack_hint': ("All the game's music, read from your own game folder. The game has no track titles: each piece is "
                         "named by the stage it plays in, with the game's own working name where it has one. The music is "
@@ -144,6 +146,40 @@ TEXT = {
                  'em relação a 60 no mesmo lugar; escolha 60, a não ser que seu PC rode bem acima de 60'),
     'skip_logos': ('Skip the boot logos', 'Pular os logotipos de abertura'),
     'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
+    'bench_title': ('Benchmark', 'Benchmark'),
+    'bench_text': ('Measures how fast the game runs on this PC, scene by scene, all by itself: each scene is '
+                   'loaded from a clean save, the camera stands still, and the frame rate of every second is '
+                   'recorded. Your own saves are set aside first and put back afterwards.\n\n'
+                   'Hands off while it runs: the game opens full screen for every scene, about a minute each. '
+                   'The result is a single .zip report file — attach it to a GitHub issue so the developers can '
+                   'see exactly how each scene runs on your PC.',
+                   'Mede a velocidade do jogo neste PC, cena por cena, sozinho: cada cena é carregada de um '
+                   'save limpo, a câmera fica parada e a taxa de quadros de cada segundo é registrada. Seus '
+                   'próprios saves são guardados antes e devolvidos depois.\n\n'
+                   'Não mexa enquanto roda: o jogo abre em tela cheia para cada cena, cerca de um minuto cada. '
+                   'O resultado é um único arquivo .zip — anexe-o a uma issue no GitHub para os desenvolvedores '
+                   'verem exatamente como cada cena roda no seu PC.'),
+    'bench_full': ('All scenes ({count})', 'Todas as cenas ({count})'),
+    'bench_pick': ('Pick scenes from the list', 'Escolher cenas da lista'),
+    'bench_custom': ('Custom list (paste)', 'Lista própria (colar)'),
+    'bench_custom_hint': ('One scene per line, as stage:start point. The list to run usually comes from a '
+                          'developer on GitHub; the lines below are examples.',
+                          'Uma cena por linha, como fase:ponto de início. A lista geralmente vem de um '
+                          'desenvolvedor no GitHub; as linhas abaixo são exemplos.'),
+    'bench_seconds': ('Seconds measured per scene', 'Segundos medidos por cena'),
+    'bench_estimate': ('Estimated time: about {minutes} min for {count} scenes',
+                       'Tempo estimado: cerca de {minutes} min para {count} cenas'),
+    'bench_start': ('Start', 'Iniciar'),
+    'bench_stop': ('Stop', 'Parar'),
+    'bench_open_folder': ('Open the report folder', 'Abrir a pasta do relatório'),
+    'bench_running': ('Scene {index} of {total}: {point}', 'Cena {index} de {total}: {point}'),
+    'bench_done': ('Done. Report: {name}', 'Concluído. Relatório: {name}'),
+    'bench_stopped': ('Stopped. A partial report was still written.',
+                      'Parado. Um relatório parcial foi gravado mesmo assim.'),
+    'bench_bad_points': ('Not in the scene list: {points}', 'Fora da lista de cenas: {points}'),
+    'bench_no_points': ('The custom list is empty.', 'A lista própria está vazia.'),
+    'bench_game_running': ('Close the game first.', 'Feche o jogo primeiro.'),
+    'bench_busy': ('A benchmark is running.', 'Um benchmark está em andamento.'),
     'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),
     'debug_logging': ('Advanced logging (for bug reports)', 'Registro avançado (para relatar erros)'),
     'debug_logging_hint': ('Can cost some FPS and makes the log bigger. Turn it on, make the problem happen, close the game, '
@@ -569,6 +605,190 @@ def help_mark(parent, text, *also):
     for widget in (mark, *also):
         add_tooltip(widget, text)
     return mark
+
+
+class BenchmarkWindow:
+    """The Benchmark window (Debug section): picks the scenes, runs benchmark.Sweep on a worker
+    thread and shows the progress; the result is one .zip under <user data>/benchmark/."""
+
+    def __init__(self, app, parent):
+        import benchmark
+        self.bm = benchmark
+        self.app = app
+        self.running = False
+        self.sweep = None
+        self.stop_event = threading.Event()
+        self.events = queue.Queue()
+        self.zip_path = None
+
+        win = self.win = ttk.Frame(parent, padding=14)
+        win.pack(fill='both', expand=True)
+        win.columnconfigure(0, weight=1)
+        full_count = len(benchmark.default_points())
+
+        ttk.Label(win, text=app.t('bench_text'), wraplength=520, justify='left').grid(
+            row=0, column=0, columnspan=3, sticky='w')
+        self.mode = tk.StringVar(value='full')
+        ttk.Radiobutton(win, text=app.t('bench_full', count=full_count), variable=self.mode, value='full',
+                        command=self.refresh).grid(row=1, column=0, sticky='w', pady=(10, 0))
+        ttk.Radiobutton(win, text=app.t('bench_pick'), variable=self.mode, value='pick',
+                        command=self.refresh).grid(row=2, column=0, sticky='w')
+        picker = ttk.Frame(win)
+        picker.grid(row=3, column=0, columnspan=3, sticky='ew')
+        self.pick = tk.Listbox(picker, selectmode='multiple', height=8, width=54, background=FIELD,
+                               foreground=TEXT_COLOR, relief='flat', exportselection=False,
+                               selectbackground=ACCENT, selectforeground=BG, font=('TkDefaultFont', 9))
+        for stage, area in benchmark.default_points():
+            self.pick.insert('end', f'{stage}:{area}')
+        bar = ttk.Scrollbar(picker, orient='vertical', command=self.pick.yview)
+        self.pick.configure(yscrollcommand=bar.set)
+        self.pick.pack(side='left', fill='x', expand=True)
+        bar.pack(side='left', fill='y')
+        self.pick.bind('<<ListboxSelect>>', lambda _e: self.refresh())
+        ttk.Radiobutton(win, text=app.t('bench_custom'), variable=self.mode, value='custom',
+                        command=self.refresh).grid(row=4, column=0, sticky='w', pady=(6, 0))
+        ttk.Label(win, text=app.t('bench_custom_hint'), wraplength=520, justify='left',
+                  foreground=MUTED).grid(row=5, column=0, columnspan=3, sticky='w', pady=(2, 2))
+        self.custom = tk.Text(win, width=56, height=4, background=FIELD, foreground=TEXT_COLOR,
+                              insertbackground=TEXT_COLOR, relief='flat', font=('TkDefaultFont', 9))
+        self.custom.insert('1.0', '\n'.join(benchmark.EXAMPLE_POINTS))
+        self.custom.grid(row=6, column=0, columnspan=3, sticky='ew')
+        self.custom.bind('<KeyRelease>', lambda _e: self.refresh())
+
+        line = ttk.Frame(win)
+        line.grid(row=7, column=0, columnspan=3, sticky='w', pady=(8, 0))
+        ttk.Label(line, text=app.t('bench_seconds')).pack(side='left')
+        self.seconds = tk.Spinbox(line, from_=10, to=120, increment=5, width=5,
+                                  command=self.refresh, background=FIELD, foreground=TEXT_COLOR,
+                                  insertbackground=TEXT_COLOR, relief='flat')
+        self.seconds.delete(0, 'end')
+        self.seconds.insert(0, '40')
+        self.seconds.pack(side='left', padx=(6, 0))
+        self.seconds.bind('<KeyRelease>', lambda _e: self.refresh())
+        self.estimate = ttk.Label(win, text='', foreground=MUTED)
+        self.estimate.grid(row=8, column=0, columnspan=3, sticky='w', pady=(4, 0))
+
+        self.progress = ttk.Progressbar(win, mode='determinate', length=520)
+        self.progress.grid(row=9, column=0, columnspan=3, sticky='ew', pady=(10, 0))
+        self.status = ttk.Label(win, text='', wraplength=520, justify='left')
+        self.status.grid(row=10, column=0, columnspan=3, sticky='w', pady=(4, 0))
+
+        buttons = ttk.Frame(win)
+        buttons.grid(row=11, column=0, columnspan=3, sticky='w', pady=(10, 0))
+        self.start_button = ttk.Button(buttons, text=app.t('bench_start'), command=self.start)
+        self.start_button.pack(side='left')
+        self.stop_button = ttk.Button(buttons, text=app.t('bench_stop'), command=self.stop, state='disabled')
+        self.stop_button.pack(side='left', padx=(6, 0))
+        self.open_button = ttk.Button(buttons, text=app.t('bench_open_folder'), command=self.open_folder,
+                                      state='disabled')
+        self.open_button.pack(side='left', padx=(6, 0))
+        self.refresh()
+
+    def alive(self):
+        try:
+            return bool(self.win.winfo_exists())
+        except tk.TclError:
+            return False
+
+    # -- the choices -------------------------------------------------------------------------
+    def chosen(self):
+        if self.mode.get() == 'full':
+            return self.bm.default_points(), []
+        if self.mode.get() == 'pick':
+            points = self.bm.default_points()
+            return [points[i] for i in self.pick.curselection()], []
+        return self.bm.parse_points(self.custom.get('1.0', 'end'))
+
+    def chosen_seconds(self):
+        try:
+            return max(5, min(600, int(self.seconds.get())))
+        except (tk.TclError, ValueError):
+            return 40
+
+    def refresh(self):
+        points, _bad = self.chosen()
+        mode = self.mode.get()
+        self.custom.configure(state='normal' if mode == 'custom' and not self.running else 'disabled')
+        self.pick.configure(state='normal' if mode == 'pick' and not self.running else 'disabled')
+        self.estimate.configure(text=self.app.t(
+            'bench_estimate', minutes=self.bm.estimate_minutes(len(points), self.chosen_seconds()),
+            count=len(points)))
+
+    # -- run ---------------------------------------------------------------------------------
+    def start(self):
+        app = self.app
+        if app.process or tlg_run.game_running():
+            messagebox.showinfo(app.t('bench_title'), app.t('bench_game_running'), parent=self.win)
+            return
+        points, bad = self.chosen()
+        if bad:
+            messagebox.showerror(app.t('bench_title'),
+                                 app.t('bench_bad_points', points=', '.join(bad[:5])), parent=self.win)
+            return
+        if not points:
+            messagebox.showerror(app.t('bench_title'), app.t('bench_no_points'), parent=self.win)
+            return
+        self.running = True
+        self.zip_path = None
+        self.stop_event.clear()
+        self.start_button.configure(state='disabled')
+        self.stop_button.configure(state='normal')
+        self.open_button.configure(state='disabled')
+        self.progress.configure(maximum=len(points), value=0)
+        self.refresh()
+        notify = lambda kind, **data: self.events.put((kind, data))  # noqa: E731  (worker thread -> queue)
+        self.sweep = self.bm.Sweep(app.settings, points, self.chosen_seconds(), notify, self.stop_event)
+        threading.Thread(target=self.sweep.run, daemon=True).start()
+        self.win.after(200, self.pump)
+
+    def stop(self):
+        self.stop_event.set()
+        self.stop_button.configure(state='disabled')
+
+    def pump(self):
+        app = self.app
+        done = False
+        while True:
+            try:
+                kind, data = self.events.get_nowait()
+            except queue.Empty:
+                break
+            if kind == 'point':
+                self.progress.configure(value=data['index'])
+                self.status.configure(text=app.t('bench_running', index=data['index'] + 1,
+                                                 total=data['total'],
+                                                 point=f"{data['stage']}:{data['area']}"))
+            elif kind == 'row':
+                self.progress.step(1)
+            elif kind == 'error':
+                self.status.configure(text=data['text'])
+            elif kind == 'done':
+                done = True
+                self.zip_path = data.get('zip')
+        if done:
+            self.running = False
+            self.sweep = None
+            self.start_button.configure(state='normal')
+            self.stop_button.configure(state='disabled')
+            if self.zip_path:
+                text = app.t('bench_stopped') + ' ' if self.stop_event.is_set() else ''
+                self.status.configure(text=text + app.t('bench_done', name=Path(self.zip_path).name))
+                self.open_button.configure(state='normal')
+            self.refresh()
+            return
+        if self.alive():
+            self.win.after(200, self.pump)
+
+    def open_folder(self):
+        if self.zip_path:
+            self.app.open(str(Path(self.zip_path).parent))
+
+    def shutdown(self):
+        """The launcher closes: end the run and the game with it."""
+        if self.running:
+            self.stop_event.set()
+            if self.sweep:
+                self.sweep.kill_game()
 
 
 def section(parent, text, help_text=None, padding=8):
@@ -1051,8 +1271,13 @@ class Launcher:
             side='right', pady=(6, 0))
         ttk.Button(header, text=self.t('report_issue'), command=self.report_issue).pack(
             side='right', padx=(0, 6), pady=(6, 0))
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill='both', expand=True)
+        tabs = ttk.Notebook(win)
+        tabs.pack(fill='both', expand=True, padx=12, pady=(8, 12))
+        frame = ttk.Frame(tabs, padding=12)
+        tabs.add(frame, text=self.t('tab_log'))
+        bench_tab = ttk.Frame(tabs)
+        tabs.add(bench_tab, text=self.t('tab_bench'))
+        self.bench_window = BenchmarkWindow(self, bench_tab)
         self.log = tk.Text(frame, wrap='none', font=('TkFixedFont', 9), state='disabled',
                            background=FIELD, foreground=MUTED, insertbackground=TEXT_COLOR,
                            highlightthickness=0, relief='flat')
@@ -2288,6 +2513,10 @@ class Launcher:
 
     def play(self, point=None):
         """point 'stage:area' = a practice start (Start at...): saves copied before, put back after."""
+        window = getattr(self, 'bench_window', None)
+        if window and window.running:
+            messagebox.showinfo(self.t('title'), self.t('bench_busy'))
+            return
         if self.process:
             messagebox.showinfo(self.t('title'), self.t('already'))
             return
@@ -2460,6 +2689,8 @@ class Launcher:
             music.kill()
 
     def close(self):
+        if getattr(self, 'bench_window', None):
+            self.bench_window.shutdown()
         self.stop_music()
         self.stop_track()
         if getattr(self, 'controller', None):
