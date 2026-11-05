@@ -91,17 +91,19 @@ void Liverpool::ProcessCommands() {
     // that late readback to change buffer ranges before the recorder was done hashing them.
     // Its first scheduler call then drained too late: stage B faulted on the same protected
     // page while stage A waited for it. Drain before *each* callback touches cache state.
+    bool skip_drain = false;
     ProcessQueuedCommands(
         [this] { return num_commands.load() != 0; },
-        [this] {
+        [this, &skip_drain] {
             std::scoped_lock lk{submit_mutex};
             auto callback = std::move(command_queue.front());
             command_queue.pop();
             --num_commands;
-            return callback;
+            skip_drain = callback.no_drain;
+            return std::move(callback.func);
         },
-        [this] {
-            if (rasterizer) {
+        [this, &skip_drain] {
+            if (rasterizer && !skip_drain) {
                 rasterizer->DrainDrawPipe(Vulkan::DrawPipe::ReasonCommands);
             }
         });

@@ -142,16 +142,19 @@ public:
         rasterizer = rasterizer_;
     }
 
+    // tlg #38: no_drain marks a command whose callback checks cache safety itself, so the
+    // draw-pipe drain before it is skipped (read-fault downloads, TLG_FAULT_NODRAIN=1).
     template <bool wait_done = false>
-    void SendCommand(auto&& func) {
+    void SendCommand(auto&& func, bool no_drain = false) {
         if constexpr (wait_done) {
             std::binary_semaphore sem{0};
             {
                 std::scoped_lock lk{submit_mutex};
-                command_queue.emplace([&sem, &func] {
-                    func();
-                    sem.release();
-                });
+                command_queue.push(QueuedCommand{[&sem, &func] {
+                                                     func();
+                                                     sem.release();
+                                                 },
+                                                 no_drain});
                 ++num_commands;
                 submit_cv.notify_one();
             }
@@ -159,7 +162,7 @@ public:
             sem.acquire();
         } else {
             std::scoped_lock lk{submit_mutex};
-            command_queue.emplace(std::move(func));
+            command_queue.push(QueuedCommand{std::move(func), no_drain});
             ++num_commands;
             submit_cv.notify_one();
         }
@@ -291,7 +294,11 @@ private:
     std::atomic<bool> submit_done{};
     std::mutex submit_mutex;
     std::condition_variable_any submit_cv;
-    std::queue<Common::UniqueFunction<void>> command_queue{};
+    struct QueuedCommand {
+        Common::UniqueFunction<void> func;
+        bool no_drain = false;
+    };
+    std::queue<QueuedCommand> command_queue{};
     std::thread::id gpu_id;
 #if defined(__linux__) || defined(_WIN32)
     u32 gpu_tid{};
