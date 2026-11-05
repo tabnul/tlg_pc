@@ -1182,6 +1182,37 @@ void FunTab() {
     }
     Help("The developers' own camera: it lets go of the normal camera that follows the boy. Turn it off to get the normal camera back. A jump or a new stage turns it off.");
 
+    ImGui::SeparatorText("Tricopilot");
+    const bool pilot = TlgFun::TricopilotOn();
+    ImGui::BeginDisabled(pilot);
+    if (ImGui::Button(TL("Start Tricopilot", "Iniciar Tricopiloto"))) {
+        TlgFun::Tricopilot(true);
+        SetOpen(false);
+    }
+    Help(TL(TlgFun::TricopilotHelp, TlgFun::TricopilotHelpPt));
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!pilot);
+    if (ImGui::Button(TL("Stop Tricopilot", "Parar Tricopiloto"))) {
+        TlgFun::Tricopilot(false);
+    }
+    Help(TL("Gives Trico and the camera back to you. He stops where he stands, and the normal camera follows the boy again.",
+            "Devolve o Trico e a câmera para você. Ele para onde está, e a câmera normal volta a seguir o menino."));
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", pilot ? TL("driving", "dirigindo") : TL("off", "desligado"));
+
+    int cam = int(TlgFun::TricopilotCamera());
+    const char* cam_names[] = {TL(TlgFun::PilotCamNames[0], TlgFun::PilotCamNamesPt[0]),
+                               TL(TlgFun::PilotCamNames[1], TlgFun::PilotCamNamesPt[1]),
+                               TL(TlgFun::PilotCamNames[2], TlgFun::PilotCamNamesPt[2]),
+                               TL(TlgFun::PilotCamNames[3], TlgFun::PilotCamNamesPt[3])};
+    ImGui::SetNextItemWidth(180.0f);
+    if (ImGui::Combo(TL("Camera##pilotcam", "Câmera##pilotcam"), &cam, cam_names, 4)) {
+        TlgFun::TricopilotCamera(TlgFun::PilotCam(cam));
+    }
+    Help(TL(TlgFun::TricopilotCamHelp, TlgFun::TricopilotCamHelpPt));
+
     ImGui::SeparatorText(TL("Trico's eyes", "Olhos do Trico"));
     bool disco = TlgFun::DiscoOn();
     if (ImGui::Checkbox(TL("Disco eyes", "Olhos disco"), &disco)) {

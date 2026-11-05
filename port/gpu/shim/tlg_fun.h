@@ -115,5 +115,50 @@ void Size(float scale);
 float SizeNow();
 void FreeCamera(bool on);
 bool FreeCameraOn();
+// Tricopilot: the developers' self-driving Trico, left in the retail game
+// (game/scripts/ai2/condor/condordebugautotrico.lua). Trico walks the scene by himself and the
+// camera follows him. The launcher's benchmark can keep it on for a whole run (TLG_TRICOPILOT=1).
+void Tricopilot(bool on);
+bool TricopilotOn();
+// Which camera watches him. The first three are the developers' own presets for this tool
+// (TricoAutoRunTest_near / _middle / _far); Game is the normal camera, which keeps following the
+// boy. Middle is what autoTrico() picks itself, Near frames Trico best in open scenes. Changing it
+// while he drives takes effect at once. The launcher passes it as TLG_TRICOPILOT_CAM=near|middle|
+// far|game.
+enum class PilotCam { Near = 0, Middle = 1, Far = 2, Game = 3 };
+void TricopilotCamera(PilotCam cam);
+PilotCam TricopilotCamera();
+inline constexpr const char* PilotCamNames[] = {"Near", "Middle", "Far", "Game camera"};
+inline constexpr const char* PilotCamNamesPt[] = {"Perto", "Médio", "Longe", "Câmera do jogo"};
+inline constexpr const char* PilotCamKeys[] = {"near", "middle", "far", "game"};
+inline constexpr const char* TricopilotCamHelp =
+    "Near keeps Trico big in the picture and is the best of the four in open scenes. Middle is the "
+    "one the developers' tool picks itself: a classic top-down view, but in a narrow or roofed "
+    "place the camera can end up inside the rock. Far looks down on the whole area, which is lovely "
+    "in a valley and useless indoors, because Trico becomes a dot. Game camera leaves your normal "
+    "camera alone: it keeps following the boy while Trico wanders off on his own.";
+inline constexpr const char* TricopilotCamHelpPt =
+    "Perto mantém o Trico grande na tela e é a melhor das quatro em cenas abertas. Médio é a que a "
+    "ferramenta dos desenvolvedores escolhe sozinha: uma vista de cima clássica, mas num lugar "
+    "estreito ou coberto a câmera pode acabar dentro da rocha. Longe mostra a área inteira, bonito "
+    "num vale e inútil em interiores, porque o Trico vira um ponto. Câmera do jogo não mexe na sua "
+    "câmera: ela continua seguindo o menino enquanto o Trico passeia sozinho.";
+// The Fun tab, both launchers and the docs show this text.
+inline constexpr const char* TricopilotHelp =
+    "Trico drives himself: he wanders the scene, looks for edges to climb or jump, and the camera "
+    "follows him. It is the developers' own debug tool, still in the game. They used it to leave the "
+    "game running by itself for hours: their script can even walk him on to the next scene and knows "
+    "every stage's start points, their own version of a soak test. Three of its pieces say how old it "
+    "is: a line to restart the game over a network socket from a PC called D:\\trico, a camera preset "
+    "named TricoAutoRunTest_middle, and helper volumes that are not even on the disc any more (the "
+    "game quietly skips those, which is why he sometimes picks an odd route). Turning it off gives "
+    "you the camera and Trico back. For fun only: he ignores the story, he can wander into water or "
+    "into a load trigger, and the story keeps running around him.";
+inline constexpr const char* TricopilotHelpPt =
+    "Trico se dirige sozinho: ele vagueia pela cena, procura bordas para escalar ou pular, e a câmera "
+    "o segue. É a ferramenta de depuração dos próprios desenvolvedores, ainda presente no jogo. Eles "
+    "a usavam para deixar o jogo rodando sozinho por horas: o script até o leva para a cena seguinte "
+    "e conhece os pontos de início de todas as fases. Só por diversão: ele ignora a história, pode "
+    "entrar na água ou num gatilho de carregamento, e a história continua ao redor dele.";
 bool EyeCustom();
 } // namespace TlgFun

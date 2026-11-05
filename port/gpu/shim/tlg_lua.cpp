@@ -264,6 +264,26 @@ std::string size_pending; // the latest Trico size, under fun_mutex: a slider dr
 std::atomic<float> trico_size{1.0f};
 std::string cam_pending; // the latest free camera wish, under fun_mutex
 std::atomic<bool> free_cam{false};
+std::atomic<bool> pilot{false}; // Tricopilot (TlgFun::Tricopilot)
+// Which camera watches him (TlgFun::PilotCam). Middle is what autoTrico() picks itself, so that
+// stays our default; the launcher and the Fun tab can pick another one, also while he drives.
+std::atomic<TlgFun::PilotCam> pilot_cam{[] {
+    const char* env = std::getenv("TLG_TRICOPILOT_CAM");
+    if (env && *env) {
+        for (int i = 0; i < 4; ++i)
+            if (std::string_view(env) == TlgFun::PilotCamKeys[i]) return TlgFun::PilotCam(i);
+    }
+    return TlgFun::PilotCam::Middle;
+}()};
+// Tricopilot for a whole run (TLG_TRICOPILOT=1, the launcher's benchmark): switched on as soon as a
+// mission scene is entered, so it starts by itself after every load.
+bool PilotWanted() {
+    static const bool want = [] {
+        const char* env = std::getenv("TLG_TRICOPILOT");
+        return env && *env && std::string_view(env) != "0";
+    }();
+    return want;
+}
 std::string eye_pending; // the latest eye colour change, under fun_mutex: a picker drag sends only the last
 
 void FunQueue(const std::string& code) {
@@ -620,6 +640,18 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                                 scene.substr(space + 1).starts_with("sub_");
             if (!helper) {
                 TlgStats::SetScene(scene);
+                // Tricopilot for a whole run (the launcher's benchmark): every new scene gets its
+                // own Trico and the game's own camera back, so arm the pilot again at each one.
+                // The title screen counts as a scene too, so a run that warps (TLG_START_POINT)
+                // first arms there and then again in the scene it lands in, which is the one that
+                // matters. Arming is cheap: the pilot's tick waits for Trico and then starts him.
+                if (PilotWanted()) {
+                    static std::string armed_for;
+                    if (armed_for != scene) {
+                        armed_for = scene;
+                        TlgFun::Tricopilot(true);
+                    }
+                }
                 // The credits (s18_Ending *_Ending_StaffRoll*) hitch at every cut above 30 FPS,
                 // the rate the PS4 game runs them at. The next real scene ends the lock.
                 // TLG_CREDITS_FPS=30|60|unlocked (benchmarks) wins over tlg.ini credits_fps.
@@ -714,6 +746,9 @@ void Jump(const char* stage, const char* area) {
     fun_tricos = 0;
     disco = false;
     eye_custom = false;
+    // The new stage's Trico is a new one and the camera is the game's again: arm Tricopilot afresh
+    // when it was on, so he keeps driving after the jump instead of standing still with a dead tick.
+    if (pilot) Tricopilot(true);
 }
 
 void AddTrico() {
@@ -923,6 +958,82 @@ void FreeCamera(bool on) {
 
 bool FreeCameraOn() {
     return free_cam;
+}
+
+// Tricopilot: the developers' own self-driving Trico (game/scripts/ai2/condor/
+// condordebugautotrico.lua, shipped as plain Lua in the retail data). autoTrico(true) attaches their
+// helper volumes, sets work.AutoTorico and hands the camera to their chase preset. Two things are
+// needed on top of that call, both found 2026-11-05:
+//  - DEBUG_AUTO_TRICO: the per-tick driver (Ai2.Condor.Scripts.AutoTorico_main, condorscripttick.lua
+//    line 184) only runs when that global is true, and the script forces it false outside their
+//    editor ("if not Engine.editor then DEBUG_AUTO_TRICO = false end"). We set it true ourselves.
+//  - Waiting for Trico: right after a load his AI props do not exist yet, so our tick keeps trying
+//    until they do (up to a minute) and only then switches him on. That is also what makes the
+//    launcher's benchmark work, where every scene starts with a load.
+// The camera for the chosen preset. The three TricoAutoRunTest_* names are the only presets this
+// tool has (condordebugautotrico.lua, condorcommonvolumeevent.lua:2239); a name the engine does not
+// know is ignored silently, it cannot break anything. Nothing re-forces the camera afterwards: the
+// per-tick block that would (line 1236) is gated on work.AutoTorico_AutoCam, which nothing ever
+// sets. So whatever we set here stays until Trico is switched off or the stage changes.
+std::string PilotCamLua(TlgFun::PilotCam cam) {
+    if (cam == TlgFun::PilotCam::Game)
+        return "pcall(function() CameraManager:SetActiveCamera('default') GameCamera:FixParam() end)\n";
+    const char* preset = cam == TlgFun::PilotCam::Near     ? "TricoAutoRunTest_near"
+                         : cam == TlgFun::PilotCam::Far    ? "TricoAutoRunTest_far"
+                                                           : "TricoAutoRunTest_middle";
+    return std::string("pcall(function() CameraManager:SetActiveCamera('game') GameCamera:FixParam('") +
+           preset + "') end)\n";
+}
+
+constexpr std::string_view PilotOnLua =
+    "DEBUG_AUTO_TRICO=true\n"
+    "if _TLG_PILOT then pcall(UnRegisterTick,_TLG_PILOT) _TLG_PILOT=nil end\n"
+    "local tries=0\n"
+    "_TLG_PILOT=function() tries=tries+1\n"
+    " local ok,ready=pcall(function() local p=Ai2.Utils.GetAIProps('Condor')\n"
+    "  return p and p.currentInfo and p.currentInfo.work~=nil end)\n"
+    " if ok and ready then UnRegisterTick(_TLG_PILOT) _TLG_PILOT=nil\n"
+    "  local started,e=pcall(autoTrico,true)\n"
+    "  if started then %CAM% end\n"
+    "  L('fun tricopilot on '..tostring(started)..' after '..tries..' ticks'..(started and '' or ' '..tostring(e)))\n"
+    " elseif tries>3600 then UnRegisterTick(_TLG_PILOT) _TLG_PILOT=nil\n"
+    "  L('fun tricopilot: no Trico in this scene') end end\n"
+    "RegisterTick(_TLG_PILOT)\n"
+    "L('fun tricopilot armed')\n";
+constexpr std::string_view PilotOffLua =
+    "if _TLG_PILOT then pcall(UnRegisterTick,_TLG_PILOT) _TLG_PILOT=nil end\n"
+    "pcall(autoTrico,false)\n"
+    "DEBUG_AUTO_TRICO=false\n"
+    // autoTrico(false) gives the camera back itself; do it again in case it never got as far as on.
+    "pcall(function() CameraManager:SetActiveCamera('default') GameCamera:FixParam() end)\n"
+    "L('fun tricopilot off')\n";
+
+void Tricopilot(bool on) {
+    pilot = on;
+    std::printf("Fun: Tricopilot %s\n", on ? "on" : "off");
+    if (!on) {
+        FunQueue(std::string(PilotOffLua));
+        return;
+    }
+    std::string code(PilotOnLua);
+    const std::string mark = "%CAM%";
+    code.replace(code.find(mark), mark.size(), PilotCamLua(pilot_cam.load()));
+    FunQueue(code);
+}
+
+bool TricopilotOn() {
+    return pilot;
+}
+
+void TricopilotCamera(TlgFun::PilotCam cam) {
+    pilot_cam = cam;
+    std::printf("Fun: Tricopilot camera %s\n", TlgFun::PilotCamKeys[int(cam)]);
+    // While he drives, switch over right away; otherwise the next start picks it up.
+    if (pilot) FunQueue(PilotCamLua(cam));
+}
+
+TlgFun::PilotCam TricopilotCamera() {
+    return pilot_cam.load();
 }
 
 void EyeNormal() {
