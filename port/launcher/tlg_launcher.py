@@ -649,10 +649,17 @@ class BenchmarkWindow:
                         command=self.refresh).grid(row=4, column=0, sticky='w', pady=(6, 0))
         ttk.Label(win, text=app.t('bench_custom_hint'), wraplength=520, justify='left',
                   foreground=MUTED).grid(row=5, column=0, columnspan=3, sticky='w', pady=(2, 2))
-        self.custom = tk.Text(win, width=56, height=4, background=FIELD, foreground=TEXT_COLOR,
-                              insertbackground=TEXT_COLOR, relief='flat', font=('TkDefaultFont', 9))
+        custom_box = ttk.Frame(win)
+        custom_box.grid(row=6, column=0, columnspan=3, sticky='ew')
+        custom_box.columnconfigure(0, weight=1)
+        self.custom = tk.Text(custom_box, width=56, height=10, background=FIELD,
+                              foreground=TEXT_COLOR, insertbackground=TEXT_COLOR, relief='flat',
+                              font=('TkDefaultFont', 9))
         self.custom.insert('1.0', '\n'.join(benchmark.EXAMPLE_POINTS))
-        self.custom.grid(row=6, column=0, columnspan=3, sticky='ew')
+        self.custom.grid(row=0, column=0, sticky='ew')
+        custom_bar = ttk.Scrollbar(custom_box, orient='vertical', command=self.custom.yview)
+        custom_bar.grid(row=0, column=1, sticky='ns')
+        self.custom.configure(yscrollcommand=custom_bar.set)
         self.custom.bind('<KeyRelease>', lambda _e: self.refresh())
 
         line = ttk.Frame(win)
