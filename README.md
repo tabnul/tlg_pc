@@ -102,7 +102,7 @@ their own use. We dug through the game's scripts, found them, and made them play
 | 🌈 | [Disco eyes](docs/fun.md#tricos-eyes) | Hidden effect, only in a few story moments | Any time, or any colour |
 | 🎥 | [Free camera](docs/fun.md#free-camera) | Developers only | In the Fun tab |
 | 🐾 | [Extra and armoured Tricos](docs/fun.md#extra-tricos) | Developers' own commands | **F9**, up to 8 |
-| 🗺️ | [Level select and QA menu](#level-select-and-qa-menu) | Developers' test menus | Working, black screen fixed |
+| 🗺️ | [Level select and QA menu](#level-select-and-qa-menu) | Developers' test menus | Working |
 
 ## Spotlight: Trico's drool
 
