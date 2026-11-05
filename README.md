@@ -50,7 +50,8 @@
   under a second at start.
 - 🛠️ **Well supported.** 19 releases since October 2026, crash reports followed up, and fixes
   shipped within days. Windows and Linux builds.
-- 🐾 **Fun.** Trico's drool, a giant or tiny Trico, extra Tricos, disco eyes and a free camera.
+- 🐾 **Fun.** Trico's drool, a giant or tiny Trico, extra Tricos, disco eyes, a free camera and
+  Tricopilot: Trico driving himself.
 - ⚙️ **Yours to tune.** Nearly every setting changes live in game, and each one says what the game
   originally used and what we recommend.
 
@@ -165,6 +166,7 @@ their own use. We dug through the game's scripts, found them, and made them play
 | 🤢 | [Trico throwing up](#spotlight-trico-tricks) | Sealed by the developers, July 2016 | Back, one click |
 | 🌈 | [Disco eyes](docs/fun.md#tricos-eyes) | Hidden effect, only in a few story moments | Any time, or any colour |
 | 🎥 | [Free camera](docs/fun.md#free-camera) | Developers only | In the Fun tab |
+| 🤖 | [Tricopilot](docs/fun.md#tricopilot) | Developers' soak-test tool, switched off | Start it yourself |
 | 🐾 | [Extra and armoured Tricos](docs/fun.md#extra-tricos) | Developers' own commands | **F9**, up to 8 |
 | 🗺️ | [Level select and QA menu](#level-select-and-qa-menu) | Developers' test menus | Working |
 
@@ -201,7 +203,7 @@ in-game **Fun** tab: **Always**, or **As the developers planned**.
 | 🎛️ | [Live graphics menu](#live-graphics-menu) | Presets, shadows, FOV, effects, colour, HDR |
 | 📍 | [Jump to any scene](#jump-to-any-scene) | Start anywhere, from the launcher or in game |
 | 🗺️ | [Level select and QA menu](#level-select-and-qa-menu) | The developers' own menus, fixed |
-| 🐾 | [Fun](#fun) | Drool, Trico tricks, size, extra Tricos, free camera |
+| 🐾 | [Fun](#fun) | Drool, Trico tricks, size, extra Tricos, free camera, Tricopilot |
 | 🎵 | [Soundtrack](#the-complete-soundtrack) | All 110 minutes of the game's music, in stereo or 5.1 |
 | 🎮 | [Controllers](#controllers) | DualSense, DualShock 4, Xbox, keyboard and mouse |
 | 🔬 | [Scene check](#scene-check) | Test all 219 scenes in one run |
@@ -279,6 +281,9 @@ in-game menu (**Insert**, the **Fun** and **Trico Tricks** tabs). Everything is 
 - 🐾 [**Extra Tricos**](docs/fun.md#extra-tricos): up to 8 more, the armoured one too (**F9**).
 - 🌈 [**Trico's eyes**](docs/fun.md#tricos-eyes): disco eyes or any colour you like.
 - 🎥 [**Free camera**](docs/fun.md#free-camera): the developers' own camera.
+- 🤖 [**Tricopilot**](docs/fun.md#tricopilot): Trico drives himself and the camera follows him —
+  the developers' own tool for leaving the game running by itself. The launcher's benchmark can
+  keep it on for a whole run.
 - 📍 [**Jump to a place**](#jump-to-any-scene): any stage, any start point, in game or
   from the launcher.
 
