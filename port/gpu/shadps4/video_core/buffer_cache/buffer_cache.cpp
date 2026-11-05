@@ -184,12 +184,6 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
             }
         }
     }
-    // tlg (issue #38): one u16 per block of the address space for cold eviction; calloc leaves
-    // the pages nothing touches uncommitted.
-    block_last_use =
-        static_cast<u16*>(std::calloc(blocks_per_arena_page * num_arena_pages, sizeof(u16)));
-    ASSERT_MSG(block_last_use, "No memory for the arena block use table");
-    epoch_start = std::chrono::steady_clock::now();
 
     const u64 bda_pagetable_size =
         (blocks_per_arena_page * num_arena_pages) * sizeof(vk::DeviceAddress);
@@ -203,9 +197,7 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
     runtime.FillBuffer(bda_pagetable_buffer.get(), 0u, bda_pagetable_size, 0u);
 }
 
-BufferCache::~BufferCache() {
-    std::free(block_last_use);
-}
+BufferCache::~BufferCache() = default;
 
 // tlg phase 4, default off: the false-share skip never showed a gain beyond noise (condor,
 // pulse, top-5 slowest scenes, 2026-10-29). TLG_RB_FALSESHARE=1 re-enables it for reference.
@@ -1408,10 +1400,6 @@ const Buffer* BufferCache::GetArena(u64 first_block, u64 last_block) {
 }
 
 void BufferCache::EnsureResident(const Buffer* arena, u64 first_block, u64 last_block) {
-    // tlg (issue #38): the bind keeps its blocks out of MaybeEvictCold for TLG_ARENA_EVICT_IDLE_S.
-    for (u64 block = first_block; block <= last_block; ++block) {
-        block_last_use[block] = use_epoch;
-    }
     u32 resident_blocks{};
     IntervalList bind_ranges;
     resident_ranges.ForEachGap(first_block, last_block + 1, [&](u64 start, u64 end) {
@@ -1423,17 +1411,6 @@ void BufferCache::EnsureResident(const Buffer* arena, u64 first_block, u64 last_
         return;
     }
     TlgStats::Timer timer{TlgStats::t_resident};
-    if (!evicted_ranges.Empty()) {
-        for (const auto& range : bind_ranges) {
-            evicted_ranges.ForEachInRange(range.start, range.end, [&](const Interval& evicted) {
-                const u64 start = std::max(range.start, evicted.start);
-                const u64 end = std::min(range.end, evicted.end);
-                TlgStats::arena_rebound.fetch_add((end - start) << block_shift,
-                                                  std::memory_order_relaxed);
-            });
-            evicted_ranges.Subtract(range.start, range.end);
-        }
-    }
 
     vk::MemoryAllocateInfo alloc_info = {
         .allocationSize = u64{resident_blocks} << block_shift,
@@ -1671,9 +1648,9 @@ static void tlg_erase_if(auto& c, auto&& pred) {
 }
 
 // tlg (issue #38): the sparse arenas grew to ~2.5 GB and never gave memory back. Release on
-// unmap (ReleaseMemory, @AjncSystem; default on and the device-lost fix, @Oussama268) and cold
-// eviction (MaybeEvictCold, @Oussama268, async @Oussama268, VRAM-percent trigger
-// @Lucas-blip-png), all from the SotC port. Thanks!
+// unmap (ReleaseMemory, @AjncSystem; default on and the device-lost fix, @Oussama268), from the
+// SotC port. Thanks! Cold eviction from the same port was removed again (#38): shaders reading
+// through pointers did not count as use, so evicted data could read as zeros for a few frames.
 void BufferCache::ReleaseMemory(VAddr device_addr, u64 size) {
     // Only whole blocks inside the unmapped range can go; partial blocks may back neighbours.
     const u64 first_block = Common::AlignUp(device_addr, u64{block_size}) >> block_shift;
@@ -1681,8 +1658,6 @@ void BufferCache::ReleaseMemory(VAddr device_addr, u64 size) {
     if (first_block >= end_block) {
         return;
     }
-    evicted_ranges.Subtract(first_block, end_block);
-    pinned_ranges.Subtract(first_block, end_block);
     boost::container::small_vector<Backing, 16> released;
     const auto collect = [&] {
         released.clear();
@@ -1762,7 +1737,6 @@ void BufferCache::UnbindResident(std::span<const Backing> released) {
                                                              std::memory_order_relaxed);
                     backing_bytes.erase(bytes);
                 }
-                evict_retry.erase(memory);
                 // The unbind is submitted before this tick's work, which waits for it.
                 scheduler.DeferOperation([device = instance.GetDevice(), memory = range.memory] {
                     device.freeMemory(memory);
@@ -1780,263 +1754,12 @@ void BufferCache::ReportArenaRelease() {
     }
     next_release_report = now + std::chrono::seconds(10);
     LOG_INFO(Render,
-             "Buffer arenas: {} MiB resident; given back {} MiB on unmap, {} MiB cold in {} runs "
-             "(rebound {} MiB, faulted back {} MiB, kept unequal {} MiB)",
+             "Buffer arenas: {} MiB resident; given back {} MiB on unmap",
              TlgStats::arena_resident_bytes.load(std::memory_order_relaxed) >> 20,
-             TlgStats::arena_released.load(std::memory_order_relaxed) >> 20,
-             TlgStats::arena_evicted.load(std::memory_order_relaxed) >> 20,
-             TlgStats::arena_evict_runs.load(std::memory_order_relaxed),
-             TlgStats::arena_rebound.load(std::memory_order_relaxed) >> 20,
-             TlgStats::arena_pinned.load(std::memory_order_relaxed) >> 20,
-             TlgStats::arena_evict_mismatch.load(std::memory_order_relaxed) >> 20);
-}
-
-bool BufferCache::MaybeEvictCold(std::chrono::steady_clock::time_point now) {
-    // The game reuses addresses it keeps mapped, so arena blocks became resident once and
-    // stayed. Once resident arena memory passes TLG_ARENA_EVICT_MB (default 1536, 0 = never) or
-    // the device use passes TLG_ARENA_EVICT_VRAM_PERCENT (default 85, 0 = off) of the budget,
-    // allocations whose blocks were not bound for TLG_ARENA_EVICT_IDLE_S (default 30) seconds
-    // and hold no GPU-modified data go back, coldest first, up to TLG_ARENA_EVICT_STEP_MB
-    // (default 64) per check (every 2 s). Their guest pages are marked CPU-modified, so the next
-    // bind uploads them again. Each allocation is read back first and goes only when every page
-    // that is not CPU-modified equals guest memory (else tried again after 60 s).
-    // Shaders reading arena memory through pointers (BDA page table) fault an evicted block
-    // back in (one frame of zeros: SotC saw shadows flicker when evicting too eagerly, @Madmer);
-    // blocks that came back that way are pinned and never evicted again.
-    static const u64 limit = [] {
-        const char* v = std::getenv("TLG_ARENA_EVICT_MB");
-        return (v ? std::strtoull(v, nullptr, 10) : 1536ull) << 20;
-    }();
-    static const u64 step = [] {
-        const char* v = std::getenv("TLG_ARENA_EVICT_STEP_MB");
-        return std::max<u64>(v ? std::strtoull(v, nullptr, 10) : 64ull, 1) << 20;
-    }();
-    static const u16 idle_epochs = [] {
-        const char* v = std::getenv("TLG_ARENA_EVICT_IDLE_S");
-        return static_cast<u16>(std::clamp<unsigned long>(v ? std::strtoul(v, nullptr, 10) : 30ul,
-                                                          2ul, 30000ul));
-    }();
-    static const u64 vram_percent = [] {
-        const char* v = std::getenv("TLG_ARENA_EVICT_VRAM_PERCENT");
-        return std::min<u64>(v ? std::strtoull(v, nullptr, 10) : 85ull, 100ull);
-    }();
-    if (pending_eviction) {
-        AdvanceUseEpoch(now);
-        return FinishEviction(now, idle_epochs, false);
-    }
-    if (now < next_evict_check) {
-        return false;
-    }
-    next_evict_check = now + std::chrono::seconds(2);
-    AdvanceUseEpoch(now);
-    const u64 resident = TlgStats::arena_resident_bytes.load(std::memory_order_relaxed);
-    const bool arena_over = limit != 0 && resident > limit;
-    bool vram_over = false;
-    if (vram_percent != 0 && resident > (256ull << 20) && instance.CanReportMemoryUsage()) {
-        const u64 budget = instance.GetDeviceMemoryBudgetNow();
-        vram_over = budget != 0 && instance.GetDeviceMemoryUsage() > budget * vram_percent / 100;
-    }
-    if (!arena_over && !vram_over) {
-        return false;
-    }
-    struct Candidate {
-        u16 age{0xFFFF}; // youngest block
-        bool keep{};
-        u64 bytes{};
-        boost::container::small_vector<Backing, 4> ranges;
-    };
-    std::unordered_map<VkDeviceMemory, Candidate> candidates;
-    for (const Backing& range : resident_ranges) {
-        auto& candidate = candidates[static_cast<VkDeviceMemory>(range.memory)];
-        if (candidate.keep) {
-            continue;
-        }
-        for (u64 block = range.start; block < range.end && !candidate.keep; ++block) {
-            const u16 age = static_cast<u16>(use_epoch - block_last_use[block]);
-            candidate.age = std::min(candidate.age, age);
-            candidate.keep = age < idle_epochs;
-        }
-        const VAddr addr = range.start << block_shift;
-        const u64 size = (range.end - range.start) << block_shift;
-        candidate.keep = candidate.keep || pinned_ranges.Overlaps(range.start, range.end) ||
-                         memory_tracker->IsRegionGpuModified(addr, size) ||
-                         gpu_modified_ranges.Intersects(addr, size);
-        candidate.ranges.push_back(range);
-    }
-    std::erase_if(evict_retry, [&](const auto& entry) { return entry.second <= now; });
-    std::vector<std::pair<u16, VkDeviceMemory>> order;
-    for (auto& [memory, candidate] : candidates) {
-        if (candidate.keep || evict_retry.contains(memory)) {
-            continue;
-        }
-        const auto bytes = backing_bytes.find(memory);
-        candidate.bytes = bytes != backing_bytes.end() ? bytes->second : 0;
-        if (candidate.bytes > step) {
-            continue; // one read-back and compare per check stays within `step`
-        }
-        order.emplace_back(candidate.age, memory);
-    }
-    if (order.empty()) {
-        next_evict_check = now + std::chrono::seconds(10); // all of it in use: look again later
-        return false;
-    }
-    std::ranges::sort(order, std::greater{});
-
-    // Read the coldest allocations back, up to `step` bytes of blocks.
-    std::vector<EvictChoice> chosen;
-    u64 total = 0;
-    for (const auto& [age, memory] : order) {
-        // The 7/8 floor is the arena threshold's: under VRAM pressure alone `step` bounds a run.
-        if (total >= step || (arena_over && resident - total <= limit / 8 * 7)) {
-            break;
-        }
-        const Candidate& candidate = candidates[memory];
-        EvictChoice& pick =
-            chosen.emplace_back(EvictChoice{memory, candidate.bytes, {}, candidate.ranges});
-        for (const Backing& range : candidate.ranges) {
-            for (u64 start = range.start; start < range.end;) {
-                const u64 page = start >> blocks_per_arena_page_shift;
-                const u64 end =
-                    std::min<u64>(range.end, (page + 1) << blocks_per_arena_page_shift);
-                pick.pieces.push_back({start << block_shift, (end - start) << block_shift, total});
-                total += (end - start) << block_shift;
-                start = end;
-            }
-        }
-    }
-    const auto download = staging_pool.Request(total, MemoryType::HostCached, 0, true);
-    for (const EvictChoice& pick : chosen) {
-        for (const EvictPiece& piece : pick.pieces) {
-            const Buffer* arena = address_space[piece.addr >> arena_page_bits];
-            if (!arena) {
-                continue;
-            }
-            const vk::BufferCopy copy{arena->Offset(piece.addr), download.offset + piece.offset,
-                                      piece.size};
-            runtime.CopyBuffer(arena, download.buffer, std::span{&copy, 1});
-        }
-    }
-    pending_eviction = PendingEviction{std::move(chosen), download, scheduler.CurrentTick(),
-                                       now + std::chrono::seconds(5)};
-    // TLG_EVICT_ASYNC=0 waits for the read-back here (scheduler.Finish() on the GPU thread,
-    // ~50 ms per 64 MiB run, one late frame each). Default: compared at a later call.
-    static const bool async = [] {
-        const char* v = std::getenv("TLG_EVICT_ASYNC");
-        return !v || v[0] != '0';
-    }();
-    return async ? false : FinishEviction(now, idle_epochs, true);
-}
-
-bool BufferCache::FinishEviction(std::chrono::steady_clock::time_point now, u16 idle_epochs,
-                                 bool wait) {
-    // The unbind's sparse batch does not wait for earlier submits, so it goes only once every
-    // command buffer submitted so far (the read-back's included) is done; after 5 s, or with
-    // `wait`, Finish() it.
-    PendingEviction& pending = *pending_eviction;
-    if (!scheduler.IsFree(pending.tick) || !scheduler.IsFree(scheduler.CurrentTick() - 1)) {
-        if (!wait && now < pending.deadline) {
-            return false;
-        }
-        scheduler.Finish();
-    }
-    const auto& download = pending.download;
-    download.buffer->Invalidate(download.offset, download.size);
-
-    std::vector<Backing> released;
-    std::array<u8, 4096> guest;
-    for (const EvictChoice& pick : pending.chosen) {
-        // Bound again, or written by the GPU, after the read-back was recorded: stays.
-        bool keep = false;
-        for (const Backing& range : pick.ranges) {
-            for (u64 block = range.start; block < range.end && !keep; ++block) {
-                keep = static_cast<u16>(use_epoch - block_last_use[block]) < idle_epochs;
-            }
-            const VAddr addr = range.start << block_shift;
-            const u64 size = (range.end - range.start) << block_shift;
-            keep = keep || pinned_ranges.Overlaps(range.start, range.end) ||
-                   memory_tracker->IsRegionGpuModified(addr, size) ||
-                   gpu_modified_ranges.Intersects(addr, size);
-        }
-        if (keep) {
-            continue;
-        }
-        bool equal = true;
-        for (const EvictPiece& piece : pick.pieces) {
-            for (u64 at = 0; at < piece.size && equal; at += guest.size()) {
-                const VAddr addr = piece.addr + at;
-                if (memory_tracker->IsRegionCpuModified(addr, guest.size())) {
-                    continue; // uploaded at the next bind anyway
-                }
-                if (!memory->TryCopySparseMemory(addr, guest.data(), guest.size())) {
-                    continue; // unmapped: nothing can read it
-                }
-                equal = std::memcmp(download.mapped + piece.offset + at, guest.data(),
-                                    guest.size()) == 0;
-            }
-        }
-        if (!equal) {
-            evict_retry.emplace(pick.memory, now + std::chrono::seconds(60));
-            TlgStats::arena_evict_mismatch.fetch_add(pick.bytes, std::memory_order_relaxed);
-            continue;
-        }
-        released.insert(released.end(), pick.ranges.begin(), pick.ranges.end());
-    }
-    staging_pool.FreeDeferred(download);
-    pending_eviction.reset();
-    // Binds queued by Finish's deferred operations (fault rebinds, arena migration) must not
-    // share the unbind's sparse batch; the chosen ranges must still be resident as chosen.
-    if (!pending_binds.empty()) {
-        scheduler.Flush();
-    }
-    std::erase_if(released, [&](const Backing& range) {
-        bool same = false;
-        resident_ranges.ForEachInRange(range.start, range.end, [&](const Backing& now_range) {
-            same |= now_range.start <= range.start && range.end <= now_range.end &&
-                    now_range.memory == range.memory;
-        });
-        return !same;
-    });
-    if (!released.empty() && async_active) {
-        // tlg: the background readback copies on its own queue: land it before unbinding.
-        ResolveAsyncReadback(async_arena);
-    }
-    for (const Backing& range : released) {
-        const VAddr addr = range.start << block_shift;
-        const u64 size = (range.end - range.start) << block_shift;
-        memory_tracker->MarkRegionAsCpuModified(addr, size);
-        evicted_ranges.Add({range.start, range.end});
-        TlgStats::arena_evicted.fetch_add(size, std::memory_order_relaxed);
-        tlg_erase_if(hot_readbacks, [&](const HotReadback& hot) {
-            return hot.addr < addr + size && addr < hot.addr + hot.size;
-        });
-        resident_ranges.Subtract(range.start, range.end);
-    }
-    TlgStats::arena_evict_runs.fetch_add(1, std::memory_order_relaxed);
-    if (!released.empty()) {
-        UnbindResident(released);
-        // A bind of the same blocks recorded before the next submit would share one sparse
-        // bind batch with the unbind; submit the unbind on its own.
-        scheduler.Flush();
-        ReportArenaRelease();
-        return true;
-    }
-    return false;
-}
-
-void BufferCache::NoteFaultRebind(VAddr addr, u64 size) {
-    const u64 first_block = addr >> block_shift;
-    const u64 end_block = (addr + size + block_size - 1) >> block_shift;
-    evicted_ranges.ForEachInRange(first_block, end_block, [&](const Interval& evicted) {
-        const u64 start = std::max(first_block, evicted.start);
-        const u64 end = std::min(end_block, evicted.end);
-        pinned_ranges.Add({start, end});
-        TlgStats::arena_pinned.fetch_add((end - start) << block_shift, std::memory_order_relaxed);
-    });
+             TlgStats::arena_released.load(std::memory_order_relaxed) >> 20);
 }
 
 void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
-    // tlg: binds stamp blocks with use_epoch; keep it current even when no eviction check runs.
-    AdvanceUseEpoch(std::chrono::steady_clock::now());
     if (pending_binds.empty()) {
         return;
     }

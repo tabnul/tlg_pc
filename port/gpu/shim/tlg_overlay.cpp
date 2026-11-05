@@ -799,6 +799,23 @@ void PerformanceTab() {
                  TL("Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often.",
                     "Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência."),
                  d.keep_gpu_textures);
+        // Test switches for the buffer memory return of v0.5.2 (SotC port), issue #38.
+        CheckRow(TL("Debug: give back freed buffer memory", "Debug: devolver memória de buffer liberada"), s.arena_release,
+                 TL("Since v0.5.2: when the game frees memory, its graphics card copy goes too. Test switch (issue #38): "
+                    "turn it off to check whether a problem started with v0.5.2. Off is the behaviour before v0.5.2. "
+                    "From the Shadow of the Colossus PC port (@AjncSystem, @Oussama268).",
+                    "Desde a v0.5.2: quando o jogo libera memória, a cópia na placa de vídeo vai junto. Chave de teste "
+                    "(issue #38): desligue para ver se um problema começou na v0.5.2. Desligado é o comportamento "
+                    "antes da v0.5.2. Do port de Shadow of the Colossus para PC (@AjncSystem, @Oussama268)."),
+                 d.arena_release);
+        CheckRow(TL("Debug: texture cleanup follows the driver", "Debug: limpeza de texturas segue o driver"), s.gc_live_budget,
+                 TL("Since v0.5.2: texture cleanup starts at the video memory the driver offers now, never below the "
+                    "start-up limits. Test switch (issue #38): off uses only the start-up limits (the behaviour before "
+                    "v0.5.2), so textures are cleaned up sooner.",
+                    "Desde a v0.5.2: a limpeza de texturas começa pela memória de vídeo que o driver oferece agora, "
+                    "nunca abaixo dos limites do início. Chave de teste (issue #38): desligado usa só os limites do "
+                    "início (o comportamento antes da v0.5.2), então as texturas são limpas mais cedo."),
+                 d.gc_live_budget);
         ImGui::EndTable();
     }
 }

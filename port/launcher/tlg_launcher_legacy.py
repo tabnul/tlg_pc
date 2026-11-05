@@ -108,6 +108,10 @@ TEXT = {
                   'Só diminua se a sua placa tiver menos de 8 GB de VRAM (6 GB: 5600, 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
     'texture_cleanup': ('Clean up textures after each load',
                         'Limpar texturas após cada carregamento'),
+    'arena_release': ('Debug: give back freed buffer memory', 'Debug: devolver memória de buffer liberada'),
+    'arena_release_hint': ('Since v0.5.2: when the game frees memory, its graphics card copy goes too. Test switch (issue #38): turn it off to check whether a problem started with v0.5.2. Off is the behaviour before v0.5.2. From the Shadow of the Colossus PC port (@AjncSystem, @Oussama268). Also in the in-game menu (Insert → Performance).', 'Desde a v0.5.2: quando o jogo libera memória, a cópia na placa de vídeo vai junto. Chave de teste (issue #38): desligue para ver se um problema começou na v0.5.2. Desligado é o comportamento antes da v0.5.2. Do port de Shadow of the Colossus para PC (@AjncSystem, @Oussama268). Também no menu do jogo (Insert → Desempenho).'),
+    'gc_live_budget': ('Debug: texture cleanup follows the driver', 'Debug: limpeza de texturas segue o driver'),
+    'gc_live_budget_hint': ('Since v0.5.2: texture cleanup starts at the video memory the driver offers now, never below the start-up limits. Test switch (issue #38): off uses only the start-up limits (the behaviour before v0.5.2), so textures are cleaned up sooner. Also in the in-game menu (Insert → Performance).', 'Desde a v0.5.2: a limpeza de texturas começa pela memória de vídeo que o driver oferece agora, nunca abaixo dos limites do início. Chave de teste (issue #38): desligado usa só os limites do início (o comportamento antes da v0.5.2), então as texturas são limpas mais cedo. Também no menu do jogo (Insert → Desempenho).'),
     'keep_gpu_textures': ('Keep GPU-only textures', 'Manter texturas só na GPU'),
     'keep_gpu_textures_hint': ('Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often. Also in the in-game menu (Insert → Performance).',
                                'Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência. Também no menu do jogo (Insert → Desempenho).'),
@@ -805,6 +809,18 @@ class Launcher:
         ttk.Checkbutton(memory, text=self.t('keep_gpu_textures'), variable=keep_gpu, command=keep_gpu_toggled).grid(
             row=2, column=0, sticky='w', pady=(4, 0))
         self.hint(memory, 2, 1, 'keep_gpu_textures_hint')
+        # Test switches for the v0.5.2 buffer memory return (issue #38; tlg.ini, apply at once).
+        for row, key in enumerate(('arena_release', 'gc_live_budget'), start=3):
+            var = tk.BooleanVar(value=tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get(key, '1') != '0')
+
+            def toggled(key=key, var=var):
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
+                self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+            ttk.Checkbutton(memory, text=self.t(key), variable=var, command=toggled).grid(
+                row=row, column=0, sticky='w', pady=(4, 0))
+            self.hint(memory, row, 1, key + '_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))

@@ -1581,17 +1581,19 @@ void TextureCache::GarbageCollectImages() {
             // tlg (#38): on a desktop GPU the start-up limits (5100/5700 MiB on 8 GB) count buffer
             // arenas too, which evicting images cannot free: past them the collector threw out
             // thousands of images per report for nothing. Follow the driver's current budget
-            // with the same rule, never below the start-up limits. TLG_GC_LIVE_BUDGET=0: off.
-            static const bool live = [] {
-                const char* env = std::getenv("TLG_GC_LIVE_BUDGET");
-                return !(env && *env == '0');
-            }();
+            // with the same rule, never below the start-up limits. Setting gc_live_budget (live;
+            // env TLG_GC_LIVE_BUDGET=0): off = the start-up limits.
+            const bool live = TlgSettings::Get().gc_live_budget.load(std::memory_order_relaxed);
             static const u64 start_trigger = trigger_gc_memory, start_pressure = pressure_gc_memory,
                              start_critical = critical_gc_memory;
             if (const u64 now = live ? instance.GetDeviceMemoryBudgetNow() : 0; now != 0) {
                 trigger_gc_memory = std::max(start_trigger, now / 10 * 7);
                 pressure_gc_memory = std::max(start_pressure, now / 100 * 85);
                 critical_gc_memory = std::max(start_critical, now / 100 * 95);
+            } else {
+                trigger_gc_memory = start_trigger;
+                pressure_gc_memory = start_pressure;
+                critical_gc_memory = start_critical;
             }
         }
     }

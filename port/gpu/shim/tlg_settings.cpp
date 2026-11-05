@@ -195,6 +195,10 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.trico_drool = i == 1 || i == 2 ? i : 0;
     } else if (key == "keep_gpu_textures") {
         v.keep_gpu_textures = value.empty() || i != 0;
+    } else if (key == "arena_release") {
+        v.arena_release = value.empty() || i != 0;
+    } else if (key == "gc_live_budget") {
+        v.gc_live_budget = value.empty() || i != 0;
     } else if (key == "render_resolution") {
         v.render_resolution = TlgGraphics::ParseResolution(value);
     } else if (key == "engine_fps") {
@@ -335,6 +339,7 @@ void Load() {
         {"TLG_LEVEL_SELECT", "level_select"},       {"TLG_TRICO_DROOL", "trico_drool"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
         {"TLG_HDR", "hdr"},                          {"TLG_FG", "frame_generation"},
+        {"TLG_ARENA_RELEASE", "arena_release"},      {"TLG_GC_LIVE_BUDGET", "gc_live_budget"},
     };
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env); value && value[0]) {
@@ -485,6 +490,8 @@ void Save() {
                  int(v.restart_unconfirmed.load()));
     std::fprintf(file, "frame_generation=%d\n", v.frame_generation.load());
     std::fprintf(file, "keep_gpu_textures=%d\n", int(v.keep_gpu_textures.load()));
+    std::fprintf(file, "arena_release=%d\ngc_live_budget=%d\n", int(v.arena_release.load()),
+                 int(v.gc_live_budget.load()));
     std::fprintf(file,
                  "mouse_enabled=%d\nmouse_sensitivity=%.2f\nmouse_invert_y=%d\nmouse_smoothing=%.2f\n"
                  "mouse_accel=%.2f\nmouse_deadzone=%.2f\nkey_map=%s\n",
