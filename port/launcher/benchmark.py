@@ -142,7 +142,8 @@ class Sweep:
         (out / 'logs').mkdir(parents=True, exist_ok=True)
 
         self.notify('status', text='prepare')
-        settings = dict(self.settings, level_select=False, debug_logging=True)  # launcher settings, but full logs
+        settings = dict(self.settings, level_select=False, debug_logging=True,
+                        skip_logos=True)  # launcher settings, but full logs and no boot logos
         notes = []
         tlg_run.prepare(settings, log=lambda line: notes.append(line) if line.startswith('Frame rate') else None)
 
