@@ -39,15 +39,15 @@
 
 - ✨ **Unique.** Features you will not find on PS4 or anywhere else: cut content and hidden
   developer tools found in the game's own files and switched back on.
+- 🎨 **Beautiful.** DLAA (NVIDIA) or FSR 3.1 (any graphics card) removes the shimmer on feathers,
+  foliage and fences. Add sharper shadows,
+  a calmer wind and an optional AI-upscaled 4x texture pack.
 - 🎵 **The full soundtrack.** All 110 minutes of the score in the launcher, in stereo or 5.1
   surround.
 - 🐉 **Trico Tricks.** Make Trico yawn, sneeze, roar, stretch, roll over or sit with one click: 30
   moves on a bar over the game (**F12**), plus the throw-up the developers cut.
 - 🚀 **Fast.** About 90-120 FPS unlocked on an RTX 5090, no freezes in play, and shaders ready in
   under a second at start.
-- 🎨 **Beautiful.** DLAA (NVIDIA) or FSR 3.1 (any graphics card) removes the shimmer on feathers,
-  foliage and fences. Add sharper shadows,
-  a calmer wind and an optional AI-upscaled 4x texture pack.
 - 🛠️ **Well supported.** 19 releases since October 2026, crash reports followed up, and fixes
   shipped within days. Windows and Linux builds.
 - 🐾 **Fun.** Trico's drool, a giant or tiny Trico, extra Tricos, disco eyes and a free camera.
