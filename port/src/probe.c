@@ -15,6 +15,7 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>
+#include <signal.h>
 #include "fault_dispatch_win.h"
 #else
 #include <sys/mman.h>
@@ -240,6 +241,16 @@ static LONG CALLBACK vectored_fault(EXCEPTION_POINTERS *info) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 static LONG WINAPI unhandled_fault(EXCEPTION_POINTERS *info) { return fatal_exception(info); }
+/* abort() does not reach the unhandled-exception filter: the CRT ends the process itself. Without
+ * this the log keeps whatever was still in its buffer and the report has no cause at all, which is
+ * how an uncaught C++ exception or a failed assert looked. */
+static void fatal_abort(int sig) {
+    (void)sig;
+    if (!__atomic_exchange_n(&fatal_reported,1,__ATOMIC_ACQ_REL))
+        fprintf(stderr,"Fault: abort() called (thread %lu)\n",GetCurrentThreadId());
+    fflush(NULL);
+    TerminateProcess(GetCurrentProcess(),3);
+}
 /* Guest code reads its TCB with `mov reg, gs:[0]` (link_*.py rewrote fs:[0]); on Windows
  * the displacement becomes the TEB TLS slot that holds the guest TCB (runtime_thread.c). */
 uint32_t runtime_thread_tcb_offset(void);
@@ -451,6 +462,7 @@ static void fault(int sig, siginfo_t *info, void *context) {
         ssize_t written_=write(2, line, strlen(line)); (void)written_;
     }
     if (isa_table) { isa_rewrite_report(isa_table, stderr); fflush(stderr); }
+    fflush(NULL);   /* the log tail is the crash report: never leave it in a buffer */
     _exit(128 + sig);
 }
 #endif
@@ -1142,6 +1154,7 @@ int main(int argc, char **argv) {
     SYSTEM_INFO system_info; GetSystemInfo(&system_info); page_size = system_info.dwPageSize;
     AddVectoredExceptionHandler(1, vectored_fault);
     SetUnhandledExceptionFilter(unhandled_fault);
+    signal(SIGABRT, fatal_abort);
     if (getenv("TLG_STRICT_HANDLES")) {
         PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY strict={0};
         strict.RaiseExceptionOnInvalidHandleReference=1;
@@ -1165,6 +1178,11 @@ int main(int argc, char **argv) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGSEGV, &sa, NULL); sigaction(SIGILL, &sa, NULL); sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGTRAP, &sa, NULL); /* int3 ISA sites */
+    /* A guest divide by zero (SIGFPE, the signal behind the load crash of issue #19) and an abort()
+     * from the host runtime (SIGABRT, where an uncaught C++ exception or a failed assert ends up)
+     * used to kill the process with the default action: no report, and the buffered log lost. Both
+     * end in the report below now, so a crash always leaves a fault line to read. */
+    sigaction(SIGFPE, &sa, NULL); sigaction(SIGABRT, &sa, NULL);
     Dl_info self_info;
     if (dladdr((void *)main,&self_info)) exe_base=(uintptr_t)self_info.dli_fbase;
     struct sigaction dump = {0}; dump.sa_sigaction = thread_dump; dump.sa_flags = SA_SIGINFO|SA_RESTART;
