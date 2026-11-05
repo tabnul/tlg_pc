@@ -12,6 +12,7 @@ from pathlib import Path
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
@@ -23,6 +24,10 @@ import logtail  # noqa: E402
 import pad_page  # noqa: E402
 import preset_share  # noqa: E402
 import tlg_run  # noqa: E402
+import savemanager  # noqa: E402,F401  (puts scripts/ on sys.path)
+import soundtrack  # noqa: E402
+import practice_save  # noqa: E402
+import start_points  # noqa: E402
 
 # Colors: warm dark with one gold accent (the home screen fades the art into BG).
 BG, PANEL, FIELD, LINE = '#16140f', '#201d17', '#0f0e0b', '#3a352b'
@@ -47,6 +52,46 @@ TEXT = {
     'launcher_section': ('Launcher', 'Launcher'),
     'scene_section': ('Display, shadows and textures', 'Tela, sombras e texturas'),
     'home_logs': ('Logs', 'Logs'),
+    'home_soundtrack': ('Soundtrack', 'Trilha sonora'),
+    'soundtrack_hint': ("All the game's music, read from your own game folder. The game has no track titles: each piece is "
+                        "named by the stage it plays in, with the game's own working name where it has one. The music is "
+                        "mixed in surround: pick Stereo for two speakers or headphones, 5.1 surround for a surround set.",
+                        "Toda a música do jogo, lida da sua própria pasta do jogo. O jogo não tem títulos de faixas: cada peça "
+                        "leva o nome da fase em que toca, com o nome de trabalho do próprio jogo quando existe. A música é "
+                        "mixada em surround: escolha Estéreo para duas caixas ou fones, Surround 5.1 para um sistema surround."),
+    'soundtrack_piece': ('Piece {n}', 'Peça {n}'),
+    'soundtrack_length': ('Length', 'Duração'),
+    'soundtrack_play': ('Play', 'Tocar'),
+    'soundtrack_pause': ('Pause', 'Pausar'),
+    'soundtrack_next': ('Next', 'Próxima'),
+    'soundtrack_stop': ('Stop', 'Parar'),
+    'soundtrack_volume': ('Volume', 'Volume'),
+    'soundtrack_speakers': ('Speakers', 'Caixas de som'),
+    'soundtrack_stereo': ('Stereo', 'Estéreo'),
+    'soundtrack_surround': ('5.1 surround', 'Surround 5.1'),
+    'soundtrack_loading': ('Reading the music from the game folder…', 'Lendo a música da pasta do jogo…'),
+    'soundtrack_count': ('{count} pieces, {minutes} minutes', '{count} peças, {minutes} minutos'),
+    'soundtrack_none': ('No music found. Set the game folder in Settings first.',
+                        'Nenhuma música encontrada. Defina primeiro a pasta do jogo nas Configurações.'),
+    'soundtrack_failed': ('This piece could not be played.', 'Esta peça não pôde ser tocada.'),
+    'home_start': ('Start at…', 'Começar em…'),
+    'start_title': ('Start at a point', 'Começar num ponto'),
+    'start_hint': ("Starts the game at the chosen start point: it continues your save, then jumps there.\n\nYour saves are copied before the game starts and put back when it closes, so nothing from this run is kept. If the launcher or the PC stops first, the next launcher start puts them back.",
+                   "Inicia o jogo no ponto escolhido: continua o seu save e depois salta para lá.\n\nOs seus saves são copiados antes do jogo iniciar e devolvidos quando ele fecha; nada desta sessão fica. Se o launcher ou o PC parar antes, o próximo início do launcher devolve os saves."),
+    'start_stage': ('Stage', 'Fase'),
+    'start_point': ('Start point', 'Ponto de início'),
+    'start_go': ('Start here', 'Começar aqui'),
+    'start_note': ('Practice run: your saves are put back when the game closes. Use Play for normal play.',
+                   'Sessão de treino: os seus saves voltam quando o jogo fecha. Use Jogar para jogar normalmente.'),
+    'start_no_save': ('Needs a save to continue from. Play normally until the game has saved once, then come back.',
+                      'Precisa de um save para continuar. Jogue normalmente até o jogo salvar uma vez e volte.'),
+    'start_starting': ('Practice start at {point}: saves copied.', 'Início de treino em {point}: saves copiados.'),
+    'start_restored': ('Your saves from before the practice start are back.',
+                       'Os seus saves de antes do início de treino voltaram.'),
+    'start_restore_failed': ('Could not put your saves back yet ({error}). They are safe in {path}; the '
+                             'launcher tries again at its next start.',
+                             'Ainda não foi possível devolver os saves ({error}). Eles estão seguros em {path}; '
+                             'o launcher tenta de novo no próximo início.'),
     'home_quit': ('Quit', 'Sair'),
     'legacy_menu': ('Switch to legacy menu', 'Mudar para o menu antigo'),
     'home_back': ('‹  Back', '‹  Voltar'),
@@ -737,6 +782,7 @@ class Launcher:
         for sequence in ('<MouseWheel>', '<Button-4>', '<Button-5>', '<Shift-MouseWheel>'):
             root.bind_all(sequence, self.wheel, add='+')
         self.build()
+        self.recover_practice()
         self.root.after(100, self.pump)
 
     def wheel(self, event):
@@ -832,6 +878,7 @@ class Launcher:
         self.build_settings()
         self.build_video()
         self.build_logs()
+        self.build_soundtrack()
         self.graphics_window = Page(self, 'graphics')
         self.graphics_window.title(self.t('graphics_title'),
                                    self.t('graphics_hint') + '\n\n' + self.t('graphics_keys') + '\n\n' + self.t('menu_note'))
@@ -841,7 +888,7 @@ class Launcher:
         self.home_items = {}
         self.home.bind('<Configure>', lambda _: self.schedule_home())
         page = getattr(self, 'page', 'home')
-        self.show_page(page if page in ('home', 'settings', 'video', 'graphics', 'controls', 'logs') else 'home')
+        self.show_page(page if page in ('home', 'settings', 'video', 'graphics', 'controls', 'logs', 'soundtrack') else 'home')
         self.refresh_status()
 
     def build_settings(self):
@@ -873,6 +920,7 @@ class Launcher:
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
+        self.build_drool(left)
 
         lang = section(right, self.t('language'))
         lang.grid(sticky='ew', pady=(0, 8))
@@ -894,6 +942,29 @@ class Launcher:
         self.hint(debug, 0, 3, 'debug_hint')
         self.check(debug, 2, 'debug_logging')
         self.hint(debug, 2, 3, 'debug_logging_hint')
+
+    def build_drool(self, parent):
+        """Trico's drool on the Settings page, with its story in plain sight: the developers built it
+        and switched it off just before release (tlg.ini trico_drool; the game reads it live, also from
+        the in-game Fun tab)."""
+        drool = next(item for item in backports_table.MENU if item.key == 'trico_drool')
+        box = section(parent, drool.name[0])
+        box.grid(sticky='ew', pady=(8, 0))
+        values = [choice[0] for choice in drool.choices]
+        lang = 1 if self.pt() else 0
+        combo = ttk.Combobox(box, values=[choice[1 + lang] for choice in drool.choices], state='readonly', width=28)
+        chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('trico_drool', drool.default)
+        combo.current(values.index(chosen) if chosen in values else 0)
+        combo.grid(row=0, column=0, sticky='w')
+
+        def picked():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'trico_drool': values[combo.current()]})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        combo.bind('<<ComboboxSelected>>', lambda _: picked())
+        ttk.Label(box, text=drool.what[lang], foreground=DIM, wraplength=420, justify='left').grid(
+            row=1, column=0, sticky='w', pady=(6, 0))
 
     def build_video(self):
         """Video: display, frame rate, resolution, anti-aliasing, frame generation | video memory."""
@@ -990,6 +1061,223 @@ class Launcher:
         for line in getattr(self, 'log_lines', []):   # kept over a language change
             self.append(line, keep=False)
 
+    # -- soundtrack -------------------------------------------------------------------------
+    def build_soundtrack(self):
+        """Soundtrack: every piece of the game's music (soundtrack.py reads it from the game folder,
+        the music tool plays it). The list is read when the page first opens."""
+        win = self.soundtrack_window = Page(self, 'soundtrack')
+        win.title(self.t('home_soundtrack'), self.t('soundtrack_hint'))
+        bar = ttk.Frame(win, padding=(12, 8, 12, 0))
+        bar.pack(fill='x')
+        self.track_button = ttk.Button(bar, text=self.t('soundtrack_play'), command=self.track_play_pause)
+        self.track_button.pack(side='left')
+        ttk.Button(bar, text=self.t('soundtrack_next'), command=self.track_next).pack(side='left', padx=(6, 0))
+        ttk.Button(bar, text=self.t('soundtrack_stop'), command=self.stop_track).pack(side='left', padx=(6, 0))
+        self.track_volume = tk.IntVar(value=int(self.settings.get('soundtrack_volume', 80)))
+        ttk.Scale(bar, from_=0, to=100, length=140, variable=self.track_volume,
+                  command=lambda _: self.track_send(f'volume {self.track_volume.get()}')).pack(side='right')
+        ttk.Label(bar, text=self.t('soundtrack_volume')).pack(side='right', padx=(0, 6))
+        # Stereo mixes the game's surround music down; 5.1 sends each channel to its own speaker.
+        modes = ('stereo', 'surround')
+        speakers = ttk.Combobox(bar, values=[self.t('soundtrack_' + m) for m in modes], state='readonly', width=13)
+        mode = self.settings.get('soundtrack_speakers', 'stereo')
+        speakers.current(modes.index(mode) if mode in modes else 0)
+        speakers.bind('<<ComboboxSelected>>', lambda _: self.track_speakers(modes[speakers.current()]))
+        speakers.pack(side='right', padx=(0, 18))
+        ttk.Label(bar, text=self.t('soundtrack_speakers')).pack(side='right', padx=(0, 6))
+        # Second line: what plays, a progress slider to skip through the piece, and the time.
+        now = ttk.Frame(win, padding=(12, 8, 12, 0))
+        now.pack(fill='x')
+        self.track_label = ttk.Label(now, text='', foreground=MUTED, width=34, anchor='w')
+        self.track_label.pack(side='left')
+        self.track_time = ttk.Label(now, text='', foreground=MUTED, width=11, anchor='e')
+        self.track_time.pack(side='right')
+        self.track_pos = tk.DoubleVar(value=0.0)
+        self.track_dragging = False
+        self.track_bar = ttk.Scale(now, from_=0, to=1, variable=self.track_pos, command=self.track_moved)
+        self.track_bar.pack(side='left', fill='x', expand=True, padx=(8, 8))
+        self.track_bar.bind('<ButtonPress-1>', lambda _: setattr(self, 'track_dragging', True))
+        self.track_bar.bind('<ButtonRelease-1>', lambda _: self.track_seek())
+        frame = ttk.Frame(win, padding=12)
+        frame.pack(fill='both', expand=True)
+        tree = self.track_tree = ttk.Treeview(frame, columns=('length',), selectmode='browse')
+        tree.heading('#0', text=self.t('home_soundtrack'), anchor='w')
+        tree.heading('length', text=self.t('soundtrack_length'), anchor='e')
+        # Fixed columns, the list only as wide as they are: the length stays next to the name.
+        tree.column('#0', width=440, stretch=False, anchor='w')
+        tree.column('length', width=70, stretch=False, anchor='e')
+        scroll = ttk.Scrollbar(frame, command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        tree.pack(side='left', fill='y')
+        scroll.pack(side='left', fill='y')
+        tree.bind('<Double-1>', lambda _: self.track_start(self.track_selected()))
+        tree.bind('<Return>', lambda _: self.track_start(self.track_selected()))
+        self.track_tracks = None   # read when the page opens (again after a rebuild)
+        self.stop_track()          # a rebuild (language change) starts the page fresh
+
+    def load_soundtrack(self):
+        game = self.settings.get('game_dir') or ''
+        if self.track_tracks is not None and getattr(self, 'track_game', None) == game:
+            return
+        self.track_game, self.track_tracks = game, []
+        self.track_tree.delete(*self.track_tree.get_children())
+        self.track_label.configure(text=self.t('soundtrack_loading'))
+
+        def work():
+            try:
+                tracks = soundtrack.scan(game, tlg_run.user_dir() / 'cache') if game else []
+            except Exception:   # never take the launcher down over the music list
+                tracks = []
+            self.root.after(0, lambda: self.fill_soundtrack(game, tracks))
+        threading.Thread(target=work, daemon=True).start()
+
+    def fill_soundtrack(self, game, tracks):
+        if game != self.track_game or not self.track_tree.winfo_exists():
+            return
+        self.track_tracks = tracks
+        tree, parent, stage = self.track_tree, '', None
+        for index, track in enumerate(tracks):
+            if track['stage'] != stage:
+                stage = track['stage']
+                parent = tree.insert('', 'end', text=stage, open=True)
+            text = self.t('soundtrack_piece', n=track['number'])
+            if track.get('name'):
+                text += f"   ·  {track['name']}"
+            tree.insert(parent, 'end', iid=f't{index}', text=text,
+                        values=(f"{int(track['seconds']) // 60}:{int(track['seconds']) % 60:02d}",))
+        minutes = round(sum(t['seconds'] for t in tracks) / 60)
+        if not getattr(self, 'track', None):
+            self.track_label.configure(text=self.t('soundtrack_count', count=len(tracks), minutes=minutes)
+                                       if tracks else self.t('soundtrack_none'))
+
+    def track_selected(self):
+        item = self.track_tree.focus()
+        if item.startswith('t'):
+            return int(item[1:])
+        children = self.track_tree.get_children(item) if item else ()
+        return int(children[0][1:]) if children else (0 if self.track_tracks else None)
+
+    def track_speakers(self, mode):
+        self.settings['soundtrack_speakers'] = mode
+        if getattr(self, 'track', None):   # replay the piece from where it was, in the new mix
+            at, paused = self.track_pos.get(), self.track_paused
+            self.track_start(self.track_index)
+            if getattr(self, 'track', None):
+                self.track_send(f'seek {at:.2f}')
+                if paused:
+                    self.track_play_pause()
+
+    def track_start(self, index):
+        tracks = self.track_tracks or []
+        if index is None or not 0 <= index < len(tracks) or self.process:
+            return
+        self.stop_track()
+        self.stop_music()
+        track, tool = tracks[index], tlg_run.music_tool()
+        out = Path(tempfile.gettempdir()) / 'tlg-soundtrack.at9'
+        try:
+            soundtrack.extract(self.track_game, track, out)
+            proc = subprocess.Popen([str(tool), str(out), str(self.track_volume.get()), '--track',
+                                     self.settings.get('soundtrack_speakers', 'stereo')],
+                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                    env=tlg_run.pad_tool_env(), text=True, bufsize=1,
+                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)) if tool else None
+        except Exception:
+            proc = None
+        if not proc:
+            self.track_label.configure(text=self.t('soundtrack_failed'))
+            return
+        self.track, self.track_index, self.track_paused = proc, index, False
+        self.track_text = f"{track['stage']} · {self.t('soundtrack_piece', n=track['number'])}"
+        self.track_button.configure(text=self.t('soundtrack_pause'))
+        self.track_tree.selection_set(f't{index}')
+        self.track_tree.focus(f't{index}')
+        self.track_tree.see(f't{index}')
+
+        def read():
+            for line in proc.stdout:
+                self.root.after(0, lambda line=line: self.track_output(proc, line.split()))
+            self.root.after(0, lambda: self.track_output(proc, ['exit']))
+        threading.Thread(target=read, daemon=True).start()
+
+    def track_output(self, proc, words):
+        if proc is not getattr(self, 'track', None) or not words:
+            return
+        if words[0] == 'pos' and len(words) == 3:
+            done, total = float(words[1]), float(words[2])
+            self.track_total = total
+            self.track_label.configure(text=self.track_text)
+            if not self.track_dragging:   # the slider follows the music unless it is being dragged
+                self.track_bar.configure(to=max(total, 0.1))
+                self.track_pos.set(done)
+                self.track_clock(done)
+        elif words[0] in ('end', 'exit'):
+            ended = words[0] == 'end'
+            self.stop_track()
+            if ended:   # on to the next piece, like an album
+                self.track_start(self.track_index + 1)
+            else:
+                self.track_label.configure(text=self.t('soundtrack_failed'))
+
+    def track_clock(self, done):
+        total = getattr(self, 'track_total', 0.0)
+        self.track_time.configure(text=f"{int(done) // 60}:{int(done) % 60:02d} / {int(total) // 60}:{int(total) % 60:02d}")
+
+    def track_moved(self, _value):
+        if self.track_dragging and getattr(self, 'track', None):
+            self.track_clock(self.track_pos.get())   # the time shows where a release would jump to
+
+    def track_seek(self):
+        self.track_dragging = False
+        if getattr(self, 'track', None):
+            self.track_send(f'seek {self.track_pos.get():.2f}')
+        else:
+            self.track_pos.set(0.0)
+
+    def track_send(self, command):
+        proc = getattr(self, 'track', None)
+        try:
+            if proc:
+                proc.stdin.write(command + '\n')
+                proc.stdin.flush()
+        except (OSError, ValueError):
+            pass
+        if command.startswith('volume'):
+            self.settings['soundtrack_volume'] = self.track_volume.get()
+
+    def track_play_pause(self):
+        if not getattr(self, 'track', None):
+            self.track_start(self.track_selected())
+            return
+        self.track_paused = not self.track_paused
+        self.track_send('pause' if self.track_paused else 'resume')
+        self.track_button.configure(text=self.t('soundtrack_play' if self.track_paused else 'soundtrack_pause'))
+
+    def track_next(self):
+        if getattr(self, 'track', None):
+            self.track_start(self.track_index + 1)
+        else:
+            self.track_start(self.track_selected())
+
+    def stop_track(self):
+        proc, self.track = getattr(self, 'track', None), None
+        try:
+            self.track_button.configure(text=self.t('soundtrack_play'))
+            self.track_label.configure(text='')
+            self.track_time.configure(text='')
+            self.track_pos.set(0.0)
+            self.track_dragging = False
+        except (AttributeError, tk.TclError):
+            pass
+        if not proc:
+            return
+        try:
+            proc.stdin.write('quit\n')
+            proc.stdin.flush()
+            proc.wait(1)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            proc.kill()
+
     def build_controls(self):
         """Controls: a Controller tab (pad_page.py) and a Keyboard & mouse tab. The game reads both at once."""
         win = self.controls_window = Page(self, 'controls')
@@ -1050,6 +1338,8 @@ class Launcher:
             child.pack_forget()
         if page != 'home':
             getattr(self, page + '_window').pack(fill='both', expand=True)
+        if page == 'soundtrack':
+            self.load_soundtrack()
         self.update_controller()
         self.draw_home()
 
@@ -1091,6 +1381,8 @@ class Launcher:
                  ('home_graphics', 'graphics', self.graphics_dialog),
                  ('home_controls', 'controls', self.controller_dialog),
                  ('home_advanced', 'advanced', self.advanced_dialog),
+                 ('home_start', 'start', self.start_dialog),
+                 ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
                  ('home_quit', None, self.quit)]
         first = 250 if home else 170
@@ -1925,7 +2217,71 @@ class Launcher:
         self.log.see('end')
         self.log.configure(state='disabled')
 
-    def play(self):
+    def recover_practice(self):
+        """A practice start (Start at...) whose saves were never put back: the launcher or the PC
+        stopped while the game ran. Puts them back now, unless the game is still running."""
+        data = tlg_run.user_dir()
+        if not practice_save.active(data) or tlg_run.game_running():
+            return
+        try:
+            practice_save.end(data)
+            self.append(self.t('start_restored'))
+        except OSError as error:
+            self.append(self.t('start_restore_failed', error=error, path=data / practice_save.COPY))
+
+    def has_save(self):
+        folder = tlg_run.user_dir() / 'savedata'
+        return folder.is_dir() and any(p.is_file() for p in folder.rglob('*'))
+
+    def start_dialog(self):
+        """Start at a point (practice): the stage and start point lists come from start_points.py
+        (tools/scene-check/start_points_gen.py); the game jumps there (TLG_START_POINT, tlg_lua.cpp)."""
+        if getattr(self, 'start_window', None) and self.start_window.winfo_exists():
+            self.start_window.lift()
+            return
+        win = self.start_window = Page(self, 'start')
+        win.title(self.t('start_title'), self.t('start_hint'))
+        frame = ttk.Frame(win, padding=(12, 12))
+        frame.pack(fill='x')
+        stages = list(dict.fromkeys(stage for stage, _ in start_points.POINTS))
+        ttk.Label(frame, text=self.t('start_stage')).grid(row=0, column=0, sticky='w', pady=4)
+        stage_box = ttk.Combobox(frame, values=stages, state='readonly', width=32)
+        stage_box.grid(row=0, column=1, sticky='w', padx=6, pady=4)
+        ttk.Label(frame, text=self.t('start_point')).grid(row=1, column=0, sticky='w', pady=4)
+        point_box = ttk.Combobox(frame, state='readonly', width=32)
+        point_box.grid(row=1, column=1, sticky='w', padx=6, pady=4)
+        last = str(self.settings.get('start_point', '')).split(':')
+
+        def stage_picked(area=None):
+            areas = [a for s, a in start_points.POINTS if s == stage_box.get()]
+            point_box.configure(values=areas)
+            point_box.current(areas.index(area) if area in areas else 0)
+
+        stage_box.current(stages.index(last[0]) if last[0] in stages else 0)
+        stage_picked(last[1] if len(last) > 1 else None)
+        stage_box.bind('<<ComboboxSelected>>', lambda _: stage_picked())
+
+        def go():
+            if not self.play_ready():
+                return
+            point = f'{stage_box.get()}:{point_box.get()}'
+            self.settings['start_point'] = point
+            tlg_run.save_settings(self.settings)
+            self.play(point)
+
+        button = ttk.Button(frame, text=self.t('start_go'), command=go)
+        button.grid(row=2, column=1, sticky='w', padx=6, pady=(10, 0))
+        note = ttk.Label(frame, foreground=MUTED, wraplength=520, justify='left')
+        note.grid(row=3, column=0, columnspan=2, sticky='w', pady=(10, 0))
+        if self.has_save():
+            note.configure(text=self.t('start_note'))
+        else:
+            note.configure(text=self.t('start_no_save'))
+            button.state(['disabled'])
+        self.show_page('start')
+
+    def play(self, point=None):
+        """point 'stage:area' = a practice start (Start at...): saves copied before, put back after."""
         if self.process:
             messagebox.showinfo(self.t('title'), self.t('already'))
             return
@@ -1934,15 +2290,32 @@ class Launcher:
         self.play_button.configure(state='disabled')
         self.cache_button.configure(state='disabled')
         self.stop_music()
-        threading.Thread(target=self.run_game, daemon=True).start()
+        self.stop_track()
+        threading.Thread(target=self.run_game, args=(point,), daemon=True).start()
 
-    def run_game(self):
+    def end_practice(self):
+        try:
+            if practice_save.end(tlg_run.user_dir()):
+                self.lines.put(self.t('start_restored'))
+        except OSError as error:
+            self.lines.put(('error', self.t('start_restore_failed', error=error,
+                                            path=tlg_run.user_dir() / practice_save.COPY)))
+
+    def run_game(self, point=None):
+        self.practice = bool(point)
         try:
             tlg_run.prepare(self.settings, log=lambda line: self.lines.put(line))
             header = [f'Frame rate: requested {tlg_run.frame_rate(self.settings)}, '
                       f'applied {tlg_run.applied_frame_rate}']
-            self.process, log = tlg_run.launch(self.settings, header=header)
+            if point:
+                practice_save.begin(tlg_run.user_dir(), point)   # raises: the game does not start
+                self.lines.put(self.t('start_starting', point=point))
+            self.process, log = tlg_run.launch(self.settings, header=header,
+                                               extra_env={'TLG_START_POINT': point} if point else None)
         except Exception as error:  # shown to the user, the launcher keeps running
+            if point:
+                self.end_practice()
+            self.practice = False
             self.lines.put(('error', str(error)))
             return
         self.lines.put(f"{self.t('running')} {log}")
@@ -1955,6 +2328,9 @@ class Launcher:
                 break
             time.sleep(0.2)
         code = self.process.wait()
+        if self.practice:
+            self.practice = False
+            self.end_practice()
         self.process = None
         self.lines.put(('ended', code))
 
@@ -2047,7 +2423,8 @@ class Launcher:
         """The game's menu tune plays while the launcher is open and the game is not running, as
         in shadPS4's game list (which plays the same file, sce_sys/snd0.at9)."""
         path = tlg_run.menu_music_file(self.settings)
-        wanted = bool(self.settings.get('menu_music', True)) and not self.process and path is not None
+        wanted = (bool(self.settings.get('menu_music', True)) and not self.process and path is not None
+                  and not getattr(self, 'track', None))   # quiet while a soundtrack piece plays
         music = getattr(self, 'music', None)
         if music and (not wanted or music.poll() is not None or getattr(self, 'music_path', None) != path):
             self.stop_music()
@@ -2078,10 +2455,18 @@ class Launcher:
 
     def close(self):
         self.stop_music()
+        self.stop_track()
         if getattr(self, 'controller', None):
             self.controller.stop()
         if self.process:
             self.process.terminate()
+            if getattr(self, 'practice', False):   # the game thread stops with the window
+                try:
+                    self.process.wait(timeout=10)
+                    self.practice = False
+                    practice_save.end(tlg_run.user_dir())
+                except Exception:   # the next launcher start puts the saves back
+                    pass
         self.root.destroy()
 
 

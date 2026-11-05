@@ -87,7 +87,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         return;
     }
     if (key == "menu_tab") {
-        v.menu_tab = i >= 0 && i <= 4 ? i : 0;
+        v.menu_tab = i >= 0 && i <= 5 ? i : 0;
         return;
     }
     if (key == "aa_row") {
@@ -191,6 +191,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.credits_fps = i == 0 ? 0 : i == 60 ? 60 : 30;
     } else if (key == "slow_motion") {
         v.slow_motion = i == 1 ? 1 : 0;
+    } else if (key == "trico_drool") {
+        v.trico_drool = i == 1 || i == 2 ? i : 0;
     } else if (key == "keep_gpu_textures") {
         v.keep_gpu_textures = value.empty() || i != 0;
     } else if (key == "render_resolution") {
@@ -330,7 +332,7 @@ void Load() {
         {"TLG_MOUSE_INVERT_Y", "mouse_invert_y"},    {"TLG_MOUSE_SMOOTHING", "mouse_smoothing"},
         {"TLG_MOUSE_ACCEL", "mouse_accel"},          {"TLG_MOUSE_DEADZONE", "mouse_deadzone"},
         {"TLG_SMAA", "smaa"},                        {"TLG_DLAA", "dlaa"},
-        {"TLG_LEVEL_SELECT", "level_select"},
+        {"TLG_LEVEL_SELECT", "level_select"},       {"TLG_TRICO_DROOL", "trico_drool"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
         {"TLG_HDR", "hdr"},                          {"TLG_FG", "frame_generation"},
     };
@@ -495,6 +497,7 @@ void Save() {
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
+    std::fprintf(file, "trico_drool=%d\n", v.trico_drool.load());
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
     std::fprintf(file, "fov=%d\n", v.fov.load());

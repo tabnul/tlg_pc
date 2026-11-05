@@ -171,6 +171,12 @@ MENU = [
            '30 FPS só enquanto a câmera lenta toca, depois voltar. Ou pular a câmera lenta. A 30 FPS nada muda.'),
           choices=(('0', '30 FPS during slow motion (advised)', '30 FPS na câmera lenta (recomendado)'),
                    ('1', 'Skip the slow motion', 'Pular a câmera lenta'))),
+    # Hack and fun (English only): the same text as the in-game Fun tab (tlg_fun.h DroolHelp).
+    _menu('Fun', 'trico_drool', 'choice', '0', ("Trico's drool", "Trico's drool"),
+          ("A feature the developers built and then switched off just before release: Trico drools. Always: a string of drool hangs from his beak the whole time. As the developers planned: it slowly grows while Trico smells something he wants, a smell-pot cart (s04_FirstAntenna and s10_Pit), and fades away when he loses interest (the boy's smell bottle was cut, so the carts are the only trigger). Stays on through jumps, new stages and extra Tricos, and is kept for the next start.",
+           "A feature the developers built and then switched off just before release: Trico drools. Always: a string of drool hangs from his beak the whole time. As the developers planned: it slowly grows while Trico smells something he wants, a smell-pot cart (s04_FirstAntenna and s10_Pit), and fades away when he loses interest (the boy's smell bottle was cut, so the carts are the only trigger). Stays on through jumps, new stages and extra Tricos, and is kept for the next start."),
+          choices=(('0', 'Off (as released)', 'Off (as released)'), ('1', 'Always', 'Always'),
+                   ('2', 'As the developers planned', 'As the developers planned'))),
     _menu('Performance', 'frames_queued', 'choice', '1', ('Frames queued', 'Quadros na fila'),
           ('More frames queued: steadier FPS, slower response to input.',
            'Mais quadros na fila: FPS mais estável, resposta mais lenta.'),
