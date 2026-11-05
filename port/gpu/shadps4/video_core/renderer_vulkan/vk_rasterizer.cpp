@@ -1905,8 +1905,6 @@ void Rasterizer::OnSubmit() {
         fault_process_pending = false;
         buffer_cache.ProcessFaultBuffer();
     }
-    // tlg (issue #38): cold arena memory goes back at the submit point (SotC port, @Oussama268).
-    buffer_cache.MaybeEvictCold(std::chrono::steady_clock::now());
     texture_cache.ProcessDownloadImages();
     texture_cache.RunGarbageCollector();
     runtime.TickFrame();
