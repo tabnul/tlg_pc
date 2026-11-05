@@ -27,6 +27,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace {
 using LoadFn = int(__attribute__((sysv_abi))*)(void*, void*, const char*, uint64_t,
