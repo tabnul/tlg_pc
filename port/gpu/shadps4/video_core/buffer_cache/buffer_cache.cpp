@@ -1824,6 +1824,11 @@ bool BufferCache::MaybeEvictCold(std::chrono::steady_clock::time_point now) {
         AdvanceUseEpoch(now);
         return FinishEviction(now, idle_epochs, false);
     }
+    // Setting arena_evict (live; env TLG_ARENA_EVICT=0): off = nothing new is evicted. A run
+    // already read back still finishes above; memory evicted before still faults back in.
+    if (!TlgSettings::Get().arena_evict.load(std::memory_order_relaxed)) {
+        return false;
+    }
     if (now < next_evict_check) {
         return false;
     }
@@ -1918,12 +1923,10 @@ bool BufferCache::MaybeEvictCold(std::chrono::steady_clock::time_point now) {
     }
     pending_eviction = PendingEviction{std::move(chosen), download, scheduler.CurrentTick(),
                                        now + std::chrono::seconds(5)};
-    // TLG_EVICT_ASYNC=0 waits for the read-back here (scheduler.Finish() on the GPU thread,
-    // ~50 ms per 64 MiB run, one late frame each). Default: compared at a later call.
-    static const bool async = [] {
-        const char* v = std::getenv("TLG_EVICT_ASYNC");
-        return !v || v[0] != '0';
-    }();
+    // Setting arena_evict_async off (live; env TLG_EVICT_ASYNC=0) waits for the read-back here
+    // (scheduler.Finish() on the GPU thread, ~50 ms per 64 MiB run, one late frame each).
+    // Default: compared at a later call.
+    const bool async = TlgSettings::Get().arena_evict_async.load(std::memory_order_relaxed);
     return async ? false : FinishEviction(now, idle_epochs, true);
 }
 

@@ -117,6 +117,15 @@ struct Values {
     /// write next to them blocks the copy back) until VRAM is critical, instead of freeing them
     /// and losing that picture. From SpartanPort (@maze1377). Live. Off: freed as before.
     std::atomic<bool> keep_gpu_textures{true};
+    /// Buffer memory return from v0.5.2 (SotC port, issue #38), each live, all on by default.
+    /// arena_release: give buffer memory back when the game unmaps it (env TLG_ARENA_RELEASE).
+    /// arena_evict: give back buffer memory unused for 30 s (env TLG_ARENA_EVICT).
+    /// arena_evict_async: compare that memory one call later instead of waiting (TLG_EVICT_ASYNC).
+    /// gc_live_budget: the texture collector follows the driver's budget (TLG_GC_LIVE_BUDGET).
+    std::atomic<bool> arena_release{true};
+    std::atomic<bool> arena_evict{true};
+    std::atomic<bool> arena_evict_async{true};
+    std::atomic<bool> gc_live_budget{true};
     /// End credits frame rate (tlg.ini credits_fps, env TLG_CREDITS_FPS=30|60|unlocked wins): 30, 60, 0 = unlimited.
     std::atomic<int> credits_fps{30};
     /// Slow motion above 30 FPS (s06 tail catch, s10 collapsing bridge; tlg.ini slow_motion, env
