@@ -428,13 +428,200 @@ void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool as
         flush_request();
     } else {
         WaitForWriter(device_addr, is_write);
-        TlgFreeze::SlowScope slow{"buffer read trip", device_addr};
-        liverpool->SendCommand<true>(std::move(flush_request));
+        {
+            TlgFreeze::SlowScope slow{"buffer read trip", device_addr};
+            if (!is_write && TlgFaultNoDrainOn() && tlg_pending_write_check && tlg_drain_draws) {
+                // tlg #38: the queued download checks safety itself and drains only when it
+                // must, instead of waiting for every queued draw first.
+                liverpool->SendCommand<true>(
+                    [this, device_addr, size, f = flush_request]() mutable {
+                        if (TryNoDrainDownload(device_addr, size)) {
+                            return;
+                        }
+                        tlg_drain_draws();
+                        f();
+                    },
+                    true);
+            } else {
+                liverpool->SendCommand<true>(std::move(flush_request));
+            }
+        }
     }
 }
 
 void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
     memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
+}
+
+// tlg #38 (default on, TLG_FAULT_NODRAIN=0 disables). A read-fault download normally waits for
+// the whole queued draw pipe to be recorded first (the drain before each command callback),
+// although the bytes it copies were submitted to the GPU long ago. Here the download runs
+// without the drain when that is provably safe on the spot: no unrecorded draw/DMA/fence
+// writes into the window (the same pending-write tracker that gates the shipped stream path),
+// and every island's producer is already submitted. Everything else falls back to the manual
+// drain plus the normal path. The island set is read without subtracting (the recorder may add
+// concurrently; a later drained download clears leftovers), the copy runs on the readback
+// queue only (the open command buffer is never touched), and the staging space is a buffer of
+// this path's own, because the shared pool is not thread-safe against the recorder.
+bool BufferCache::TlgFaultNoDrainOn() {
+    static const bool on = [] {
+        const char* env = std::getenv("TLG_FAULT_NODRAIN");
+        return !(env && env[0] == '0');
+    }();
+    return on;
+}
+
+static std::atomic<u64> tlg_nd_done{0};
+static std::atomic<u64> tlg_nd_kb{0};
+static std::atomic<u64> tlg_nd_stale{0};
+static std::atomic<u64> tlg_nd_clean{0};
+static std::atomic<u64> tlg_nd_pending{0};
+static std::atomic<u64> tlg_nd_unsafe{0};
+static std::atomic<u64> tlg_nd_other{0};
+static std::atomic<u64> tlg_nd_report_ns{0};
+
+static void TlgNoDrainReport() {
+    const u64 now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count();
+    u64 last_ns = tlg_nd_report_ns.load(std::memory_order_relaxed);
+    if (last_ns == 0) {
+        tlg_nd_report_ns.compare_exchange_strong(last_ns, now_ns, std::memory_order_relaxed);
+    } else if (now_ns - last_ns >= 5'000'000'000ULL &&
+               tlg_nd_report_ns.compare_exchange_strong(last_ns, now_ns,
+                                                        std::memory_order_relaxed)) {
+        std::printf("Fault nodrain (5 s): %llu copied (%llu KB), %llu stale, %llu clean; "
+                    "drained: %llu pending write, %llu unsafe tick, %llu other\n",
+                    static_cast<unsigned long long>(tlg_nd_done.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_kb.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_stale.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_clean.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_pending.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_unsafe.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_other.exchange(0)));
+        std::fflush(stdout);
+    }
+}
+
+bool BufferCache::TryNoDrainDownload(VAddr device_addr, u64 size) {
+    if (async_active) {
+        return false;
+    }
+    // The arena is looked up without creating one (as WaitForWriter does); the window is the
+    // one the normal read-fault path downloads.
+    const u64 arena_page = (device_addr >> block_shift) >> blocks_per_arena_page_shift;
+    const Buffer* arena = address_space[arena_page];
+    if (!arena) {
+        return false;
+    }
+    const u64 window_size = ReadWindowSize();
+    const VAddr arena_base = arena->cpu_addr;
+    const VAddr arena_end = arena_base + arena->size_bytes;
+    const VAddr window_start =
+        std::max<VAddr>(Common::AlignDown(device_addr, window_size), arena_base);
+    const VAddr window_end = std::min<VAddr>(
+        std::max<VAddr>(window_start + window_size,
+                        Common::AlignUp(device_addr + size, TRACKER_BYTES_PER_PAGE)),
+        arena_end);
+    if (device_addr < window_start || device_addr + size > window_end) {
+        return false;
+    }
+    const u64 window_bytes = window_end - window_start;
+    if (tlg_pending_write_check(window_start, window_bytes)) {
+        // An unrecorded draw/DMA/fence still writes into the window: only the drain helps.
+        tlg_nd_pending.fetch_add(1, std::memory_order_relaxed);
+        TlgNoDrainReport();
+        return false;
+    }
+    // Collect the islands. Marks are not subtracted here: the recorder may add concurrently,
+    // and the leftovers only cost a later stale-skip.
+    boost::container::small_vector<vk::BufferCopy, 8> copies;
+    u64 total = 0;
+    u64 copied_bytes = 0;
+    u64 stale_bytes = 0;
+    u64 last_write = 0;
+    bool unsafe = false;
+    bool saw_mark = false;
+    const u64 current_tick = scheduler.CurrentTick();
+    memory_tracker->ForEachDownloadRange<false>(
+        window_start, window_bytes, [&](u64 address, u64 range_size) {
+            saw_mark = true;
+            gpu_modified_ranges.ForEachInRange(address, range_size, [&](VAddr start, VAddr end) {
+                const u64 offset = start - arena_base;
+                const u64 island = end - start;
+                if (arena->UnchangedSinceDownload(offset, island)) {
+                    stale_bytes += island;
+                    return;
+                }
+                const u64 lw = arena->LastWrite(offset, island);
+                if (lw == 0 || lw >= current_tick) {
+                    // Unknown producer, or one this thread would still have to submit.
+                    unsafe = true;
+                    return;
+                }
+                copies.push_back(vk::BufferCopy{
+                    .srcOffset = offset,
+                    .dstOffset = total,
+                    .size = island,
+                });
+                total += Common::AlignUp(island, u64{64});
+                copied_bytes += island;
+                last_write = std::max(last_write, lw);
+            });
+        });
+    if (unsafe) {
+        tlg_nd_unsafe.fetch_add(1, std::memory_order_relaxed);
+        TlgNoDrainReport();
+        return false;
+    }
+    if (copies.empty()) {
+        if (stale_bytes != 0) {
+            // RAM already holds every byte: unprotect, as the drained path would.
+            memory_tracker->UnmarkRegionAsGpuModified(window_start, window_bytes);
+            ClearExactWritePagesInner(window_start, window_bytes);
+            tlg_nd_stale.fetch_add(1, std::memory_order_relaxed);
+            TlgNoDrainReport();
+            return true;
+        }
+        if (saw_mark) {
+            // Mark without data: the drained path decides and reports it.
+            tlg_nd_other.fetch_add(1, std::memory_order_relaxed);
+            TlgNoDrainReport();
+            return false;
+        }
+        // No mark left: another download landed everything first.
+        tlg_nd_clean.fetch_add(1, std::memory_order_relaxed);
+        TlgNoDrainReport();
+        return true;
+    }
+    if (!nodrain_buffer || nodrain_buffer->SizeBytes() < total) {
+        nodrain_buffer = std::make_unique<Buffer>(instance, 0,
+                                                  std::max<u64>(Common::AlignUp(total, 1_MB), 1_MB),
+                                                  MemoryType::HostCached,
+                                                  "BufferCache:NoDrainReadback");
+    }
+    // Every producer is submitted: wait for its tick (the fast-fault precedent), then copy on
+    // the readback queue. The open command buffer stays untouched.
+    scheduler.GetWorkSemaphore()->Wait(last_write);
+    if (!CopyOnReadbackQueue(arena, nodrain_buffer.get(), copies, last_write)) {
+        tlg_nd_other.fetch_add(1, std::memory_order_relaxed);
+        TlgNoDrainReport();
+        return false;
+    }
+    nodrain_buffer->Invalidate(0, total);
+    for (const auto& copy : copies) {
+        const VAddr dst_addr = arena_base + copy.srcOffset;
+        const u8* src = nodrain_buffer->mapped_data.data() + copy.dstOffset;
+        NoteDownloadChanged(dst_addr, src, copy.size);
+        memory->TryWriteBacking(std::bit_cast<u8*>(dst_addr), src, copy.size);
+    }
+    memory_tracker->UnmarkRegionAsGpuModified(window_start, window_bytes);
+    ClearExactWritePagesInner(window_start, window_bytes);
+    arena->NoteDownloaded(window_start - arena_base, window_bytes);
+    tlg_nd_done.fetch_add(1, std::memory_order_relaxed);
+    tlg_nd_kb.fetch_add(copied_bytes / 1024, std::memory_order_relaxed);
+    TlgNoDrainReport();
+    return true;
 }
 
 void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size,
