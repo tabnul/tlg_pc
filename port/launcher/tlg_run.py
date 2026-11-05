@@ -912,6 +912,18 @@ def raise_open_file_limit():
         pass
 
 
+def game_running():
+    """True while a tlg-probe (the game) runs, started by any launcher. False when that cannot be told."""
+    try:
+        if os.name == 'nt':
+            out = subprocess.run(['tasklist', '/FI', f'IMAGENAME eq {PROBE.name}', '/NH'], capture_output=True,
+                                 text=True, timeout=10, creationflags=NO_WINDOW).stdout
+            return PROBE.name.lower() in out.lower()
+        return subprocess.run(['pgrep', '-x', PROBE.name], capture_output=True, timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def launch(settings, seconds=0, extra_env=None, detached=False, header=()):
     """Writes the in-game settings, starts the game; returns (process, log path).
     The game always writes straight into the log file (after the header lines): a pipe that only

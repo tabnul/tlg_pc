@@ -19,6 +19,9 @@
 #include <SDL3/SDL.h>
 #include "tlg_settings.h"
 #include "tlg_lab.h"
+#include "tlg_fun.h"
+#include "tlg_fun_icons.h"
+#include "tlg_fun_points.h"
 #include "tlg_graphics.h"
 #include "tlg_perf_stats.h"
 extern "C" void runtime_restart(void); // src/probe.c: starts run.py again, ends this process
@@ -62,6 +65,9 @@ namespace {
 std::mutex imgui_mutex; // the ImGui context: window thread (input) and present thread
 bool initialized = false;
 std::atomic<bool> menu_open{false};
+// tlg: the Fun move bar (F12): Trico's working moves as icons; the mouse goes to it while it is up.
+std::atomic<bool> move_bar_open{false};
+ImTextureData* move_icons = nullptr; // TlgFunIcons atlas, made on first use (present thread)
 bool r3_down = false, l2_down = false;
 std::atomic<bool> loading{false};
 std::atomic<u32> loading_done{0}, loading_total{0};
@@ -114,7 +120,7 @@ void SetOpen(bool value) {
     if (menu_open.exchange(value) == value) {
         return;
     }
-    ImGui::GetIO().MouseDrawCursor = value;
+    ImGui::GetIO().MouseDrawCursor = value || move_bar_open;
     if (value) {
         requested_tab = TlgSettings::Get().menu_tab;
     }
@@ -669,7 +675,7 @@ void ImageTab() {
 
 // tlg: tuning tests, all live: the rows from TLG_LAB (tlg_lab.h), not saved; they last until reset
 // or the game closes. Settings that prove worth keeping move to the Image tab.
-void LabTab() {
+[[maybe_unused]] void LabTab() {
     auto& s = TlgSettings::Get();
     const auto& d = Defaults();
     const std::vector<TlgLab::Row> rows = TlgLab::Rows();
@@ -898,6 +904,7 @@ void ControlsTab() {
         InfoRow("Options", "Enter");
         InfoRow(TL("Touchpad (photo / pause)", "Touchpad (foto / pausa)"), "Tab / Backspace");
         InfoRow(TL("Release the mouse", "Soltar o mouse"), "Esc");
+        InfoRow(TL("Add a Trico (Fun tab)", "Adicionar um Trico (aba Diversão)"), "F9");
         const char* env = std::getenv("TLG_KEY_MAP");
         const std::string remap = env && env[0] ? std::string(env) : s.key_map;
         if (!remap.empty()) {
@@ -909,6 +916,280 @@ void ControlsTab() {
     ImGui::TextDisabled("%s", TL("Remap keys and mouse buttons in the launcher (Controls); it applies at the next start.",
                                  "Remapeie teclas e botões do mouse no launcher (Controles); vale a partir da próxima vez que o jogo abrir."));
     ImGui::PopTextWrapPos();
+}
+
+// tlg: Fun tab: jump to any start point of the story (as the game's QA menu does, without
+// turning it on) and extra Tricos (also F9). Commands run at the game's next settings tick.
+// The move bar: the working moves of TlgFun::Actions (before "May not work"), one row per group,
+// each an icon (TlgFunIcons, same order) with its name under it and as a tooltip. Fun tab and F12.
+void MakeMoveIcons() {
+    static bool tried = false;
+    if (tried) {
+        return;
+    }
+    tried = true;
+    TlgPng::Image atlas;
+    if (!TlgPng::DecodeRgba(TlgFunIcons::Png, sizeof(TlgFunIcons::Png), atlas) || atlas.rgba.empty()) {
+        std::printf("Fun: move icons did not decode\n");
+        return;
+    }
+    move_icons = IM_NEW(ImTextureData)();
+    move_icons->Create(ImTextureFormat_RGBA32, atlas.width, atlas.height);
+    std::memcpy(move_icons->GetPixels(), atlas.rgba.data(), atlas.rgba.size());
+    ImGui::RegisterUserTexture(move_icons);
+}
+
+// rows 0: one row per group (the menu tab); rows > 0: the moves spread evenly over that many rows (the
+// F12 bar, 2 rows: user 2026-11-05).
+void MoveBar(float slot, int rows = 0) {
+    const float label_h = ImGui::GetTextLineHeight() * 0.8f * 2.0f;
+    int per_row = 0;
+    if (rows > 0) {
+        int moves = 0;
+        for (const auto& a : TlgFun::Actions) {
+            if (!a.command && std::strcmp(a.name, "May not work") == 0) {
+                break;
+            }
+            moves += a.command ? 1 : 0;
+        }
+        per_row = (moves + rows - 1) / rows;
+    }
+    int icon = 0;
+    bool row_started = false;
+    for (const auto& a : TlgFun::Actions) {
+        if (!a.command) {
+            if (std::strcmp(a.name, "May not work") == 0) {
+                break;
+            }
+            if (per_row == 0) {
+                row_started = false;
+            }
+            continue;
+        }
+        if (per_row > 0 && icon > 0 && icon % per_row == 0) {
+            row_started = false;
+        }
+        if (row_started) {
+            ImGui::SameLine();
+        }
+        row_started = true;
+        ImGui::PushID(icon);
+        ImGui::BeginGroup();
+        bool pressed;
+        if (move_icons && icon < TlgFunIcons::Count) {
+            const float u = float(TlgFunIcons::Size) / float(move_icons->Width);
+            const float v = float(TlgFunIcons::Size) / float(move_icons->Height);
+            const float x = float(icon % TlgFunIcons::Columns) * u, y = float(icon / TlgFunIcons::Columns) * v;
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+            pressed = ImGui::ImageButton("##move", move_icons->GetTexRef(), ImVec2(slot, slot), ImVec2(x, y),
+                                         ImVec2(x + u, y + v));
+            ImGui::PopStyleVar();
+        } else {
+            pressed = ImGui::Button("##move", ImVec2(slot + 4, slot + 4));
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) {
+            ImGui::SetTooltip("%s", a.name);
+        }
+        if (pressed) {
+            TlgFun::Act(a.command);
+        }
+        // The name under the icon, up to the bracket ("Roll on the ground (needs room)").
+        const char* end = std::strstr(a.name, " (");
+        const std::string label = end ? std::string(a.name, end) : std::string(a.name);
+        ImGui::BeginChild("##label", ImVec2(slot + 4, label_h), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
+        ImGui::SetWindowFontScale(0.8f);
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(hovered ? ImVec4(1.0f, 0.86f, 0.5f, 1.0f) : ImVec4(0.92f, 0.92f, 0.92f, 1.0f), "%s",
+                           label.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndChild();
+        ImGui::EndGroup();
+        ImGui::PopID();
+        ++icon;
+    }
+}
+
+void MoveBarWindow() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+                                   viewport->WorkPos.y + viewport->WorkSize.y - 16.0f * base_scale),
+                            ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowBgAlpha(0.55f);
+    ImGui::Begin("##move_bar", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav |
+                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::TextDisabled("Trico's moves (F12 hides)");
+    MoveBar(48.0f * base_scale, 2);
+    ImGui::End();
+}
+
+// tlg: Trico Tricks, Trico's moves on their own tab (user 2026-11-05: moves out of the Fun tab).
+void TricksTab() {
+    ImGui::TextDisabled("Moves that work (also as a bar in the game: F12, click a move)");
+    MoveBar(44.0f * base_scale);
+    ImGui::TextDisabled("Every move, also the ones that may not work:");
+    static int action = 1;
+    const auto& picked = TlgFun::Actions[action];
+    ImGui::SetNextItemWidth(260);
+    if (ImGui::BeginCombo("##action", picked.name)) {
+        for (int i = 0; i < int(std::size(TlgFun::Actions)); ++i) {
+            const auto& a = TlgFun::Actions[i];
+            if (!a.command) {
+                ImGui::SeparatorText(a.name);
+                continue;
+            }
+            if (ImGui::Selectable(a.name, i == action)) {
+                action = i;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Do it")) {
+        TlgFun::Act(picked.command);
+    }
+    Help("Asks the story's Trico to do it, as the game itself does. He first gets into the pose the move needs (stands up, sits or lies down) and gets up to 3 tries. His own mind can still win, and some moves need room (a roll can push the boy off a ledge). \"May not work\": never seen in our tests, or not tested.");
+}
+
+void FunTab() {
+    static int stage = 0, point = 0;
+    std::vector<const char*> stages;
+    for (const auto& p : TlgFun::Points) {
+        if (stages.empty() || std::strcmp(stages.back(), p.stage) != 0) {
+            stages.push_back(p.stage);
+        }
+    }
+    stage = std::clamp(stage, 0, int(stages.size()) - 1);
+    std::vector<int> points;
+    for (int i = 0; i < int(std::size(TlgFun::Points)); ++i) {
+        if (std::strcmp(TlgFun::Points[i].stage, stages[stage]) == 0) {
+            points.push_back(i);
+        }
+    }
+    point = std::clamp(point, 0, int(points.size()) - 1);
+    ImGui::SeparatorText(TL("Jump to a place", "Ir para um lugar"));
+    if (BeginRows("##jump")) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TL("Stage", "Fase"));
+        ImGui::TableNextColumn();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::BeginCombo("##stage", stages[stage])) {
+            for (int i = 0; i < int(stages.size()); ++i) {
+                if (ImGui::Selectable(stages[i], i == stage)) {
+                    stage = i;
+                    point = 0;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TL("Start point", "Ponto de início"));
+        ImGui::TableNextColumn();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::BeginCombo("##point", TlgFun::Points[points[point]].area)) {
+            for (int i = 0; i < int(points.size()); ++i) {
+                if (ImGui::Selectable(TlgFun::Points[points[i]].area, i == point)) {
+                    point = i;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndTable();
+    }
+    if (ImGui::Button(TL("Jump there", "Ir para lá"))) {
+        const auto& p = TlgFun::Points[points[point]];
+        TlgFun::Jump(p.stage, p.area);
+        SetOpen(false);
+    }
+    Help(TL("Starts the stage at this point, as the game's own level select does. The story continues from there, and the game can save there at its next checkpoint: keep a copy of your save (launcher: Saves folder) if you want to go back.",
+            "Começa a fase neste ponto, como a seleção de fases do próprio jogo. A história continua dali, e o jogo pode salvar ali no próximo checkpoint: guarde uma cópia do seu save (launcher: Pasta de saves) se quiser voltar."));
+
+    ImGui::SeparatorText(TL("Extra Tricos", "Tricos extras"));
+    // The count comes from the game; ask again every 2 seconds while this tab shows.
+    static auto asked = std::chrono::steady_clock::time_point{};
+    const auto now = std::chrono::steady_clock::now();
+    if (now - asked > std::chrono::seconds(2)) {
+        asked = now;
+        TlgFun::CountTricos();
+    }
+    const int tricos = TlgFun::Tricos();
+    char text[64];
+    std::snprintf(text, sizeof(text), "%s / %d", tricos < 0 ? "?" : std::to_string(tricos).c_str(), TlgFun::MaxTricos);
+    if (BeginRows("##tricos")) {
+        InfoRow(TL("Extra Tricos here", "Tricos extras aqui"), text);
+        ImGui::EndTable();
+    }
+    ImGui::BeginDisabled(tricos >= TlgFun::MaxTricos);
+    if (ImGui::Button(TL("Add a Trico (F9)", "Adicionar um Trico (F9)"))) {
+        TlgFun::AddTrico();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add an enemy Trico")) {
+        TlgFun::AddEnemyTrico();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(tricos == 0);
+    if (ImGui::Button(TL("Remove extra Tricos", "Remover Tricos extras"))) {
+        TlgFun::RemoveTricos();
+    }
+    ImGui::EndDisabled();
+    Help(TL("A new Trico appears next to the boy. At most 8 extra: with more, the game's physics runs out of room and the game crashes. For fun only: they do not follow the story and can block the way. A jump or another stage ends them.",
+            "Um novo Trico aparece ao lado do menino. No máximo 8 extras: com mais, a física do jogo fica sem espaço e o jogo trava. Só por diversão: eles não seguem a história e podem bloquear o caminho. Um salto ou outra fase acaba com eles."));
+    Help("An enemy Trico is the armoured one from later in the story. It appears a bit further away from the boy. It counts to the same limit of 8.");
+
+    ImGui::SeparatorText("Trico's size");
+    float size = TlgFun::SizeNow();
+    ImGui::SetNextItemWidth(260);
+    if (ImGui::SliderFloat("##size", &size, TlgFun::SizeMin, TlgFun::SizeMax, "%.2fx")) {
+        TlgFun::Size(size);
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(size == 1.0f);
+    if (ImGui::Button("Normal size")) {
+        TlgFun::Size(1.0f);
+    }
+    ImGui::EndDisabled();
+    Help("Makes the story's Trico bigger or smaller, the whole of him. A big Trico may not fit through narrow spots, so make him normal again to pass. A jump or a new stage brings back his normal size.");
+
+    ImGui::SeparatorText("Free camera");
+    bool free_cam = TlgFun::FreeCameraOn();
+    if (ImGui::Checkbox("Free camera##freecam", &free_cam)) {
+        TlgFun::FreeCamera(free_cam);
+    }
+    Help("The developers' own camera: it lets go of the normal camera that follows the boy. Turn it off to get the normal camera back. A jump or a new stage turns it off.");
+
+    ImGui::SeparatorText(TL("Trico's eyes", "Olhos do Trico"));
+    bool disco = TlgFun::DiscoOn();
+    if (ImGui::Checkbox(TL("Disco eyes", "Olhos disco"), &disco)) {
+        TlgFun::Disco(disco);
+    }
+    static float colour[3] = {1.0f, 0.08f, 0.08f};
+    if (ImGui::ColorEdit3(TL("Eye colour", "Cor dos olhos"), colour, ImGuiColorEditFlags_NoInputs)) {
+        TlgFun::EyeColour(int(colour[0] * 255 + 0.5f), int(colour[1] * 255 + 0.5f), int(colour[2] * 255 + 0.5f));
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!TlgFun::EyeCustom());
+    if (ImGui::Button(TL("Normal colours", "Cores normais"))) {
+        TlgFun::EyeNormal();
+    }
+    ImGui::EndDisabled();
+    Help(TL("Trico's eyes keep changing to random colours: the game's own hidden effect, normally only seen in a few story moments. Turning it off brings the normal colours back. A jump turns it off.",
+            "Os olhos do Trico mudam sem parar para cores aleatórias: o efeito escondido do próprio jogo, normalmente visto só em alguns momentos da história. Desligar traz as cores normais de volta. Um salto desliga."));
+
+    ImGui::SeparatorText("Trico's drool");
+    if (BeginRows("##drool")) {
+        static const char* const drool_labels[] = {"Off (as released)", "Always", "As the developers planned"};
+        static const int drool_values[] = {0, 1, 2};
+        ChoiceRow("Drool", TlgSettings::Get().trico_drool, drool_labels, drool_values, 3, TlgFun::DroolHelp, 0);
+        ImGui::EndTable();
+    }
 }
 
 int RestartChanges() {
@@ -940,7 +1221,7 @@ void Menu() {
         return;
     }
     footer_help = nullptr;
-    constexpr int TabCount = 5;
+    constexpr int TabCount = 6; // tlg: Lab tab out of the menu (user 2026-11-05)
     const ImGuiIO& io = ImGui::GetIO();
     if (!io.WantTextInput) {
         const int step = ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) || ImGui::IsKeyPressed(ImGuiKey_E, false) ? 1
@@ -954,7 +1235,8 @@ void Menu() {
     const float footer = ImGui::GetFrameHeightWithSpacing() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 2.0f;
     if (ImGui::BeginTabBar("##tabs")) {
         static const char* const tabs[TabCount] = {"Overlay", TL("Image", "Imagem"), TL("Performance", "Desempenho"),
-                                                   TL("Controls", "Controles"), "Lab"};
+                                                   TL("Controls", "Controles"), TL("Fun", "Diversão"),
+                                                   "Trico Tricks"};
         for (int tab = 0; tab < TabCount; ++tab) {
             const ImGuiTabItemFlags flags = requested_tab == tab ? ImGuiTabItemFlags_SetSelected : 0;
             if (!ImGui::BeginTabItem(tabs[tab], nullptr, flags)) {
@@ -969,7 +1251,8 @@ void Menu() {
                 case 1: ImageTab(); break;
                 case 2: PerformanceTab(); break;
                 case 3: ControlsTab(); break;
-                case 4: LabTab(); break;
+                case 4: FunTab(); break;
+                case 5: TricksTab(); break;
                 default: OverlayTab(); break;
                 }
             }
@@ -1712,7 +1995,7 @@ void UpdateChoiceTextures() {
 
 void FinishSaveDialog() {
     RetireChoiceTextures();
-    ImGui::GetIO().MouseDrawCursor = menu_open;
+    ImGui::GetIO().MouseDrawCursor = menu_open || move_bar_open;
 }
 
 // The save list and messages take the keys, buttons and mouse that answer them; the rest stays
@@ -1854,6 +2137,23 @@ bool HandleEvent(const SDL_Event& event) {
             std::fflush(stdout);
             return true;
         }
+        // tlg: F9 adds a Trico (Fun tab).
+        if (down && !event.key.repeat && event.key.key == SDLK_F9) {
+            if (TlgFun::Tricos() >= TlgFun::MaxTricos) {
+                notice_text = "Trico limit (" + std::to_string(TlgFun::MaxTricos) + ")";
+            } else {
+                TlgFun::AddTrico();
+                notice_text = "Trico +1";
+            }
+            notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            return true;
+        }
+        // tlg: F12 shows or hides the Fun move bar; the mouse then picks a move.
+        if (down && !event.key.repeat && event.key.key == SDLK_F12) {
+            move_bar_open = !move_bar_open;
+            io.MouseDrawCursor = is_open || move_bar_open;
+            return true;
+        }
         // tlg: F10 shows or hides the performance overlay (FPS counter) at any time.
         if (down && !event.key.repeat && event.key.key == SDLK_F10) {
             auto& settings = TlgSettings::Get();
@@ -1918,7 +2218,7 @@ bool HandleEvent(const SDL_Event& event) {
         return true;
     }
     case SDL_EVENT_MOUSE_MOTION: {
-        if (!is_open) {
+        if (!is_open && !move_bar_open) {
             return false;
         }
         const float density = PixelDensity(event.motion.windowID);
@@ -1927,7 +2227,7 @@ bool HandleEvent(const SDL_Event& event) {
     }
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP: {
-        if (!is_open) {
+        if (!is_open && !move_bar_open) {
             return false;
         }
         const int button = event.button.button == SDL_BUTTON_LEFT    ? 0
@@ -1998,7 +2298,7 @@ bool Visible() {
     return initialized && (loading || background_total || menu_open || text_entry_active || choice_active ||
                            message_active || progress_on || now < progress_until || now < toast_until || AaLabelOn() ||
                            NoticeActive() ||
-                           choice_retiring || s.show_fps);
+                           choice_retiring || s.show_fps || move_bar_open);
 }
 
 bool CapturesInput() {
@@ -2134,6 +2434,7 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
 
     UpdateChoiceTextures();
+    MakeMoveIcons();
     ImGui_ImplVulkan_NewFrame();
     ImGui::NewFrame();
     if (loading) {
@@ -2156,6 +2457,9 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
     if (NoticeActive() && !menu_open) {
         NoticeBox();
+    }
+    if (move_bar_open && !menu_open && !loading) {
+        MoveBarWindow();
     }
     if (AaLabelOn() && !menu_open) {
         const auto& s = TlgSettings::Get();

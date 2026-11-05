@@ -122,6 +122,10 @@ struct Values {
     /// Slow motion above 30 FPS (s06 tail catch, s10 collapsing bridge; tlg.ini slow_motion, env
     /// TLG_SLOW_MOTION wins): 0 = run it capped at 30 FPS (default), 1 = skip it.
     std::atomic<int> slow_motion{0};
+    /// Trico's drool, a feature the developers switched off before release (condorcommonslaver.lua;
+    /// tlg.ini trico_drool, env TLG_TRICO_DROOL wins): 0 = off as shipped, 1 = always,
+    /// 2 = as the developers planned (only while he wants a smell pot or the boy's smell bottle).
+    std::atomic<int> trico_drool{0};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: run.py turns them into patches and environment variables; "Apply and restart".

@@ -1382,6 +1382,27 @@ class Launcher:
         ttk.Label(frame, text=self.t('mods_warning'), foreground='#a33', wraplength=520, justify='left').pack(
             anchor='w', pady=(4, 8))
 
+        # Trico's drool (tlg.ini trico_drool; the game reads it live, also from the in-game Fun tab).
+        drool = next(item for item in backports_table.MENU if item.key == 'trico_drool')
+        drool_box_frame = ttk.LabelFrame(frame, text=drool.name[0], padding=8)
+        drool_box_frame.pack(fill='x', anchor='w', pady=(0, 8))
+        drool_values = [choice[0] for choice in drool.choices]
+        drool_box = ttk.Combobox(drool_box_frame, values=[choice[1] for choice in drool.choices],
+                                 state='readonly', width=28)
+        chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('trico_drool', drool.default)
+        drool_box.current(drool_values.index(chosen) if chosen in drool_values else 0)
+        drool_box.pack(side='left')
+
+        def drool_picked():
+            tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'trico_drool': drool_values[drool_box.current()]})
+            self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+        drool_box.bind('<<ComboboxSelected>>', lambda _: drool_picked())
+        ttk.Label(drool_box_frame, text=' ? ', foreground='#4a7ab0').pack(side='left', padx=(6, 0))
+        for widget in drool_box_frame.winfo_children():
+            add_tooltip(widget, drool.what[0])
+
         list_frame = ttk.Frame(frame)
         list_frame.pack(fill='both', expand=True)
         canvas = tk.Canvas(list_frame, highlightthickness=0)

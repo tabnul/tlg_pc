@@ -166,7 +166,7 @@ def export_preset(settings, states, name='', what='', port_version='', exported=
     `states` as Backend.fix_states: {item id: value or None}. Items left on automatic stay out."""
     items = {}
     for item in backports_table.ITEMS:
-        if item.id in backports_table.NOT_IN_PRESETS:
+        if item.id in backports_table.NOT_IN_PRESETS or item.tab == 'Fun':   # cheats are no graphics preset
             continue
         value = backports_table.effective(item, states)
         if value is not None:
