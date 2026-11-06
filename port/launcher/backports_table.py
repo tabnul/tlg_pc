@@ -75,9 +75,11 @@ MENU = [
            'Recomendado: ligado.')),
     _menu('Effects', 'shadow_scale', 'choice', '1', ('Shadow resolution', 'Resolução das sombras'),
           ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of "
-           'tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and 1 GB of video memory; recommended with headroom.',
+           'tree and leaf shadows, with any anti-aliasing. '
+           '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.',
            'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos '
-           'tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e 1 GB; recomendado com folga.'),
+           'tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. '
+           '8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos.'),
           choices=(('1', 'Game (2048)', 'Jogo (2048)'), ('2', '4096', '4096'), ('4', '8192', '8192'))),
     _menu('Effects', 'ssao', 'int', '100', ('Ambient occlusion', 'Oclusão de ambiente'),
           ('Strength of the contact shadows in corners and under grass. 0% turns the pass off (saves a little GPU '

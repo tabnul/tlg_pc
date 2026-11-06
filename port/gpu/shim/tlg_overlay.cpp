@@ -556,8 +556,8 @@ void ImageTab() {
         static const char* const shadow_labels[] = {TL("Game (2048)", "Jogo (2048)"), "4096", "8192"};
         static const int shadow_values[] = {1, 2, 4};
         ChoiceRow(TL("Shadow resolution", "Resolução das sombras"), s.shadow_scale, shadow_labels, shadow_values, 3,
-                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about 1 GB of video memory; recommended when you have the headroom.",
-                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga."), d.shadow_scale, 1);
+                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.",
+                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos."), d.shadow_scale, 1);
         SliderRow(TL("Field of view", "Campo de visão"), s.fov, 50, 110, "%d°",
                   TL("Camera field of view. Default 70° is as shipped; higher shows more around the boy. Applies while the game runs (not in the paused menu).",
                      "Campo de visão da câmera. Padrão 70° é o original; mais alto mostra mais em volta do menino. Aplica com o jogo rodando (não no menu pausado)."), d.fov, 70);

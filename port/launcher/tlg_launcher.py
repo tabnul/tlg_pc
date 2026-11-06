@@ -422,11 +422,11 @@ TEXT = {
     'preset_recommended': ('Recommended (default)', 'Recomendado (padrão)'),
     'preset_custom': ('Custom', 'Personalizado'),
     'shadow_hint': ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much "
-                    'less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about '
-                    '1 GB of video memory; recommended when you have the headroom.',
+                    'less shimmer of tree and leaf shadows, with any anti-aliasing. '
+                    '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.',
                     'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é '
-                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa '
-                    'cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga.'),
+                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. '
+                    '8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos.'),
     'grass_smooth': ('Grass animated every frame (default)', 'Grama animada todo quadro (padrão)'),
     'grass_hint': ('The game moves most grass only every 4th frame, which looks choppy at high frame rates. '
                    'Off is as shipped.',
