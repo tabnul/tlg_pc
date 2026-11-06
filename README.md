@@ -327,6 +327,10 @@ and takes a screenshot of each. Run it before and after a change. More in
 3. **Audio:** put the PS4 firmware's `libSceNgs2.sprx` in `system_lib/` next to the executable.
 4. **Play:** start the launcher, pick the game folder and language, and press **Play**.
 
+**Error 4551 on Windows 11?** Smart App Control blocks programs without a digital signature, and
+the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control
+settings. On some Windows versions it can only be turned back on by reinstalling Windows.
+
 **PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX
 card, FSR 4 AA a recent card (greyed out otherwise); FSR 3.1 AA runs on any card.
 

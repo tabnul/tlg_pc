@@ -81,6 +81,7 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 ### Problemas
 
 - **Som incompleto ou estranho**: sem o `libSceNgs2.sprx` em `system_lib/`, o port usa o seu próprio mixer, ainda experimental (sem reverb e sem filtros). Com o arquivo, o áudio é o nativo.
+- **"Erro 4551" ou bloqueado pelo Controle Inteligente de Aplicativos (Smart App Control)**: o Windows 11 bloqueia programas sem assinatura digital, e o port não é assinado. Desligue em Segurança do Windows > Controle de aplicativos e do navegador > Configurações do Controle Inteligente de Aplicativos. Em algumas versões do Windows só dá para religar reinstalando o Windows.
 - **Não abre ou fecha sozinho**: veja a caixa de log no launcher e mande o `out/last_run.log` numa [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use um driver recente.
 
@@ -159,6 +160,7 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 ### Problems
 
 - **Incomplete or odd sound**: without `libSceNgs2.sprx` in `system_lib/`, the port uses its own mixer, still experimental (no reverb or filters yet). With the file, audio is native.
+- **"Error 4551" or blocked by Smart App Control**: Windows 11 blocks programs without a digital signature, and the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control settings. On some Windows versions it can only be turned back on by reinstalling Windows.
 - **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use a recent driver.
 
