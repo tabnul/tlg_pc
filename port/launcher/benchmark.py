@@ -112,13 +112,22 @@ class Sweep:
     'done' (zip path or None), 'error' (text). stop_event ends the run after the current scene;
     its second set (or kill) also kills the running game."""
 
-    def __init__(self, settings, points, seconds, notify, stop_event):
+    def __init__(self, settings, points, seconds, notify, stop_event, tricopilot=False,
+                 tricopilot_cam='middle'):
         self.settings = dict(settings)
         self.points = list(points)
         self.seconds = max(5, int(seconds))
         self.notify = notify
         self.stop = stop_event
         self.process = None
+        # Tricopilot (TLG_TRICOPILOT=1): the shim starts the developers' self-driving Trico as soon
+        # as each scene is entered, so the scenes are measured with Trico moving instead of waiting.
+        # It changes the numbers, so runs with and without it are not comparable (meta.json says
+        # which it was).
+        self.tricopilot = bool(tricopilot)
+        # Which camera watches him (TLG_TRICOPILOT_CAM): near, middle, far or game. It only changes
+        # what you see, not what is measured, but it is recorded with the run all the same.
+        self.tricopilot_cam = str(tricopilot_cam or 'middle')
 
     # ---- the run ----
 
@@ -189,6 +198,9 @@ class Sweep:
     def _visit(self, index, stage, area, settings, notes):
         """One scene: launch, wait for the warp and the load, measure, close. Returns (row, samples, log)."""
         env = dict(BENCH_ENV, TLG_START_POINT=f'{stage}:{area}')
+        if self.tricopilot:
+            env['TLG_TRICOPILOT'] = '1'
+            env['TLG_TRICOPILOT_CAM'] = self.tricopilot_cam
         budget = WARP_WAIT_S + LOAD_WAIT_S + self.seconds + 60
         started = time.time()
         process, log = tlg_run.launch(settings, seconds=budget, extra_env=env, header=notes)
@@ -298,6 +310,8 @@ class Sweep:
             gathered = {'error': str(error)}
         meta = {'kind': 'tlg launcher benchmark', 'when': time.strftime('%Y-%m-%d %H:%M'),
                 'seconds_per_scene': self.seconds, 'points': len(self.points),
+                'tricopilot': self.tricopilot,
+                'tricopilot_cam': self.tricopilot_cam if self.tricopilot else None,
                 'finished': sum(1 for r in rows if r['status'] == 'ok'),
                 'system': gathered,
                 'env': BENCH_ENV, 'ini_overrides': BENCH_INI,

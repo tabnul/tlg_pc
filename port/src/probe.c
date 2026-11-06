@@ -15,6 +15,7 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>
+#include <signal.h>
 #include "fault_dispatch_win.h"
 #else
 #include <sys/mman.h>
@@ -27,6 +28,8 @@
 #include <execinfo.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sched.h>
+#include <time.h>
 #endif
 
 typedef struct { uint64_t address, size, flags; } Segment;
@@ -240,6 +243,16 @@ static LONG CALLBACK vectored_fault(EXCEPTION_POINTERS *info) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 static LONG WINAPI unhandled_fault(EXCEPTION_POINTERS *info) { return fatal_exception(info); }
+/* abort() does not reach the unhandled-exception filter: the CRT ends the process itself. Without
+ * this the log keeps whatever was still in its buffer and the report has no cause at all, which is
+ * how an uncaught C++ exception or a failed assert looked. */
+static void fatal_abort(int sig) {
+    (void)sig;
+    if (!__atomic_exchange_n(&fatal_reported,1,__ATOMIC_ACQ_REL))
+        fprintf(stderr,"Fault: abort() called (thread %lu)\n",GetCurrentThreadId());
+    fflush(NULL);
+    TerminateProcess(GetCurrentProcess(),3);
+}
 /* Guest code reads its TCB with `mov reg, gs:[0]` (link_*.py rewrote fs:[0]); on Windows
  * the displacement becomes the TEB TLS slot that holds the guest TCB (runtime_thread.c). */
 uint32_t runtime_thread_tcb_offset(void);
@@ -451,6 +464,7 @@ static void fault(int sig, siginfo_t *info, void *context) {
         ssize_t written_=write(2, line, strlen(line)); (void)written_;
     }
     if (isa_table) { isa_rewrite_report(isa_table, stderr); fflush(stderr); }
+    fflush(NULL);   /* the log tail is the crash report: never leave it in a buffer */
     _exit(128 + sig);
 }
 #endif
@@ -594,7 +608,32 @@ mismatch:
     printf("Lua hook: unavailable (code signature mismatch)\n");
 }
 
+/* Host helpers for the guest patches below (both platforms). */
+static uint32_t host_thread_id(void) {
 #ifdef _WIN32
+    return (uint32_t)GetCurrentThreadId();
+#else
+    return (uint32_t)syscall(SYS_gettid);
+#endif
+}
+static uint64_t host_ticks_ms(void) {
+#ifdef _WIN32
+    return GetTickCount64();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+#endif
+}
+static void host_sleep_ms(unsigned ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    if (ms) usleep(ms * 1000);
+    else sched_yield();
+#endif
+}
+
 /* Button and stick hold counts at any frame rate (input_timing.h); TLG_INPUT_TIMING=0 is off. */
 static void install_input_timing(Segment *segments, uint64_t count) {
     const char *enabled = getenv("TLG_INPUT_TIMING");
@@ -779,7 +818,7 @@ static ABI void bind_guard_consume(void *context, void *packet) {
     bind_guard_check(packet);
     bind_consume_next(context, packet);
     static uint64_t last;
-    const uint64_t now = GetTickCount64();
+    const uint64_t now = host_ticks_ms();
     if (now - last < 10000) return;
     last = now;
     const int64_t a = __atomic_load_n(&bind_counts[0], __ATOMIC_RELAXED), c = __atomic_load_n(&bind_counts[1], __ATOMIC_RELAXED);
@@ -845,7 +884,7 @@ static unsigned reinit_depth;   /* nested takes by the owner */
 static int64_t reinit_waits;
 
 static ABI void reinit_lock(void) {
-    const uint32_t self = (uint32_t)GetCurrentThreadId();
+    const uint32_t self = host_thread_id();
     if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) == self) {
         ++reinit_depth;
         return;
@@ -858,23 +897,23 @@ static ABI void reinit_lock(void) {
             __builtin_ia32_pause();
             continue;
         }
-        if (!start) start = GetTickCount64();
-        const uint64_t waited = GetTickCount64() - start;
+        if (!start) start = host_ticks_ms();
+        const uint64_t waited = host_ticks_ms() - start;
         if (waited > 1000) {
             printf("Re-init lock: thread %u gave up after %" PRIu64 " ms (held by thread %u), going on without it\n",
                    self, waited, __atomic_load_n(&reinit_owner, __ATOMIC_RELAXED));
             return;
         }
-        Sleep(spin < 1000 ? 0 : 1);
+        host_sleep_ms(spin < 1000 ? 0 : 1);
     }
     if (!start) return;
     const int64_t n = __atomic_add_fetch(&reinit_waits, 1, __ATOMIC_RELAXED);
     if (n <= 20 || !(n % 100))
         printf("Re-init lock: thread %u waited %" PRIu64 " ms for a buffer re-init (%" PRId64 " so far)\n", self,
-               GetTickCount64() - start, n);
+               host_ticks_ms() - start, n);
 }
 static ABI void reinit_unlock(void) {
-    if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) != (uint32_t)GetCurrentThreadId()) return;   /* gave up */
+    if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) != host_thread_id()) return;   /* gave up */
     if (reinit_depth) {
         --reinit_depth;
         return;
@@ -948,7 +987,6 @@ static void install_reinit_lock(Segment *segments, uint64_t count) {
 mismatch:
     printf("Re-init lock: unavailable (code signature mismatch)\n");
 }
-#endif
 
 /* G3PATCH2 (patches.py): the patches' image base, then byte writes at image offsets, applied
  * after relocation. A write may replace a whole base-relative pointer slot (60/90 FPS++ swap
@@ -1142,6 +1180,7 @@ int main(int argc, char **argv) {
     SYSTEM_INFO system_info; GetSystemInfo(&system_info); page_size = system_info.dwPageSize;
     AddVectoredExceptionHandler(1, vectored_fault);
     SetUnhandledExceptionFilter(unhandled_fault);
+    signal(SIGABRT, fatal_abort);
     if (getenv("TLG_STRICT_HANDLES")) {
         PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY strict={0};
         strict.RaiseExceptionOnInvalidHandleReference=1;
@@ -1165,6 +1204,11 @@ int main(int argc, char **argv) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGSEGV, &sa, NULL); sigaction(SIGILL, &sa, NULL); sigaction(SIGBUS, &sa, NULL);
     sigaction(SIGTRAP, &sa, NULL); /* int3 ISA sites */
+    /* A guest divide by zero (SIGFPE, the signal behind the load crash of issue #19) and an abort()
+     * from the host runtime (SIGABRT, where an uncaught C++ exception or a failed assert ends up)
+     * used to kill the process with the default action: no report, and the buffered log lost. Both
+     * end in the report below now, so a crash always leaves a fault line to read. */
+    sigaction(SIGFPE, &sa, NULL); sigaction(SIGABRT, &sa, NULL);
     Dl_info self_info;
     if (dladdr((void *)main,&self_info)) exe_base=(uintptr_t)self_info.dli_fbase;
     struct sigaction dump = {0}; dump.sa_sigaction = thread_dump; dump.sa_flags = SA_SIGINFO|SA_RESTART;
@@ -1374,11 +1418,9 @@ int main(int argc, char **argv) {
     }
     if (patch_file) apply_patches(patch_file, segments, ns, relocs, nr);
     if (gpu_enabled) install_lua_hook(segments, ns);
-#ifdef _WIN32
     if (gpu_enabled) install_input_timing(segments, ns);
     if (gpu_enabled) install_bind_guard(segments, ns);
     if (gpu_enabled) install_reinit_lock(segments, ns);
-#endif
 #ifdef _WIN32
     printf("Guest TCB loads redirected to the TEB TLS slot: %" PRIu64 "\n", patch_tcb_loads(segments, ns));
 #endif

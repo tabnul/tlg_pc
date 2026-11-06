@@ -169,6 +169,35 @@ TEXT = {
     'bench_seconds': ('Seconds measured per scene', 'Segundos medidos por cena'),
     'bench_estimate': ('Estimated time: about {minutes} min for {count} scenes',
                        'Tempo estimado: cerca de {minutes} min para {count} cenas'),
+    'bench_pilot': ('Let Trico drive (Tricopilot)', 'Deixar o Trico dirigir (Tricopiloto)'),
+    'bench_pilot_help': (
+        "Every scene is measured with Trico walking around instead of standing still, so the "
+        "numbers include his animation, his physics and the camera following him. Tricopilot is the "
+        "developers' own debug tool, still in the game: they left the game running by itself for "
+        "hours with it. Keep it off to compare with other people's runs, and say it was on when you "
+        "share a run with it (the report notes it too).",
+        'Cada cena é medida com o Trico andando em vez de parado, então os números incluem a '
+        'animação dele, a física e a câmera que o segue. O Tricopiloto é a ferramenta de depuração '
+        'dos próprios desenvolvedores, ainda presente no jogo. Deixe desligado para comparar com as '
+        'medições de outras pessoas (o relatório também anota isso).'),
+    'bench_pilot_cam': ('Camera', 'Câmera'),
+    'bench_cam_near': ('Near', 'Perto'),
+    'bench_cam_middle': ('Middle', 'Médio'),
+    'bench_cam_far': ('Far', 'Longe'),
+    'bench_cam_game': ('Game camera', 'Câmera do jogo'),
+    'bench_pilot_cam_help': (
+        "Which camera watches Trico while he drives. Near keeps him big in the picture and is the "
+        "best of the four in open scenes. Middle is the one the developers' tool picks itself: a "
+        "classic top-down view, but in a narrow or roofed place the camera can end up inside the "
+        "rock. Far looks down on the whole area, lovely in a valley and useless indoors, because "
+        "Trico becomes a dot. Game camera leaves the normal camera alone, so it keeps following the "
+        "boy while Trico wanders off. It only changes what you see, not what is measured.",
+        'Qual câmera acompanha o Trico enquanto ele dirige. Perto o mantém grande na tela e é a '
+        'melhor das quatro em cenas abertas. Médio é a que a ferramenta dos desenvolvedores escolhe '
+        'sozinha: uma vista de cima clássica, mas num lugar estreito ou coberto a câmera pode '
+        'acabar dentro da rocha. Longe mostra a área inteira, bonito num vale e inútil em '
+        'interiores. Câmera do jogo não mexe na câmera normal, que continua seguindo o menino. '
+        'Só muda o que você vê, não o que é medido.'),
     'bench_start': ('Start', 'Iniciar'),
     'bench_stop': ('Stop', 'Parar'),
     'bench_open_folder': ('Open the report folder', 'Abrir a pasta do relatório'),
@@ -672,6 +701,20 @@ class BenchmarkWindow:
         self.seconds.insert(0, '40')
         self.seconds.pack(side='left', padx=(6, 0))
         self.seconds.bind('<KeyRelease>', lambda _e: self.refresh())
+        # Tricopilot: the game drives Trico himself all through the run (shim: TLG_TRICOPILOT=1).
+        self.pilot = tk.BooleanVar(value=False)
+        self.pilot_check = ttk.Checkbutton(line, text=app.t('bench_pilot'), variable=self.pilot)
+        self.pilot_check.pack(side='left', padx=(20, 0))
+        help_mark(line, app.t('bench_pilot_help'), self.pilot_check).pack(side='left', padx=(6, 0))
+        # Which camera watches him (shim: TLG_TRICOPILOT_CAM). Picture only, not the numbers.
+        self.pilot_cams = [('near', app.t('bench_cam_near')), ('middle', app.t('bench_cam_middle')),
+                           ('far', app.t('bench_cam_far')), ('game', app.t('bench_cam_game'))]
+        ttk.Label(line, text=app.t('bench_pilot_cam')).pack(side='left', padx=(14, 0))
+        self.pilot_cam = tk.StringVar(value=self.pilot_cams[1][1])
+        self.pilot_cam_box = ttk.Combobox(line, textvariable=self.pilot_cam, state='readonly',
+                                          width=13, values=[name for _k, name in self.pilot_cams])
+        self.pilot_cam_box.pack(side='left', padx=(6, 0))
+        help_mark(line, app.t('bench_pilot_cam_help'), self.pilot_cam_box).pack(side='left', padx=(6, 0))
         self.estimate = ttk.Label(win, text='', foreground=MUTED)
         self.estimate.grid(row=8, column=0, columnspan=3, sticky='w', pady=(4, 0))
 
@@ -717,9 +760,19 @@ class BenchmarkWindow:
         mode = self.mode.get()
         self.custom.configure(state='normal' if mode == 'custom' and not self.running else 'disabled')
         self.pick.configure(state='normal' if mode == 'pick' and not self.running else 'disabled')
+        self.pilot_check.configure(state='disabled' if self.running else 'normal')
+        self.pilot_cam_box.configure(state='disabled' if self.running else 'readonly')
         self.estimate.configure(text=self.app.t(
             'bench_estimate', minutes=self.bm.estimate_minutes(len(points), self.chosen_seconds()),
             count=len(points)))
+
+    def _cam_key(self):
+        """The camera the shim wants (near/middle/far/game) for the name shown in the box."""
+        name = self.pilot_cam.get()
+        for key, shown in self.pilot_cams:
+            if shown == name:
+                return key
+        return 'middle'
 
     # -- run ---------------------------------------------------------------------------------
     def start(self):
@@ -744,7 +797,9 @@ class BenchmarkWindow:
         self.progress.configure(maximum=len(points), value=0)
         self.refresh()
         notify = lambda kind, **data: self.events.put((kind, data))  # noqa: E731  (worker thread -> queue)
-        self.sweep = self.bm.Sweep(app.settings, points, self.chosen_seconds(), notify, self.stop_event)
+        self.sweep = self.bm.Sweep(app.settings, points, self.chosen_seconds(), notify, self.stop_event,
+                                   tricopilot=bool(self.pilot.get()),
+                                   tricopilot_cam=self._cam_key())
         threading.Thread(target=self.sweep.run, daemon=True).start()
         self.win.after(200, self.pump)
 

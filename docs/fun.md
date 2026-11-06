@@ -18,6 +18,7 @@ Open the in-game menu with **Insert** (or **R3 + L2** on a controller) and go to
 - [Extra Tricos](#extra-tricos)
 - [Trico's eyes](#tricos-eyes)
 - [Free camera](#free-camera)
+- [Tricopilot](#tricopilot), the developers' self-driving Trico
 - [Trico Tricks: make Trico move](#trico-tricks-make-trico-move)
 - [Trico's toilet](#tricos-toilet), something you almost never get to see
 - [Jump to a place](#jump-to-a-place)
@@ -90,6 +91,45 @@ at the scene from anywhere. Turn it off to get the normal camera back. A jump or
 it off.
 
 ![The free camera looking down on a crowd of Tricos](screenshots/fun/free-camera.jpg)
+
+## Tricopilot
+
+**Start Tricopilot** in the **Fun** tab and Trico drives himself: he wanders the scene, looks for
+edges to climb or jump, and the camera follows him around. **Stop Tricopilot** gives him and the
+camera back to you.
+
+It is not ours. It is the developers' own debug tool, `condordebugautotrico.lua`, still sitting in
+the retail game's scripts. They used it to leave the game running by itself for hours while they
+watched for crashes: the same file can walk Trico on to the next scene when he is done with this
+one, and it knows every stage's start points — their own version of the scene sweep this port uses
+for testing. Three leftovers in it say how old it is: a line that restarts the game over a network
+socket from a PC called `D:\trico`, a camera preset named `TricoAutoRunTest_middle`, and helper
+volumes that are not on the disc any more. The game quietly skips those missing volumes, which is
+why Trico sometimes picks an odd route.
+
+**Camera.** The top-down view is the developers' own chase preset, and their tool has three of
+them. The **Camera** box next to the Start button picks which one watches him, also while he is
+already driving:
+
+- **Near** keeps Trico big in the picture. The best of the four in open scenes.
+- **Middle** is what their tool picks itself (`TricoAutoRunTest_middle`): the classic top-down
+  view. In a narrow or roofed place the camera can end up inside the rock — in
+  s13_FirstFlight `_005_Garden` (mission `FF_b01_EnterGarden`) it does exactly that, while Near
+  frames him cleanly.
+- **Far** looks down on the whole area. Lovely in a valley, useless indoors: Trico becomes a dot.
+- **Game camera** leaves your normal camera alone. It keeps following the boy while Trico wanders
+  off on his own.
+
+The game switches the tool off outside the developers' editor, so the port switches it back on
+(`DEBUG_AUTO_TRICO`) and waits for Trico to exist before starting him, which is what makes it work
+right after a load.
+
+For fun only: Trico ignores the story while he drives, he can wander into water or into a load
+trigger, and the story keeps running around him. The launcher's benchmark can keep Tricopilot on
+for a whole run (**Debug > Benchmark**, "Let Trico drive"), so the scenes are measured with him
+moving instead of standing still. The same four cameras are in the box next to it; the camera only
+changes what you see, not what is measured. Those numbers are not comparable with runs without
+Tricopilot; the report notes which it was, and which camera.
 
 ## Trico Tricks: make Trico move
 
