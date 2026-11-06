@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace TlgSettings {
 
@@ -53,6 +54,11 @@ bool dlss_checked = false;
 int dlss_supported_file = -1;
 // The upscaler tlg.ini selected before a fallback to FSR 3.1 (-1: none): Save writes it back.
 int selected_upscaler = -1;
+// fsr4_default in tlg.ini: the one-time switch from FSR 3.1 to FSR 4 native AA on a card that
+// runs FSR 4 ran (once per install; later choices stay).
+bool fsr4_default_done = false;
+// fsr4_supported in tlg.ini: the game's last FSR 4 check, for the launcher (-1: none).
+int fsr4_supported_file = -1;
 
 void DlssFallback(Values& v) {
     if (v.upscaler == UpscalerDlss && dlss_checked && !v.dlss_supported) FallBackToFsr3();
@@ -94,6 +100,12 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         aa_row_file = i != 0;
     } else if (key == "dlss_supported") {
         dlss_supported_file = i != 0;
+        return;
+    } else if (key == "fsr4_supported") {
+        fsr4_supported_file = i != 0;
+        return;
+    } else if (key == "fsr4_default") {
+        fsr4_default_done = i != 0;
         return;
     }
     if (key == "key_map") {
@@ -308,9 +320,10 @@ void Load() {
     if (ReadFile(v)) {
         std::printf("Settings: %s\n", Path());
     }
-    // tlg: the anti-aliasing row runs DLAA or FSR 3.1 at native size (AaMode); files from before
-    // it, and other upscalers, load as DLAA.
-    if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3)) {
+    // tlg: the anti-aliasing row runs DLAA, FSR 3.1 or FSR 4 at native size (AaMode); files from
+    // before it, and other upscalers, load as DLAA.
+    if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3 &&
+                         v.upscaler != UpscalerFsr4)) {
         v.upscaler = UpscalerDlss;
     }
     DlssFallback(v);
@@ -373,6 +386,26 @@ bool GraphicsNeedRestart() {
            v.stale_readback != v.startup_stale_readback || v.hdr != v.startup_hdr;
 }
 
+namespace {
+// Rewrites only these keys in tlg.ini (the launcher reads them before the menu saves).
+bool WriteKeys(const std::vector<std::pair<std::string, std::string>>& keys) {
+    std::vector<std::string> lines;
+    if (std::ifstream in{Path()}) {
+        for (std::string line; std::getline(in, line);) {
+            bool replaced = false;
+            for (const auto& [key, value] : keys) replaced |= line.starts_with(key + "=");
+            if (!replaced) lines.push_back(line);
+        }
+    }
+    if (lines.empty()) return false;
+    std::ofstream out{Path()};
+    if (!out) return false;
+    for (const auto& line : lines) out << line << '\n';
+    for (const auto& [key, value] : keys) out << key << '=' << value << '\n';
+    return true;
+}
+} // namespace
+
 void ConfigureUpscalerSupport(bool fsr4, bool fsr411) {
     auto& v = Get();
     v.fsr4_supported = fsr4;
@@ -393,18 +426,8 @@ void ConfigureDlssSupport(bool available, const char* problem) {
     dlss_checked = true;
     if (dlss_supported_file != int(available)) {
         // Only this line changes: the launcher greys DLAA out from it.
-        std::vector<std::string> lines;
-        if (std::ifstream in{Path()}) {
-            for (std::string line; std::getline(in, line);)
-                if (!line.starts_with("dlss_supported=")) lines.push_back(line);
-        }
-        if (!lines.empty()) {
-            if (std::ofstream out{Path()}) {
-                for (const auto& line : lines) out << line << '\n';
-                out << "dlss_supported=" << int(available) << '\n';
-                dlss_supported_file = available;
-            }
-        }
+        if (WriteKeys({{"dlss_supported", std::to_string(int(available))}}))
+            dlss_supported_file = available;
     }
     static std::string kept;
     kept = problem ? problem : "";
@@ -414,6 +437,27 @@ void ConfigureDlssSupport(bool available, const char* problem) {
                     kept.empty() ? "tlg_dlss.dll or nvngx_dlss.dll missing" : kept.c_str());
         FallBackToFsr3();
     }
+    // tlg: once per install, a card that runs FSR 4 moves from FSR 3.1 native AA (chosen, or
+    // the fallback from DLAA without DLSS) to FSR 4 native AA. Later choices stay; scripts that
+    // set TLG_UPSCALER keep theirs.
+    const char* env = std::getenv("TLG_UPSCALER");
+    std::vector<std::pair<std::string, std::string>> keys;
+    if (v.fsr4_supported && !fsr4_default_done && !(env && env[0])) {
+        fsr4_default_done = true;
+        keys.emplace_back("fsr4_default", "1");
+        if (v.dlaa && v.upscaler == UpscalerFsr3) {
+            std::printf("Upscaler: this GPU runs FSR 4; native AA moves from FSR 3.1 to FSR 4 (once)\n");
+            v.upscaler = UpscalerFsr4;
+            selected_upscaler = -1;
+            v.preset = NativeAA;
+            keys.emplace_back("upscaler", "fsr4");
+        }
+    }
+    if (fsr4_supported_file != int(v.fsr4_supported.load())) {
+        keys.emplace_back("fsr4_supported", std::to_string(int(v.fsr4_supported.load())));
+        fsr4_supported_file = v.fsr4_supported;
+    }
+    if (!keys.empty()) WriteKeys(keys);
 }
 
 void FallBackToFsr3() {
@@ -514,6 +558,8 @@ void Save() {
                  pack > 0 ? TexturePackNames()[pack - 1].c_str() : "off");
     if (dlss_checked || dlss_supported_file >= 0)
         std::fprintf(file, "dlss_supported=%d\n", dlss_checked ? int(v.dlss_supported.load()) : dlss_supported_file);
+    if (fsr4_supported_file >= 0) std::fprintf(file, "fsr4_supported=%d\n", fsr4_supported_file);
+    if (fsr4_default_done) std::fprintf(file, "fsr4_default=1\n");
     // Read by run.sh at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
@@ -672,7 +718,8 @@ const char* UpscalerName(int upscaler) {
 int AaModeOf() {
     const auto& v = Get();
     if (!v.dlaa || v.upscaler == UpscalerTaa) return AaOff;
-    return v.upscaler == UpscalerFsr3 ? AaFsr3Native : AaDlaa;
+    if (v.upscaler == UpscalerFsr3) return AaFsr3Native;
+    return v.upscaler == UpscalerFsr4 ? AaFsr4Native : AaDlaa;
 }
 
 void SetAaMode(int mode) {
@@ -680,17 +727,19 @@ void SetAaMode(int mode) {
     mode = std::clamp(mode, 0, AaModeCount - 1);
     v.dlaa = mode != AaOff;
     if (mode == AaOff) return;
-    v.upscaler = mode == AaDlaa ? UpscalerDlss : UpscalerFsr3;
+    v.upscaler = mode == AaDlaa ? UpscalerDlss : mode == AaFsr4Native ? UpscalerFsr4 : UpscalerFsr3;
     selected_upscaler = -1;
     v.preset = NativeAA;
 }
 
 bool AaModeSupported(int mode) {
-    return mode != AaDlaa || Get().dlss_supported;
+    if (mode == AaDlaa) return Get().dlss_supported;
+    if (mode == AaFsr4Native) return Get().fsr4_supported;
+    return true;
 }
 
 const char* AaModeName(int mode) {
-    static constexpr const char* names[AaModeCount] = {"Off", "DLAA", "FSR 3.1 Native AA"};
+    static constexpr const char* names[AaModeCount] = {"Off", "DLAA", "FSR 3.1 Native AA", "FSR 4 Native AA"};
     return names[std::clamp(mode, 0, AaModeCount - 1)];
 }
 

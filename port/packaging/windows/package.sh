@@ -82,6 +82,18 @@ elif [[ -n ${TLG_REQUIRE_DLSS:-} ]]; then
 else
     echo 'No DLSS bridge in out/ (build_dlss.sh not run): packaging without DLAA'
 fi
+# FSR 4 native AA: the open FSR 4 v07 model (MIT; AMD FidelityFX SDK source, assets built by
+# @FireBurn's Q2RTX, run by his UniversalScalers-Vulkan; packaging after @FelipePrado0's SpartanPort).
+# Only the native model: the anti-aliasing row runs no other. Without it FSR 4 runs as FSR 3.1.
+TLG_FSR4_MODELS=native bash tools/fetch_fsr4_assets.sh
+mkdir -p "$dest/fsr4_shaders"
+cp -r fsr4_shaders/LICENSE-FSR4-v07.txt fsr4_shaders/rcas.spv fsr4_shaders/spd_auto_exposure.spv \
+    fsr4_shaders/fsr4_model_v07_i8_native_* "$dest/fsr4_shaders/"
+if [[ -d fsr4_shaders/opt ]]; then
+    mkdir -p "$dest/fsr4_shaders/opt"
+    cp fsr4_shaders/opt/*native* "$dest/fsr4_shaders/opt/" 2>/dev/null || true
+fi
+cp fsr4_shaders/LICENSE-FSR4-v07.txt "$dest/"
 cp -r scripts "$dest/"
 find "$dest" -name __pycache__ -prune -exec rm -r {} +
 cp LICENSE packaging/README-player.md "$dest/"

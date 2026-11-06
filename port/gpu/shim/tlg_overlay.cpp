@@ -523,10 +523,12 @@ void ImageTab() {
     }
     ImGui::SeparatorText(TL("Anti-aliasing", "Anti-aliasing"));
     if (BeginRows("##antialiasing")) {
-        // tlg: one row for DLAA and FSR 3.1 native AA (TlgSettings::AaMode). DLAA needs DLSS
-        // (tlg_dlss.dll, an NVIDIA RTX card); the game's own SMAA runs either way.
+        // tlg: one row for DLAA, FSR 3.1 and FSR 4 native AA (TlgSettings::AaMode). DLAA needs DLSS
+        // (tlg_dlss.dll, an NVIDIA RTX card), FSR 4 a card with its shader features (most AMD,
+        // NVIDIA and Intel cards of the last years); the game's own SMAA runs either way.
         static const char* const aa_labels[TlgSettings::AaModeCount] = {
-            TL("Off", "Desligado"), "DLAA (NVIDIA DLSS)", TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo")};
+            TL("Off", "Desligado"), "DLAA (NVIDIA DLSS)", TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo"),
+            TL("FSR 4 Native AA", "FSR 4 AA nativo")};
         Row(TL("Anti-aliasing", "Anti-aliasing"));
         const int aa_mode = TlgSettings::AaModeOf();
         if (ImGui::BeginCombo("##value", aa_labels[aa_mode])) {
@@ -542,9 +544,9 @@ void ImageTab() {
         }
         Help(!s.dlss_supported && aa_mode == TlgSettings::AaOff
                  ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("DLAA needs an NVIDIA RTX card and tlg_dlss.dll; FSR 3.1 native AA runs on any card.", "O DLAA precisa de uma placa NVIDIA RTX e do tlg_dlss.dll; o FSR 3.1 AA nativo roda em qualquer placa."))
-                 : TL("Stable, smooth edges on foliage, feathers and railings, at native resolution on the game's own motion vectors. DLAA: NVIDIA DLSS (RTX cards). FSR 3.1 native AA: AMD FSR, on any card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
-                      "Bordas estáveis e suaves em folhagem, penas e grades, na resolução nativa com os vetores de movimento do próprio jogo. DLAA: NVIDIA DLSS (placas RTX). FSR 3.1 AA nativo: AMD FSR, em qualquer placa. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
-             {s.dlss_supported ? "DLAA" : aa_labels[TlgSettings::AaFsr3Native], ""});
+                 : TL("Stable, smooth edges on foliage, feathers and railings, at native resolution on the game's own motion vectors. DLAA: NVIDIA DLSS (RTX cards). FSR 4 native AA: AMD FSR 4, sharper and steadier than FSR 3.1, on recent cards (greyed out when the card lacks it). FSR 3.1 native AA: AMD FSR, on any card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
+                      "Bordas estáveis e suaves em folhagem, penas e grades, na resolução nativa com os vetores de movimento do próprio jogo. DLAA: NVIDIA DLSS (placas RTX). FSR 4 AA nativo: AMD FSR 4, mais nítido e estável que o FSR 3.1, em placas recentes (cinza quando a placa não suporta). FSR 3.1 AA nativo: AMD FSR, em qualquer placa. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
+             {s.dlss_supported ? "DLAA" : aa_labels[s.fsr4_supported ? TlgSettings::AaFsr4Native : TlgSettings::AaFsr3Native], ""});
         ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",

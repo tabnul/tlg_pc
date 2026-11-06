@@ -224,7 +224,7 @@ const char* PresetName(int preset);
 const char* UpscalerName(int upscaler);
 
 /// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler (native size).
-enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaModeCount };
+enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaFsr4Native, AaModeCount };
 int AaModeOf();
 /// Sets dlaa and the upscaler for a mode.
 void SetAaMode(int mode);

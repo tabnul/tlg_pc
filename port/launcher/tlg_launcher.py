@@ -249,13 +249,16 @@ TEXT = {
     'aa_off': ('Off', 'Desligado'),
     'aa_dlaa': ('DLAA (NVIDIA RTX)', 'DLAA (NVIDIA RTX)'),
     'aa_fsr3': ('FSR 3.1 Native AA', 'FSR 3.1 AA nativo'),
+    'aa_fsr4': ('FSR 4 Native AA', 'FSR 4 AA nativo'),
     'fg_mode': ('Frame generation', 'Geração de quadros'),
     'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
                 'Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
     'aa_no_dlss': ('No DLSS on this GPU: DLAA runs as FSR 3.1 Native AA',
                    'Sem DLSS nesta GPU: o DLAA roda como FSR 3.1 AA nativo'),
-    'smaa_hint': ('Not recommended: DLAA and FSR 3.1 already smooth the edges; SMAA on top blurs the image and the HUD.',
-                  'Não recomendado: o DLAA e o FSR 3.1 já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
+    'aa_no_fsr4': ('This GPU cannot run FSR 4: it runs as FSR 3.1 Native AA',
+                   'Esta GPU não roda o FSR 4: ele roda como FSR 3.1 AA nativo'),
+    'smaa_hint': ('Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
+                  'Não recomendado: o DLAA e o FSR já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
     'sharpening': ('Sharpening', 'Nitidez'),
     'sharpen_off': ('Off', 'Desligada'),
     'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
@@ -559,8 +562,10 @@ SHARPENERS = ['off', 'rcas', 'cas']
 INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '1', 'rcas_strength': '75', 'cas_strength': '100', 'color_adjust': '1', 'color_brightness': '0.00',
                 'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
 # The anti-aliasing row (TlgSettings::AaMode): (label, tlg.ini dlaa / upscaler). DLAA needs an
-# NVIDIA RTX card; FSR 3.1 native AA runs on any card.
-AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3'))]
+# NVIDIA RTX card, FSR 4 native AA a recent card (the game checks it once per install and then
+# moves FSR 3.1 to FSR 4); FSR 3.1 native AA runs on any card.
+AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3')),
+            ('aa_fsr4', ('1', 'fsr4'))]
 
 
 def fg_mode_of(ini):
@@ -573,16 +578,21 @@ def dlss_unsupported(ini):
     return ini.get('dlss_supported') == '0'
 
 
+def fsr4_unsupported(ini):
+    # The game writes its FSR 4 check (fsr4_supported); without it, FSR 4 runs as FSR 3.1.
+    return ini.get('fsr4_supported') == '0'
+
+
 def aa_mode_of(ini):
-    # The AA_MODES index tlg.ini picks (TlgSettings::AaModeOf: every upscaler but TAA and FSR 3.1
-    # loads as DLAA).
+    # The AA_MODES index tlg.ini picks (TlgSettings::AaModeOf: every upscaler but TAA, FSR 3.1 and
+    # FSR 4 loads as DLAA).
     if ini.get('dlaa', '1') in ('0', ''):
         return 0
     if ini.get('aa_row', '0') in ('0', ''):
         return 1  # a file from before the row: DLAA
     if ini.get('upscaler') == 'taa':
         return 0
-    return 2 if ini.get('upscaler') == 'fsr3' else 1
+    return {'fsr3': 2, 'fsr4': 3}.get(ini.get('upscaler'), 1)
 
 
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
@@ -1131,8 +1141,10 @@ class Launcher:
             self.refresh_preset()
 
     def update_aa_note(self, ini):
-        # DLAA stays the choice in tlg.ini; the game runs FSR 3.1 while DLSS is missing.
-        if self.aa_box.current() == 1 and dlss_unsupported(ini):
+        # DLAA or FSR 4 stays the choice in tlg.ini; the game runs FSR 3.1 while the card lacks it.
+        mode = self.aa_box.current()
+        if (mode == 1 and dlss_unsupported(ini)) or (mode == 3 and fsr4_unsupported(ini)):
+            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 1 else 'aa_no_fsr4'))
             self.aa_note.grid()
         else:
             self.aa_note.grid_remove()

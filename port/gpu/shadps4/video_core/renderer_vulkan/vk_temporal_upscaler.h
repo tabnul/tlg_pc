@@ -208,13 +208,13 @@ private:
                     bool hdr, std::array<float, 2> frame_jitter);
     /// Records FSR 4 into output_image; on a permanent failure FSR 3 takes over.
     bool RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color, Fsr4Upscaler::Image depth,
-                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms);
+                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms, std::array<float, 2> frame_jitter);
     /// Records the portable FSR 3.1 context into output_image (HDR color, General layouts).
     bool RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk::Format color_format,
                     vk::ImageUsageFlags color_usage, vk::Image depth, vk::Format depth_format,
                     vk::ImageUsageFlags depth_usage, u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
                     bool has_reactive, std::array<float, 2> frame_jitter);
-    /// tlg: FSR 3.1 at native size on the game's motion (the anti-aliasing row).
+    /// tlg: FSR 3.1 or FSR 4 at native size on the game's motion (the anti-aliasing row).
     [[nodiscard]] bool FsrNativeAa() const;
     void RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color, vk::ImageView depth);
     /// Sharpness above 1 for FSR 3/4 (their RCAS stops at 1): one more RCAS pass over the target
