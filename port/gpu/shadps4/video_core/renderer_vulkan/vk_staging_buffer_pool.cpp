@@ -27,6 +27,19 @@ namespace {
 // upload ring keeps TLG_STAGING_KEEP_MB (512) and is populated at startup.
 constexpr u64 RING_IDLE_FRAMES = 3000;
 constexpr u64 LARGE_IDLE_FRAMES = 3000;
+// tlg: video-memory staging (detiling scratch, the depth/color copy buffer) costs no first-touch
+// populate, so it goes back after ~5 s idle and is not covered by the upload ring's keep. It sat
+// in video memory for good before (up to the 512 MiB keep plus 128 MiB copy buffer, issue #38:
+// an 8 GB card full of memory the cache collector cannot free).
+// TLG_STAGING_DEVICE_TRIM=0: the old way (A/B).
+constexpr u64 DEVICE_IDLE_FRAMES = 300;
+bool DeviceTrim() {
+    static const bool on = [] {
+        const char* v = std::getenv("TLG_STAGING_DEVICE_TRIM");
+        return !v || v[0] != '0';
+    }();
+    return on;
+}
 constexpr u64 PREWARM_BLOCKS = 8;
 constexpr u64 LARGE_MIN_GRANULARITY = 64_KB;
 constexpr u64 BLOCK_SIZE = 16_MB;
@@ -172,9 +185,12 @@ void StagingBufferPool::TickFrame() {
 
 void StagingBufferPool::TrimRing(Ring& ring) {
     auto& blocks = ring.blocks;
+    const bool device = DeviceTrim() && &ring == &rings[u32(MemoryType::DeviceLocal)];
+    const u64 keep = device ? 0 : keep_blocks;
+    const u64 idle_frames = device ? DEVICE_IDLE_FRAMES : RING_IDLE_FRAMES;
     for (size_t i = blocks.size(); i-- > 0;) {
         const Block& block = blocks[i];
-        if (blocks.size() <= keep_blocks || frame - block.last_used_frame < RING_IDLE_FRAMES ||
+        if (blocks.size() <= keep || frame - block.last_used_frame < idle_frames ||
             !scheduler.IsFree(block.buffer->LastTick())) {
             continue;
         }
@@ -191,8 +207,11 @@ void StagingBufferPool::TrimRing(Ring& ring) {
 }
 
 void StagingBufferPool::TrimLarge(std::vector<LargeBuffer>& cache) {
-    std::erase_if(cache, [this](const LargeBuffer& entry) {
-        return !entry.held && frame - entry.last_used_frame >= LARGE_IDLE_FRAMES &&
+    const u64 idle_frames = DeviceTrim() && &cache == &large_caches[u32(MemoryType::DeviceLocal)]
+                                ? DEVICE_IDLE_FRAMES
+                                : LARGE_IDLE_FRAMES;
+    std::erase_if(cache, [this, idle_frames](const LargeBuffer& entry) {
+        return !entry.held && frame - entry.last_used_frame >= idle_frames &&
                scheduler.IsFree(entry.tick);
     });
 }

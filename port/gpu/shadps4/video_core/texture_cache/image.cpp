@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "tlg_toggles.h"
+#include <cstdlib>
 #include <ranges>
 #include "common/assert.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
@@ -106,8 +107,26 @@ void UniqueImage::Destroy() {
 void UniqueImage::Create(const vk::ImageCreateInfo& image_ci, VmaPool pool) {
     this->image_ci = image_ci;
     ASSERT(!image);
+    // tlg: from the SotC port (@AjncSystem, thanks, 1e510224ad): images of 2048x2048 texels and
+    // more (per layer, x layers) get memory of their own, so it goes back to the driver when the
+    // image goes. In shared 64 MiB blocks a block only goes back when it is empty; ~430 MiB sat
+    // free in blocks on an 8 GB card at the s19_Flashback fl2B_010 crash (issue #38).
+    // TLG_IMAGE_DEDICATED=0 turns it off, TLG_IMAGE_DEDICATED_TEXELS sets the threshold. Not
+    // for images in a custom pool (texture pack).
+    static const u64 dedicated_texels = [] {
+        const char* v = std::getenv("TLG_IMAGE_DEDICATED");
+        if (v && v[0] == '0') {
+            return ~u64{0};
+        }
+        const char* t = std::getenv("TLG_IMAGE_DEDICATED_TEXELS");
+        return t ? std::strtoull(t, nullptr, 10) : u64{2048} * 2048;
+    }();
+    const u64 texels = u64{image_ci.extent.width} * image_ci.extent.height *
+                       image_ci.extent.depth * image_ci.arrayLayers;
+    const bool dedicated = !pool && texels >= dedicated_texels;
     const VmaAllocationCreateInfo alloc_ci = {
-        .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT,
+        .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT |
+                 (dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0u),
         .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         .requiredFlags = 0,
         .preferredFlags = 0,
