@@ -106,9 +106,11 @@ public:
     /// download needs: "does an unrecorded draw/DMA/fence still write this range" and the
     /// manual drain for the fallback.
     void SetNoDrainHooks(std::function<bool(VAddr, u64)> pending_check,
-                         std::function<void()> drain) {
+                         std::function<void()> drain,
+                         std::function<bool(const std::function<void()>&)> between_packets) {
         tlg_pending_write_check = std::move(pending_check);
         tlg_drain_draws = std::move(drain);
+        tlg_between_packets = std::move(between_packets);
     }
     /// tlg: the buffer tracking of one page, for the fault-loop report.
     std::string DescribeFaultState(VAddr device_addr);
@@ -207,6 +209,9 @@ private:
     bool TryNoDrainDownload(VAddr device_addr, u64 size);
     std::function<bool(VAddr, u64)> tlg_pending_write_check;
     std::function<void()> tlg_drain_draws;
+    /// Runs the callback while the draw recording thread is between two packets (it owns the
+    /// caches while it runs one); returns true when it had to wait for a packet.
+    std::function<bool(const std::function<void()>&)> tlg_between_packets;
     std::unique_ptr<Buffer> nodrain_buffer;
 
     // Disabled unless a launch profile opts in. When enabled, exact GPU-dirty islands in the
