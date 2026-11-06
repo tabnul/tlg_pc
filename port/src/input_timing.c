@@ -3,6 +3,9 @@
  * input timing for EU 01.00. */
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <pthread.h>
+#endif
 #include "input_timing.h"
 
 typedef struct TlgInputContext {
@@ -19,7 +22,15 @@ typedef struct {
 
 static TlgInputUpdate original_update;
 static __thread TlgInputContext *current_input;
+#ifdef _WIN32
 static SRWLOCK history_lock = SRWLOCK_INIT;
+#define history_lock_take() AcquireSRWLockExclusive(&history_lock)
+#define history_lock_give() ReleaseSRWLockExclusive(&history_lock)
+#else
+static pthread_mutex_t history_lock = PTHREAD_MUTEX_INITIALIZER;
+#define history_lock_take() pthread_mutex_lock(&history_lock)
+#define history_lock_give() pthread_mutex_unlock(&history_lock)
+#endif
 static TlgInputHistory histories[128];
 
 void tlg_input_configure(TlgInputUpdate original) {
@@ -57,7 +68,7 @@ void *TLG_INPUT_ABI tlg_input_copy(void *destination, const void *source, size_t
     /* This runs inside the game's own sensor lock (the memcpy is before its unlock), so the graph
      * never sees a half-corrected snapshot. No allocation or logging on the input path; no host
      * lock is held while guest code runs. */
-    AcquireSRWLockExclusive(&history_lock);
+    history_lock_take();
     TlgInputHistory *history = NULL, *available = NULL;
     for (unsigned i = 0; i < sizeof(histories) / sizeof(histories[0]); ++i) {
         if (histories[i].sensor == sensor) { history = &histories[i]; break; }
@@ -87,9 +98,6 @@ void *TLG_INPUT_ABI tlg_input_copy(void *destination, const void *source, size_t
                 i * TLG_INPUT_STICK_STRIDE + TLG_INPUT_STICK_AGE, &count, 4);
         }
     }
-    ReleaseSRWLockExclusive(&history_lock);
+    history_lock_give();
     return destination;
 }
-#else
-typedef int tlg_input_timing_windows_only;
-#endif

@@ -108,11 +108,9 @@ static inline int tlg_input_rel_branch(unsigned char *out, uintptr_t from,
     return 1;
 }
 
-#ifdef _WIN32
 #define TLG_INPUT_ABI __attribute__((sysv_abi))
 typedef void (TLG_INPUT_ABI *TlgInputUpdate)(void *, float);
 void tlg_input_configure(TlgInputUpdate original);
 void TLG_INPUT_ABI tlg_input_update(void *sensor, float dt);
 void *TLG_INPUT_ABI tlg_input_copy(void *destination, const void *source, size_t size);
-#endif
 #endif
