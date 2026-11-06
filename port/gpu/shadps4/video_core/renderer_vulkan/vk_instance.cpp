@@ -421,6 +421,10 @@ bool Instance::CreateDevice() {
             feature_chain.get<vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR>();
     }
     shader_clock = add_extension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+    // tlg #38 crash hunt: fault tracking may cost the driver something, so it is off unless asked.
+    if (const char* fault_env = std::getenv("TLG_VK_FAULT"); fault_env && fault_env[0] == '1') {
+        device_fault = add_extension(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
+    }
     if (shader_clock) {
         shader_clock_features = feature_chain.get<vk::PhysicalDeviceShaderClockFeaturesKHR>();
         LOG_INFO(Render_Vulkan, "- shaderSubgroupClock: {}",
@@ -631,7 +635,13 @@ bool Instance::CreateDevice() {
         vk::PhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE{
             .shaderMixedFloatDotProductFloat16AccFloat32 = true,
         },
+        vk::PhysicalDeviceFaultFeaturesEXT{
+            .deviceFault = true,
+        },
     };
+    if (!device_fault) {
+        device_chain.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
+    }
 
     if (!custom_border_color) {
         device_chain.unlink<vk::PhysicalDeviceCustomBorderColorFeaturesEXT>();
@@ -965,6 +975,87 @@ vk::Format Instance::GetSupportedFormat(const vk::Format format,
         }
     }
     return format;
+}
+
+// tlg #38 crash hunt: ask the driver what it faulted on. Without this the only thing we see is
+// "Device lost during submit", which says where we noticed, not what went wrong.
+void Instance::ReportDeviceFault(const char* where) const {
+    if (!device_fault) {
+        std::printf("GPU fault report (%s): not available (run with TLG_VK_FAULT=1)\n", where);
+        std::fflush(stdout);
+        return;
+    }
+    const auto& dispatch = VULKAN_HPP_DEFAULT_DISPATCHER;
+    if (dispatch.vkGetDeviceFaultInfoEXT == nullptr) {
+        std::printf("GPU fault report (%s): driver has no vkGetDeviceFaultInfoEXT\n", where);
+        std::fflush(stdout);
+        return;
+    }
+    VkDeviceFaultCountsEXT counts{};
+    counts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
+    if (dispatch.vkGetDeviceFaultInfoEXT(*device, &counts, nullptr) != VK_SUCCESS) {
+        std::printf("GPU fault report (%s): the driver kept no fault info\n", where);
+        std::fflush(stdout);
+        return;
+    }
+    std::vector<VkDeviceFaultAddressInfoEXT> addresses(counts.addressInfoCount);
+    std::vector<VkDeviceFaultVendorInfoEXT> vendors(counts.vendorInfoCount);
+    counts.vendorBinarySize = 0;
+    VkDeviceFaultInfoEXT info{};
+    info.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
+    info.pAddressInfos = addresses.empty() ? nullptr : addresses.data();
+    info.pVendorInfos = vendors.empty() ? nullptr : vendors.data();
+    // VK_INCOMPLETE only means we did not ask for the vendor binary blob, which we do not want.
+    const VkResult fault_result = dispatch.vkGetDeviceFaultInfoEXT(*device, &counts, &info);
+    if (fault_result != VK_SUCCESS && fault_result != VK_INCOMPLETE) {
+        std::printf("GPU fault report (%s): second fault query failed (%d)\n", where,
+                    (int)fault_result);
+        std::fflush(stdout);
+        return;
+    }
+    std::printf("GPU fault report (%s): \"%s\"  %u addresses, %u vendor entries\n", where,
+                info.description, counts.addressInfoCount, counts.vendorInfoCount);
+    for (u32 i = 0; i < counts.addressInfoCount; ++i) {
+        const VkDeviceFaultAddressInfoEXT& a = addresses[i];
+        const char* kind = "unknown";
+        switch (a.addressType) {
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_READ_INVALID_EXT:
+            kind = "read invalid";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_WRITE_INVALID_EXT:
+            kind = "write invalid";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_EXECUTE_INVALID_EXT:
+            kind = "execute invalid";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_UNKNOWN_EXT:
+            kind = "instruction pointer unknown";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_INVALID_EXT:
+            kind = "instruction pointer invalid";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_FAULT_EXT:
+            kind = "instruction pointer fault";
+            break;
+        case VK_DEVICE_FAULT_ADDRESS_TYPE_NONE_EXT:
+            kind = "none";
+            break;
+        default:
+            break;
+        }
+        const u64 precision = (u64)a.addressPrecision;
+        const u64 lower = precision ? (a.reportedAddress & ~(precision - 1)) : a.reportedAddress;
+        std::printf("  fault %u: %s at %#llx (range %#llx..%#llx, precision %#llx)\n", i, kind,
+                    (unsigned long long)a.reportedAddress, (unsigned long long)lower,
+                    (unsigned long long)(lower + precision), (unsigned long long)precision);
+    }
+    for (u32 i = 0; i < counts.vendorInfoCount; ++i) {
+        const VkDeviceFaultVendorInfoEXT& v = vendors[i];
+        std::printf("  vendor %u: \"%s\" code %#llx data %#llx\n", i, v.description,
+                    (unsigned long long)v.vendorFaultCode,
+                    (unsigned long long)v.vendorFaultData);
+    }
+    std::fflush(stdout);
 }
 
 } // namespace Vulkan

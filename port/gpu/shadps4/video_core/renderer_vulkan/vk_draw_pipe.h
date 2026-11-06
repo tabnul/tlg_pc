@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <x86intrin.h>
 
@@ -137,6 +138,26 @@ public:
         return consumed.load(std::memory_order_acquire) == head;
     }
 
+    /// tlg #38: runs `fn` on stage A while stage B is between two packets (or idle), so `fn`
+    /// may touch the caches without a drain. Stage B owns the caches only while it runs a
+    /// packet; a waiting caller gets the gap after the current packet, before stage B starts
+    /// the next one. `fn` must not drain (stage B is held) and must not block on stage B.
+    /// Returns true when it had to wait for a packet to finish.
+    template <typename F>
+    bool RunBetweenPackets(F&& fn) {
+        if (packet_mutex.try_lock()) {
+            fn();
+            packet_mutex.unlock();
+            return false;
+        }
+        gap_waiters.fetch_add(1, std::memory_order_seq_cst);
+        packet_mutex.lock();
+        gap_waiters.fetch_sub(1, std::memory_order_seq_cst);
+        fn();
+        packet_mutex.unlock();
+        return true;
+    }
+
     /// Statistics (stage A): packets, drains that had to wait, cycles waited, cycles stage B
     /// spent running packets.
     u64 packets = 0, drains = 0, drain_cycles = 0;
@@ -238,7 +259,15 @@ private:
                 continue;
             }
             const u64 start = __rdtsc();
-            handler(context, reinterpret_cast<const u8*>(header + 1), header->payload);
+            {
+                std::scoped_lock lk{packet_mutex};
+                handler(context, reinterpret_cast<const u8*>(header + 1), header->payload);
+            }
+            // A stage A caller waits for this gap: let it take the lock before the next
+            // packet, or an unfair mutex could keep it out for a whole frame.
+            while (gap_waiters.load(std::memory_order_seq_cst) != 0) {
+                __builtin_ia32_pause();
+            }
             busy_cycles.fetch_add(__rdtsc() - start, std::memory_order_relaxed);
             at += header->size;
             consumed.store(at, std::memory_order_seq_cst);
@@ -258,6 +287,8 @@ private:
     alignas(64) std::atomic<u32> drain_waiters{0}; ///< stage A threads asleep in a drain
     std::atomic<bool> sleeping{false};
     std::atomic<u32> stage_b_tid{0};
+    std::mutex packet_mutex;         ///< held by stage B while it runs one packet
+    std::atomic<u32> gap_waiters{0}; ///< stage A callers waiting for the gap
     std::jthread thread;
 };
 

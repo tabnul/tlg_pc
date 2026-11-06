@@ -303,6 +303,15 @@ public:
         return IsFsr4Int8Supported() && mixed_float_dot_product;
     }
 
+    /// tlg #38 crash hunt: VK_EXT_device_fault is enabled (TLG_VK_FAULT=1).
+    bool IsDeviceFaultSupported() const {
+        return device_fault;
+    }
+
+    /// tlg #38 crash hunt: on a lost device, print the driver's fault report (addresses and
+    /// resources it blames). Safe to call when the extension is off: it then says so.
+    void ReportDeviceFault(const char* where) const;
+
     /// VK_KHR_shader_clock is supported.
     bool IsShaderSubgroupClockSupported() const {
         return shader_clock && shader_clock_features.shaderSubgroupClock;
@@ -580,6 +589,7 @@ private:
     bool image_2d_view_of_3d{};
     bool image_view_min_lod{};
     bool shader_clock{};
+    bool device_fault{}; // tlg #38: VK_EXT_device_fault (TLG_VK_FAULT=1)
     bool compute_shader_derivatives{};
     bool mixed_float_dot_product{}; // tlg: VK_VALVE_shader_mixed_float_dot_product (FSR 4.1.1)
     bool supports_memory_budget{};
