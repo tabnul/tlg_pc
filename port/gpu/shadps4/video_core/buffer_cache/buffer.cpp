@@ -199,10 +199,19 @@ Buffer::Buffer(const Vulkan::Instance& instance, VAddr cpu_addr_, u64 size_bytes
     : cpu_addr{cpu_addr_}, size_bytes{size_bytes_}, mem_type{mem_type_},
       buffer{instance.GetDevice(), instance.GetAllocator()} {
 
+    // tlg: when the readback queue lives in another family than the graphics queue (AMD and
+    // Intel report a single graphics queue), both families touch these buffers, so they are
+    // created with concurrent sharing instead of an ownership transfer per copy.
+    const std::array<u32, 2> share_families = {instance.GetGraphicsQueueFamilyIndex(),
+                                               instance.GetReadbackQueueFamilyIndex()};
+    const bool cross_family = instance.IsReadbackCrossFamily();
     vk::BufferCreateInfo buffer_ci = {
         .size = size_bytes,
         .usage = AllFlags,
-        .sharingMode = vk::SharingMode::eExclusive,
+        .sharingMode = cross_family ? vk::SharingMode::eConcurrent
+                                    : vk::SharingMode::eExclusive,
+        .queueFamilyIndexCount = cross_family ? 2u : 0u,
+        .pQueueFamilyIndices = cross_family ? share_families.data() : nullptr,
     };
     VmaAllocationInfo alloc_info{};
     buffer.Create(buffer_ci, mem_type, &alloc_info);

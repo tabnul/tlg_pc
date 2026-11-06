@@ -1041,7 +1041,7 @@ bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
         auto [pool_result, pool] = device.createCommandPoolUnique({
             .flags = vk::CommandPoolCreateFlagBits::eTransient |
                      vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-            .queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex(),
+            .queueFamilyIndex = instance.GetReadbackQueueFamilyIndex(),
         });
         auto [fence_result, fence] = device.createFenceUnique({});
         if (pool_result != vk::Result::eSuccess || fence_result != vk::Result::eSuccess) {
@@ -1058,6 +1058,9 @@ bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
         readback_pool = std::move(pool);
         readback_fence = std::move(fence);
         readback_cmdbuf = cmdbufs.front();
+        LOG_INFO(Render_Vulkan, "tlg: readback cmdbuf {} on family {}",
+                 static_cast<void*>(static_cast<VkCommandBuffer>(readback_cmdbuf)),
+                 instance.GetReadbackQueueFamilyIndex());
     }
 
     const vk::CommandBufferBeginInfo begin_info{
