@@ -29,6 +29,9 @@ public:
     explicit Instance(s32 physical_device_index, bool enable_validation);
     ~Instance();
 
+    /// tlg: logs the driver's device-fault report (address, type) after a lost device.
+    void ReportDeviceFault() const;
+
     /// Returns a formatted string for the driver version
     std::string GetDriverVersionName();
 
@@ -589,6 +592,7 @@ private:
     bool pipeline_binaries{};
     vk::PipelineBinaryKeyKHR pipeline_binary_global_key{};
     bool maintenance_8{};
+    bool device_fault{};
     bool attachment_feedback_loop{};
     bool image_2d_view_of_3d{};
     bool image_view_min_lod{};

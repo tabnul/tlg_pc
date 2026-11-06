@@ -259,6 +259,39 @@ bool InitializePipelineBinaryCache(vk::Device device, bool supported,
     return true;
 }
 
+void Instance::ReportDeviceFault() const {
+    if (!device_fault) {
+        LOG_CRITICAL(Render_Vulkan, "Device lost: this driver has no VK_EXT_device_fault report");
+        return;
+    }
+    vk::DeviceFaultCountsEXT counts{};
+    if (device->getFaultInfoEXT(&counts, nullptr) != vk::Result::eSuccess) {
+        LOG_CRITICAL(Render_Vulkan, "Device lost: fault counts query failed");
+        return;
+    }
+    std::vector<vk::DeviceFaultAddressInfoEXT> addrs(counts.addressInfoCount);
+    std::vector<vk::DeviceFaultVendorInfoEXT> vendors(counts.vendorInfoCount);
+    counts.vendorBinarySize = 0;
+    vk::DeviceFaultInfoEXT info{
+        .pAddressInfos = addrs.data(),
+        .pVendorInfos = vendors.data(),
+    };
+    const auto result = device->getFaultInfoEXT(&counts, &info);
+    LOG_CRITICAL(Render_Vulkan, "Device fault ({}): '{}', {} addresses, {} vendor records",
+                 vk::to_string(result), info.description.data(), counts.addressInfoCount,
+                 counts.vendorInfoCount);
+    for (u32 i = 0; i < counts.addressInfoCount; ++i) {
+        LOG_CRITICAL(Render_Vulkan, "  fault address {:#x} (+-{:#x}) type {}",
+                     addrs[i].reportedAddress, addrs[i].addressPrecision,
+                     vk::to_string(addrs[i].addressType));
+    }
+    for (u32 i = 0; i < counts.vendorInfoCount; ++i) {
+        LOG_CRITICAL(Render_Vulkan, "  vendor fault '{}' code {:#x} data {:#x}",
+                     vendors[i].description.data(), vendors[i].vendorFaultCode,
+                     vendors[i].vendorFaultData);
+    }
+}
+
 bool Instance::CreateDevice() {
     const vk::StructureChain feature_chain = physical_device.getFeatures2<
         vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features,
@@ -272,7 +305,7 @@ bool Instance::CreateDevice() {
         vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR,
         vk::PhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE,
         vk::PhysicalDevicePipelineBinaryFeaturesKHR,
-        vk::PhysicalDeviceMaintenance5FeaturesKHR>();
+        vk::PhysicalDeviceMaintenance5FeaturesKHR, vk::PhysicalDeviceFaultFeaturesEXT>();
     features = feature_chain.get().features;
 
     const vk::StructureChain properties_chain = physical_device.getProperties2<
@@ -332,6 +365,9 @@ bool Instance::CreateDevice() {
         feature_chain.get<vk::PhysicalDevicePipelineBinaryFeaturesKHR>().pipelineBinaries &&
         add_extension(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
     maintenance_8 = add_extension(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    // tlg: on a lost device the driver can say which GPU address faulted (s04 crashes).
+    device_fault = feature_chain.get<vk::PhysicalDeviceFaultFeaturesEXT>().deviceFault &&
+                   add_extension(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
     attachment_feedback_loop = add_extension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
     if (attachment_feedback_loop) {
         attachment_feedback_loop =
@@ -611,6 +647,9 @@ bool Instance::CreateDevice() {
             .robustImageAccess2 = true,
             .nullDescriptor = true,
         },
+        vk::PhysicalDeviceFaultFeaturesEXT{
+            .deviceFault = true,
+        },
         vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT{
             .vertexInputDynamicState = true,
         },
@@ -681,6 +720,9 @@ bool Instance::CreateDevice() {
 
     if (!custom_border_color) {
         device_chain.unlink<vk::PhysicalDeviceCustomBorderColorFeaturesEXT>();
+    }
+    if (!device_fault) {
+        device_chain.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
     }
     if (!dynamic_state_3) {
         device_chain.unlink<vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT>();

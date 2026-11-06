@@ -453,7 +453,7 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
     memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
 }
 
-// tlg #38 (default on, TLG_FAULT_NODRAIN=0 disables). A read-fault download normally waits for
+// tlg #38 (default OFF since v0.7.2, TLG_FAULT_NODRAIN=1 enables). A read-fault download normally waits for
 // the whole queued draw pipe to be recorded first (the drain before each command callback),
 // although the bytes it copies were submitted to the GPU long ago. Here the download runs
 // without the drain when that is provably safe on the spot: no unrecorded draw/DMA/fence
@@ -464,9 +464,12 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
 // queue only (the open command buffer is never touched), and the staging space is a buffer of
 // this path's own, because the shared pool is not thread-safe against the recorder.
 bool BufferCache::TlgFaultNoDrainOn() {
+    // Parked: with this path on the GPU writes to address 0 and the device is lost within a
+    // minute in s04_FirstAntenna _110_WatersideGarden_001 .. _160_FAEnd, on NVIDIA and AMD
+    // (upstream #138). On the side queue and on the graphics queue alike; cause still open.
     static const bool on = [] {
         const char* env = std::getenv("TLG_FAULT_NODRAIN");
-        return !(env && env[0] == '0');
+        return env && env[0] == '1';
     }();
     return on;
 }
@@ -1991,6 +1994,9 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
     const bool refuse = refuse_every && ++batches % refuse_every == 0;
     auto submit_result = refuse ? vk::Result::eErrorOutOfDeviceMemory
                                 : instance.GetGraphicsQueue().bindSparse(sparse_info);
+    if (submit_result == vk::Result::eErrorDeviceLost) {
+        instance.ReportDeviceFault();
+    }
     ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
     // tlg: from the SotC port (@Madmer, thanks): out of video and system memory the driver may
     // refuse the bind; the semaphore the next submit waits for was then never signalled and the
@@ -2000,7 +2006,10 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
         memory_semaphore.Wait(signal_tick - 1);
         submit_result = refuse ? vk::Result::eErrorOutOfDeviceMemory
                                : instance.GetGraphicsQueue().bindSparse(sparse_info);
-        ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
+        if (submit_result == vk::Result::eErrorDeviceLost) {
+        instance.ReportDeviceFault();
+    }
+    ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
     }
     if (submit_result != vk::Result::eSuccess) {
         const vk::SemaphoreSignalInfo signal_info = {.semaphore = signal_sema,
