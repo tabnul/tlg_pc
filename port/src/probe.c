@@ -28,6 +28,8 @@
 #include <execinfo.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sched.h>
+#include <time.h>
 #endif
 
 typedef struct { uint64_t address, size, flags; } Segment;
@@ -606,7 +608,32 @@ mismatch:
     printf("Lua hook: unavailable (code signature mismatch)\n");
 }
 
+/* Host helpers for the guest patches below (both platforms). */
+static uint32_t host_thread_id(void) {
 #ifdef _WIN32
+    return (uint32_t)GetCurrentThreadId();
+#else
+    return (uint32_t)syscall(SYS_gettid);
+#endif
+}
+static uint64_t host_ticks_ms(void) {
+#ifdef _WIN32
+    return GetTickCount64();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+#endif
+}
+static void host_sleep_ms(unsigned ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    if (ms) usleep(ms * 1000);
+    else sched_yield();
+#endif
+}
+
 /* Button and stick hold counts at any frame rate (input_timing.h); TLG_INPUT_TIMING=0 is off. */
 static void install_input_timing(Segment *segments, uint64_t count) {
     const char *enabled = getenv("TLG_INPUT_TIMING");
@@ -791,7 +818,7 @@ static ABI void bind_guard_consume(void *context, void *packet) {
     bind_guard_check(packet);
     bind_consume_next(context, packet);
     static uint64_t last;
-    const uint64_t now = GetTickCount64();
+    const uint64_t now = host_ticks_ms();
     if (now - last < 10000) return;
     last = now;
     const int64_t a = __atomic_load_n(&bind_counts[0], __ATOMIC_RELAXED), c = __atomic_load_n(&bind_counts[1], __ATOMIC_RELAXED);
@@ -857,7 +884,7 @@ static unsigned reinit_depth;   /* nested takes by the owner */
 static int64_t reinit_waits;
 
 static ABI void reinit_lock(void) {
-    const uint32_t self = (uint32_t)GetCurrentThreadId();
+    const uint32_t self = host_thread_id();
     if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) == self) {
         ++reinit_depth;
         return;
@@ -870,23 +897,23 @@ static ABI void reinit_lock(void) {
             __builtin_ia32_pause();
             continue;
         }
-        if (!start) start = GetTickCount64();
-        const uint64_t waited = GetTickCount64() - start;
+        if (!start) start = host_ticks_ms();
+        const uint64_t waited = host_ticks_ms() - start;
         if (waited > 1000) {
             printf("Re-init lock: thread %u gave up after %" PRIu64 " ms (held by thread %u), going on without it\n",
                    self, waited, __atomic_load_n(&reinit_owner, __ATOMIC_RELAXED));
             return;
         }
-        Sleep(spin < 1000 ? 0 : 1);
+        host_sleep_ms(spin < 1000 ? 0 : 1);
     }
     if (!start) return;
     const int64_t n = __atomic_add_fetch(&reinit_waits, 1, __ATOMIC_RELAXED);
     if (n <= 20 || !(n % 100))
         printf("Re-init lock: thread %u waited %" PRIu64 " ms for a buffer re-init (%" PRId64 " so far)\n", self,
-               GetTickCount64() - start, n);
+               host_ticks_ms() - start, n);
 }
 static ABI void reinit_unlock(void) {
-    if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) != (uint32_t)GetCurrentThreadId()) return;   /* gave up */
+    if (__atomic_load_n(&reinit_owner, __ATOMIC_RELAXED) != host_thread_id()) return;   /* gave up */
     if (reinit_depth) {
         --reinit_depth;
         return;
@@ -960,7 +987,6 @@ static void install_reinit_lock(Segment *segments, uint64_t count) {
 mismatch:
     printf("Re-init lock: unavailable (code signature mismatch)\n");
 }
-#endif
 
 /* G3PATCH2 (patches.py): the patches' image base, then byte writes at image offsets, applied
  * after relocation. A write may replace a whole base-relative pointer slot (60/90 FPS++ swap
@@ -1392,11 +1418,9 @@ int main(int argc, char **argv) {
     }
     if (patch_file) apply_patches(patch_file, segments, ns, relocs, nr);
     if (gpu_enabled) install_lua_hook(segments, ns);
-#ifdef _WIN32
     if (gpu_enabled) install_input_timing(segments, ns);
     if (gpu_enabled) install_bind_guard(segments, ns);
     if (gpu_enabled) install_reinit_lock(segments, ns);
-#endif
 #ifdef _WIN32
     printf("Guest TCB loads redirected to the TEB TLS slot: %" PRIu64 "\n", patch_tcb_loads(segments, ns));
 #endif
