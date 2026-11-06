@@ -1072,7 +1072,7 @@ class Launcher:
         self.build()
         self.recover_practice()
         self.root.after(100, self.pump)
-        self.root.after(1000, self.music_tick)
+        self.root.after(5000, self.music_tick)
 
     def wheel(self, event):
         """The mouse wheel scrolls the scroll area under the pointer (lists and text scroll themselves)."""
@@ -2655,9 +2655,9 @@ class Launcher:
         self.root.after(100, self.pump)
 
     def music_tick(self):
-        """Once a second: the menu tune starts again once the game or a benchmark run has closed."""
+        """Every five seconds: the menu tune starts again once the game or a benchmark run has closed."""
         self.sync_music()
-        self.root.after(1000, self.music_tick)
+        self.root.after(5000, self.music_tick)
 
     def switch_menu(self):
         # main() starts the other menu once this window is closed.
