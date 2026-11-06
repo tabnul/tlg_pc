@@ -383,6 +383,8 @@ void BufferCache::WaitForWriter(VAddr device_addr, bool is_write) {
     }
 }
 
+static std::atomic<u64> tlg_nd_gap_waits{0}; ///< the fault had to wait for a recording packet
+
 void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool assume_locks) {
     const auto flush_request = [this, device_addr, size, is_write] {
         const u32 first_block = device_addr >> block_shift;
@@ -430,14 +432,26 @@ void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool as
         WaitForWriter(device_addr, is_write);
         {
             TlgFreeze::SlowScope slow{"buffer read trip", device_addr};
-            if (!is_write && TlgFaultNoDrainOn() && tlg_pending_write_check && tlg_drain_draws) {
+            if (!is_write && TlgFaultNoDrainOn() && tlg_pending_write_check && tlg_drain_draws &&
+                tlg_between_packets) {
                 // tlg #38: the queued download checks safety itself and drains only when it
-                // must, instead of waiting for every queued draw first.
+                // must, instead of waiting for every queued draw first. It runs in the gap
+                // between two recorded packets: the recording thread owns the caches (and
+                // the readback queue, command buffer and fence of its own inline fault
+                // downloads) while it runs a packet. Before this path every command callback
+                // drained first, so the two threads never met; without the gap they did, and
+                // the device was lost (s04_FirstAntenna, v0.7.0).
                 liverpool->SendCommand<true>(
                     [this, device_addr, size, f = flush_request]() mutable {
-                        if (TryNoDrainDownload(device_addr, size)) {
+                        bool done = false;
+                        if (tlg_between_packets(
+                                [&] { done = TryNoDrainDownload(device_addr, size); })) {
+                            tlg_nd_gap_waits.fetch_add(1, std::memory_order_relaxed);
+                        }
+                        if (done) {
                             return;
                         }
+                        // The fallback drains: never while the recorder is held.
                         tlg_drain_draws();
                         f();
                     },
@@ -491,14 +505,16 @@ static void TlgNoDrainReport() {
                tlg_nd_report_ns.compare_exchange_strong(last_ns, now_ns,
                                                         std::memory_order_relaxed)) {
         std::printf("Fault nodrain (5 s): %llu copied (%llu KB), %llu stale, %llu clean; "
-                    "drained: %llu pending write, %llu unsafe tick, %llu other\n",
+                    "drained: %llu pending write, %llu unsafe tick, %llu other; "
+                    "%llu waited for a packet\n",
                     static_cast<unsigned long long>(tlg_nd_done.exchange(0)),
                     static_cast<unsigned long long>(tlg_nd_kb.exchange(0)),
                     static_cast<unsigned long long>(tlg_nd_stale.exchange(0)),
                     static_cast<unsigned long long>(tlg_nd_clean.exchange(0)),
                     static_cast<unsigned long long>(tlg_nd_pending.exchange(0)),
                     static_cast<unsigned long long>(tlg_nd_unsafe.exchange(0)),
-                    static_cast<unsigned long long>(tlg_nd_other.exchange(0)));
+                    static_cast<unsigned long long>(tlg_nd_other.exchange(0)),
+                    static_cast<unsigned long long>(tlg_nd_gap_waits.exchange(0)));
         std::fflush(stdout);
     }
 }
@@ -1332,7 +1348,7 @@ void BufferCache::ReportReadbackStats() {
 }
 
 namespace {
-// tlg: TLG_BUFFER_STATS=1 â€” how buffer bindings reach the GPU, by guest region (256 MiB),
+// tlg: TLG_BUFFER_STATS=1 — how buffer bindings reach the GPU, by guest region (256 MiB),
 // printed every 5 s: small read-only copies into the stream buffer, arena bindings, and the
 // bytes those re-upload after CPU writes. Input for engine-level short paths.
 struct BufferStats {
