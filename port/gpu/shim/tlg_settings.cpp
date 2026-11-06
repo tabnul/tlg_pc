@@ -178,7 +178,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "color_saturation") {
         v.saturation = TlgGraphics::ClampColor(TlgGraphics::Saturation, value.empty() ? 1.0f : f);
     } else if (key == "color_gamma") {
-        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 0.75f : f);
+        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 1.0f : f);
     } else if (key == "frames_queued") {
         v.frames_queued = TlgGraphics::ParseFramesQueued(value.empty() ? -1 : i);
     } else if (key == "frame_generation") {

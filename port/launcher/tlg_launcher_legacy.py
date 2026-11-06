@@ -410,7 +410,7 @@ SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
 INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '1', 'rcas_strength': '75', 'cas_strength': '100', 'color_adjust': '1', 'color_brightness': '0.00',
-                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
+                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '1.00'}
 # The anti-aliasing row (TlgSettings::AaMode): (label, tlg.ini dlaa / upscaler). DLAA needs an
 # NVIDIA RTX card; FSR 3.1 native AA runs on any card.
 AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3'))]
@@ -513,6 +513,13 @@ def apply_theme(root):
     style.configure('TLabelframe.Label', background=BG, foreground=ACCENT, font=(SERIF, 11))
     style.configure('TButton', background=PANEL, foreground=TEXT_COLOR, bordercolor=LINE, padding=(10, 4))
     style.map('TButton', background=[('pressed', FIELD), ('active', LINE)], bordercolor=[('active', ACCENT)])
+    # Scroll bars: a light thumb on the dark trough (the default thumb is BG, hard to see).
+    for bar in ('Vertical.TScrollbar', 'Horizontal.TScrollbar'):
+        style.configure(bar, background='#6e6656', troughcolor=FIELD, bordercolor=LINE,
+                        lightcolor='#6e6656', darkcolor='#6e6656', arrowcolor=TEXT_COLOR)
+        style.map(bar, background=[('pressed', ACCENT), ('active', '#8c826e')],
+                  lightcolor=[('pressed', ACCENT), ('active', '#8c826e')],
+                  darkcolor=[('pressed', ACCENT), ('active', '#8c826e')])
     style.configure('TCheckbutton', background=BG, indicatorbackground=FIELD, indicatorforeground=BG)
     style.map('TCheckbutton', indicatorbackground=[('selected', ACCENT)], background=[('active', BG)])
     style.configure('TRadiobutton', background=BG, indicatorbackground=FIELD)

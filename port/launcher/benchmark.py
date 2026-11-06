@@ -154,7 +154,11 @@ class Sweep:
         settings = dict(self.settings, level_select=False, debug_logging=True,
                         skip_logos=True)  # launcher settings, but full logs and no boot logos
         notes = []
-        tlg_run.prepare(settings, log=lambda line: notes.append(line) if line.startswith('Frame rate') else None)
+        # Kept in every scene log: the frame rate and whether the boot logos were really skipped.
+        keep = ('Frame rate', 'Patch skip logos', 'Skip logos')
+        tlg_run.prepare(settings, log=lambda line: notes.append(line) if line.startswith(keep) else None)
+        if not any(line.startswith('Patch skip logos') for line in notes):
+            notes.append('Skip logos: not applied (no logo patch written)')
 
         ini = data / 'tlg.ini'
         before = {key: tlg_run.read_ini(ini).get(key) for key in BENCH_INI}

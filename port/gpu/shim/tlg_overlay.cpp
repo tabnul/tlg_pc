@@ -650,13 +650,13 @@ void ImageTab() {
     ImGui::SeparatorText(TL("Color", "Cor"));
     if (BeginRows("##color")) {
         CheckRow(TL("Color adjustments", "Ajustes de cor"), s.color_adjust,
-                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). SDR only; HDR is left as is. Default on (gamma 0.75); off is the game as shipped. No measurable cost.",
-                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Só em SDR; o HDR fica como está. Padrão ligado (gama 0,75); desligado é o jogo original. Sem custo mensurável."), d.color_adjust, false);
+                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). SDR only; HDR is left as is. Default on, all neutral (gamma 1); off is the game as shipped. No measurable cost.",
+                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Só em SDR; o HDR fica como está. Padrão ligado, tudo neutro (gama 1); desligado é o jogo original. Sem custo mensurável."), d.color_adjust, false);
         ImGui::BeginDisabled(!s.color_adjust);
         FloatSliderRow(TL("Brightness", "Brilho"), s.brightness, G::Brightness, TL("Adds light or shadow evenly; 0 is unchanged.", "Clareia ou escurece por igual; 0 não altera."), d.brightness);
         FloatSliderRow(TL("Contrast", "Contraste"), s.contrast, G::Contrast, TL("Spreads tones away from mid gray; 1 is unchanged.", "Afasta os tons do cinza médio; 1 não altera."), d.contrast);
         FloatSliderRow(TL("Saturation", "Saturação"), s.saturation, G::Saturation, TL("Color intensity: 0 is black and white, 1 is unchanged.", "Intensidade das cores: 0 é preto e branco, 1 não altera."), d.saturation);
-        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 0.75: the game's SDR image is over-lit outdoors. 1 is the game's own.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 0,75: a imagem SDR do jogo é clara demais ao ar livre. 1 é a do jogo."), d.color_gamma);
+        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 1, a do jogo; 0,75 suaviza a imagem SDR clara demais ao ar livre."), d.color_gamma);
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
