@@ -2004,6 +2004,9 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
     const bool refuse = refuse_every && ++batches % refuse_every == 0;
     auto submit_result = refuse ? vk::Result::eErrorOutOfDeviceMemory
                                 : instance.GetGraphicsQueue().bindSparse(sparse_info);
+    if (submit_result == vk::Result::eErrorDeviceLost) {
+        instance.ReportDeviceFault("arena bind submit");
+    }
     ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
     // tlg: from the SotC port (@Madmer, thanks): out of video and system memory the driver may
     // refuse the bind; the semaphore the next submit waits for was then never signalled and the
@@ -2013,7 +2016,10 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
         memory_semaphore.Wait(signal_tick - 1);
         submit_result = refuse ? vk::Result::eErrorOutOfDeviceMemory
                                : instance.GetGraphicsQueue().bindSparse(sparse_info);
-        ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
+        if (submit_result == vk::Result::eErrorDeviceLost) {
+        instance.ReportDeviceFault("arena bind submit");
+    }
+    ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
     }
     if (submit_result != vk::Result::eSuccess) {
         const vk::SemaphoreSignalInfo signal_info = {.semaphore = signal_sema,
