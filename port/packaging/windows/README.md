@@ -38,7 +38,12 @@ game directly with the saved settings.
 `patches.py` applies the built-in patches only to the game build they were checked against
 (CUSA01623 01.02, by eboot.bin sha256; `TLG_FORCE_PATCHES=1` overrides); other builds run unpatched.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
-`bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux.
+`bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux. `package.sh` runs it with
+`TLG_FSR4_MODELS=native` and ships the native FSR 4 model, the two helper shaders and
+`LICENSE-FSR4-v07.txt` (MIT) in `fsr4_shaders\` (packaging idea from @FelipePrado0's SpartanPort,
+files from @FireBurn's UniversalScalers-Vulkan / Q2RTX); `tlg_run.py` points `TLG_FSR4_DIR` at it.
+FSR 4 Native AA (`upscaler=fsr4`) runs on the same motion vectors and jitter as DLAA; the game
+switches FSR 3.1 to it once on a card that runs it (`fsr4_default=1` records that).
 
 DLAA (optional, NVIDIA RTX): `DLSS_SDK_ROOT=<checkout of github.com/NVIDIA/DLSS, tag v310.9.16>
 bash packaging/windows/build_dlss.sh` builds `tlg_dlss.dll` (`gpu/dlss_bridge`, the only code that

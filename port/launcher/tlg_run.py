@@ -180,8 +180,8 @@ DEFAULT_ENV = {
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
     'TLG_GC_BUDGET_MB': '7000',    # texture cache budget; higher only piles up old textures (#104)
-    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
-    'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
+    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA, FSR 3.1 or FSR 4 native AA).
+    'TLG_JITTER': '1',             # jitter only while DLAA or FSR native AA runs
     'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
 }
@@ -781,6 +781,10 @@ def build_env(settings, extra=None):
     env['TLG_CONFIG'] = str(user_dir() / 'tlg.ini')
     if 'TLG_TEXPACK_DIR' not in env:
         env['TLG_TEXPACK_DIR'] = str(texpack_dir(settings))
+    # FSR 4 native AA: the game runs in the data folder; the model ships next to the launcher.
+    fsr4 = PORT_DIR / 'fsr4_shaders'
+    if 'TLG_FSR4_DIR' not in env and fsr4.is_dir():
+        env['TLG_FSR4_DIR'] = str(fsr4)
     # A dev run on Windows loads the game's DLLs (SDL3, FFmpeg, libc++) from the MSYS2 toolchain;
     # without it on PATH the game exits before its first log line.
     toolchain = Path(os.environ.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'

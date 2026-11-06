@@ -5,7 +5,7 @@
 <p align="center">
   <b>The best way to enjoy Fumito Ueda's masterpiece on PC.</b><br>
   <i>By fans, for fans.</i><br>
-  A native port for Windows and Linux: DLAA and FSR 3.1, frame generation, the complete orchestral soundtrack, widescreen, optional AI-upscaled textures,<br>
+  A native port for Windows and Linux: DLAA, FSR 4 and FSR 3.1, frame generation, the complete orchestral soundtrack, widescreen, optional AI-upscaled textures,<br>
   high frame rates without shader stutter.<br>
   <b>Unique features: content the developers cut, and easter eggs they left
   behind, brought back to life.</b>
@@ -39,7 +39,7 @@
 
 - ✨ **Unique.** Features you will not find on PS4 or anywhere else: cut content and hidden
   developer tools found in the game's own files and switched back on.
-- 🎨 **Beautiful.** DLAA (NVIDIA) or FSR 3.1 (any graphics card) removes the shimmer on feathers,
+- 🎨 **Beautiful.** DLAA (NVIDIA), FSR 4 (recent cards) or FSR 3.1 (any card) removes the shimmer on feathers,
   foliage and fences. Add sharper shadows,
   a calmer wind and an optional AI-upscaled 4x texture pack.
 - 🎵 **The full soundtrack.** All 110 minutes of the score in the launcher, in stereo or 5.1
@@ -63,11 +63,13 @@
 - At 21:9, menus, hints and subtitles are laid out for the wider screen instead of stretched.
 - 32:9 is experimental: some overlays sit to the left and parts of the menus are stretched.
 
-### DLAA and FSR 3.1 AA
+### DLAA and FSR AA
 
 - NVIDIA's DLSS anti-aliasing at native resolution, fed with the game's own motion vectors.
 - Replaces the game's SMAA and removes most of the shimmer on foliage, feathers and fences.
-- On by default on RTX cards. **FSR 3.1 Native AA** does the same on any card.
+- On by default on RTX cards. **FSR 4 Native AA** does the same with AMD's FSR 4, on recent AMD
+  and other cards, on Windows and Linux; it is chosen once by itself on a card that runs it.
+  **FSR 3.1 Native AA** runs on any card.
 - **F8** switches between your choice and the original SMAA. More in [docs/dlaa.md](docs/dlaa.md).
 
 ### Frame generation
@@ -194,7 +196,7 @@ in-game **Fun** tab: **Always**, or **As the developers planned**.
 
 | | Feature | What you get |
 |---|---|---|
-| 🎨 | [DLAA and FSR 3.1 AA](#dlaa-and-fsr-31-aa) | Clean, stable edges, no shimmer |
+| 🎨 | [DLAA and FSR AA](#dlaa-and-fsr-aa) | Clean, stable edges, no shimmer |
 | 🎞️ | [Frame generation](#frame-generation) | DLSS or FSR 3.1: twice the frames shown |
 | 🚀 | [Smooth, no shader stutter](#smooth-no-shader-stutter) | 30, 60 or unlocked; shader recipes |
 | 🖥️ | [Any resolution, ultrawide](#any-resolution-ultrawide) | 21:9 with menus laid out for it |
@@ -326,12 +328,12 @@ and takes a screenshot of each. Run it before and after a change. More in
 4. **Play:** start the launcher, pick the game folder and language, and press **Play**.
 
 **PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX
-card; FSR 3.1 AA runs on any card.
+card, FSR 4 AA a recent card (greyed out otherwise); FSR 3.1 AA runs on any card.
 
 | Key | In game |
 |---|---|
 | Insert (R3 + L2) | The port's menu |
-| F8 | DLAA or FSR 3.1 / original SMAA |
+| F8 | DLAA or FSR / original SMAA |
 | F9 | Add a Trico |
 | F10 | FPS counter |
 | F12 | Trico Tricks bar |
@@ -394,8 +396,11 @@ loader, the runtime and most of what makes the game playable at all is HayatoG's
 - The controller drawing on the Controls page: the [RPCS3](https://github.com/RPCS3/rpcs3)
   DualShock 3 drawing by HerrHulaHoop (GPL-2.0), made into a DualShock 4 for this port.
 - [UniversalScalers-Vulkan](https://github.com/FireBurn/UniversalScalers-Vulkan) (formerly FSR-Vulkan)
-  by Mike Lothian (@FireBurn), AMD FSR 3.1 and FSR 4 on Vulkan, which FSR 3.1 AA and FSR frame
-  generation run on. Thank you!
+  by Mike Lothian (@FireBurn), AMD FSR 3.1 and FSR 4 on Vulkan, which FSR 3.1 AA, FSR 4 AA and FSR
+  frame generation run on, and the open FSR 4 model files his
+  [Q2RTX](https://github.com/FireBurn/Q2RTX) builds from AMD's MIT-licensed FidelityFX SDK. Thank you!
+- Felipe Prado ([@FelipePrado0](https://github.com/FelipePrado0)): shipping the FSR 4 model inside the
+  packages follows his [SpartanPort](https://github.com/FelipePrado0/SpartanPort). Thank you!
 - Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
   another program's DLL already sits in the PS4 address range
   ([SpartanPort #1076](https://github.com/FelipePrado0/SpartanPort/pull/1076)). Thank you!

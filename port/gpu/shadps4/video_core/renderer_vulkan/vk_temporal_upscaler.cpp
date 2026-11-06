@@ -311,10 +311,11 @@ bool TemporalUpscaler::OnFrameStart() {
     // natively at that size. The scene targets only know the 1920x1080 buffers (reduced presets
     // misplace the half-resolution layers), so the upscaler stays off; at 1920x1080 it works.
     static const char* resolution_patch = std::getenv("TLG_RESOLUTION_PATCH");
-    // DLAA and FSR 3.1 native AA work on the game's own targets at any size (RunGameMotion).
+    // DLAA and FSR 3.1/4 native AA work on the game's own targets at any size (RunGameMotion).
     if (resolution_patch && TlgSettings::Get().upscaler != TlgSettings::UpscalerOff &&
         TlgSettings::Get().upscaler != TlgSettings::UpscalerDlss &&
-        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr3) {
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr3 &&
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr4) {
         TlgSettings::Get().upscaler.store(TlgSettings::UpscalerOff);
         static bool logged = false;
         if (!std::exchange(logged, true)) {
@@ -387,7 +388,7 @@ bool TemporalUpscaler::OnFrameStart() {
     opaque_valid = false;
     mask_ready = false;
     // tlg: game-motion DLAA jitters only frames DLSS resolves (unresolved jitter shimmers);
-    // FSR 3.1 native AA resolves them the same way.
+    // FSR 3.1 and FSR 4 native AA resolve them the same way.
     jitter_active = jitter_on && (UseDlss() || FsrNativeAa()) && !Scaled();
     // Halton(2, 3); the menu or toggle 1 << 25 disables it.
     if (!jitter_on) {
@@ -1144,7 +1145,7 @@ void TemporalUpscaler::RunGameMotion() {
         failed = true;
         return;
     }
-    const char* provider = UseDlss() ? "DLAA" : "FSR 3.1 native AA";
+    const char* provider = UseDlss() ? "DLAA" : UseFsr4() ? "FSR 4 native AA" : "FSR 3.1 native AA";
     static const char* logged = nullptr;
     if (std::exchange(logged, provider) != provider) {
         std::printf("Upscaler: %s on game motion vectors %ux%u\n", provider, w, h);
@@ -1202,10 +1203,14 @@ void TemporalUpscaler::RunGameMotion() {
                      {depth.GetImage(), depth_view, depth_format, vk::ImageAspectFlagBits::eDepth,
                       w, h},
                      w, h, w, h, frame_ms, true, game_frame.jitter)
-        : FsrNativeAa() &&
-          RecordFsr3(cmdbuf, color.GetImage(), color.info.pixel_format, color.usage_flags,
-                     depth.GetImage(), depth_format, depth.usage_flags, w, h, w, h, frame_ms,
-                     false, game_frame.jitter);
+        : !FsrNativeAa() ? false
+        : UseFsr4()
+            ? RecordFsr4(cmdbuf, {color.GetImage(), color_view, w, h},
+                         {depth.GetImage(), depth_view, w, h}, w, h, w, h, frame_ms,
+                         game_frame.jitter)
+            : RecordFsr3(cmdbuf, color.GetImage(), color.info.pixel_format, color.usage_flags,
+                         depth.GetImage(), depth_format, depth.usage_flags, w, h, w, h, frame_ms,
+                         false, game_frame.jitter);
     if (!ok) {
         return;
     }
@@ -1366,7 +1371,8 @@ void TemporalUpscaler::Run() {
         dispatched = true;
     } else if (UseFsr4()) {
         dispatched = RecordFsr4(cmdbuf, {input_color, input_color_view, w, h},
-                                {input_depth, input_depth_view, w, h}, w, h, ow, oh, frame_ms);
+                                {input_depth, input_depth_view, w, h}, w, h, ow, oh, frame_ms,
+                                jitter);
     } else if (UseDlss()) {
         dispatched = RecordDlss(
             cmdbuf,
@@ -1854,7 +1860,7 @@ void TemporalUpscaler::RunScaled() {
         } else {
             ok4 = RecordFsr4(cmdbuf, {color_image, color_view, source_width, source_height},
                             {depth_image, depth_view, source_width, source_height}, w, h, ow,
-                            oh, frame_ms);
+                            oh, frame_ms, jitter);
         }
         if (ok4) {
             if (UseDlss()) {
@@ -2236,7 +2242,7 @@ bool TemporalUpscaler::UseFsr4() const {
 
 bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color,
                                   Fsr4Upscaler::Image depth, u32 w, u32 h, u32 ow, u32 oh,
-                                  float frame_ms) {
+                                  float frame_ms, std::array<float, 2> frame_jitter) {
     const auto& settings = TlgSettings::Get();
     // Same jitter convention as FSR 3; the menu (or toggle 1 << 26) flips it for tests.
     const float sign =
@@ -2250,7 +2256,7 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
         .render_width = w,
         .render_height = h,
         .preset = applied_preset,
-        .jitter = {sign * jitter[0], sign * jitter[1]},
+        .jitter = {sign * frame_jitter[0], sign * frame_jitter[1]},
         .frame_ms = frame_ms,
         .near_plane = camera_motion.Near(),
         .far_plane = 3000.0f,
@@ -2288,9 +2294,11 @@ bool TemporalUpscaler::SkipGameSmaa(u64 vs_hash) const {
 }
 
 bool TemporalUpscaler::FsrNativeAa() const {
-    // FSR 3.1 at native size is its anti-aliasing mode, on the game's motion like DLAA.
+    // FSR 3.1 or FSR 4 at native size is its anti-aliasing mode, on the game's motion like DLAA.
     const auto& settings = TlgSettings::Get();
-    return settings.upscaler == TlgSettings::UpscalerFsr3 && settings.dlaa && settings.jitter;
+    return (settings.upscaler == TlgSettings::UpscalerFsr3 ||
+            (settings.upscaler == TlgSettings::UpscalerFsr4 && UseFsr4())) &&
+           settings.dlaa && settings.jitter;
 }
 
 bool TemporalUpscaler::UseDlss() const {
