@@ -210,7 +210,9 @@ class Sweep:
         samples, missions, stalls = [], [], 0
         try:
             import logtail
-            tail = logtail.LogTail(log)
+            # A load can write thousands of lines in one burst; a small tail drops the
+            # middle of the burst and with it the start/overlay markers ("no load").
+            tail = logtail.LogTail(log, max_lines=50000)
             phase, deadline = 'warp', started + WARP_WAIT_S
             measure_end = None
             while True:

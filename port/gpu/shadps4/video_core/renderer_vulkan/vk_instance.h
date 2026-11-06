@@ -98,9 +98,20 @@ public:
         return present_queue;
     }
 
-    /// tlg: second queue of the graphics family (null when the family has only one).
+    /// tlg: second queue used for readback copies (null when the device has none spare).
     vk::Queue GetReadbackQueue() const {
         return readback_queue;
+    }
+
+    /// tlg: queue family the readback queue belongs to (may differ from the graphics family).
+    u32 GetReadbackQueueFamilyIndex() const {
+        return readback_queue_family_index;
+    }
+
+    /// tlg: true when the readback queue sits in another family than the graphics queue, so
+    /// buffers touched by both have to be created with concurrent sharing.
+    bool IsReadbackCrossFamily() const {
+        return has_readback_queue && readback_queue_family_index != queue_family_index;
     }
 
     TracyVkCtx GetProfilerContext() const {
@@ -557,6 +568,8 @@ private:
     vk::Queue graphics_queue;
     vk::Queue readback_queue;
     bool has_readback_queue{};
+    u32 readback_queue_family_index{0};
+    u32 readback_queue_index{0};
     std::vector<vk::PhysicalDevice> physical_devices;
     std::vector<std::string> available_extensions;
     std::unordered_map<vk::Format, vk::FormatProperties3> format_properties;

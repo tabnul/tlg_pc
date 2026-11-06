@@ -791,6 +791,8 @@ class BenchmarkWindow:
         self.running = True
         self.zip_path = None
         self.stop_event.clear()
+        app.stop_music()   # quiet while the game runs; back once the run is done (sync_music)
+        app.stop_track()
         self.start_button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.open_button.configure(state='disabled')
@@ -1070,6 +1072,7 @@ class Launcher:
         self.build()
         self.recover_practice()
         self.root.after(100, self.pump)
+        self.root.after(5000, self.music_tick)
 
     def wheel(self, event):
         """The mouse wheel scrolls the scroll area under the pointer (lists and text scroll themselves)."""
@@ -2649,8 +2652,12 @@ class Launcher:
                     self.append(item)
         except queue.Empty:
             pass
-        self.sync_music()   # starts again once the game has closed
         self.root.after(100, self.pump)
+
+    def music_tick(self):
+        """Every five seconds: the menu tune starts again once the game or a benchmark run has closed."""
+        self.sync_music()
+        self.root.after(5000, self.music_tick)
 
     def switch_menu(self):
         # main() starts the other menu once this window is closed.
@@ -2720,7 +2727,9 @@ class Launcher:
         """The game's menu tune plays while the launcher is open and the game is not running, as
         in shadPS4's game list (which plays the same file, sce_sys/snd0.at9)."""
         path = tlg_run.menu_music_file(self.settings)
+        bench = getattr(self, 'bench_window', None)
         wanted = (bool(self.settings.get('menu_music', True)) and not self.process and path is not None
+                  and not (bench and bench.running)   # nor during a benchmark run
                   and not getattr(self, 'track', None))   # quiet while a soundtrack piece plays
         music = getattr(self, 'music', None)
         if music and (not wanted or music.poll() is not None or getattr(self, 'music_path', None) != path):

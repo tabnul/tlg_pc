@@ -467,7 +467,7 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
     memory_tracker->UnmarkRegionAsGpuModified(device_addr, size);
 }
 
-// tlg #38 (default on, TLG_FAULT_NODRAIN=0 disables). A read-fault download normally waits for
+// tlg #38 (default OFF since v0.7.3, TLG_FAULT_NODRAIN=1 enables). A read-fault download normally waits for
 // the whole queued draw pipe to be recorded first (the drain before each command callback),
 // although the bytes it copies were submitted to the GPU long ago. Here the download runs
 // without the drain when that is provably safe on the spot: no unrecorded draw/DMA/fence
@@ -478,9 +478,12 @@ void BufferCache::ReleaseReadProtection(VAddr device_addr, u64 size) {
 // queue only (the open command buffer is never touched), and the staging space is a buffer of
 // this path's own, because the shared pool is not thread-safe against the recorder.
 bool BufferCache::TlgFaultNoDrainOn() {
+    // Parked: with this path on the GPU writes to address 0 and the device is lost within a
+    // minute in s04_FirstAntenna _110_WatersideGarden_001 .. _160_FAEnd, on NVIDIA and AMD
+    // (upstream #138). On the side queue and on the graphics queue alike; cause still open.
     static const bool on = [] {
         const char* env = std::getenv("TLG_FAULT_NODRAIN");
-        return !(env && env[0] == '0');
+        return env && env[0] == '1';
     }();
     return on;
 }
@@ -1057,7 +1060,7 @@ bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
         auto [pool_result, pool] = device.createCommandPoolUnique({
             .flags = vk::CommandPoolCreateFlagBits::eTransient |
                      vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-            .queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex(),
+            .queueFamilyIndex = instance.GetReadbackQueueFamilyIndex(),
         });
         auto [fence_result, fence] = device.createFenceUnique({});
         if (pool_result != vk::Result::eSuccess || fence_result != vk::Result::eSuccess) {
@@ -1074,6 +1077,9 @@ bool BufferCache::CopyOnReadbackQueue(const Buffer* arena, const Buffer* dst,
         readback_pool = std::move(pool);
         readback_fence = std::move(fence);
         readback_cmdbuf = cmdbufs.front();
+        LOG_INFO(Render_Vulkan, "tlg: readback cmdbuf {} on family {}",
+                 static_cast<void*>(static_cast<VkCommandBuffer>(readback_cmdbuf)),
+                 instance.GetReadbackQueueFamilyIndex());
     }
 
     const vk::CommandBufferBeginInfo begin_info{
