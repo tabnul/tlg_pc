@@ -52,8 +52,8 @@ int main() {
     _putenv_s("TLG_CONFIG", path);
     _putenv_s("TLG_ASYNC_SHADERS", "");
     auto& v = TlgSettings::Get();
-    // SMAA is off by default; CAS (100%) and the SDR color adjustment (gamma 0.75) are on.
-    assert(!v.smaa && v.cas && v.color_adjust && v.cas_strength == 100 && v.color_gamma == 0.75f);
+    // SMAA is off by default; CAS (100%) and the SDR color adjustment (neutral, gamma 1) are on.
+    assert(!v.smaa && v.cas && v.color_adjust && v.cas_strength == 100 && v.color_gamma == 1.0f);
     TlgSettings::Load();
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);  // a stored async_shaders=1 is ignored
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);

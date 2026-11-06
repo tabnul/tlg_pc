@@ -97,7 +97,7 @@ struct Values {
     std::atomic<bool> cas{true};
     std::atomic<int> cas_strength{100};
     std::atomic<bool> color_adjust{true};
-    std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{0.75f};
+    std::atomic<float> brightness{0.0f}, contrast{1.0f}, saturation{1.0f}, color_gamma{1.0f};
     /// Set by the presenter: sharpening ran on the last frame (it needs FSR 1 when the game's
     /// image is smaller than the window).
     std::atomic<bool> rcas_applied{false};
