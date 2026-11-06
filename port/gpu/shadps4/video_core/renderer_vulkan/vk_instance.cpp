@@ -453,16 +453,61 @@ bool Instance::CreateDevice() {
         return false;
     }
 
-    // tlg: a second queue of the graphics family, when it has one, for buffer readbacks that
-    // must not wait for the open GPU queue (BufferCache::DownloadMemory).
+    // tlg: a second queue for buffer readbacks that must not wait for the open GPU queue
+    // (BufferCache::DownloadMemory). NVIDIA reports 16 graphics queues, so queue 1 of the
+    // graphics family serves there. AMD (RADV) and Intel (ANV) report a single graphics queue,
+    // so every read fault used to take the drain path on those drivers; for them a queue of a
+    // compute or transfer family is taken instead.
+    // TLG_READBACK_QUEUE: auto (default) | graphics (only a second graphics queue) |
+    // other (always another family, for testing the AMD path on an NVIDIA card) | none.
+    const char* readback_env = std::getenv("TLG_READBACK_QUEUE");
+    const std::string_view readback_mode = readback_env && readback_env[0] ? readback_env : "auto";
     static constexpr std::array queue_priorities = {1.0f, 1.0f};
-    const u32 queue_count = family_properties[queue_family_index].queueCount >= 2 ? 2u : 1u;
-    has_readback_queue = queue_count == 2;
-    const vk::DeviceQueueCreateInfo queue_info = {
+    readback_queue_family_index = queue_family_index;
+    readback_queue_index = 0;
+    has_readback_queue = false;
+    if (readback_mode != "none") {
+        if (family_properties[queue_family_index].queueCount >= 2 && readback_mode != "other") {
+            has_readback_queue = true;
+            readback_queue_index = 1;
+        } else if (readback_mode != "graphics") {
+            for (std::size_t i = 0; i < family_properties.size(); i++) {
+                const u32 index = static_cast<u32>(i);
+                if (index == queue_family_index || family_properties[i].queueCount == 0) {
+                    continue;
+                }
+                const auto flags = family_properties[i].queueFlags;
+                if (!(flags &
+                      (vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer))) {
+                    continue;
+                }
+                readback_queue_family_index = index;
+                has_readback_queue = true;
+                if (!(flags & vk::QueueFlagBits::eGraphics)) {
+                    break; // a family of its own: stop looking
+                }
+            }
+        }
+    }
+    boost::container::static_vector<vk::DeviceQueueCreateInfo, 2> queue_infos;
+    queue_infos.push_back(vk::DeviceQueueCreateInfo{
         .queueFamilyIndex = queue_family_index,
-        .queueCount = queue_count,
+        .queueCount = readback_queue_index == 1 ? 2u : 1u,
         .pQueuePriorities = queue_priorities.data(),
-    };
+    });
+    if (has_readback_queue && readback_queue_family_index != queue_family_index) {
+        queue_infos.push_back(vk::DeviceQueueCreateInfo{
+            .queueFamilyIndex = readback_queue_family_index,
+            .queueCount = 1u,
+            .pQueuePriorities = queue_priorities.data(),
+        });
+    }
+    LOG_INFO(Render_Vulkan,
+             "tlg: readback queue {} (mode {}, graphics family {} with {} queues, readback "
+             "family {} slot {})",
+             has_readback_queue ? "on" : "off", readback_mode, queue_family_index,
+             family_properties[queue_family_index].queueCount, readback_queue_family_index,
+             readback_queue_index);
 
     const auto vk11_features = feature_chain.get<vk::PhysicalDeviceVulkan11Features>();
     vk12_features = feature_chain.get<vk::PhysicalDeviceVulkan12Features>();
@@ -481,8 +526,8 @@ bool Instance::CreateDevice() {
     }
     vk::StructureChain device_chain = {
         vk::DeviceCreateInfo{
-            .queueCreateInfoCount = 1u,
-            .pQueueCreateInfos = &queue_info,
+            .queueCreateInfoCount = static_cast<u32>(queue_infos.size()),
+            .pQueueCreateInfos = queue_infos.data(),
             .enabledExtensionCount = static_cast<u32>(enabled_extensions.size()),
             .ppEnabledExtensionNames = enabled_extensions.data(),
         },
@@ -639,12 +684,12 @@ bool Instance::CreateDevice() {
             .deviceFault = true,
         },
     };
-    if (!device_fault) {
-        device_chain.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
-    }
 
     if (!custom_border_color) {
         device_chain.unlink<vk::PhysicalDeviceCustomBorderColorFeaturesEXT>();
+    }
+    if (!device_fault) {
+        device_chain.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
     }
     if (!dynamic_state_3) {
         device_chain.unlink<vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT>();
@@ -719,7 +764,7 @@ bool Instance::CreateDevice() {
     graphics_queue = device->getQueue(queue_family_index, 0);
     present_queue = device->getQueue(queue_family_index, 0);
     if (has_readback_queue) {
-        readback_queue = device->getQueue(queue_family_index, 1);
+        readback_queue = device->getQueue(readback_queue_family_index, readback_queue_index);
     }
 
     if (calibrated_timestamps) {
