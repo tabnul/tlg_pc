@@ -74,7 +74,7 @@ class TableTest(unittest.TestCase):
         self.assertEqual(bt.ADVANCED, [])
 
     def test_states_round_trip_and_defaults_store_nothing(self):
-        ini = {'fsr1': '1', 'sharpness': '1.5', 'color_contrast': '1.20', 'overlay_corner': '9'}
+        ini = {'fsr1': '1', 'sharpness': '1.75', 'color_contrast': '1.20', 'overlay_corner': '9'}
         states = bt.read_states(ini, {'deferred_readback': False, 'background_warmup': True})
         self.assertEqual(states['menu:fsr1'], '1')
         self.assertIsNone(states['menu:sharpness'])          # equal to the default

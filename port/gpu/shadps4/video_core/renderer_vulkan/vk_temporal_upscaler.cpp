@@ -825,8 +825,8 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
                          sizeof(params), &params);
     cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
     const auto& settings = TlgSettings::Get();
-    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 4.0f);
-    const std::array<float, 2> sharpen_params{strength, strength};
+    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 1.0f); // 0..100%, as FSR's own
+    const std::array<float, 2> sharpen_params{strength, 1.0f};
     if (settings.sharpen && strength > 0.0f && !(params.pad & 0xffu)) {
         const vk::MemoryBarrier2 resolved{
             .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
@@ -848,27 +848,34 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
         cmdbuf.pushConstants(*taa_sharpen_pipeline_layout, vk::ShaderStageFlagBits::eCompute,
                              0, sizeof(sharpen_params), sharpen_params.data());
         cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
+        ExtraSharpen(cmdbuf, vk::Image(output_image), false, out_width, out_height); // above 100%
     }
     taa_next = 1 - taa_next;
 }
 
 void TemporalUpscaler::ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w,
                                     u32 h) {
+    // One scale for every upscaler (user, 2026-11-07): 0..100% is the upscaler's own sharpening
+    // (FSR 3.1 / FSR 4 RCAS; DLSS and TAA, which have none, get the same RCAS). Every 100% above
+    // adds one full RCAS pass on the result, the last one partial: 400% = own + 3 passes.
     const auto& settings = TlgSettings::Get();
-    const float extra = std::clamp(settings.sharpness.load(), 0.0f, 4.0f) - 1.0f;
-    if (settings.sharpen && extra > 0.0f) {
-        RcasPass(cmdbuf, target, ldr, w, h, extra, extra);
+    float extra = std::clamp(settings.sharpness.load(), 0.0f, 4.0f) - 1.0f;
+    if (!settings.sharpen) {
+        return;
+    }
+    for (; extra > 0.0f; extra -= 1.0f) {
+        RcasPass(cmdbuf, target, ldr, w, h, std::min(extra, 1.0f), 1.0f);
     }
 }
 
 void TemporalUpscaler::DlssSharpen(vk::CommandBuffer cmdbuf, u32 w, u32 h) {
-    // The menu's 0..1 matches FSR 3's RCAS (fully applied); above 1 extrapolated.
+    // DLSS has no own sharpening any more: RCAS 0..100% stands in for it, as FSR's own.
     const auto& settings = TlgSettings::Get();
-    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 4.0f);
-    if (settings.sharpen && strength > 0.0f) {
-        RcasPass(cmdbuf, vk::Image(output_image), false, w, h, strength,
-                 std::max(strength, 1.0f));
+    const float base = std::clamp(settings.sharpness.load(), 0.0f, 1.0f);
+    if (settings.sharpen && base > 0.0f) {
+        RcasPass(cmdbuf, vk::Image(output_image), false, w, h, base, 1.0f);
     }
+    ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
 }
 
 void TemporalUpscaler::RcasPass(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w,
@@ -2482,7 +2489,7 @@ void TemporalUpscaler::RunScaled() {
     info.cameraFar = 3000.0f;
     info.cameraVerticalFovRadians = camera_motion.VerticalFov();
     info.viewSpaceToMeters = 1.0f;
-    info.sharpness = std::min(settings.sharpness.load(), 1.0f);
+    info.sharpness = std::min(settings.sharpness.load(), 1.0f); // 0..100%: FSR's own RCAS
     info.enableSharpening = settings.sharpen ? VK_TRUE : VK_FALSE;
     info.reset = reset ? VK_TRUE : VK_FALSE;
     info.frameId = frame_id++;
@@ -2777,8 +2784,7 @@ bool TemporalUpscaler::RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk:
     info.cameraFar = 3000.0f;
     info.cameraVerticalFovRadians = CameraValue(camera_motion.VerticalFov(), 1.0f, 3.0f);
     info.viewSpaceToMeters = 1.0f;
-    // RCAS strength 0..1 (menu, TLG_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
-    // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the menu's 0..2.
+    // 0..100% = FSR's own RCAS; every 100% above adds one full RCAS pass (ExtraSharpen).
     info.sharpness = std::min(TlgSettings::Get().sharpness.load(), 1.0f);
     info.enableSharpening = TlgSettings::Get().sharpen ? VK_TRUE : VK_FALSE;
     info.reset = reset ? VK_TRUE : VK_FALSE;
@@ -2840,7 +2846,7 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
         .near_plane = camera_motion.Near(),
         .far_plane = 3000.0f,
         .vertical_fov = camera_motion.VerticalFov(),
-        .sharpness = std::min(settings.sharpness.load(), 1.0f),
+        .sharpness = std::min(settings.sharpness.load(), 1.0f), // 0..100%: FSR 4's own RCAS
         .sharpen = settings.sharpen,
         .reset = reset,
         .auto_exposure = settings.fsr4_auto_exposure,

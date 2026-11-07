@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // RCAS on the resolved scene only. The unsharpened history and HUD are untouched.
-// Strength 0..4: above 1 the RCAS change is extrapolated (stronger than AMD's maximum). The
-// same pass sharpens FSR 3/4 output beyond their own RCAS (LDR_OUTPUT: the 8-bit UI image),
-// and DLSS output like FSR 3's own RCAS. Blend: how much of the RCAS change is applied (DLSS:
-// 1 up to strength 1, as AMD's; the others: the strength).
+// One pass = RCAS strength 0..1 (AMD's range). The menu above 100% runs extra full passes
+// (ExtraSharpen), so blend stays 1; values above 1 extrapolate the change (not used now).
 #version 450
 #extension GL_GOOGLE_include_directive : require
 layout(local_size_x = 8, local_size_y = 8) in;
