@@ -2055,8 +2055,12 @@ bool TemporalUpscaler::RunGameUpscale(VideoCore::ImageId ldr, VideoCore::ImageId
     } else {
         ExtraSharpen(cmdbuf, vk::Image(output_image), false, ow, oh);
     }
-    // Frame generation takes render-size depth/motion with an output-size frame: not yet.
-    fg_pending = false;
+    // Frame generation: render-size depth and motion (checked equal to w x h above) with the
+    // output-size frame; DLSS and FSR frame generation both take the two sizes apart.
+    fg_pending = true;
+    fg_reset = reset;
+    fg_jitter = game_frame.jitter;
+    fg_depth = game_frame.depth;
     reset = false;
     game_reset = false;
     last_game_motion = now;
