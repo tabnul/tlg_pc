@@ -5,7 +5,7 @@
 <p align="center">
   <b>The best way to enjoy Fumito Ueda's masterpiece on PC.</b><br>
   <i>By fans, for fans.</i><br>
-  A native port for Windows and Linux: DLAA and FSR 3.1, frame generation, the complete orchestral soundtrack, widescreen, optional AI-upscaled textures,<br>
+  A native port for Windows and Linux: DLSS, FSR 4 and FSR 3.1 upscaling and anti-aliasing, frame generation, the complete orchestral soundtrack, widescreen, optional AI-upscaled textures,<br>
   high frame rates without shader stutter.<br>
   <b>Unique features: content the developers cut, and easter eggs they left
   behind, brought back to life.</b>
@@ -39,8 +39,8 @@
 
 - ✨ **Unique.** Features you will not find on PS4 or anywhere else: cut content and hidden
   developer tools found in the game's own files and switched back on.
-- 🎨 **Beautiful.** DLAA (NVIDIA) or FSR 3.1 (any graphics card) removes the shimmer on feathers,
-  foliage and fences. Add sharper shadows,
+- 🎨 **Beautiful.** DLSS (NVIDIA), FSR 4 (recent cards) or FSR 3.1 (any card) removes the shimmer on feathers,
+  foliage and fences, at your screen size or upscaled from a lower one for more FPS. Add sharper shadows,
   a calmer wind and an optional AI-upscaled 4x texture pack.
 - 🎵 **The full soundtrack.** All 110 minutes of the score in the launcher, in stereo or 5.1
   surround.
@@ -63,17 +63,25 @@
 - At 21:9, menus, hints and subtitles are laid out for the wider screen instead of stretched.
 - 32:9 is experimental: some overlays sit to the left and parts of the menus are stretched.
 
-### DLAA and FSR 3.1 AA
+### DLSS and FSR upscaling
 
-- NVIDIA's DLSS anti-aliasing at native resolution, fed with the game's own motion vectors.
-- Replaces the game's SMAA and removes most of the shimmer on foliage, feathers and fences.
-- On by default on RTX cards. **FSR 3.1 Native AA** does the same on any card.
-- **F8** switches between your choice and the original SMAA. More in [docs/dlaa.md](docs/dlaa.md).
+- **DLSS** (NVIDIA RTX), **FSR 4** (recent AMD and other cards) or **FSR 3.1** (any card), fed with
+  the game's own motion vectors. FSR on Windows and Linux.
+- **Native AA** (the default): the game renders at your screen size and DLAA or FSR Native AA
+  replaces the game's SMAA, removing most of the shimmer on foliage, feathers and fences.
+- **Quality, Balanced, Performance, Ultra Performance:** the game renders below your screen size
+  and DLSS or FSR builds the full picture, for more FPS; menus and subtitles stay sharp at full size.
+- DLSS Native AA (DLAA) is on by default on RTX cards; on a card that runs FSR 4, FSR 3.1 moves to
+  FSR 4 once by itself. Sharpening goes up to 400%.
+- **F8** switches between your choice and the game's own. More in
+  [port/docs/upscaling.md](port/docs/upscaling.md) and [docs/dlaa.md](docs/dlaa.md).
 
 ### Frame generation
 
 - DLSS frame generation (RTX 40 or newer) or FSR 3.1 frame generation (any brand).
 - Adds one generated image per game frame, so twice the frames are shown.
+- Works with every upscaler and Quality setting, also mixed (DLSS upscaling with FSR frame
+  generation).
 - Off by default. Tested on an RTX 5090 on Windows.
 
 ### Optional AI-upscaled textures
@@ -109,7 +117,7 @@ Press **Insert** in game and change the picture while you play. The launcher has
 | **Camera** | Field of view from 50 to 110 degrees |
 | **Game effects** | Ambient occlusion, bloom, reflections, motion blur, vignette, sharpening, fog: 0-100%+ |
 | **Textures** | LOD bias, anisotropic filtering up to 16x, live texture pack switching |
-| **Scaling** | FSR 1, AMD CAS or RCAS sharpening |
+| **Scaling** | DLSS, FSR 4 or FSR 3.1 upscaling, Native AA to Ultra Performance; sharpening up to 400% |
 | **Colour** | Brightness, contrast, saturation, gamma; HDR10 output |
 | **Frame rate** | 30 (as on PS4), 60 or unlocked; frame queue depth |
 | **Menu buttons** | [Cross or Circle to confirm](docs/menu-buttons.md), gameplay buttons untouched |
@@ -194,7 +202,7 @@ in-game **Fun** tab: **Always**, or **As the developers planned**.
 
 | | Feature | What you get |
 |---|---|---|
-| 🎨 | [DLAA and FSR 3.1 AA](#dlaa-and-fsr-31-aa) | Clean, stable edges, no shimmer |
+| 🎨 | [DLSS and FSR upscaling](#dlss-and-fsr-upscaling) | Clean, stable edges; render lower for more FPS |
 | 🎞️ | [Frame generation](#frame-generation) | DLSS or FSR 3.1: twice the frames shown |
 | 🚀 | [Smooth, no shader stutter](#smooth-no-shader-stutter) | 30, 60 or unlocked; shader recipes |
 | 🖥️ | [Any resolution, ultrawide](#any-resolution-ultrawide) | 21:9 with menus laid out for it |
@@ -325,13 +333,17 @@ and takes a screenshot of each. Run it before and after a change. More in
 3. **Audio:** put the PS4 firmware's `libSceNgs2.sprx` in `system_lib/` next to the executable.
 4. **Play:** start the launcher, pick the game folder and language, and press **Play**.
 
-**PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLAA needs an NVIDIA RTX
-card; FSR 3.1 AA runs on any card.
+**Error 4551 on Windows 11?** Smart App Control blocks programs without a digital signature, and
+the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control
+settings. On some Windows versions it can only be turned back on by reinstalling Windows.
+
+**PC:** a Vulkan 1.3 graphics card with 6 GB of video memory or more. DLSS needs an NVIDIA RTX
+card, FSR 4 a recent card (greyed out otherwise); FSR 3.1 runs on any card.
 
 | Key | In game |
 |---|---|
 | Insert (R3 + L2) | The port's menu |
-| F8 | DLAA or FSR 3.1 / original SMAA |
+| F8 | DLSS or FSR / the game's own anti-aliasing |
 | F9 | Add a Trico |
 | F10 | FPS counter |
 | F12 | Trico Tricks bar |
@@ -371,7 +383,7 @@ cd port && TLG_LTO=OFF bash build.sh
 ```
 
 On Windows this runs in an MSYS2 CLANG64 shell; see
-[port/packaging/windows/README.md](port/packaging/windows/README.md). DLAA needs the DLSS SDK as
+[port/packaging/windows/README.md](port/packaging/windows/README.md). DLSS needs the DLSS SDK as
 well (`build_dlss.sh`).
 
 ## Credits
@@ -394,8 +406,11 @@ loader, the runtime and most of what makes the game playable at all is HayatoG's
 - The controller drawing on the Controls page: the [RPCS3](https://github.com/RPCS3/rpcs3)
   DualShock 3 drawing by HerrHulaHoop (GPL-2.0), made into a DualShock 4 for this port.
 - [UniversalScalers-Vulkan](https://github.com/FireBurn/UniversalScalers-Vulkan) (formerly FSR-Vulkan)
-  by Mike Lothian (@FireBurn), AMD FSR 3.1 and FSR 4 on Vulkan, which FSR 3.1 AA and FSR frame
-  generation run on. Thank you!
+  by Mike Lothian (@FireBurn), AMD FSR 3.1 and FSR 4 on Vulkan, which FSR 3.1 AA, FSR 4 AA and FSR
+  frame generation run on, and the open FSR 4 model files his
+  [Q2RTX](https://github.com/FireBurn/Q2RTX) builds from AMD's MIT-licensed FidelityFX SDK. Thank you!
+- Felipe Prado ([@FelipePrado0](https://github.com/FelipePrado0)): shipping the FSR 4 model inside the
+  packages follows his [SpartanPort](https://github.com/FelipePrado0/SpartanPort). Thank you!
 - Lucas Emiliano ([@devLucasEmiliano](https://github.com/devLucasEmiliano)) for the start-up fix when
   another program's DLL already sits in the PS4 address range
   ([SpartanPort #1076](https://github.com/FelipePrado0/SpartanPort/pull/1076)). Thank you!

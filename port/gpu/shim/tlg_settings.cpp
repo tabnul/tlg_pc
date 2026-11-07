@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -14,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace TlgSettings {
 
@@ -53,6 +56,11 @@ bool dlss_checked = false;
 int dlss_supported_file = -1;
 // The upscaler tlg.ini selected before a fallback to FSR 3.1 (-1: none): Save writes it back.
 int selected_upscaler = -1;
+// fsr4_default in tlg.ini: the one-time switch from FSR 3.1 to FSR 4 native AA on a card that
+// runs FSR 4 ran (once per install; later choices stay).
+bool fsr4_default_done = false;
+// fsr4_supported in tlg.ini: the game's last FSR 4 check, for the launcher (-1: none).
+int fsr4_supported_file = -1;
 
 void DlssFallback(Values& v) {
     if (v.upscaler == UpscalerDlss && dlss_checked && !v.dlss_supported) FallBackToFsr3();
@@ -95,6 +103,12 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "dlss_supported") {
         dlss_supported_file = i != 0;
         return;
+    } else if (key == "fsr4_supported") {
+        fsr4_supported_file = i != 0;
+        return;
+    } else if (key == "fsr4_default") {
+        fsr4_default_done = i != 0;
+        return;
     }
     if (key == "key_map") {
         v.key_map = value;
@@ -111,7 +125,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "sharpen") {
         v.sharpen = i != 0;
     } else if (key == "sharpness") {
-        v.sharpness = Clamp(f, 0.0f, 2.0f);
+        v.sharpness = Clamp(f, 0.0f, 4.0f);
     } else if (key == "jitter") {
         v.jitter = i != 0;
     } else if (key == "reactive") {
@@ -178,7 +192,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "color_saturation") {
         v.saturation = TlgGraphics::ClampColor(TlgGraphics::Saturation, value.empty() ? 1.0f : f);
     } else if (key == "color_gamma") {
-        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 0.75f : f);
+        v.color_gamma = TlgGraphics::ClampColor(TlgGraphics::Gamma, value.empty() ? 1.0f : f);
     } else if (key == "frames_queued") {
         v.frames_queued = TlgGraphics::ParseFramesQueued(value.empty() ? -1 : i);
     } else if (key == "frame_generation") {
@@ -308,13 +322,21 @@ void Load() {
     if (ReadFile(v)) {
         std::printf("Settings: %s\n", Path());
     }
-    // tlg: the anti-aliasing row runs DLAA or FSR 3.1 at native size (AaMode); files from before
-    // it, and other upscalers, load as DLAA.
-    if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3)) {
+    // tlg: the upscaler row: Built-in (off), DLSS, FSR 3.1 or FSR 4; at Native AA quality the
+    // choice is the anti-aliasing (DLAA, FSR native AA). Files from before the AA row, and
+    // other upscalers, load as DLSS. The quality (preset) is the render size the launcher
+    // patches in (startup); the menu keeps it for the next launch.
+    if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3 &&
+                         v.upscaler != UpscalerFsr4 && v.upscaler != UpscalerOff)) {
         v.upscaler = UpscalerDlss;
     }
+    // tlg: the AA row is gone (2026-11-07); a file with AA off keeps its picture as Built-in.
+    if (!v.dlaa && v.upscaler != UpscalerOff) {
+        std::printf("Settings: anti-aliasing was off; upscaler set to Built-in\n");
+        v.upscaler = UpscalerOff;
+    }
+    v.dlaa = v.upscaler != UpscalerOff;
     DlssFallback(v);
-    if (v.upscaler != UpscalerTaa) v.preset = NativeAA;
     // Environment overrides (scripts, A/B tests).
     if (const char* env = std::getenv("TLG_UPSCALER")) {
         v.upscaler = UpscalerOff;
@@ -370,8 +392,93 @@ bool GraphicsNeedRestart() {
     return v.render_resolution != v.startup_render_resolution ||
            v.engine_fps != v.startup_engine_fps ||
            v.deferred_readback != v.startup_deferred_readback ||
-           v.stale_readback != v.startup_stale_readback || v.hdr != v.startup_hdr;
+           v.stale_readback != v.startup_stale_readback || v.hdr != v.startup_hdr ||
+           QualityNeedsRestart();
 }
+
+bool QualityNeedsRestart() {
+    const auto& v = Get();
+    return v.preset != v.startup_preset;
+}
+
+void OutputSize(int& width, int& height) {
+    width = 1920;
+    height = 1080;
+    if (const char* patch = std::getenv("TLG_RESOLUTION_PATCH"); patch && patch[0]) {
+        if (std::sscanf(patch, "%dx%d", &width, &height) != 2 || width <= 0 || height <= 0) {
+            width = 1920;
+            height = 1080;
+        }
+    }
+}
+
+void StartupRenderSize(int& width, int& height) {
+    OutputSize(width, height);
+    if (const char* render = std::getenv("TLG_RENDER_RESOLUTION"); render && render[0]) {
+        int w = 0, h = 0;
+        if (std::sscanf(render, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
+            width = w;
+            height = h;
+        }
+    }
+}
+
+bool EngineUpscaleMode() {
+    static const bool smaller = [] {
+        int ow, oh, rw, rh;
+        OutputSize(ow, oh);
+        StartupRenderSize(rw, rh);
+        return rw <= ow && rh <= oh && (rw < ow || rh < oh);
+    }();
+    return smaller && Get().upscaler != UpscalerOff;
+}
+
+bool AaOn() {
+    return Get().dlaa || EngineUpscaleMode();
+}
+
+namespace {
+std::atomic<long long> aa_sharpened_ms{-1000000};
+std::atomic<const char*> aa_sharpener{"AA step"};
+long long NowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+} // namespace
+
+void MarkAaSharpened(const char* sharpener) {
+    aa_sharpener.store(sharpener, std::memory_order_relaxed);
+    aa_sharpened_ms.store(NowMs(), std::memory_order_relaxed);
+}
+
+const char* AaSharpenerName() {
+    return aa_sharpener.load(std::memory_order_relaxed);
+}
+
+bool AaSharpenedRecently() {
+    return NowMs() - aa_sharpened_ms.load(std::memory_order_relaxed) < 250;
+}
+
+namespace {
+// Rewrites only these keys in tlg.ini (the launcher reads them before the menu saves).
+bool WriteKeys(const std::vector<std::pair<std::string, std::string>>& keys) {
+    std::vector<std::string> lines;
+    if (std::ifstream in{Path()}) {
+        for (std::string line; std::getline(in, line);) {
+            bool replaced = false;
+            for (const auto& [key, value] : keys) replaced |= line.starts_with(key + "=");
+            if (!replaced) lines.push_back(line);
+        }
+    }
+    if (lines.empty()) return false;
+    std::ofstream out{Path()};
+    if (!out) return false;
+    for (const auto& line : lines) out << line << '\n';
+    for (const auto& [key, value] : keys) out << key << '=' << value << '\n';
+    return true;
+}
+} // namespace
 
 void ConfigureUpscalerSupport(bool fsr4, bool fsr411) {
     auto& v = Get();
@@ -393,18 +500,8 @@ void ConfigureDlssSupport(bool available, const char* problem) {
     dlss_checked = true;
     if (dlss_supported_file != int(available)) {
         // Only this line changes: the launcher greys DLAA out from it.
-        std::vector<std::string> lines;
-        if (std::ifstream in{Path()}) {
-            for (std::string line; std::getline(in, line);)
-                if (!line.starts_with("dlss_supported=")) lines.push_back(line);
-        }
-        if (!lines.empty()) {
-            if (std::ofstream out{Path()}) {
-                for (const auto& line : lines) out << line << '\n';
-                out << "dlss_supported=" << int(available) << '\n';
-                dlss_supported_file = available;
-            }
-        }
+        if (WriteKeys({{"dlss_supported", std::to_string(int(available))}}))
+            dlss_supported_file = available;
     }
     static std::string kept;
     kept = problem ? problem : "";
@@ -414,12 +511,53 @@ void ConfigureDlssSupport(bool available, const char* problem) {
                     kept.empty() ? "tlg_dlss.dll or nvngx_dlss.dll missing" : kept.c_str());
         FallBackToFsr3();
     }
+    // tlg: once per install, a card that runs FSR 4 moves from FSR 3.1 native AA (chosen, or
+    // the fallback from DLAA without DLSS) to FSR 4 native AA. Later choices stay; scripts that
+    // set TLG_UPSCALER keep theirs.
+    const char* env = std::getenv("TLG_UPSCALER");
+    std::vector<std::pair<std::string, std::string>> keys;
+    if (v.fsr4_supported && !fsr4_default_done && !(env && env[0])) {
+        fsr4_default_done = true;
+        keys.emplace_back("fsr4_default", "1");
+        if (v.dlaa && v.upscaler == UpscalerFsr3) {
+            std::printf("Upscaler: this GPU runs FSR 4; native AA moves from FSR 3.1 to FSR 4 (once)\n");
+            v.upscaler = UpscalerFsr4;
+            selected_upscaler = -1;
+            v.preset = NativeAA;
+            keys.emplace_back("upscaler", "fsr4");
+        }
+    }
+    if (fsr4_supported_file != int(v.fsr4_supported.load())) {
+        keys.emplace_back("fsr4_supported", std::to_string(int(v.fsr4_supported.load())));
+        fsr4_supported_file = v.fsr4_supported;
+    }
+    if (!keys.empty()) WriteKeys(keys);
 }
 
 void FallBackToFsr3() {
     auto& v = Get();
     if (v.upscaler != UpscalerFsr3) selected_upscaler = v.upscaler;
     v.upscaler = UpscalerFsr3;
+}
+
+int SelectedUpscaler() {
+    const auto& v = Get();
+    return selected_upscaler >= 0 && v.upscaler == UpscalerFsr3 ? selected_upscaler : v.upscaler.load();
+}
+
+int DefaultAaUpscaler() {
+    const auto& v = Get();
+    return v.dlss_supported ? UpscalerDlss : v.fsr4_supported ? UpscalerFsr4 : UpscalerFsr3;
+}
+
+void SetUpscaler(int upscaler) {
+    // tlg: the upscaler choice is the anti-aliasing too (user, 2026-11-07: no separate AA row):
+    // Built-in = the game's own, any other = its AA (native) or upscaling (below native).
+    auto& v = Get();
+    v.upscaler = std::clamp(upscaler, 0, UpscalerCount - 1);
+    v.dlaa = v.upscaler != UpscalerOff;
+    selected_upscaler = -1;
+    if (v.upscaler == UpscalerDlss && !v.dlss_supported) FallBackToFsr3();
 }
 
 bool FixedRenderSession() {
@@ -479,12 +617,12 @@ void Save() {
                  v.overlay_opacity.load(), v.overlay_layout.load(), v.menu_tab.load());
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\n"
-                 "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
+                 "fsr1=%d\nframes_queued=%d\n"
                  "readback_batch=%d\ntexture_cleanup=%d\nrender_resolution=%s\nengine_fps=%d\nhdr=%d\n"
                  "deferred_readback=%d\nstale_readback=%d\nrestart_unconfirmed=%d\n",
                  TlgGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
                  int(v.vsync.load()), v.fps_limit.load(),
-                 int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
+                 int(v.fsr1.load()), v.frames_queued.load(),
                  v.readback_batch.load(), int(v.texture_cleanup.load()), TlgGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
@@ -498,9 +636,9 @@ void Save() {
                  int(v.mouse_enabled.load()), v.mouse_sensitivity.load(), int(v.mouse_invert_y.load()),
                  v.mouse_smoothing.load(), v.mouse_accel.load(), v.mouse_deadzone.load(), v.key_map.c_str());
     std::fprintf(file,
-                 "dlaa=%d\nshadow_scale=%d\nsmaa=%d\ncas=%d\ncas_strength=%d\ncolor_adjust=%d\n"
+                 "dlaa=%d\nshadow_scale=%d\nsmaa=%d\ncolor_adjust=%d\n"
                  "color_brightness=%.2f\ncolor_contrast=%.2f\ncolor_saturation=%.2f\ncolor_gamma=%.2f\n",
-                 int(v.dlaa.load()),v.shadow_scale.load(), int(v.smaa.load()), int(v.cas.load()), v.cas_strength.load(),
+                 int(v.dlaa.load()),v.shadow_scale.load(), int(v.smaa.load()),
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
@@ -514,6 +652,8 @@ void Save() {
                  pack > 0 ? TexturePackNames()[pack - 1].c_str() : "off");
     if (dlss_checked || dlss_supported_file >= 0)
         std::fprintf(file, "dlss_supported=%d\n", dlss_checked ? int(v.dlss_supported.load()) : dlss_supported_file);
+    if (fsr4_supported_file >= 0) std::fprintf(file, "fsr4_supported=%d\n", fsr4_supported_file);
+    if (fsr4_default_done) std::fprintf(file, "fsr4_default=1\n");
     // Read by run.sh at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
@@ -522,7 +662,7 @@ void Save() {
 
 namespace {
 // The game as shipped: none of the port's filters, the game's own shadows, filtering and textures.
-constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nrcas=0\ncas=0\nshadow_scale=1\nfov=70\n"
+constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nsharpen=0\nshadow_scale=1\nfov=70\n"
                                    "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\n";
 
 void ApplyLines(Values& v, const std::string& lines) {
@@ -551,10 +691,9 @@ std::string GraphicsText(const Values& v) {
     add("dlaa", v.dlaa);
     add("smaa", v.smaa);
     add("fsr1", v.fsr1);
-    add("rcas", v.rcas);
-    add("rcas_strength", v.rcas_strength);
-    add("cas", v.cas);
-    add("cas_strength", v.cas_strength);
+    // One Sharpening setting (2026-11-07): rcas / cas keys are still read but no longer used.
+    add("sharpen", v.sharpen);
+    add_float("sharpness", v.sharpness);
     add("shadow_scale", v.shadow_scale);
     add("fov", v.fov);
     for (const auto& [name, member] : EffectKeys)
@@ -616,7 +755,13 @@ std::vector<std::string> GraphicsPresetNames() {
 }
 
 void ApplyGraphicsPreset(int index) {
-    if (index >= 0 && index < int(Presets().size())) ApplyLines(Get(), Presets()[index].text);
+    if (index < 0 || index >= int(Presets().size())) return;
+    auto& v = Get();
+    ApplyLines(v, Presets()[index].text);
+    // dlaa is the upscaler choice now (no AA row): Stock (dlaa=0) is Built-in, a preset with
+    // dlaa=1 on Built-in picks the card's best upscaler.
+    if (!v.dlaa && SelectedUpscaler() != UpscalerOff) SetUpscaler(UpscalerOff);
+    if (v.dlaa && v.upscaler == UpscalerOff) SetUpscaler(DefaultAaUpscaler());
 }
 
 int MatchingGraphicsPreset() {
@@ -654,14 +799,23 @@ void DeleteGraphicsPreset(int index) {
 }
 
 float PresetScale(int preset) {
-    static constexpr float scales[PresetCount] = {1.0f, 1.5f, 1.7f, 2.0f, 3.0f};
+    static constexpr float scales[PresetCount] = {1.0f, 1.5f, 1.7f, 2.0f, 3.0f, 1.0f / 1.5f, 0.5f};
     return scales[std::clamp(preset, 0, PresetCount - 1)];
 }
 
 const char* PresetName(int preset) {
-    static constexpr const char* names[PresetCount] = {"Native AA", "Quality", "Balanced",
-                                                       "Performance", "Ultra Performance"};
+    static constexpr const char* names[PresetCount] = {
+        "Native AA", "Quality", "Balanced", "Performance", "Ultra Performance",
+        "Supersampling 150% (experimental)", "Supersampling 200% (experimental)"};
     return names[std::clamp(preset, 0, PresetCount - 1)];
+}
+
+void PresetRenderSize(int preset, int output_width, int output_height, int& width, int& height) {
+    // The same rule as the launcher (tlg_run.render_resolution): output / scale, each side
+    // rounded to the nearest even number.
+    const float scale = PresetScale(preset);
+    width = int(std::lround(output_width / scale / 2.0f)) * 2;
+    height = int(std::lround(output_height / scale / 2.0f)) * 2;
 }
 
 const char* UpscalerName(int upscaler) {
@@ -671,8 +825,9 @@ const char* UpscalerName(int upscaler) {
 
 int AaModeOf() {
     const auto& v = Get();
-    if (!v.dlaa || v.upscaler == UpscalerTaa) return AaOff;
-    return v.upscaler == UpscalerFsr3 ? AaFsr3Native : AaDlaa;
+    if (!AaOn() || v.upscaler == UpscalerTaa || v.upscaler == UpscalerOff) return AaOff;
+    if (v.upscaler == UpscalerFsr3) return AaFsr3Native;
+    return v.upscaler == UpscalerFsr4 ? AaFsr4Native : AaDlaa;
 }
 
 void SetAaMode(int mode) {
@@ -680,17 +835,19 @@ void SetAaMode(int mode) {
     mode = std::clamp(mode, 0, AaModeCount - 1);
     v.dlaa = mode != AaOff;
     if (mode == AaOff) return;
-    v.upscaler = mode == AaDlaa ? UpscalerDlss : UpscalerFsr3;
+    v.upscaler = mode == AaDlaa ? UpscalerDlss : mode == AaFsr4Native ? UpscalerFsr4 : UpscalerFsr3;
     selected_upscaler = -1;
     v.preset = NativeAA;
 }
 
 bool AaModeSupported(int mode) {
-    return mode != AaDlaa || Get().dlss_supported;
+    if (mode == AaDlaa) return Get().dlss_supported;
+    if (mode == AaFsr4Native) return Get().fsr4_supported;
+    return true;
 }
 
 const char* AaModeName(int mode) {
-    static constexpr const char* names[AaModeCount] = {"Off", "DLAA", "FSR 3.1 Native AA"};
+    static constexpr const char* names[AaModeCount] = {"Off", "DLAA", "FSR 3.1 Native AA", "FSR 4 Native AA"};
     return names[std::clamp(mode, 0, AaModeCount - 1)];
 }
 

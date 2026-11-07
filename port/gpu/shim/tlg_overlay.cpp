@@ -491,61 +491,106 @@ void ImageTab() {
     }
     const int iw = s.image_width, ih = s.image_height, ww = s.window_width, wh = s.window_height;
     const bool upscaling = iw < ww && ih < wh;
-    const bool downscaling = iw > ww || ih > wh;
-    const bool rcas_blocked = s.rcas && !s.rcas_applied;
     // tlg: only spatial filters on the final image. The temporal upscalers (FSR 3/4, TAA, DLSS) were
     // built for GoW3's pipeline and make TLG's image shake, so they are not offered here.
     ImGui::SeparatorText(TL("Scaling and sharpening", "Escala e nitidez"));
     if (BeginRows("##scaling")) {
         CheckRow(TL("Upscale with FSR 1", "Ampliar com FSR 1"), s.fsr1,
                  TL("Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).", "Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor)."), d.fsr1, false);
-        // tlg: one sharpening filter at a time: FSR 1's RCAS or AMD CAS (stored as rcas / cas).
-        static const char* const filters[] = {TL("Off", "Desligada"), "RCAS (FSR 1)", "CAS (AMD)"};
-        int filter = s.cas ? 2 : s.rcas ? 1 : 0;
-        Row(TL("Sharpening", "Nitidez"));
-        if (ImGui::Combo("##value", &filter, filters, 3)) {
-            Store(s.rcas, filter == 1, true);
-            Store(s.cas, filter == 2, true);
+        // tlg: one Sharpening setting (2026-11-07): with DLSS / FSR / TAA it is their own RCAS in
+        // the AA step (scene only, the UI stays crisp), with Built-in AMD CAS on the final picture.
+        const bool aa_sharpens = TlgSettings::AaSharpenedRecently();
+        CheckRow(TL("Sharpening", "Nitidez"), s.sharpen,
+                 aa_sharpens ? TL("Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.", "Deixa a imagem mais nítida. Agora feito pela própria etapa de anti-aliasing (o RCAS dela), só na cena.")
+                             : TL("Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.", "Deixa a imagem mais nítida. Com Do jogo é o AMD CAS na imagem final; com DLSS, FSR ou TAA a nitidez deles."),
+                 d.sharpen, false);
+        ImGui::BeginDisabled(!s.sharpen);
+        {
+            Row(TL("Sharpening strength", "Intensidade da nitidez"));
+            const Marks marks{Format("%.0f%%", d.sharpness * 100.0f), ""};
+            ImGui::SetNextItemWidth(-ResetWidth(false));
+            float pct = s.sharpness * 100.0f;
+            if (ImGui::SliderFloat("##value", &pct, 0.0f, 400.0f, "%.0f%%", ImGuiSliderFlags_AlwaysClamp)) {
+                Store(s.sharpness, std::clamp(std::round(pct) / 100.0f, 0.0f, 4.0f), true);
+            }
+            Help(aa_sharpens ? TL("How strong the sharpening is. Up to 100%: the upscaler's own sharpening; every 100% above adds one more sharpening pass.", "Quão forte é a nitidez. Até 100%: a nitidez do próprio upscaler; cada 100% acima adiciona mais uma passada.")
+                             : TL("How strong the sharpening is. CAS stops at 100%.", "Quão forte é a nitidez. O CAS para em 100%."), marks);
+            ResetButtons(s.sharpness, d.sharpness.load(), std::optional<float>(), marks);
+            ImGui::PopID();
         }
-        const Marks filter_marks{filters[d.cas ? 2 : d.rcas ? 1 : 0], filters[0]};
-        Help(rcas_blocked && !s.cas && downscaling ? TL("No effect: the game's image is larger than the window.", "Sem efeito: a imagem do jogo é maior que a janela.")
-             : rcas_blocked && !s.cas            ? TL("RCAS needs FSR 1 here: the game's image is smaller than the window. CAS works at any size.", "O RCAS precisa do FSR 1 aqui: a imagem do jogo é menor que a janela. O CAS funciona em qualquer tamanho.")
-                                                 : TL("Sharpens the final image. RCAS comes with FSR 1; CAS (AMD Contrast Adaptive Sharpening) is softer on noise and works at any size.", "Deixa a imagem final mais nítida. O RCAS vem com o FSR 1; o CAS (AMD Contrast Adaptive Sharpening) realça menos o ruído e funciona em qualquer tamanho."), filter_marks);
-        ImGui::PopID();
-        if (s.cas) {
-            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.cas_strength, 0, 100, "%d%%", TL("How strong the CAS sharpening is.", "Quão forte é a nitidez do CAS."), d.cas_strength);
-        } else {
-            ImGui::BeginDisabled(!s.rcas || rcas_blocked);
-            SliderRow(TL("Sharpening strength", "Intensidade da nitidez"), s.rcas_strength, 0, 100, "%d%%", TL("How strong the sharpening is.", "Quão forte é a nitidez."), d.rcas_strength);
-            ImGui::EndDisabled();
-        }
+        ImGui::EndDisabled();
         ImGui::EndTable();
     }
-    ImGui::SeparatorText(TL("Anti-aliasing", "Anti-aliasing"));
+    ImGui::SeparatorText(TL("Upscaling and anti-aliasing", "Ampliação e anti-aliasing"));
     if (BeginRows("##antialiasing")) {
-        // tlg: one row for DLAA and FSR 3.1 native AA (TlgSettings::AaMode). DLAA needs DLSS
-        // (tlg_dlss.dll, an NVIDIA RTX card); the game's own SMAA runs either way.
-        static const char* const aa_labels[TlgSettings::AaModeCount] = {
-            TL("Off", "Desligado"), "DLAA (NVIDIA DLSS)", TL("FSR 3.1 Native AA", "FSR 3.1 AA nativo")};
-        Row(TL("Anti-aliasing", "Anti-aliasing"));
-        const int aa_mode = TlgSettings::AaModeOf();
-        if (ImGui::BeginCombo("##value", aa_labels[aa_mode])) {
-            for (int i = 0; i < TlgSettings::AaModeCount; ++i) {
-                ImGui::BeginDisabled(!TlgSettings::AaModeSupported(i));
-                if (ImGui::Selectable(aa_labels[i], i == aa_mode) && i != aa_mode) {
-                    TlgSettings::SetAaMode(i);
+        namespace S = TlgSettings;
+        // tlg: Upscaler (Built-in, DLSS, FSR 3.1, FSR 4), Quality (the render size; the launcher
+        // patches it in at start, so it needs a restart) and the AA checkbox (DLAA / FSR native
+        // AA at native size). Below native size the upscaler is the anti-aliasing: the AA row
+        // does not apply. DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a card with its
+        // shader features; both grey out when the card lacks them.
+        // TAA (test 2026-11-07): our own light temporal AA, native size only, between the
+        // game's SMAA and DLAA / FSR native AA in cost.
+        static const char* const up_labels[] = {TL("Built-in (game)", "Do jogo"), "DLSS (NVIDIA)", "FSR 3.1",
+                                                "FSR 4", TL("TAA (native only)", "TAA (só nativo)")};
+        static const int up_values[] = {S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3, S::UpscalerFsr4,
+                                        S::UpscalerTaa};
+        constexpr int up_count = int(std::size(up_values));
+        Row(TL("Upscaler", "Ampliador"));
+        const int upscaler = S::SelectedUpscaler();
+        int up_index = 2;
+        for (int i = 0; i < up_count; ++i) {
+            if (up_values[i] == upscaler) up_index = i;
+        }
+        if (ImGui::BeginCombo("##value", up_labels[up_index])) {
+            for (int i = 0; i < up_count; ++i) {
+                const bool supported = (up_values[i] != S::UpscalerDlss || s.dlss_supported) &&
+                                       (up_values[i] != S::UpscalerFsr4 || s.fsr4_supported);
+                ImGui::BeginDisabled(!supported);
+                if (ImGui::Selectable(up_labels[i], i == up_index) && i != up_index) {
+                    S::SetUpscaler(up_values[i]);
                     dirty = true;
                 }
                 ImGui::EndDisabled();
             }
             ImGui::EndCombo();
         }
-        Help(!s.dlss_supported && aa_mode == TlgSettings::AaOff
-                 ? (s.dlss_problem.load() ? s.dlss_problem.load() : TL("DLAA needs an NVIDIA RTX card and tlg_dlss.dll; FSR 3.1 native AA runs on any card.", "O DLAA precisa de uma placa NVIDIA RTX e do tlg_dlss.dll; o FSR 3.1 AA nativo roda em qualquer placa."))
-                 : TL("Stable, smooth edges on foliage, feathers and railings, at native resolution on the game's own motion vectors. DLAA: NVIDIA DLSS (RTX cards). FSR 3.1 native AA: AMD FSR, on any card. Off: the game's own anti-aliasing only. F8 switches between off and the choice in game.",
-                      "Bordas estáveis e suaves em folhagem, penas e grades, na resolução nativa com os vetores de movimento do próprio jogo. DLAA: NVIDIA DLSS (placas RTX). FSR 3.1 AA nativo: AMD FSR, em qualquer placa. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo entre desligado e a escolha."),
-             {s.dlss_supported ? "DLAA" : aa_labels[TlgSettings::AaFsr3Native], ""});
+        Help(!s.dlss_supported && s.dlss_problem.load()
+                 ? s.dlss_problem.load()
+                 : TL("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). The choice is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA; Built-in keeps only the game's own. F8 switches between Built-in and your choice in game.",
+                      "Qual ampliador desenha a imagem na qualidade escolhida: DLSS (placas NVIDIA RTX), FSR 4 (qualquer placa recente, não só AMD; mais nítido e estável que o FSR 3.1), FSR 3.1 (qualquer placa) ou a ampliação do próprio jogo. TAA é um anti-aliasing mais leve e suave, só no tamanho nativo. A escolha também é o anti-aliasing: na qualidade AA nativo o DLSS é DLAA e o FSR é FSR AA nativo; Do jogo mantém só o do jogo. F8 alterna entre Do jogo e a sua escolha no jogo."),
+             {s.dlss_supported ? "DLSS (NVIDIA)" : up_labels[s.fsr4_supported ? 3 : 2], ""});
         ImGui::PopID();
+        static const char* const quality_labels[S::PresetCount] = {
+            TL("Native AA", "AA nativo"), TL("Quality", "Qualidade"), TL("Balanced", "Equilibrado"),
+            TL("Performance", "Desempenho"), TL("Ultra Performance", "Ultra desempenho"),
+            TL("Supersampling 150% (experimental)", "Supersampling 150% (experimental)"),
+            TL("Supersampling 200% (experimental)", "Supersampling 200% (experimental)")};
+        int ow = 0, oh = 0, rw = 0, rh = 0;
+        S::OutputSize(ow, oh);
+        S::PresetRenderSize(s.preset, ow, oh, rw, rh);
+        static std::string quality_help;
+        quality_help = Format("%s: ", quality_labels[std::clamp(s.preset.load(), 0, S::PresetCount - 1)]);
+        if (s.preset == S::NativeAA) {
+            quality_help += Format(TL("renders at the output size, %dx", "desenha no tamanho de saída, %dx"), ow) + Format("%d.", oh);
+        } else if (S::IsSupersampling(s.preset)) {
+            quality_help += Format(TL("renders at %dx", "desenha em %dx"), rw) + Format("%d, ", rh) +
+                            Format(TL("shrunk to %dx", "reduzido para %dx"), ow) + Format("%d.", oh);
+        } else {
+            quality_help += Format(TL("renders at %dx", "desenha em %dx"), rw) + Format("%d, ", rh) +
+                            Format(TL("upscaled to %dx", "ampliado para %dx"), ow) + Format("%d.", oh);
+        }
+        if (s.preset != s.startup_preset) {
+            int aw = 0, ah = 0;
+            S::PresetRenderSize(s.startup_preset, ow, oh, aw, ah);
+            quality_help += Format(TL(" Until the restart the game keeps rendering at %dx", " Até reiniciar o jogo continua a desenhar em %dx"), aw) +
+                            Format("%d (", ah) + quality_labels[std::clamp(s.startup_preset, 0, S::PresetCount - 1)] + ").";
+        }
+        quality_help += TL(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.",
+                           " Saída / 1,5 (Qualidade), 1,7 (Equilibrado), 2 (Desempenho) ou 3 (Ultra desempenho) por lado; o ampliador completa o resto. Definido no início: mudar exige Aplicar e reiniciar.");
+        // Supersampling (experimental, tlg.ini / TLG_UPSCALE_PRESET) is listed only while selected.
+        ChoiceRow(TL("Quality (requires restart)", "Qualidade (exige reiniciar)"), s.preset, quality_labels, nullptr,
+                  S::IsSupersampling(s.preset) ? S::PresetCount : S::MenuPresetCount, quality_help.c_str(), S::NativeAA);
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",
                     "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."), d.smaa, false);
@@ -556,8 +601,8 @@ void ImageTab() {
         static const char* const shadow_labels[] = {TL("Game (2048)", "Jogo (2048)"), "4096", "8192"};
         static const int shadow_values[] = {1, 2, 4};
         ChoiceRow(TL("Shadow resolution", "Resolução das sombras"), s.shadow_scale, shadow_labels, shadow_values, 3,
-                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about 1 GB of video memory; recommended when you have the headroom.",
-                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga."), d.shadow_scale, 1);
+                  TL("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.",
+                     "Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos."), d.shadow_scale, 1);
         SliderRow(TL("Field of view", "Campo de visão"), s.fov, 50, 110, "%d°",
                   TL("Camera field of view. Default 70° is as shipped; higher shows more around the boy. Applies while the game runs (not in the paused menu).",
                      "Campo de visão da câmera. Padrão 70° é o original; mais alto mostra mais em volta do menino. Aplica com o jogo rodando (não no menu pausado)."), d.fov, 70);
@@ -650,13 +695,13 @@ void ImageTab() {
     ImGui::SeparatorText(TL("Color", "Cor"));
     if (BeginRows("##color")) {
         CheckRow(TL("Color adjustments", "Ajustes de cor"), s.color_adjust,
-                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). SDR only; HDR is left as is. Default on (gamma 0.75); off is the game as shipped. No measurable cost.",
-                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Só em SDR; o HDR fica como está. Padrão ligado (gama 0,75); desligado é o jogo original. Sem custo mensurável."), d.color_adjust, false);
+                 TL("Brightness, contrast, saturation and gamma of the final image (the HUD included). SDR only; HDR is left as is. Default on, all neutral (gamma 1); off is the game as shipped. No measurable cost.",
+                    "Brilho, contraste, saturação e gama da imagem final (o HUD incluído). Só em SDR; o HDR fica como está. Padrão ligado, tudo neutro (gama 1); desligado é o jogo original. Sem custo mensurável."), d.color_adjust, false);
         ImGui::BeginDisabled(!s.color_adjust);
         FloatSliderRow(TL("Brightness", "Brilho"), s.brightness, G::Brightness, TL("Adds light or shadow evenly; 0 is unchanged.", "Clareia ou escurece por igual; 0 não altera."), d.brightness);
         FloatSliderRow(TL("Contrast", "Contraste"), s.contrast, G::Contrast, TL("Spreads tones away from mid gray; 1 is unchanged.", "Afasta os tons do cinza médio; 1 não altera."), d.contrast);
         FloatSliderRow(TL("Saturation", "Saturação"), s.saturation, G::Saturation, TL("Color intensity: 0 is black and white, 1 is unchanged.", "Intensidade das cores: 0 é preto e branco, 1 não altera."), d.saturation);
-        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 0.75: the game's SDR image is over-lit outdoors. 1 is the game's own.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 0,75: a imagem SDR do jogo é clara demais ao ar livre. 1 é a do jogo."), d.color_gamma);
+        FloatSliderRow(TL("Gamma", "Gama"), s.color_gamma, G::Gamma, TL("Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.", "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 1, a do jogo; 0,75 suaviza a imagem SDR clara demais ao ar livre."), d.color_gamma);
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
@@ -668,7 +713,7 @@ void ImageTab() {
         std::snprintf(text, sizeof(text), "%d x %d", ww, wh);
         InfoRow(TL("Windowed", "Janela"), text);
         InfoRow("FSR 1", !s.fsr1 ? TL("off", "desligado") : upscaling ? TL("active", "ativo") : TL("no effect (image not smaller than window)", "sem efeito (imagem não é menor que a janela)"));
-        InfoRow(TL("Sharpening", "Nitidez"), !s.rcas_applied ? TL("not applied", "não aplicada") : s.cas ? TL("applied (CAS)", "aplicada (CAS)") : TL("applied (RCAS)", "aplicada (RCAS)"));
+        InfoRow(TL("Sharpening", "Nitidez"), !s.sharpen ? TL("off", "desligada") : s.rcas_applied ? TL("applied (CAS)", "aplicada (CAS)") : TlgSettings::AaSharpenedRecently() ? TL("applied (RCAS, in the AA step)", "aplicada (RCAS, na etapa de AA)") : TL("not applied", "não aplicada"));
         ImGui::EndTable();
     }
 }
@@ -1244,7 +1289,7 @@ int RestartChanges() {
     const auto& s = TlgSettings::Get();
     return (s.render_resolution != s.startup_render_resolution) + (s.engine_fps != s.startup_engine_fps) +
            (s.deferred_readback != s.startup_deferred_readback) + (s.stale_readback != s.startup_stale_readback) +
-           (s.hdr != s.startup_hdr);
+           (s.hdr != s.startup_hdr) + (s.preset != s.startup_preset);
 }
 
 void Menu() {
@@ -1280,7 +1325,10 @@ void Menu() {
             requested_tab = (s.menu_tab + step + TabCount) % TabCount;
         }
     }
-    const float footer = ImGui::GetFrameHeightWithSpacing() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 2.0f;
+    // Restart row, help box (fixed height) and Close row; a long help text never pushes the
+    // "Apply and restart" button out of the window (user 2026-11-07).
+    const float help_height = ImGui::GetTextLineHeightWithSpacing() * 5.0f;
+    const float footer = ImGui::GetFrameHeightWithSpacing() * 2.0f + help_height + ImGui::GetStyle().ItemSpacing.y * 3.0f;
     if (ImGui::BeginTabBar("##tabs")) {
         static const char* const tabs[TabCount] = {"Overlay", TL("Image", "Imagem"), TL("Performance", "Desempenho"),
                                                    TL("Controls", "Controles"), TL("Fun", "Diversão"),
@@ -1316,9 +1364,6 @@ void Menu() {
     }
 
     ImGui::Separator();
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", footer_help ? footer_help : TL("L1 / R1 or Q / E: switch tabs. Settings are saved in tlg.ini.", "L1 / R1 ou Q / E: trocar de aba. As configurações ficam salvas em tlg.ini."));
-    ImGui::PopTextWrapPos();
     if (const int changes = RestartChanges()) {
         ImGui::TextColored(ImVec4(0.85f, 0.72f, 0.45f, 1.0f), "%d change%s need%s a restart (unsaved progress is lost).",
                            changes, changes == 1 ? "" : "s", changes == 1 ? "s" : "");
@@ -1335,6 +1380,12 @@ void Menu() {
     } else {
         ImGui::NewLine();
     }
+    if (ImGui::BeginChild("##help", ImVec2(0, help_height))) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", footer_help ? footer_help : TL("L1 / R1 or Q / E: switch tabs. Settings are saved in tlg.ini.", "L1 / R1 ou Q / E: trocar de aba. As configurações ficam salvas em tlg.ini."));
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::EndChild();
     const float close_width = ImGui::CalcTextSize(TL("Close", "Fechar")).x + ImGui::GetStyle().FramePadding.x * 2;
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - close_width);
     if (ImGui::Button(TL("Close", "Fechar"))) {
@@ -2152,10 +2203,17 @@ bool HandleEvent(const SDL_Event& event) {
         // tlg: F8 switches between the anti-aliasing choice and the game's own SMAA (saved; the
         // label shows briefly).
         if (down && !event.key.repeat && event.key.key == SDLK_F8) {
-            auto& settings = TlgSettings::Get();
-            settings.dlaa = !settings.dlaa;
+            // Switches between Built-in and the last other upscaler (DLSS, else FSR 4, else FSR 3.1).
+            static int last_upscaler = -1;
+            const int current = TlgSettings::SelectedUpscaler();
+            if (current != TlgSettings::UpscalerOff) {
+                last_upscaler = current;
+                TlgSettings::SetUpscaler(TlgSettings::UpscalerOff);
+            } else {
+                TlgSettings::SetUpscaler(last_upscaler >= 0 ? last_upscaler : TlgSettings::DefaultAaUpscaler());
+            }
             aa_label_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-            std::printf("AA: %s (F8)\n", settings.dlaa ? TlgSettings::AaModeName(TlgSettings::AaModeOf()) : "game SMAA");
+            std::printf("AA: %s (F8)\n", TlgSettings::AaOn() ? TlgSettings::AaModeName(TlgSettings::AaModeOf()) : "game SMAA");
             TlgSettings::Save();
             return true;
         }
@@ -2336,7 +2394,7 @@ static bool NoticeActive() {
 /// tlg: the AA label (top right), for a moment after F8.
 bool AaLabelOn() {
     const auto& s = TlgSettings::Get();
-    return s.upscaler == TlgSettings::UpscalerDlss &&
+    return s.upscaler != TlgSettings::UpscalerOff && s.upscaler != TlgSettings::UpscalerTaa &&
            std::chrono::steady_clock::now() < aa_label_until;
 }
 

@@ -179,6 +179,30 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
     TlgSettings::ConfigureUpscalerSupport(instance.IsFsr4Int8Supported(),
                                          instance.IsFsr411Supported());
     fsr4 = std::make_unique<Fsr4Upscaler>(instance, scheduler);
+    // tlg: engine upscale: the resolution patch gave the game a render size below its output.
+    if (const char* render = std::getenv("TLG_RENDER_RESOLUTION")) {
+        u32 ow = 1920, oh = 1080;
+        if (const char* patch = std::getenv("TLG_RESOLUTION_PATCH")) {
+            if (std::sscanf(patch, "%ux%u", &ow, &oh) != 2) {
+                ow = 1920;
+                oh = 1080;
+            }
+        }
+        u32 rw = 0, rh = 0;
+        if (std::sscanf(render, "%ux%u", &rw, &rh) == 2 && rw && rh && rw <= ow && rh <= oh &&
+            (rw < ow || rh < oh)) {
+            engine_upscale = true;
+            engine_render_w = rw;
+            engine_render_h = rh;
+            engine_output_w = ow;
+            engine_output_h = oh;
+            if (const char* ps = std::getenv("TLG_UPSCALE_PS")) {
+                engine_upscale_ps = std::strtoull(ps, nullptr, 16);
+            }
+            std::printf("Engine upscale: render %ux%u, output %ux%u (PS_Upscale%s)\n", rw, rh, ow,
+                        oh, engine_upscale_ps ? " by TLG_UPSCALE_PS" : " to be found");
+        }
+    }
     {
         const Dlss* dlss = Dlss::Get();
         static std::string problem;
@@ -311,10 +335,12 @@ bool TemporalUpscaler::OnFrameStart() {
     // natively at that size. The scene targets only know the 1920x1080 buffers (reduced presets
     // misplace the half-resolution layers), so the upscaler stays off; at 1920x1080 it works.
     static const char* resolution_patch = std::getenv("TLG_RESOLUTION_PATCH");
-    // DLAA and FSR 3.1 native AA work on the game's own targets at any size (RunGameMotion).
+    // DLAA, FSR 3.1/4 native AA and TAA work on the game's own targets at any size (RunGameMotion).
     if (resolution_patch && TlgSettings::Get().upscaler != TlgSettings::UpscalerOff &&
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa &&
         TlgSettings::Get().upscaler != TlgSettings::UpscalerDlss &&
-        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr3) {
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr3 &&
+        TlgSettings::Get().upscaler != TlgSettings::UpscalerFsr4) {
         TlgSettings::Get().upscaler.store(TlgSettings::UpscalerOff);
         static bool logged = false;
         if (!std::exchange(logged, true)) {
@@ -327,8 +353,9 @@ bool TemporalUpscaler::OnFrameStart() {
     const int preset = TlgSettings::RenderPreset();
     if (applied_preset != preset || settings.upscaler == TlgSettings::UpscalerOff) failed = false;
     const bool active = Active();
+    // tlg: the AA row, or forced in the engine upscale mode (DLSS/FSR is the AA then).
     const bool jitter_on = active && settings.jitter && !TlgToggle::Disabled(1u << 25) &&
-                           settings.dlaa;
+                           TlgSettings::AaOn();
     const int upscaler = settings.upscaler.load();
     const int output = settings.output_res.load();
     const bool output_changed = !scaled_session && applied_output != output;
@@ -380,6 +407,12 @@ bool TemporalUpscaler::OnFrameStart() {
     display_redirect = ui_phase;
     ui_phase = false;
     ui_read_barrier = false;
+    engine_redirect = {};
+    engine_ui_carried = engine_ui;
+    engine_ui = false;
+    engine_ui_color = {};
+    engine_ui_read_barrier = false;
+    engine_hdr_post_done = false;
     done_this_frame = false;
     ldr_target = {};
     scene_color = {};
@@ -387,8 +420,8 @@ bool TemporalUpscaler::OnFrameStart() {
     opaque_valid = false;
     mask_ready = false;
     // tlg: game-motion DLAA jitters only frames DLSS resolves (unresolved jitter shimmers);
-    // FSR 3.1 native AA resolves them the same way.
-    jitter_active = jitter_on && (UseDlss() || FsrNativeAa()) && !Scaled();
+    // FSR 3.1 and FSR 4 native AA resolve them the same way.
+    jitter_active = jitter_on && (UseDlss() || FsrNativeAa() || TaaNativeAa()) && !Scaled();
     // Halton(2, 3); the menu or toggle 1 << 25 disables it.
     if (!jitter_on) {
         jitter = {};
@@ -413,7 +446,8 @@ bool TemporalUpscaler::OnFrameStart() {
 }
 
 void TemporalUpscaler::AdvanceJitter() {
-    const u32 phases = Scaled() ? Motion::JitterPhases(render_width, target_width)
+    const u32 phases = EngineUpscale() ? Motion::JitterPhases(engine_render_w, engine_output_w)
+        : Scaled() ? Motion::JitterPhases(render_width, target_width)
         : Motion::JitterPhases(scene_targets.Size().width, 1920);
     jitter_index = jitter_index % phases + 1;
     jitter = {Halton(jitter_index, 2) - 0.5f, Halton(jitter_index, 3) - 0.5f};
@@ -431,6 +465,10 @@ void TemporalUpscaler::OnGameMotionPass(VideoCore::ImageId scene, VideoCore::Ima
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
     if (cs_hash == game_trigger_hash && game_frame.valid) {
+        // Engine upscale: the frame is resolved later, at the PS_Upscale draw (RunGameUpscale).
+        if (EngineUpscale()) {
+            return;
+        }
         if (GameMotion()) {
             RunGameMotion();
         } else {
@@ -787,8 +825,8 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
                          sizeof(params), &params);
     cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
     const auto& settings = TlgSettings::Get();
-    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 2.0f);
-    const std::array<float, 2> sharpen_params{strength, strength};
+    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 1.0f); // 0..100%, as FSR's own
+    const std::array<float, 2> sharpen_params{strength, 1.0f};
     if (settings.sharpen && strength > 0.0f && !(params.pad & 0xffu)) {
         const vk::MemoryBarrier2 resolved{
             .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
@@ -810,27 +848,34 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
         cmdbuf.pushConstants(*taa_sharpen_pipeline_layout, vk::ShaderStageFlagBits::eCompute,
                              0, sizeof(sharpen_params), sharpen_params.data());
         cmdbuf.dispatch((out_width + 7) / 8, (out_height + 7) / 8, 1);
+        ExtraSharpen(cmdbuf, vk::Image(output_image), false, out_width, out_height); // above 100%
     }
     taa_next = 1 - taa_next;
 }
 
 void TemporalUpscaler::ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w,
                                     u32 h) {
+    // One scale for every upscaler (user, 2026-11-07): 0..100% is the upscaler's own sharpening
+    // (FSR 3.1 / FSR 4 RCAS; DLSS and TAA, which have none, get the same RCAS). Every 100% above
+    // adds one full RCAS pass on the result, the last one partial: 400% = own + 3 passes.
     const auto& settings = TlgSettings::Get();
-    const float extra = std::clamp(settings.sharpness.load(), 0.0f, 2.0f) - 1.0f;
-    if (settings.sharpen && extra > 0.0f) {
-        RcasPass(cmdbuf, target, ldr, w, h, extra, extra);
+    float extra = std::clamp(settings.sharpness.load(), 0.0f, 4.0f) - 1.0f;
+    if (!settings.sharpen) {
+        return;
+    }
+    for (; extra > 0.0f; extra -= 1.0f) {
+        RcasPass(cmdbuf, target, ldr, w, h, std::min(extra, 1.0f), 1.0f);
     }
 }
 
 void TemporalUpscaler::DlssSharpen(vk::CommandBuffer cmdbuf, u32 w, u32 h) {
-    // The menu's 0..1 matches FSR 3's RCAS (fully applied); above 1 extrapolated.
+    // DLSS has no own sharpening any more: RCAS 0..100% stands in for it, as FSR's own.
     const auto& settings = TlgSettings::Get();
-    const float strength = std::clamp(settings.sharpness.load(), 0.0f, 2.0f);
-    if (settings.sharpen && strength > 0.0f) {
-        RcasPass(cmdbuf, vk::Image(output_image), false, w, h, strength,
-                 std::max(strength, 1.0f));
+    const float base = std::clamp(settings.sharpness.load(), 0.0f, 1.0f);
+    if (settings.sharpen && base > 0.0f) {
+        RcasPass(cmdbuf, vk::Image(output_image), false, w, h, base, 1.0f);
     }
+    ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
 }
 
 void TemporalUpscaler::RcasPass(vk::CommandBuffer cmdbuf, vk::Image target, bool ldr, u32 w,
@@ -1121,6 +1166,56 @@ bool TemporalUpscaler::TakeFgInputs(FgInputs& inputs) {
     return true;
 }
 
+// tlg: TLG_GPU_PROFILE=1 splits the AA and upscale step into its parts (issue #57): GPU time per
+// part goes to the GPU profile; the processor time of the step and of the DLSS / FSR call are
+// printed every 5 s ("AA CPU"), because on a fast GPU the cost can be on the processor side.
+namespace {
+void AaMark(const char* path, const char* part) {
+    auto* profiler = GpuProfiler::Get();
+    if (!profiler) {
+        return;
+    }
+    const std::string label = std::string{"AA "} + path + ": " + part;
+    profiler->Mark(0xAA00'0000'0000'0000ull ^ std::hash<std::string>{}(label),
+                   [&label] { return label; });
+}
+
+struct AaCpuTimer {
+    using Clock = std::chrono::steady_clock;
+    const char* path = nullptr;
+    Clock::time_point start = Clock::now();
+    Clock::time_point call_start{};
+    double call_ms = 0;
+    explicit AaCpuTimer(const char* path_) : path{GpuProfiler::Get() ? path_ : nullptr} {}
+    void CallStart() {
+        call_start = Clock::now();
+    }
+    void CallEnd() {
+        call_ms = std::chrono::duration<double, std::milli>(Clock::now() - call_start).count();
+    }
+    ~AaCpuTimer() {
+        if (!path) {
+            return;
+        }
+        static std::unordered_map<std::string, std::array<double, 3>> totals; // step, call, count
+        static Clock::time_point window = Clock::now();
+        auto& t = totals[path];
+        t[0] += std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+        t[1] += call_ms;
+        t[2] += 1;
+        if (Clock::now() - window < std::chrono::seconds(5)) {
+            return;
+        }
+        window = Clock::now();
+        for (const auto& [name, v] : totals) {
+            std::printf("AA CPU: %s %.3f ms/step, %.3f ms in the DLSS/FSR call, %.0f steps\n",
+                        name.c_str(), v[0] / v[2], v[1] / v[2], v[2]);
+        }
+        totals.clear();
+    }
+};
+} // namespace
+
 void TemporalUpscaler::RunGameMotion() {
     auto& color = texture_cache.GetImage(game_frame.scene);
     auto& motion = texture_cache.GetImage(game_frame.motion);
@@ -1144,7 +1239,10 @@ void TemporalUpscaler::RunGameMotion() {
         failed = true;
         return;
     }
-    const char* provider = UseDlss() ? "DLAA" : "FSR 3.1 native AA";
+    const bool taa = TaaNativeAa();
+    const char* provider = taa ? "TAA" : UseDlss() ? "DLAA" : UseFsr4() ? "FSR 4 native AA" : "FSR 3.1 native AA";
+    const char* profile_path = provider;
+    AaCpuTimer cpu_timer{provider};
     static const char* logged = nullptr;
     if (std::exchange(logged, provider) != provider) {
         std::printf("Upscaler: %s on game motion vectors %ux%u\n", provider, w, h);
@@ -1161,6 +1259,8 @@ void TemporalUpscaler::RunGameMotion() {
     runtime.Transit(&color, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
     runtime.FlushBarriers();
     const auto cmdbuf = scheduler.CommandBuffer();
+    const u64 profile_resume = GpuProfiler::Get() ? GpuProfiler::Get()->Current() : 0;
+    AaMark(profile_path, "1 motion vectors");
     const auto all = vk::PipelineStageFlagBits2::eAllCommands;
     const auto rw = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite;
     const auto own_barrier = [&](vk::Image image, vk::ImageLayout old_layout,
@@ -1195,21 +1295,37 @@ void TemporalUpscaler::RunGameMotion() {
     last_frame = now;
     // Fresh history after a settings change, a skipped frame, or a menu or loading screen.
     reset = game_reset || now - last_game_motion > std::chrono::milliseconds(100);
-    const bool ok = UseDlss()
+    AaMark(profile_path, "2 DLSS / FSR");
+    cpu_timer.CallStart();
+    if (taa) {
+        // RecordTaa reads the member jitter; it also sharpens (menu sharpness) by itself.
+        const auto current_jitter = std::exchange(jitter, game_frame.jitter);
+        RecordTaa(cmdbuf, color_view, depth_view);
+        jitter = current_jitter;
+    }
+    const bool ok = taa ? true : UseDlss()
         ? RecordDlss(cmdbuf,
                      {color.GetImage(), color_view, color.info.pixel_format,
                       vk::ImageAspectFlagBits::eColor, w, h},
                      {depth.GetImage(), depth_view, depth_format, vk::ImageAspectFlagBits::eDepth,
                       w, h},
                      w, h, w, h, frame_ms, true, game_frame.jitter)
-        : FsrNativeAa() &&
-          RecordFsr3(cmdbuf, color.GetImage(), color.info.pixel_format, color.usage_flags,
-                     depth.GetImage(), depth_format, depth.usage_flags, w, h, w, h, frame_ms,
-                     false, game_frame.jitter);
+        : !FsrNativeAa() ? false
+        : UseFsr4()
+            ? RecordFsr4(cmdbuf, {color.GetImage(), color_view, w, h},
+                         {depth.GetImage(), depth_view, w, h}, w, h, w, h, frame_ms,
+                         game_frame.jitter)
+            : RecordFsr3(cmdbuf, color.GetImage(), color.info.pixel_format, color.usage_flags,
+                         depth.GetImage(), depth_format, depth.usage_flags, w, h, w, h, frame_ms,
+                         false, game_frame.jitter);
+    cpu_timer.CallEnd();
     if (!ok) {
         return;
     }
-    if (UseDlss()) {
+    TlgSettings::MarkAaSharpened(SharpenerName()); // the presenter skips CAS: one sharpener per frame
+    AaMark(profile_path, "3 sharpen");
+    if (taa) {
+    } else if (UseDlss()) {
         DlssSharpen(cmdbuf, w, h);
     } else {
         ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
@@ -1254,6 +1370,7 @@ void TemporalUpscaler::RunGameMotion() {
                              sizeof(mode), &mode);
         cmdbuf.dispatch((w + 7) / 8, (h + 7) / 8, 1);
     }
+    AaMark(profile_path, "4 copy back");
     // The DLSS output replaces the scene (B10G11R11 has no alpha to keep).
     own_barrier(vk::Image(output_image), vk::ImageLayout::eGeneral, all, rw,
                 vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eTransfer,
@@ -1270,6 +1387,9 @@ void TemporalUpscaler::RunGameMotion() {
     cmdbuf.blitImage(vk::Image(output_image), vk::ImageLayout::eTransferSrcOptimal,
                      color.GetImage(), vk::ImageLayout::eTransferDstOptimal, region,
                      vk::Filter::eNearest);
+    if (profile_resume) {
+        GpuProfiler::Get()->Resume(profile_resume);
+    }
 }
 
 void TemporalUpscaler::Run() {
@@ -1366,7 +1486,8 @@ void TemporalUpscaler::Run() {
         dispatched = true;
     } else if (UseFsr4()) {
         dispatched = RecordFsr4(cmdbuf, {input_color, input_color_view, w, h},
-                                {input_depth, input_depth_view, w, h}, w, h, ow, oh, frame_ms);
+                                {input_depth, input_depth_view, w, h}, w, h, ow, oh, frame_ms,
+                                jitter);
     } else if (UseDlss()) {
         dispatched = RecordDlss(
             cmdbuf,
@@ -1381,6 +1502,7 @@ void TemporalUpscaler::Run() {
     if (dispatched) {
         reset = false;
         dispatched_last_frame = true;
+        TlgSettings::MarkAaSharpened(SharpenerName()); // the presenter skips CAS: one sharpener per frame
         if (UseDlss()) {
             DlssSharpen(cmdbuf, ow, oh);
         } else if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
@@ -1495,12 +1617,16 @@ std::array<u32, 2> TemporalUpscaler::SceneSize(u32 w, u32 h) const {
 
 float TemporalUpscaler::SceneMipBias() const {
     if (!Active() || TlgSettings::Get().upscaler == TlgSettings::UpscalerTaa) return 0.0f;
-    const float render = float(TlgSettings::Get().active_render_width.load());
-    const float output = float(Scaled() ? target_width : 1920u);
+    float render = float(TlgSettings::Get().active_render_width.load());
+    float output = float(Scaled() ? target_width : 1920u);
+    if (EngineUpscale()) {
+        render = float(engine_render_w);
+        output = float(engine_output_w);
+    }
     float bias = render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
     // DLSS and FSR guides: log2(render / output) - 1; the resolve keeps the extra detail stable.
     // tlg: Lab tab lod_bias, in quarter steps (default -4: the guide's -1).
-    if ((UseDlss() || FsrNativeAa()) && TlgSettings::Get().dlaa) {
+    if ((UseDlss() || FsrNativeAa()) && TlgSettings::AaOn()) {
         bias += TlgSettings::Get().lod_bias.load() * 0.25f;
     }
     return bias;
@@ -1523,11 +1649,54 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
     }
 }
 
-void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
+bool TemporalUpscaler::OnDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color,
                               VideoCore::ImageId depth, bool native_viewport) {
+    if (engine_redirect) {
+        // HDR: the redirect covers only the PS_Upscale draw right after OnEngineDraw.
+        if (!engine_redirect_hit) {
+            static bool logged = false;
+            if (!std::exchange(logged, true)) {
+                std::printf("Engine upscale: HDR redirect missed (PS_Upscale read another image "
+                            "like #%u)\n", engine_redirect.index);
+            }
+        }
+        engine_redirect = {};
+    }
+    if (engine_ui) {
+        // A UI movie can start without stencil and enable it for later text/masks.
+        if (color == engine_ui_color && depth && depth != ui_depth) {
+            EnsureUiResources(engine_output_w, engine_output_h, vk::Format::eR8G8B8A8Unorm,
+                              texture_cache.GetImage(depth).info.pixel_format);
+            PrepareUiDepth(depth);
+            ui_depth = depth;
+        }
+    } else if (engine_upscale && engine_hdr_seen && color && !Scaled()) {
+        // In HDR the UI (HUD, hint boxes, menus; several shaders) draws into the frame after the
+        // game's last image pass (vs 0811cca2, seen 2026-11-07): every later draw is UI.
+        static const u64 hdr_post_vs = [] {
+            const char* env = std::getenv("TLG_HDR_POST_VS");
+            return env ? std::strtoull(env, nullptr, 16) : 0x0811cca2ull;
+        }();
+        const auto& info = texture_cache.GetImage(color).info;
+        if (info.pixel_format == vk::Format::eB10G11R11UfloatPack32 &&
+            info.size.width == engine_render_w && info.size.height == engine_render_h) {
+            const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
+                               (engine_hdr_post_done && vs_hash != hdr_post_vs);
+            if (vs_hash == hdr_post_vs) {
+                engine_hdr_post_done = true;
+            }
+            engine_hdr_src = color;
+            if (movie) {
+                StartEngineHdrUi(color, depth, vs_hash);
+            }
+        }
+    }
+    if (engine_upscale && color && !Scaled() && OnEngineDraw(vs_hash, ps_hash, color)) {
+        return true;
+    }
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
     if (!Scaled() || !color) {
-        return;
+        return false;
     }
     if (ui_phase) {
         // A UI movie can start without stencil and enable it for later text/masks.
@@ -1537,7 +1706,7 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
             PrepareUiDepth(depth);
             ui_depth = depth;
         }
-        return;
+        return false;
     }
     const auto& image = texture_cache.GetImage(color);
     const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
@@ -1551,18 +1720,385 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                                   camera_motion.Ready() && ldr_target == color,
                                   Active() && !failed)) {
     case UiComposition::Background::None:
-        return;
+        return false;
     case UiComposition::Background::Temporal:
         RunScaled();
         if (ui_phase) {
-            return;
+            return false;
         }
         // A failed FSR dispatch must not force UI text back to the scene resolution.
         [[fallthrough]];
     case UiComposition::Background::Copy:
         RunUiOnly(color, depth);
-        return;
+        return false;
     }
+    return false;
+}
+
+bool TemporalUpscaler::StartEngineHdrUi(VideoCore::ImageId color, VideoCore::ImageId depth,
+                                        u64 vs_hash) {
+    if (engine_hdr_format != vk::Format::eB10G11R11UfloatPack32 || !engine_hdr_image ||
+        !EngineUpscale() || !game_frame.valid) {
+        static bool logged = false;
+        if (!std::exchange(logged, true)) {
+            std::printf("Engine upscale: HDR UI stays in the render-size frame (format %d, image %d, "
+                        "frame %d)\n", int(engine_hdr_format), int(bool(engine_hdr_image)),
+                        int(game_frame.valid));
+        }
+        return false;
+    }
+    if (!RunGameUpscale(color, {}, true)) {
+        return false;
+    }
+    scheduler.EndRendering();
+    const vk::ImageMemoryBarrier2 b{
+        .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentRead |
+                         vk::AccessFlagBits2::eColorAttachmentWrite,
+        .oldLayout = vk::ImageLayout::eGeneral,
+        .newLayout = vk::ImageLayout::eGeneral,
+        .image = vk::Image(engine_hdr_image),
+        .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+    };
+    scheduler.CommandBuffer().pipelineBarrier2(
+        {.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+    const auto depth_format = depth ? texture_cache.GetImage(depth).info.pixel_format
+                                    : vk::Format::eD32SfloatS8Uint;
+    EnsureUiResources(engine_output_w, engine_output_h, vk::Format::eR8G8B8A8Unorm, depth_format);
+    PrepareUiDepth(depth);
+    ui_depth = depth;
+    engine_ui = true;
+    engine_ui_color = color;
+    engine_ui_read_barrier = false;
+    static bool logged = false;
+    if (!std::exchange(logged, true)) {
+        std::printf("Engine upscale: HDR, DLSS before the UI (vs %08llx on #%u), the UI draws at "
+                    "%ux%u\n", (unsigned long long)vs_hash, color.index, engine_output_w,
+                    engine_output_h);
+    }
+    return true;
+}
+
+bool TemporalUpscaler::EngineUpscale() const {
+    // DLSS, FSR 4 or FSR 3.1 (with the AA setting on, like native AA) on the game's motion.
+    return engine_upscale && !engine_failed && GameMotion() && (UseDlss() || FsrNativeAa());
+}
+
+bool TemporalUpscaler::OnEngineDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color) {
+    const auto& image = texture_cache.GetImage(color);
+    const u32 w = image.info.size.width, h = image.info.size.height;
+    const bool rgba8 = image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+                       image.info.pixel_format == vk::Format::eR8G8B8A8Srgb;
+    if (rgba8 && w == engine_render_w && h == engine_render_h) {
+        engine_ldr = color; // the game's finished frame (post + SMAA), PS_Upscale's input
+        return false;
+    }
+    if (!rgba8 && !engine_ldr) {
+        engine_ldr = engine_hdr_src; // HDR: PS_Upscale's input is the float frame
+    }
+    if (!engine_ldr || w != engine_output_w || h != engine_output_h) {
+        return false;
+    }
+    if (!engine_upscale_ps) {
+        if (!game_frame.valid) {
+            return false; // no scene frame in flight (loading screens): not the upscale pass
+        }
+        engine_upscale_ps = ps_hash;
+        std::printf("Engine upscale: PS_Upscale draw vs %08llx ps %08llx, %ux%u -> %ux%u "
+                    "(TLG_UPSCALE_PS=%08llx pins it)\n",
+                    (unsigned long long)vs_hash, (unsigned long long)ps_hash, engine_render_w,
+                    engine_render_h, w, h, (unsigned long long)ps_hash);
+    }
+    if (ps_hash != engine_upscale_ps) {
+        return false;
+    }
+    const auto ldr = std::exchange(engine_ldr, VideoCore::ImageId{});
+    if (!engine_ui && !engine_ui_carried && (!EngineUpscale() || !game_frame.valid)) {
+        return false; // the game's own enlargement
+    }
+    if (!rgba8) {
+        // HDR target (A2B10G10R10, PQ): the game's PS_Upscale converts to HDR itself. Its
+        // input (a render-size float frame, not the 8-bit one) is redirected to
+        // engine_hdr_image while it binds; RunEngineUpscale fills that with DLSS and the draw
+        // goes ahead on it.
+        if (!engine_hdr_image || engine_hdr_w != w || engine_hdr_h != h) {
+            // PS_Upscale samples its whole input (UV 0..1, a full-screen triangle), so the
+            // DLSS image stands in at output size, same format as the game's frame when the
+            // GPU can blit into it (checked 2026-11-07 against the game's own HDR output).
+            const auto feats = instance.GetPhysicalDevice()
+                                   .getFormatProperties(vk::Format::eB10G11R11UfloatPack32)
+                                   .optimalTilingFeatures;
+            engine_hdr_format = (feats & vk::FormatFeatureFlagBits::eBlitDst) &&
+                                        (feats & vk::FormatFeatureFlagBits::eSampledImage)
+                                    ? vk::Format::eB10G11R11UfloatPack32
+                                    : vk::Format::eR16G16B16A16Sfloat;
+            if (engine_hdr_image) {
+                scheduler.Finish();
+            }
+            engine_hdr_views.clear();
+            engine_hdr_image =
+                VideoCore::UniqueImage(instance.GetDevice(), instance.GetAllocator());
+            engine_hdr_image.Create(vk::ImageCreateInfo{
+                .imageType = vk::ImageType::e2D,
+                .format = engine_hdr_format,
+                .extent = {w, h, 1},
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = vk::SampleCountFlagBits::e1,
+                .tiling = vk::ImageTiling::eOptimal,
+                .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled |
+                         vk::ImageUsageFlagBits::eColorAttachment,
+                .initialLayout = vk::ImageLayout::eUndefined,
+            });
+            engine_hdr_w = w;
+            engine_hdr_h = h;
+            std::printf("Engine upscale: HDR, the game's PS_Upscale reads the %s image (%ux%u, "
+                        "format %d)\n",
+                        UseDlss() ? "DLSS" : UseFsr4() ? "FSR 4" : "FSR 3.1", w, h,
+                        int(engine_hdr_format));
+        }
+        engine_redirect = ldr;
+        engine_redirect_hit = false;
+    }
+    engine_pending_hdr = !rgba8;
+    engine_hdr_seen = !rgba8;
+    // Deferred to RunEngineUpscale(): the rasterizer first prepares the target (guest upload,
+    // layout, clear decision), or an upload in BeginRendering would wipe the blit.
+    engine_pending_ldr = ldr;
+    engine_pending_target = color;
+    return true;
+}
+
+bool TemporalUpscaler::RunEngineUpscale(std::span<const VideoCore::ImageId> sampled) {
+    auto ldr = std::exchange(engine_pending_ldr, VideoCore::ImageId{});
+    const auto target = std::exchange(engine_pending_target, VideoCore::ImageId{});
+    if (!ldr || !target) {
+        return false;
+    }
+    // PS_Upscale's input is what the draw samples: prefer that over the last LDR target seen.
+    for (const auto id : sampled) {
+        if (!id || id == target) {
+            continue;
+        }
+        const auto& info = texture_cache.GetImage(id).info;
+        const bool rgba8 = info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+                           info.pixel_format == vk::Format::eR8G8B8A8Srgb ||
+                           (engine_pending_hdr &&
+                            info.pixel_format == vk::Format::eB10G11R11UfloatPack32);
+        if (rgba8 && info.size.width == engine_render_w && info.size.height == engine_render_h) {
+            static bool logged = false;
+            if (!std::exchange(logged, true)) {
+                std::printf("Engine upscale: PS_Upscale samples image #%u (last LDR target #%u)\n",
+                            id.index, ldr.index);
+            }
+            ldr = id;
+            break;
+        }
+    }
+    const bool hdr = std::exchange(engine_pending_hdr, false);
+    const bool carried = std::exchange(engine_ui_carried, false);
+    if (hdr && (engine_ui || carried)) {
+        return false; // DLSS ran before the UI; PS_Upscale reads the image with the UI on it
+    }
+    if (!RunGameUpscale(ldr, target, hdr) || hdr) {
+        return false; // HDR: the game's PS_Upscale draws next, on the redirected DLSS image
+    }
+    // Back to the layout the prepared render state expects for the (skipped) draw.
+    auto& out = texture_cache.GetImage(target);
+    runtime.Transit(&out, vk::ImageLayout::eColorAttachmentOptimal,
+                    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    vk::AccessFlagBits2::eColorAttachmentWrite |
+                        vk::AccessFlagBits2::eColorAttachmentRead);
+    runtime.FlushBarriers();
+    return true;
+}
+
+bool TemporalUpscaler::RunGameUpscale(VideoCore::ImageId ldr, VideoCore::ImageId target,
+                                      bool hdr) {
+    auto& color = texture_cache.GetImage(ldr);
+    auto& motion = texture_cache.GetImage(game_frame.motion);
+    auto& depth = texture_cache.GetImage(game_frame.depth);
+    // HDR before the UI: no PS_Upscale target yet (the output size is known).
+    auto& out = texture_cache.GetImage(target ? target : ldr);
+    const u32 w = color.info.size.width, h = color.info.size.height;
+    const u32 ow = target ? out.info.size.width : engine_output_w;
+    const u32 oh = target ? out.info.size.height : engine_output_h;
+    const auto depth_format = depth.info.pixel_format;
+    const bool usable = motion.info.pixel_format == vk::Format::eR16G16Sfloat &&
+                        motion.info.size.width == w && motion.info.size.height == h &&
+                        depth.info.size.width == w && depth.info.size.height == h &&
+                        (hdr || (out.usage_flags & vk::ImageUsageFlagBits::eTransferDst));
+    if (!usable) {
+        std::printf("Engine upscale: inputs unusable (ldr %ux%u, motion %d %ux%u, depth %ux%u, "
+                    "target usage %x); engine's own PS_Upscale instead\n",
+                    w, h, int(motion.info.pixel_format), motion.info.size.width,
+                    motion.info.size.height, depth.info.size.width, depth.info.size.height,
+                    u32(out.usage_flags));
+        engine_failed = true;
+        return false;
+    }
+    if (!EnsureResources(w, h, ow, oh, false)) {
+        failed = true;
+        return false;
+    }
+    static bool logged = false;
+    if (!std::exchange(logged, true)) {
+        std::printf("Engine upscale: %s %ux%u -> %ux%u on the game's motion vectors, replacing "
+                    "PS_Upscale\n", UseDlss() ? "DLSS" : UseFsr4() ? "FSR 4" : "FSR 3.1", w, h, ow, oh);
+        std::printf("Engine upscale: target #%u format %d usage %x tiled %u mips %u layers %u, "
+                    "input #%u format %d\n", target.index, int(out.info.pixel_format),
+                    u32(out.usage_flags), u32(out.info.props.is_tiled), out.info.resources.levels,
+                    out.info.resources.layers, ldr.index, int(color.info.pixel_format));
+    }
+    static const char* debug = std::getenv("TLG_ENGINE_UPSCALE_DEBUG");
+    if (!hdr && debug && debug[0] == '1') {
+        // Diagnostic: the plain input enlarged, no DLSS.
+        scheduler.EndRendering();
+        runtime.Transit(&color, vk::ImageLayout::eTransferSrcOptimal,
+                        vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferRead);
+        runtime.Transit(&out, vk::ImageLayout::eTransferDstOptimal,
+                        vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite);
+        runtime.FlushBarriers();
+        const vk::ImageBlit region{
+            .srcSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+            .srcOffsets = std::array{vk::Offset3D{0, 0, 0}, vk::Offset3D{int(w), int(h), 1}},
+            .dstSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+            .dstOffsets = std::array{vk::Offset3D{0, 0, 0}, vk::Offset3D{int(ow), int(oh), 1}},
+        };
+        scheduler.CommandBuffer().blitImage(color.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+                                            out.GetImage(), vk::ImageLayout::eTransferDstOptimal,
+                                            region, vk::Filter::eLinear);
+        game_frame.valid = false;
+        return true;
+    }
+    // The 8-bit LDR input is gamma encoded; read it through an sRGB view so the upscaler works in
+    // linear light and the blit into the sRGB target re-encodes it exactly once.
+    // HDR: PS_Upscale decodes the gamma itself, so DLSS works on the stored values as they are.
+    const auto in_format = hdr ? color.info.pixel_format : vk::Format::eR8G8B8A8Srgb;
+    const auto color_view = CachedView(color, in_format, vk::ImageAspectFlagBits::eColor);
+    const auto motion_src_view =
+        CachedView(motion, vk::Format::eR16G16Sfloat, vk::ImageAspectFlagBits::eColor);
+    const auto depth_view = CachedView(depth, depth_format, vk::ImageAspectFlagBits::eDepth);
+    const char* profile_path =
+        UseDlss() ? "DLSS upscale" : UseFsr4() ? "FSR 4 upscale" : "FSR 3.1 upscale";
+    AaCpuTimer cpu_timer{profile_path};
+
+    scheduler.EndRendering();
+    const auto read = vk::PipelineStageFlagBits2::eComputeShader;
+    runtime.Transit(&depth, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+    runtime.Transit(&motion, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+    runtime.Transit(&color, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+    runtime.FlushBarriers();
+    const auto cmdbuf = scheduler.CommandBuffer();
+    const u64 profile_resume = GpuProfiler::Get() ? GpuProfiler::Get()->Current() : 0;
+    AaMark(profile_path, "1 motion vectors");
+    const auto all = vk::PipelineStageFlagBits2::eAllCommands;
+    const auto rw = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite;
+    const auto own_barrier = [&](vk::Image image, vk::ImageLayout old_layout,
+                                 vk::PipelineStageFlags2 src_stage, vk::AccessFlags2 src_access,
+                                 vk::ImageLayout new_layout, vk::PipelineStageFlags2 dst_stage,
+                                 vk::AccessFlags2 dst_access) {
+        const vk::ImageMemoryBarrier2 barrier{
+            .srcStageMask = src_stage,
+            .srcAccessMask = src_access,
+            .dstStageMask = dst_stage,
+            .dstAccessMask = dst_access,
+            .oldLayout = old_layout,
+            .newLayout = new_layout,
+            .image = image,
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier});
+    };
+    own_barrier(vk::Image(motion_image), vk::ImageLayout::eUndefined, all,
+                vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral, read,
+                vk::AccessFlagBits2::eShaderWrite);
+    own_barrier(vk::Image(output_image), vk::ImageLayout::eUndefined, all,
+                vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral, all, rw);
+    camera_motion.RecordGameMotion(cmdbuf, depth_view, motion_src_view, *motion_view, w, h);
+    own_barrier(vk::Image(motion_image), vk::ImageLayout::eGeneral, read,
+                vk::AccessFlagBits2::eShaderWrite, vk::ImageLayout::eGeneral, all,
+                vk::AccessFlagBits2::eShaderRead);
+
+    const auto now = std::chrono::steady_clock::now();
+    float frame_ms = std::chrono::duration<float, std::milli>(now - last_frame).count();
+    if (frame_ms <= 0.0f || frame_ms > 200.0f) frame_ms = 16.6f;
+    last_frame = now;
+    reset = game_reset || now - last_game_motion > std::chrono::milliseconds(100);
+    AaMark(profile_path, "2 DLSS / FSR");
+    cpu_timer.CallStart();
+    const bool ok =
+        UseDlss() ? RecordDlss(cmdbuf,
+                               {color.GetImage(), color_view, in_format,
+                                vk::ImageAspectFlagBits::eColor, w, h},
+                               {depth.GetImage(), depth_view, depth_format,
+                                vk::ImageAspectFlagBits::eDepth, w, h},
+                               w, h, ow, oh, frame_ms, false, game_frame.jitter)
+        : UseFsr4() ? RecordFsr4(cmdbuf, {color.GetImage(), color_view, w, h},
+                                 {depth.GetImage(), depth_view, w, h}, w, h, ow, oh, frame_ms,
+                                 game_frame.jitter)
+                    : RecordFsr3(cmdbuf, color.GetImage(), in_format,
+                                 color.usage_flags, depth.GetImage(), depth_format,
+                                 depth.usage_flags, w, h, ow, oh, frame_ms, false,
+                                 game_frame.jitter);
+    cpu_timer.CallEnd();
+    game_frame.valid = false;
+    if (!ok) {
+        return false;
+    }
+    TlgSettings::MarkAaSharpened(SharpenerName()); // the presenter skips CAS: one sharpener per frame
+    AaMark(profile_path, "3 sharpen");
+    if (UseDlss()) {
+        DlssSharpen(cmdbuf, ow, oh);
+    } else {
+        ExtraSharpen(cmdbuf, vk::Image(output_image), false, ow, oh);
+    }
+    // Frame generation: render-size depth and motion (checked equal to w x h above) with the
+    // output-size frame; DLSS and FSR frame generation both take the two sizes apart.
+    fg_pending = true;
+    fg_reset = reset;
+    fg_jitter = game_frame.jitter;
+    fg_depth = game_frame.depth;
+    reset = false;
+    game_reset = false;
+    last_game_motion = now;
+    jitter_pending = true; // for the next game frame (OnFrameStart)
+    dispatched_last_frame = true;
+    const vk::ImageBlit region{
+        .srcSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+        .srcOffsets = std::array{vk::Offset3D{0, 0, 0}, vk::Offset3D{int(ow), int(oh), 1}},
+        .dstSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+        .dstOffsets = std::array{vk::Offset3D{0, 0, 0}, vk::Offset3D{int(ow), int(oh), 1}},
+    };
+    if (hdr) {
+        // Into the image PS_Upscale samples instead of its render-size input.
+        own_barrier(vk::Image(output_image), vk::ImageLayout::eGeneral, all, rw,
+                    vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eTransfer,
+                    vk::AccessFlagBits2::eTransferRead);
+        own_barrier(vk::Image(engine_hdr_image), vk::ImageLayout::eUndefined, all,
+                    vk::AccessFlagBits2::eNone, vk::ImageLayout::eTransferDstOptimal,
+                    vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite);
+        cmdbuf.blitImage(vk::Image(output_image), vk::ImageLayout::eTransferSrcOptimal,
+                         vk::Image(engine_hdr_image), vk::ImageLayout::eTransferDstOptimal,
+                         region, vk::Filter::eNearest);
+        own_barrier(vk::Image(engine_hdr_image), vk::ImageLayout::eTransferDstOptimal,
+                    vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite,
+                    vk::ImageLayout::eGeneral, all, vk::AccessFlagBits2::eShaderRead);
+        return true;
+    }
+    // The DLSS result stands in for PS_Upscale's output; the UI draws over it next.
+    own_barrier(vk::Image(output_image), vk::ImageLayout::eGeneral, all, rw,
+                vk::ImageLayout::eTransferSrcOptimal, vk::PipelineStageFlagBits2::eTransfer,
+                vk::AccessFlagBits2::eTransferRead);
+    runtime.Transit(&out, vk::ImageLayout::eTransferDstOptimal,
+                    vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite);
+    runtime.FlushBarriers();
+    cmdbuf.blitImage(vk::Image(output_image), vk::ImageLayout::eTransferSrcOptimal,
+                     out.GetImage(), vk::ImageLayout::eTransferDstOptimal, region,
+                     vk::Filter::eNearest);
+    return true;
 }
 
 void TemporalUpscaler::EnsureUiResources(u32 w, u32 h, vk::Format color, vk::Format depth) {
@@ -1854,9 +2390,10 @@ void TemporalUpscaler::RunScaled() {
         } else {
             ok4 = RecordFsr4(cmdbuf, {color_image, color_view, source_width, source_height},
                             {depth_image, depth_view, source_width, source_height}, w, h, ow,
-                            oh, frame_ms);
+                            oh, frame_ms, jitter);
         }
         if (ok4) {
+            TlgSettings::MarkAaSharpened(SharpenerName()); // the presenter skips CAS: one sharpener per frame
             if (UseDlss()) {
                 DlssSharpen(cmdbuf, ow, oh);
             } else if (TlgSettings::Get().upscaler != TlgSettings::UpscalerTaa) {
@@ -1956,7 +2493,7 @@ void TemporalUpscaler::RunScaled() {
     info.cameraFar = 3000.0f;
     info.cameraVerticalFovRadians = camera_motion.VerticalFov();
     info.viewSpaceToMeters = 1.0f;
-    info.sharpness = std::min(settings.sharpness.load(), 1.0f);
+    info.sharpness = std::min(settings.sharpness.load(), 1.0f); // 0..100%: FSR's own RCAS
     info.enableSharpening = settings.sharpen ? VK_TRUE : VK_FALSE;
     info.reset = reset ? VK_TRUE : VK_FALSE;
     info.frameId = frame_id++;
@@ -1976,6 +2513,7 @@ void TemporalUpscaler::RunScaled() {
         ok = true;
         reset = false;
         dispatched_last_frame = true;
+        TlgSettings::MarkAaSharpened(SharpenerName()); // the presenter skips CAS: one sharpener per frame
         ExtraSharpen(cmdbuf, vk::Image(ui_image), true, ow, oh);
     }
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral, all,
@@ -2015,6 +2553,18 @@ vk::ImageView TemporalUpscaler::Mirror(vk::Image image, std::vector<MirrorView>&
 
 bool TemporalUpscaler::RedirectColor(VideoCore::ImageId color,
                                      const VideoCore::ImageViewInfo& view_info, Target& target) {
+    if (engine_ui && color == engine_ui_color) {
+        if (view_info.format == engine_hdr_format) {
+            target = {Mirror(vk::Image(engine_hdr_image), engine_hdr_views, view_info.format, {}),
+                      vk::ImageLayout::eGeneral, engine_output_w, engine_output_h, false, true};
+            return true;
+        }
+        static bool logged = false;
+        if (!std::exchange(logged, true)) {
+            std::printf("Engine upscale: HDR UI draws through view format %d, not redirected\n",
+                        int(view_info.format));
+        }
+    }
     if (ui_phase && color == ui_color) {
         target = {Mirror(vk::Image(ui_image), ui_views, view_info.format, {}),
                   vk::ImageLayout::eGeneral, ui_width, ui_height, true};
@@ -2078,16 +2628,60 @@ bool TemporalUpscaler::RedirectColor(VideoCore::ImageId color,
 }
 
 bool TemporalUpscaler::RedirectDepth(VideoCore::ImageId depth, Target& target) {
-    if (!ui_phase || depth != ui_depth) {
+    if ((!ui_phase && !engine_ui) || !depth || depth != ui_depth) {
         return false;
     }
-    target = {*ui_depth_view, vk::ImageLayout::eGeneral, ui_width, ui_height, true};
+    target = {*ui_depth_view, vk::ImageLayout::eGeneral, ui_width, ui_height, !engine_ui,
+              engine_ui};
     return true;
+}
+
+bool TemporalUpscaler::EngineRedirects(VideoCore::ImageId image) const {
+    if (!engine_redirect || !image) {
+        return false;
+    }
+    if (image == engine_redirect) {
+        return true;
+    }
+    const auto& info = texture_cache.GetImage(image).info;
+    return (info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+            info.pixel_format == vk::Format::eR8G8B8A8Srgb ||
+            info.pixel_format == vk::Format::eB10G11R11UfloatPack32) &&
+           info.size.width == engine_render_w && info.size.height == engine_render_h;
 }
 
 bool TemporalUpscaler::RedirectSampled(VideoCore::ImageId image,
                                        const VideoCore::ImageViewInfo& info, vk::ImageView& view,
                                        vk::ImageLayout& layout) {
+    if (EngineRedirects(image) && engine_hdr_image) {
+        if (!std::exchange(engine_redirect_hit, true)) {
+            static bool logged = false;
+            if (!std::exchange(logged, true)) {
+                std::printf("Engine upscale: HDR, PS_Upscale samples image #%u (LDR target #%u)"
+                            " -> DLSS image\n", image.index, engine_redirect.index);
+            }
+        }
+        if ((engine_ui || engine_ui_carried) && !std::exchange(engine_ui_read_barrier, true)) {
+            scheduler.EndRendering();
+            const vk::ImageMemoryBarrier2 b{
+                .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+                .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+                .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+                .oldLayout = vk::ImageLayout::eGeneral,
+                .newLayout = vk::ImageLayout::eGeneral,
+                .image = vk::Image(engine_hdr_image),
+                .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+            };
+            scheduler.Record([b](vk::CommandBuffer cmd) {
+                cmd.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+            });
+        }
+        view = Mirror(vk::Image(engine_hdr_image), engine_hdr_views, engine_hdr_format,
+                      info.mapping);
+        layout = vk::ImageLayout::eGeneral; // written and barriered in RunGameUpscale
+        return true;
+    }
     if (!display_redirect || image != ui_color) {
         return false;
     }
@@ -2194,8 +2788,7 @@ bool TemporalUpscaler::RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk:
     info.cameraFar = 3000.0f;
     info.cameraVerticalFovRadians = CameraValue(camera_motion.VerticalFov(), 1.0f, 3.0f);
     info.viewSpaceToMeters = 1.0f;
-    // RCAS strength 0..1 (menu, TLG_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
-    // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the menu's 0..2.
+    // 0..100% = FSR's own RCAS; every 100% above adds one full RCAS pass (ExtraSharpen).
     info.sharpness = std::min(TlgSettings::Get().sharpness.load(), 1.0f);
     info.enableSharpening = TlgSettings::Get().sharpen ? VK_TRUE : VK_FALSE;
     info.reset = reset ? VK_TRUE : VK_FALSE;
@@ -2203,7 +2796,9 @@ bool TemporalUpscaler::RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk:
 
     FfxVkPortableUpscaleCreateInfo create_info{};
     create_info.structSize = sizeof(create_info);
-    create_info.flags = FFX_VK_PORTABLE_CONTEXT_HDR_COLOR_INPUT | FFX_VK_PORTABLE_CONTEXT_AUTO_EXPOSURE;
+    create_info.flags = context_hdr ? (FFX_VK_PORTABLE_CONTEXT_HDR_COLOR_INPUT |
+                                       FFX_VK_PORTABLE_CONTEXT_AUTO_EXPOSURE)
+                                    : 0;
     create_info.maxRenderSize = {w, h};
     create_info.maxOutputSize = {ow, oh};
     // Motion cuts FSR 3's history (AMD default 1): at 1 a running boy shows the raw frame, with
@@ -2236,7 +2831,7 @@ bool TemporalUpscaler::UseFsr4() const {
 
 bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color,
                                   Fsr4Upscaler::Image depth, u32 w, u32 h, u32 ow, u32 oh,
-                                  float frame_ms) {
+                                  float frame_ms, std::array<float, 2> frame_jitter) {
     const auto& settings = TlgSettings::Get();
     // Same jitter convention as FSR 3; the menu (or toggle 1 << 26) flips it for tests.
     const float sign =
@@ -2250,12 +2845,12 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image 
         .render_width = w,
         .render_height = h,
         .preset = applied_preset,
-        .jitter = {sign * jitter[0], sign * jitter[1]},
+        .jitter = {sign * frame_jitter[0], sign * frame_jitter[1]},
         .frame_ms = frame_ms,
         .near_plane = camera_motion.Near(),
         .far_plane = 3000.0f,
         .vertical_fov = camera_motion.VerticalFov(),
-        .sharpness = std::min(settings.sharpness.load(), 1.0f),
+        .sharpness = std::min(settings.sharpness.load(), 1.0f), // 0..100%: FSR 4's own RCAS
         .sharpen = settings.sharpen,
         .reset = reset,
         .auto_exposure = settings.fsr4_auto_exposure,
@@ -2288,9 +2883,23 @@ bool TemporalUpscaler::SkipGameSmaa(u64 vs_hash) const {
 }
 
 bool TemporalUpscaler::FsrNativeAa() const {
-    // FSR 3.1 at native size is its anti-aliasing mode, on the game's motion like DLAA.
+    // FSR 3.1 or FSR 4 at native size is its anti-aliasing mode, on the game's motion like DLAA.
     const auto& settings = TlgSettings::Get();
-    return settings.upscaler == TlgSettings::UpscalerFsr3 && settings.dlaa && settings.jitter;
+    return (settings.upscaler == TlgSettings::UpscalerFsr3 ||
+            (settings.upscaler == TlgSettings::UpscalerFsr4 && UseFsr4())) &&
+           TlgSettings::AaOn() && settings.jitter;
+}
+
+const char* TemporalUpscaler::SharpenerName() const {
+    return TlgSettings::Get().upscaler == TlgSettings::UpscalerTaa ? "TAA sharpening"
+           : UseDlss()                                            ? "RCAS after DLSS"
+                                                                  : "FSR's own RCAS";
+}
+
+bool TemporalUpscaler::TaaNativeAa() const {
+    // tlg: a lighter middle ground between the game's SMAA and DLAA / FSR native AA.
+    const auto& settings = TlgSettings::Get();
+    return settings.upscaler == TlgSettings::UpscalerTaa && TlgSettings::AaOn() && settings.jitter;
 }
 
 bool TemporalUpscaler::UseDlss() const {

@@ -28,7 +28,7 @@ def t(key, **fmt):
 def custom_states():
     """A player's choices: a few menu values of each type, a start-up switch off and one on."""
     states = {i.id: None for i in backports_table.ITEMS}
-    states.update({'menu:fsr1': '1', 'menu:rcas_strength': '80', 'menu:color_contrast': '1.2', 'menu:fps_limit': '60',
+    states.update({'menu:fsr1': '1', 'menu:ssao': '80', 'menu:color_contrast': '1.2', 'menu:fps_limit': '60',
                    'menu:overlay_corner': '3', 'TLG_BACKGROUND_WARMUP': '0', 'TLG_DEFERRED_READBACK': '1'})
     return states
 
@@ -191,17 +191,17 @@ class ValidationTests(Base):
         self.assertFalse(any(p.fatal for p in problems))
 
     def test_out_of_range_and_wrong_type_values_are_refused_and_listed(self):
-        bad = {'menu:rcas_strength': '101',         # int, hi 100
+        bad = {'menu:sharpness': '4.5',            # float, hi 4
                'menu:color_contrast': 9,            # float, hi 1.5
                'menu:color_gamma': 'abc',
                'menu:fsr1': '2',                    # bool
                'menu:fps_limit': '45',              # choice
-               'menu:cas_strength': 80.5,           # int, not whole
+               'menu:ssao': 80.5,                   # int, not whole
                'TLG_BLOCK1D': None, 'TLG_BACKGROUND_WARMUP': [1],
                'menu:overlay_scale': float('inf')}
-        preset, problems = self.read(self.valid(items=dict(bad, **{'menu:rcas': '1'}),
+        preset, problems = self.read(self.valid(items=dict(bad, **{'menu:sharpen': '1'}),
                                                 settings={'vsync': 'yes', 'gpu_readbacks': '7', 'frame_rate': 2}))
-        self.assertEqual(preset['items'], {'menu:rcas': '1'})
+        self.assertEqual(preset['items'], {'menu:sharpen': '1'})
         self.assertEqual(preset['settings'], {})
         refused = {p.detail.split(' = ')[0] for p in problems if p.code in ('bad_item', 'bad_setting')}
         self.assertEqual(refused, set(bad) | {'vsync', 'frame_rate'})
@@ -209,20 +209,20 @@ class ValidationTests(Base):
 
     def test_valid_values_of_every_type_are_accepted_and_normalised(self):
         preset, problems = self.read(self.valid(
-            items={'menu:rcas_strength': 70, 'menu:color_contrast': '1.50', 'menu:fps_limit': 120, 'TLG_BLOCK1D': True,
+            items={'menu:ssao': 70, 'menu:color_contrast': '1.50', 'menu:fps_limit': 120, 'TLG_BLOCK1D': True,
                    'menu:overlay_scale': 100.0, 'menu:color_saturation': 2.0},
             settings={'vsync': 0, 'gpu_readbacks': 2, 'frame_rate': 'unlocked'}))
         self.assertEqual(problems, [])
-        self.assertEqual(preset['items'], {'menu:rcas_strength': '70', 'menu:color_contrast': '1.5', 'menu:fps_limit': '120',
+        self.assertEqual(preset['items'], {'menu:ssao': '70', 'menu:color_contrast': '1.5', 'menu:fps_limit': '120',
                                            'TLG_BLOCK1D': '1', 'menu:overlay_scale': '100', 'menu:color_saturation': '2'})
         self.assertEqual(preset['settings'], {'vsync': False, 'frame_rate': 'unlocked'})
 
     def test_readback_rows_in_old_files_are_skipped_quietly(self):
         items = {item_id: '0' for item_id in backports_table.NOT_IN_PRESETS if item_id.startswith('TLG_')}
-        preset, problems = self.read(self.valid(items=dict(items, **{'menu:readback_batch': '64', 'menu:rcas': '1'}),
+        preset, problems = self.read(self.valid(items=dict(items, **{'menu:readback_batch': '64', 'menu:sharpen': '1'}),
                                                 settings={'vsync': False, 'gpu_readbacks': '0'}))
         self.assertEqual(problems, [])
-        self.assertEqual(preset['items'], {'menu:rcas': '1'})
+        self.assertEqual(preset['items'], {'menu:sharpen': '1'})
         self.assertEqual(preset['settings'], {'vsync': False})
         _, stored = gfxlogic.custom_targets({'items': items})
         self.assertFalse(set(stored) & backports_table.NOT_IN_PRESETS)

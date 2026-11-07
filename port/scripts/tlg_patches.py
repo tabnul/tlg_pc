@@ -227,6 +227,17 @@ SUBTITLE_SCALE_EXPECTED = struct.pack('<2f', 1 / 1920, 1 / 1080)
 GARLIC_SIZE = 0x1dd3a46
 GARLIC_SIZE_EXPECTED = bytes.fromhex('41bf000000b0')
 GARLIC_EXTRA_MB = 1248
+# Above 4 GiB (supersampling only, experimental): the Pro path adds 512 MiB with a 32-bit
+# displacement (lea r13, [r15 + 0x20000000] at 0x1dd3a8c) and three cmove instructions fall
+# back to the base size when the console is not a Pro. Both sizes reach the allocate/map calls
+# as 64-bit values. Raising the displacement and clearing the cmoves (4-byte nops) gives
+# base + extra on every console: ceiling just under 6 GiB. 2026-11-07: 200% supersampling at
+# 3840x1600 (7680x3200 render) runs with 5120 MB (game used 4590 MB).
+GARLIC_PRO_LEA = 0x1dd3a8c
+GARLIC_PRO_LEA_EXPECTED = bytes.fromhex('4d8daf00000020')
+GARLIC_PRO_CMOVES = [(0x1dd3aad, bytes.fromhex('490f44d7')), (0x1dd3b21, bytes.fromhex('490f44f7')),
+                     (0x1dd3b47, bytes.fromhex('4d0f44ef'))]
+GARLIC_ABOVE_4G_MB = 1056  # 4064 + 1056 = 5120 MB
 
 
 # Boot logos: the game init (0x1231d62) fills a table of four 0x1c-byte entries at rsp+0x6f0
@@ -262,13 +273,28 @@ def checked_offset(eboot, address, expected):
     return offset
 
 
-def resolution_writes(eboot, size):
+def parse_render_resolution(value):
+    """(width, height) of the smaller render size "WxH" (TLG_RENDER_RESOLUTION), or None."""
+    parts = str(value or '').lower().replace(' ', '').split('x')
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None
+    width, height = (int(part) for part in parts)
+    if not (0 < width <= 0xffff and 0 < height <= 0xffff):
+        return None
+    return width, height
+
+
+def resolution_writes(eboot, size, render=None):
     """[(image offset, new bytes, description)] of the default mode entry, and of Hor+ and the UI
-    canvas for frames wider than 16:9, after checking them."""
+    canvas for frames wider than 16:9, after checking them. `render` (w, h) makes the engine
+    render the scene at that size and enlarge it to `size` with its own PS_Upscale pass (the
+    PS4 Pro "1920x1080(scale)" path); None renders at the output size."""
     width, height = size
+    render_width, render_height = render or size
     offset = checked_offset(eboot, RESOLUTION_ENTRY, RESOLUTION_EXPECTED)
-    new = struct.pack('<4H', width, height, width, height) + RESOLUTION_EXPECTED[8:]
-    writes = [(offset, new, f'resolution: {RESOLUTION_ENTRY:#x} default mode 1920x1080 -> {width}x{height}')]
+    new = struct.pack('<4H', render_width, render_height, width, height) + RESOLUTION_EXPECTED[8:]
+    what = f'{width}x{height}' if not render else f'render {render_width}x{render_height}, output {width}x{height}'
+    writes = [(offset, new, f'resolution: {RESOLUTION_ENTRY:#x} default mode 1920x1080 -> {what}')]
     if width * 9 > height * 16:
         call = checked_offset(eboot, HOR_PLUS_CALL, HOR_PLUS_CALL_EXPECTED)
         block = checked_offset(eboot, HOR_PLUS_BLOCK, HOR_PLUS_BLOCK_EXPECTED)
@@ -290,12 +316,22 @@ def resolution_writes(eboot, size):
     return writes
 
 
-def garlic_writes(eboot):
-    """[(image offset, new bytes, description)] of the larger GPU heap, after checking it."""
+def garlic_writes(eboot, above_4g=False):
+    """[(image offset, new bytes, description)] of the larger GPU heap, after checking it.
+    `above_4g` (supersampling) adds GARLIC_ABOVE_4G_MB through the Pro add-on path."""
     garlic = checked_offset(eboot, GARLIC_SIZE, GARLIC_SIZE_EXPECTED)
     size_mb = 2816 + GARLIC_EXTRA_MB
-    return [(garlic, GARLIC_SIZE_EXPECTED[:2] + struct.pack('<I', size_mb << 20),
-             f'garlic: {GARLIC_SIZE:#x} GPU heap 2816 -> {size_mb} MB')]
+    total_mb = size_mb + (GARLIC_ABOVE_4G_MB if above_4g else 0)
+    writes = [(garlic, GARLIC_SIZE_EXPECTED[:2] + struct.pack('<I', size_mb << 20),
+               f'garlic: {GARLIC_SIZE:#x} GPU heap 2816 -> {total_mb} MB')]
+    if above_4g:
+        lea = checked_offset(eboot, GARLIC_PRO_LEA, GARLIC_PRO_LEA_EXPECTED)
+        writes.append((lea, GARLIC_PRO_LEA_EXPECTED[:3] + struct.pack('<I', GARLIC_ABOVE_4G_MB << 20),
+                       f'garlic above 4 GiB: {GARLIC_PRO_LEA:#x} Pro add-on 512 -> {GARLIC_ABOVE_4G_MB} MB'))
+        for address, expected in GARLIC_PRO_CMOVES:
+            writes.append((checked_offset(eboot, address, expected), bytes.fromhex('0f1f4000'),
+                           f'garlic above 4 GiB: {address:#x} non-Pro size fallback cleared'))
+    return writes
 # Verified EU CUSA03745 01.03, decoded from the SELF. Other builds fail closed.
 MENU_ELF_SHA256 = 'ce2a5da1de13d7e43a2403cefe649f0f35a968e8b3779b911a314292472ef573'
 MENU_OFFSET = 0xd2ebee
@@ -365,7 +401,7 @@ def compile_mods(game_dir, eboot, mods_dir, mods_config, lines):
 
 
 def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution=None,
-            skip_logos=False, menu_confirm='cross'):
+            skip_logos=False, menu_confirm='cross', render_resolution=None):
     """Writes out/patches.bin for the mode plus any enabled mod; returns (applied mode, lines).
     Any problem with the frame rate patches (other eboot build, unexpected bytes) falls back to
     30 FPS without them; a mod problem only drops that mod, never the frame rate patches."""
@@ -416,13 +452,31 @@ def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution
             lines.append(f'Mod {what} ({data.hex()})')
     res_writes = []
     size = parse_resolution(os.environ.get('TLG_RESOLUTION') or resolution)
+    render = parse_render_resolution(os.environ.get('TLG_RENDER_RESOLUTION') or render_resolution)
+    if render and not size:
+        size = (1920, 1080)
+    if render and render == size:
+        render = None
+    supersampling = False
+    if render and (render[0] > size[0]) != (render[1] > size[1]):
+        lines.append(f'Resolution: render {render[0]}x{render[1]} must be smaller or larger than '
+                     'the output on both sides: ignored')
+        render = None
+    elif render and render[0] > size[0]:
+        # Supersampling: the engine's PS_Upscale pass shrinks the larger render into the output.
+        supersampling = True
+        lines.append(f'Resolution: render {render[0]}x{render[1]} larger than output (supersampling)')
     if size:
         try:
-            res_writes = resolution_writes(read_eboot_elf(game_dir), size)
+            res_writes = resolution_writes(read_eboot_elf(game_dir), size, render)
         except ValueError as error:
             lines.append(f'Resolution: {error}: not applied, 1920x1080')
+            render, supersampling = None, False
         for _, data, what in res_writes:
             lines.append(f'Resolution patch {what} ({data.hex()})')
+        if res_writes and render:
+            # The launcher reads this line: TLG_RENDER_RESOLUTION for the renderer.
+            lines.append(f'Resolution patch render size: {render[0]}x{render[1]}')
     logo = []
     if skip_logos or os.environ.get('TLG_SKIP_LOGOS') == '1':
         try:
@@ -433,7 +487,9 @@ def prepare(game_dir, out_dir, mode, mods_dir=None, mods_config=None, resolution
             lines.append(f'Patch {what} ({data.hex()})')
     heap = []
     try:
-        heap = garlic_writes(read_eboot_elf(game_dir))
+        # Supersampling renders a frame too large for the 4 GiB heap: the experimental
+        # above-4-GiB heap comes only with it.
+        heap = garlic_writes(read_eboot_elf(game_dir), above_4g=supersampling)
     except (OSError, ValueError) as error:
         lines.append(f'GPU heap: {error}: not applied, 2816 MB')
     for _, data, what in heap:
@@ -464,12 +520,16 @@ def main():
     p.add_argument('--mods-dir', help='folder of shadPS4/GoldHEN cheat XML files')
     p.add_argument('--mods-config', help='mods.json: {"enabled": [...], "disabled": [...]}')
     p.add_argument('--resolution', help='WxH, e.g. 3440x1440 (default 1920x1080)')
+    p.add_argument('--render-resolution',
+                   help='WxH the engine renders at: smaller than --resolution = upscaling '
+                        '(DLSS/FSR replace the engine pass), larger = supersampling (experimental, '
+                        'GPU heap above 4 GiB)')
     p.add_argument('--skip-logos', action='store_true', help='skip the boot logos')
     p.add_argument('--menu-confirm', choices=('cross', 'circle'), default='cross',
                    help='menu confirm button; Circle game-menu patch requires verified EU 01.03')
     a = p.parse_args()
     _, lines = prepare(a.game_dir, a.out, a.mode, a.mods_dir, a.mods_config, a.resolution,
-                       a.skip_logos, a.menu_confirm)
+                       a.skip_logos, a.menu_confirm, a.render_resolution)
     print('\n'.join(lines))
 
 

@@ -32,7 +32,7 @@ Nada disso vai no download; você precisa da sua própria cópia. Use **The Last
 
 1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
 2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos).
+3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, upscaling DLSS e FSR, HDR, efeitos).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
 5. Escolha um dos idiomas oferecidos para sua pasta do jogo e clique em **Jogar**. A primeira partida demora um pouco mais.
@@ -45,7 +45,7 @@ No Linux, `./install_desktop.sh` adiciona o jogo ao menu de aplicativos.
 
 - **F10**: liga e desliga o contador de FPS
 - **Insert** (ou R3 + L2 no controle): abre o menu do port (imagem, desempenho, overlay)
-- **F8**: alterna entre o DLAA e o anti-aliasing do próprio jogo (Windows, NVIDIA RTX). O DLAA (NVIDIA DLSS na resolução nativa) deixa a folhagem e as bordas finas estáveis; vem ligado e pode ser desligado no launcher ou em Imagem › Anti-aliasing no menu do port. Em outras placas a opção fica desativada.
+- **F8**: alterna entre o upscaler escolhido e o anti-aliasing do próprio jogo. DLSS (placas RTX), FSR 4 (placas recentes, Windows e Linux) ou FSR 3.1 (qualquer placa) deixam a folhagem e as bordas finas estáveis. Na qualidade AA nativo (o padrão, DLSS em placas RTX) o jogo renderiza no tamanho da sua tela; em Qualidade, Equilibrado, Desempenho ou Ultra desempenho ele renderiza menor e o DLSS ou FSR amplia a imagem, para mais FPS. Troque no launcher ou em Ampliação e anti-aliasing no menu do port (a qualidade exige reiniciar). O FSR 4 é escolhido uma vez sozinho numa placa que o roda.
 - Controles de PS4/PS5, Xbox e 8BitDo funcionam via SDL3, por USB ou Bluetooth.
 
 ### Teclado e mouse
@@ -75,12 +75,12 @@ Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta
 - Saves: `user/savedata/`, ao lado do executável (guarde essa pasta ao atualizar)
 - Logs: `out/logs/` (`out/last_run.log` é o da última sessão; mande ele junto se reportar um problema)
 - Configurações do launcher: `~/.config/tlg-launcher/` (Linux) ou `%APPDATA%\tlg-launcher` (Windows). Se você escolher outra pasta de dados em **Saves e dados**, o caminho fica em `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` no Windows)
-- Launcher antigo: **Mudar para o menu antigo** nas configurações, ou inicie `The Last Guardian.exe --legacy`. Ele será removido numa versão futura.
 - Fundo do launcher: por padrão a imagem dos seus arquivos do jogo (`sce_sys/pic1.png`). Para usar outra, salve-a como `launcher_background.png` (ou `.jpg`) na pasta `user/`; ela é ajustada à janela. Exemplo: [a arte da capa do jogo](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
 ### Problemas
 
 - **Som incompleto ou estranho**: sem o `libSceNgs2.sprx` em `system_lib/`, o port usa o seu próprio mixer, ainda experimental (sem reverb e sem filtros). Com o arquivo, o áudio é o nativo.
+- **"Erro 4551" ou bloqueado pelo Controle Inteligente de Aplicativos (Smart App Control)**: o Windows 11 bloqueia programas sem assinatura digital, e o port não é assinado. Desligue em Segurança do Windows > Controle de aplicativos e do navegador > Configurações do Controle Inteligente de Aplicativos. Em algumas versões do Windows só dá para religar reinstalando o Windows.
 - **Não abre ou fecha sozinho**: veja a caixa de log no launcher e mande o `out/last_run.log` numa [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use um driver recente.
 
@@ -110,7 +110,7 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
-3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects).
+3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLSS and FSR upscaling, HDR, effects).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick one of the languages offered for your game folder and click **Play**. The first start takes a little longer.
@@ -123,7 +123,7 @@ On Linux, `./install_desktop.sh` adds the game to the applications menu.
 
 - **F10**: toggles the FPS counter
 - **Insert** (or R3 + L2 on a controller): opens the port's menu (image, performance, overlay)
-- **F8**: switches between DLAA and the game's own anti-aliasing (Windows, NVIDIA RTX). DLAA (NVIDIA DLSS at native resolution) keeps foliage and thin edges stable; it is on by default and can be turned off in the launcher or under Image › Anti-aliasing in the port's menu. On other graphics cards the setting is greyed out.
+- **F8**: switches between the chosen upscaler and the game's own anti-aliasing. DLSS (RTX cards), FSR 4 (recent cards, Windows and Linux) or FSR 3.1 (any card) keep foliage and thin edges stable. At the Native AA quality (the default, DLSS on RTX cards) the game renders at your screen size; at Quality, Balanced, Performance or Ultra Performance it renders smaller and DLSS or FSR upscale it, for more FPS. Change it in the launcher or under Upscaling and anti-aliasing in the port's menu (Quality needs a restart). FSR 4 is chosen once by itself on a card that runs it.
 - PS4/PS5, Xbox and 8BitDo controllers work through SDL3, over USB or Bluetooth.
 
 ### Keyboard and mouse
@@ -153,12 +153,12 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 - Saves: `user/savedata/` next to the executable (keep this folder when updating)
 - Logs: `out/logs/` (`out/last_run.log` is the latest session; attach it to bug reports)
 - Launcher settings: `~/.config/tlg-launcher/` (Linux) or `%APPDATA%\tlg-launcher` (Windows). If you pick another data folder in **Saves & data**, its path is kept in `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` on Windows)
-- Old launcher: **Switch to legacy menu** in Settings, or start `The Last Guardian.exe --legacy`. It will be phased out in a later release.
 - Launcher background: by default the picture from your own game files (`sce_sys/pic1.png`). To use another one, save it as `launcher_background.png` (or `.jpg`) in the `user/` folder; it is fitted to the window. Example: [the game's cover art](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
 ### Problems
 
 - **Incomplete or odd sound**: without `libSceNgs2.sprx` in `system_lib/`, the port uses its own mixer, still experimental (no reverb or filters yet). With the file, audio is native.
+- **"Error 4551" or blocked by Smart App Control**: Windows 11 blocks programs without a digital signature, and the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control settings. On some Windows versions it can only be turned back on by reinstalling Windows.
 - **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/tlg_pc/issues).
 - **NVIDIA**: use a recent driver.
 
@@ -167,3 +167,5 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 This project is not affiliated with Sony Interactive Entertainment, SIE Japan Studio or genDESIGN. The Last Guardian is a trademark of Sony Interactive Entertainment. / Este projeto não tem vínculo com a Sony Interactive Entertainment, SIE Japan Studio ou genDESIGN.
 
 The Windows package contains NVIDIA DLSS (`out/nvngx_dlss.dll`) under NVIDIA's license (`out/NVIDIA-DLSS-LICENSE.txt`). NVIDIA, RTX and DLSS are trademarks of NVIDIA Corporation. / O pacote Windows contém o NVIDIA DLSS (`out/nvngx_dlss.dll`) sob a licença da NVIDIA (`out/NVIDIA-DLSS-LICENSE.txt`). NVIDIA, RTX e DLSS são marcas da NVIDIA Corporation.
+
+The packages contain the open AMD FSR 4 model (`fsr4_shaders/`, MIT, `LICENSE-FSR4-v07.txt`), built by @FireBurn's Q2RTX from AMD's FidelityFX SDK. AMD and FSR are trademarks of Advanced Micro Devices, Inc. / Os pacotes contêm o modelo aberto do AMD FSR 4 (`fsr4_shaders/`, MIT, `LICENSE-FSR4-v07.txt`), gerado pelo Q2RTX do @FireBurn a partir do FidelityFX SDK da AMD. AMD e FSR são marcas da Advanced Micro Devices, Inc.

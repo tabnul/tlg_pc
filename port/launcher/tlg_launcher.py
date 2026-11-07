@@ -95,7 +95,6 @@ TEXT = {
                              'Ainda não foi possível devolver os saves ({error}). Eles estão seguros em {path}; '
                              'o launcher tenta de novo no próximo início.'),
     'home_quit': ('Quit', 'Sair'),
-    'legacy_menu': ('Switch to legacy menu', 'Mudar para o menu antigo'),
     'home_back': ('‹  Back', '‹  Voltar'),
     'home_picture': ('Background picture…', 'Imagem de fundo…'),
     'home_picture_reset': ('Default picture', 'Imagem padrão'),
@@ -245,21 +244,45 @@ TEXT = {
     'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
                 'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
     'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
-    'aa_mode': ('Anti-aliasing (F8 in game)', 'Anti-aliasing (F8 no jogo)'),
     'aa_off': ('Off', 'Desligado'),
-    'aa_dlaa': ('DLAA (NVIDIA RTX)', 'DLAA (NVIDIA RTX)'),
-    'aa_fsr3': ('FSR 3.1 Native AA', 'FSR 3.1 AA nativo'),
+    'upscaler': ('Upscaler', 'Ampliador'),
+    'up_off': ('Built-in (game)', 'Do jogo'),
+    'up_dlss': ('DLSS (NVIDIA RTX)', 'DLSS (NVIDIA RTX)'),
+    'up_fsr3': ('FSR 3.1 (any card)', 'FSR 3.1 (qualquer placa)'),
+    'up_fsr4': ('FSR 4 (any recent card)', 'FSR 4 (qualquer placa recente)'),
+    'up_taa': ('TAA (any card, native only)', 'TAA (qualquer placa, só nativo)'),
+    'upscaler_hint': ('Which upscaler draws the image at the chosen quality. It is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA. TAA: a lighter, softer anti-aliasing, at native size only. Built-in: only the game\'s own upscale pass and anti-aliasing. F8 in game switches between Built-in and your choice.',
+                      'Qual ampliador desenha a imagem na qualidade escolhida. Ele também é o anti-aliasing: na qualidade AA nativo o DLSS é DLAA e o FSR é FSR AA nativo. TAA: um anti-aliasing mais leve e suave, só no tamanho nativo. Do jogo: só a ampliação e o anti-aliasing do próprio jogo. F8 no jogo alterna entre Do jogo e a sua escolha.'),
+    'quality': ('Quality', 'Qualidade'),
+    'preset_native': ('Native AA', 'AA nativo'),
+    'preset_quality': ('Quality', 'Qualidade'),
+    'preset_balanced': ('Balanced', 'Equilibrado'),
+    'preset_performance': ('Performance', 'Desempenho'),
+    'preset_ultra': ('Ultra Performance', 'Ultra desempenho'),
+    'preset_super150': ('Supersampling 150% (experimental)', 'Supersampling 150% (experimental)'),
+    'preset_super200': ('Supersampling 200% (experimental)', 'Supersampling 200% (experimental)'),
+    'quality_native': ('{preset}: renders at the output size, {output}.', '{preset}: desenha no tamanho de saída, {output}.'),
+    'quality_up': ('{preset}: renders at {render}, upscaled to {output}.', '{preset}: desenha em {render}, ampliado para {output}.'),
+    'quality_super': ('{preset}: renders at {render}, shrunk to {output}.', '{preset}: desenha em {render}, reduzido para {output}.'),
+    'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
+                      'Applied at start: the game restarts for a change.',
+                      'Qualidade 1/1,5, Equilibrado 1/1,7, Desempenho 1/2, Ultra desempenho 1/3 da saída em cada lado; o ampliador completa o resto. '
+                      'Aplicado no início: o jogo reinicia para mudar.'),
     'fg_mode': ('Frame generation', 'Geração de quadros'),
     'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
                 'Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
-    'aa_no_dlss': ('No DLSS on this GPU: DLAA runs as FSR 3.1 Native AA',
-                   'Sem DLSS nesta GPU: o DLAA roda como FSR 3.1 AA nativo'),
-    'smaa_hint': ('Not recommended: DLAA and FSR 3.1 already smooth the edges; SMAA on top blurs the image and the HUD.',
-                  'Não recomendado: o DLAA e o FSR 3.1 já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
+    'aa_no_dlss': ('No DLSS on this GPU: it runs as FSR 3.1',
+                   'Sem DLSS nesta GPU: roda como FSR 3.1'),
+    'aa_no_fsr4': ('This GPU cannot run FSR 4: it runs as FSR 3.1',
+                   'Esta GPU não roda o FSR 4: roda como FSR 3.1'),
+    'smaa_hint': ('Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
+                  'Não recomendado: o DLAA e o FSR já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
     'sharpening': ('Sharpening', 'Nitidez'),
-    'sharpen_off': ('Off', 'Desligada'),
-    'sharpen_rcas': ('RCAS (FSR 1)', 'RCAS (FSR 1)'),
-    'sharpen_cas': ('CAS (AMD)', 'CAS (AMD)'),
+    'sharpening_hint': ('Sharpens the image. With DLSS, FSR or TAA it is their own sharpening (scene only); with '
+                        "Built-in it is AMD CAS on the final picture. Up to 100% the upscaler's own sharpening; "
+                        'every 100% above adds one more pass (CAS stops at 100%). Default 175%.',
+                        'Deixa a imagem mais nítida. Com DLSS, FSR ou TAA é a nitidez deles (só a cena); com Do jogo '
+                        'é o AMD CAS na imagem final. Até 100% a nitidez do próprio upscaler; cada 100% acima adiciona mais uma passada (o CAS para em 100%). Padrão 175%.'),
     'color_adjust': ('Color adjustments', 'Ajustes de cor'),
     'color_brightness': ('Brightness (0 = unchanged)', 'Brilho (0 = sem alteração)'),
     'color_contrast': ('Contrast (1 = unchanged)', 'Contraste (1 = sem alteração)'),
@@ -422,11 +445,11 @@ TEXT = {
     'preset_recommended': ('Recommended (default)', 'Recomendado (padrão)'),
     'preset_custom': ('Custom', 'Personalizado'),
     'shadow_hint': ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much "
-                    'less shimmer of tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and about '
-                    '1 GB of video memory; recommended when you have the headroom.',
+                    'less shimmer of tree and leaf shadows, with any anti-aliasing. '
+                    '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.',
                     'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é '
-                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa '
-                    'cerca de 8 FPS e cerca de 1 GB de memória de vídeo; recomendado quando houver folga.'),
+                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. '
+                    '8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos.'),
     'grass_smooth': ('Grass animated every frame (default)', 'Grama animada todo quadro (padrão)'),
     'grass_hint': ('The game moves most grass only every 4th frame, which looks choppy at high frame rates. '
                    'Off is as shipped.',
@@ -553,14 +576,16 @@ def sdl_key_name(keysym):
         return f'Keypad {keysym[3:]}'
     return None
 
-SHARPENERS = ['off', 'rcas', 'cas']
 # Image filters: kept in tlg.ini only (the in-game menu writes the same keys), with their
 # defaults and ranges (tlg_graphics.h).
-INI_DEFAULTS = {'smaa': '0', 'rcas': '1', 'cas': '1', 'rcas_strength': '75', 'cas_strength': '100', 'color_adjust': '1', 'color_brightness': '0.00',
-                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '0.75'}
-# The anti-aliasing row (TlgSettings::AaMode): (label, tlg.ini dlaa / upscaler). DLAA needs an
-# NVIDIA RTX card; FSR 3.1 native AA runs on any card.
-AA_MODES = [('aa_off', None), ('aa_dlaa', ('1', 'dlss')), ('aa_fsr3', ('1', 'fsr3'))]
+INI_DEFAULTS = {'smaa': '0', 'sharpen': '1', 'sharpness': '1.75', 'color_adjust': '1', 'color_brightness': '0.00',
+                'color_contrast': '1.00', 'color_saturation': '1.00', 'color_gamma': '1.00'}
+# The Upscaler row (tlg.ini upscaler): (label, value). DLSS needs an NVIDIA RTX card, FSR 4 a
+# recent card (the game checks both once per install and runs FSR 3.1 meanwhile); FSR 3.1 runs
+# on any card; off is the game's own upscale pass. At Native AA quality the upscaler is the
+# anti-aliasing, below it the upscaler is too (no separate AA checkbox; dlaa = not Built-in).
+# TAA (2026-11-07): our own light temporal AA at native size, between SMAA and DLAA in cost.
+UPSCALERS = [('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
 
 
 def fg_mode_of(ini):
@@ -573,16 +598,27 @@ def dlss_unsupported(ini):
     return ini.get('dlss_supported') == '0'
 
 
-def aa_mode_of(ini):
-    # The AA_MODES index tlg.ini picks (TlgSettings::AaModeOf: every upscaler but TAA and FSR 3.1
-    # loads as DLAA).
+def fsr4_unsupported(ini):
+    # The game writes its FSR 4 check (fsr4_supported); without it, FSR 4 runs as FSR 3.1.
+    return ini.get('fsr4_supported') == '0'
+
+
+def upscaler_of(ini):
+    # The UPSCALERS index tlg.ini picks (TlgSettings::Load: a file from before the row, and every
+    # other upscaler, loads as DLSS; anti-aliasing off loads as Built-in).
+    if ini.get('aa_row', '0') in ('0', ''):
+        return 1
     if ini.get('dlaa', '1') in ('0', ''):
         return 0
-    if ini.get('aa_row', '0') in ('0', ''):
-        return 1  # a file from before the row: DLAA
-    if ini.get('upscaler') == 'taa':
-        return 0
-    return 2 if ini.get('upscaler') == 'fsr3' else 1
+    return {'off': 0, 'fsr3': 2, 'fsr4': 3, 'taa': 4}.get(ini.get('upscaler'), 1)
+
+
+def quality_text(t, size, preset):
+    """The Quality row's help: the render size for the output size, then the rules."""
+    render = tlg_run.render_resolution(size, preset)
+    key = 'quality_native' if not render else 'quality_super' if tlg_run.supersampling(preset) else 'quality_up'
+    line = t(key).format(preset=t(tlg_run.PRESET_KEYS[preset]), render=render, output=size)
+    return line + '\n' + t('quality_rules')
 
 
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
@@ -613,7 +649,7 @@ def add_tooltip(widget, text):
         hide()
         win = tk.Toplevel(widget)
         win.overrideredirect(True)
-        tk.Label(win, text=text, background=PANEL, foreground=TEXT_COLOR, relief='solid', borderwidth=1,
+        tk.Label(win, text=text() if callable(text) else text, background=PANEL, foreground=TEXT_COLOR, relief='solid', borderwidth=1,
                  wraplength=360, justify='left', padx=6, pady=4).pack()
         win.update_idletasks()
         x = min(event.x_root + 14, widget.winfo_screenwidth() - win.winfo_reqwidth() - 4)
@@ -934,6 +970,13 @@ def apply_theme(root):
     style.configure('TLabelframe.Label', background=BG, foreground=ACCENT, font=(SERIF, 11))
     style.configure('TButton', background=PANEL, foreground=TEXT_COLOR, bordercolor=LINE, padding=(10, 4))
     style.map('TButton', background=[('pressed', FIELD), ('active', LINE)], bordercolor=[('active', ACCENT)])
+    # Scroll bars: a light thumb on the dark trough (the default thumb is BG, hard to see).
+    for bar in ('Vertical.TScrollbar', 'Horizontal.TScrollbar'):
+        style.configure(bar, background='#6e6656', troughcolor=FIELD, bordercolor=LINE,
+                        lightcolor='#6e6656', darkcolor='#6e6656', arrowcolor=TEXT_COLOR)
+        style.map(bar, background=[('pressed', ACCENT), ('active', '#8c826e')],
+                  lightcolor=[('pressed', ACCENT), ('active', '#8c826e')],
+                  darkcolor=[('pressed', ACCENT), ('active', '#8c826e')])
     style.configure('TCheckbutton', background=BG, indicatorbackground=FIELD, indicatorforeground=BG)
     style.map('TCheckbutton', indicatorbackground=[('selected', ACCENT)], background=[('active', BG)])
     style.configure('TRadiobutton', background=BG, indicatorbackground=FIELD)
@@ -1098,44 +1141,42 @@ class Launcher:
         en, pt = TEXT[key]
         return (pt if self.pt() else en).format(**fmt)
 
-    def strength_key(self):
-        return {1: 'rcas_strength', 2: 'cas_strength'}.get(self.sharpener.current())
-
     def update_strength(self, ini):
-        key = self.strength_key()
-        if key is None:
-            self.sharpen_strength.state(['disabled'])
-            self.sharpen_shown.configure(text='')
-            return
+        """The one Sharpening slider (sharpness 0..4 in tlg.ini, shown 0..400%), steps of 5%."""
         try:
-            value = min(max(int(float(ini.get(key, INI_DEFAULTS[key]))), 0), 100)
+            value = min(max(int(round(float(ini.get('sharpness', INI_DEFAULTS['sharpness'])) * 20)) * 5, 0), 400)
         except ValueError:
-            value = int(INI_DEFAULTS[key])
-        self.sharpen_strength.state(['!disabled'])
+            value = 150
+        self.sharpen_var.set(ini.get('sharpen', INI_DEFAULTS['sharpen']) not in ('0', ''))
+        self.sharpen_strength.state(['!disabled' if self.sharpen_var.get() else 'disabled'])
         self.sharpen_value = None  # set() calls strength_moved: no write while it shows the file
         self.sharpen_strength.set(value)
         self.sharpen_value = value
         self.sharpen_shown.configure(text=f'{value}%')
 
     def strength_moved(self, raw):
-        key = self.strength_key()
-        if key is None or self.sharpen_value is None:
+        if self.sharpen_value is None:
             return
         step = int(round(float(raw) / 5) * 5)
         self.sharpen_shown.configure(text=f'{step}%')
         if step != getattr(self, 'sharpen_value', None):
             self.sharpen_value = step
             tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
-            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: step})
+            tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {'sharpness': f'{step / 100:.2f}'})
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
             self.refresh_preset()
 
     def update_aa_note(self, ini):
-        # DLAA stays the choice in tlg.ini; the game runs FSR 3.1 while DLSS is missing.
-        if self.aa_box.current() == 1 and dlss_unsupported(ini):
+        # DLSS or FSR 4 stays the choice in tlg.ini; the game runs FSR 3.1 while the card lacks it.
+        mode = self.up_box.current()
+        if (mode == 1 and dlss_unsupported(ini)) or (mode == 3 and fsr4_unsupported(ini)):
+            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 1 else 'aa_no_fsr4'))
             self.aa_note.grid()
         else:
             self.aa_note.grid_remove()
+
+    def quality_help(self):
+        return quality_text(self.t, str(self.settings.get('resolution', '1920x1080')), max(self.quality_box.current(), 0))
 
     # -- window -----------------------------------------------------------------------------
     def build(self):
@@ -1224,7 +1265,6 @@ class Launcher:
         ttk.Button(launcher, text=self.t('home_picture'), command=self.pick_background).pack(side='left')
         ttk.Button(launcher, text=self.t('home_picture_reset'), command=self.reset_background).pack(
             side='left', padx=(6, 0))
-        ttk.Button(launcher, text=self.t('legacy_menu'), command=self.switch_menu).pack(side='left', padx=(6, 0))
         debug = section(right, self.t('debug'))
         debug.grid(sticky='ew')
         self.check(debug, 0, 'level_select')
@@ -1273,21 +1313,31 @@ class Launcher:
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        ttk.Label(video, text=self.t('aa_mode')).grid(row=9, column=0, sticky='w', pady=(6, 0))
-        self.aa_box = ttk.Combobox(video, values=[self.t(label) for label, _ in AA_MODES],
-                                   state='readonly', width=20)
-        self.aa_box.current(aa_mode_of(ini))
-        self.aa_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
-        self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        # Upscaler (also the anti-aliasing) and Quality (render size, applied at start): tlg.ini
+        # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for Quality).
+        ttk.Label(video, text=self.t('upscaler')).grid(row=9, column=0, sticky='w', pady=(6, 0))
+        self.up_box = ttk.Combobox(video, values=[self.t(label) for label, _ in UPSCALERS],
+                                   state='readonly', width=24)
+        self.up_box.current(upscaler_of(ini))
+        self.up_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.up_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.hint(video, 9, 2, 'upscaler_hint')
         self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=DIM, wraplength=320)
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
+        ttk.Label(video, text=self.t('quality')).grid(row=11, column=0, sticky='w', pady=(6, 0))
+        self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.menu_preset_keys(tlg_run.quality_preset(ini))],
+                                        state='readonly', width=30)
+        self.quality_box.current(tlg_run.quality_preset(ini))
+        self.quality_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.quality_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        help_mark(video, self.quality_help, *video.grid_slaves(row=11, column=0)).grid(row=11, column=2, sticky='w', padx=(4, 0))
         self.update_aa_note(ini)
-        ttk.Label(video, text=self.t('fg_mode')).grid(row=11, column=0, sticky='w', pady=(6, 0))
+        ttk.Label(video, text=self.t('fg_mode')).grid(row=14, column=0, sticky='w', pady=(6, 0))
         self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS', 'FSR 3.1'], state='readonly', width=20)
         self.fg_box.current(fg_mode_of(ini))
-        self.fg_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.fg_box.grid(row=14, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        self.hint(video, 11, 2, 'fg_hint')
+        self.hint(video, 14, 2, 'fg_hint')
         self.hdr_var = tk.BooleanVar(value=ini.get('hdr', '1') != '0')
 
         def hdr_toggled():
@@ -1296,8 +1346,9 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
             self.refresh_preset()
         ttk.Checkbutton(video, text='HDR', variable=self.hdr_var, command=hdr_toggled).grid(
-            row=13, column=0, columnspan=2, sticky='w', pady=(6, 0))
-        self.hint(video, 13, 2, 'hdr_hint')
+            row=16, column=0, columnspan=2, sticky='w', pady=(6, 0))
+        self.hint(video, 16, 2, 'hdr_hint')
+        self.build_aa_filters(video, 17)
 
         memory = section(main, self.t('memory'))
         memory.grid(row=0, column=1, sticky='new', padx=6, pady=4)
@@ -1342,7 +1393,8 @@ class Launcher:
         tabs.add(frame, text=self.t('tab_log'))
         bench_tab = ttk.Frame(tabs)
         tabs.add(bench_tab, text=self.t('tab_bench'))
-        self.bench_window = BenchmarkWindow(self, bench_tab)
+        # Taller than the window at 1080p (70% of the screen): scroll bars when it does not fit.
+        self.bench_window = BenchmarkWindow(self, scroll_area(bench_tab, padding=0))
         self.log = tk.Text(frame, wrap='none', font=('TkFixedFont', 9), state='disabled',
                            background=FIELD, foreground=MUTED, insertbackground=TEXT_COLOR,
                            highlightthickness=0, relief='flat')
@@ -1832,13 +1884,12 @@ class Launcher:
         except tk.TclError:
             self.banner = None
 
-    def build_filters(self, parent, row):
-        """SMAA, sharpening and color adjustments, read from and written to tlg.ini right away."""
-        ttk.Separator(parent).grid(row=row + 1, column=0, columnspan=3, sticky='ew', pady=(8, 4))
+    def build_aa_filters(self, parent, row):
+        """SMAA and Sharpening on the Video page next to the upscaler (user, 2026-11-07); tlg.ini at once."""
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
-        self.ini_vars = {}
-        for offset, key in ((2, 'smaa'), (4, 'color_adjust')):
+        self.ini_vars = getattr(self, 'ini_vars', {})
+        for offset, key in ((0, 'smaa'),):
             var = tk.BooleanVar(value=ini[key] not in ('0', ''))
             self.ini_vars[key] = var
             cell = ttk.Frame(parent)
@@ -1847,20 +1898,30 @@ class Launcher:
             box.pack(side='left')
             if key == 'smaa':
                 self.hint_mark(cell, 'smaa_hint', box).pack(side='left', padx=(4, 0))
-        ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 3, column=0, sticky='w')
+        ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 1, column=0, sticky='w')
         cell = ttk.Frame(parent)
-        cell.grid(row=row + 3, column=1, sticky='w', padx=6, pady=2)
-        self.sharpener = ttk.Combobox(cell, values=[self.t('sharpen_' + k) for k in SHARPENERS],
-                                      state='readonly', width=16)
-        self.sharpener.current(2 if ini['cas'] not in ('0', '') else 1 if ini['rcas'] not in ('0', '') else 0)
-        self.sharpener.pack(side='left')
-        self.sharpener.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        # Strength of the picked sharpener (rcas_strength or cas_strength), steps of 5.
+        cell.grid(row=row + 1, column=1, sticky='w', padx=6, pady=2)
+        # One Sharpening setting (2026-11-07): sharpen + sharpness, used by the AA step or by CAS.
+        self.sharpen_var = tk.BooleanVar(value=ini['sharpen'] not in ('0', ''))
+        box = ttk.Checkbutton(cell, variable=self.sharpen_var, command=self.filters_changed)
+        box.pack(side='left')
+        self.hint_mark(cell, 'sharpening_hint', box).pack(side='left', padx=(4, 0))
         self.sharpen_shown = ttk.Label(cell, width=5)
-        self.sharpen_strength = ttk.Scale(cell, from_=0, to=100, length=110, command=self.strength_moved)
+        self.sharpen_strength = ttk.Scale(cell, from_=0, to=400, length=110, command=self.strength_moved)
         self.sharpen_strength.pack(side='left', padx=(8, 4))
         self.sharpen_shown.pack(side='left')
         self.update_strength(ini)
+
+    def build_filters(self, parent, row):
+        """Color adjustments, read from and written to tlg.ini right away (SMAA and Sharpening: build_aa_filters)."""
+        ttk.Separator(parent).grid(row=row + 1, column=0, columnspan=3, sticky='ew', pady=(8, 4))
+        ini = dict(INI_DEFAULTS)
+        ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
+        self.ini_vars = getattr(self, 'ini_vars', {})  # SMAA lives on the Video page (build_aa_filters)
+        var = tk.BooleanVar(value=ini['color_adjust'] not in ('0', ''))
+        self.ini_vars['color_adjust'] = var
+        ttk.Checkbutton(parent, text=self.t('color_adjust'), variable=var, command=self.filters_changed).grid(
+            row=row + 4, column=0, columnspan=2, sticky='w', pady=2)
         for index, key in enumerate(COLOR_RANGES):
             low, high = COLOR_RANGES[key]
             ttk.Label(parent, text=self.t(key)).grid(row=row + 5 + index, column=0, sticky='w', padx=(16, 0))
@@ -1927,7 +1988,8 @@ class Launcher:
     def reload_ini(self):
         """The rows that show tlg.ini values read it again."""
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        self.aa_box.current(aa_mode_of(ini))
+        self.up_box.current(upscaler_of(ini))
+        self.quality_box.current(tlg_run.quality_preset(ini))
         self.fg_box.current(fg_mode_of(ini))
         self.update_aa_note(ini)
         self.hdr_var.set(ini.get('hdr', '1') != '0')
@@ -1989,18 +2051,17 @@ class Launcher:
 
     def filters_changed(self):
         values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
-                  'rcas': int(self.sharpener.current() == 1), 'cas': int(self.sharpener.current() == 2)}
+                  'sharpen': int(self.sharpen_var.get())}
         values['frame_generation'] = max(self.fg_box.current(), 0)
-        aa = self.aa_box.current()
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         self.update_aa_note(current_ini)
         self.update_strength(current_ini)
-        if aa >= 0 and aa != aa_mode_of(current_ini):
-            picked = AA_MODES[aa][1]
-            if picked is None:
-                values['dlaa'] = 0  # F8 or the row brings the upscaler choice back
-            else:
-                values.update(dlaa=picked[0], upscaler=picked[1], preset=0, aa_row=1)
+        if self.up_box.current() >= 0:
+            values.update(upscaler=UPSCALERS[self.up_box.current()][1], aa_row=1)
+        if self.quality_box.current() >= 0:
+            values['preset'] = self.quality_box.current()
+        # No AA checkbox (2026-11-07): the upscaler choice is the anti-aliasing; Built-in = the game's own.
+        values['dlaa'] = int(self.up_box.current() > 0)
         for key, (low, high) in COLOR_RANGES.items():
             try:
                 value = min(max(float(self.ini_vars[key].get().replace(',', '.')), low), high)
@@ -2659,13 +2720,6 @@ class Launcher:
         self.sync_music()
         self.root.after(5000, self.music_tick)
 
-    def switch_menu(self):
-        # main() starts the other menu once this window is closed.
-        self.settings['legacy_menu'] = not self.settings.get('legacy_menu')
-        tlg_run.save_settings(self.settings)
-        self.menu_switch = True
-        self.quit()
-
     def quit(self):
         # Clicked from the sidebar: destroying the window inside its own click handler leaves Tk
         # finishing that click on freed memory ("alloc: invalid block"), so close just after.
@@ -2788,19 +2842,11 @@ def main():
         sys.exit(tlg_run.main(args))
     if args[:1] == ['--play']:
         sys.exit(tlg_run.main(args[1:]))
-    # The legacy menu (the launcher before the 2026-11 redesign) as a fallback: --legacy, or the
-    # switch in its Settings (saved as legacy_menu). The switch closes one menu and opens the other.
-    import tlg_launcher_legacy
-    legacy = '--legacy' in args or bool(tlg_run.load_settings().get('legacy_menu'))
-    while True:
-        module = tlg_launcher_legacy if legacy else sys.modules[__name__]
-        root = tk.Tk(className='tlg-pc')  # matches StartupWMClass in the desktop entry
-        module.apply_theme(root)
-        app = module.Launcher(root)
-        root.mainloop()
-        if not getattr(app, 'menu_switch', False):
-            break
-        legacy = not legacy
+    # The legacy menu was removed (user, 2026-11-07); an old legacy_menu setting is ignored.
+    root = tk.Tk(className='tlg-pc')  # matches StartupWMClass in the desktop entry
+    apply_theme(root)
+    Launcher(root)
+    root.mainloop()
 
 
 if __name__ == '__main__':

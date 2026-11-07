@@ -104,7 +104,9 @@ def resolution_elf(expected=True):
                                (t.UI_SIZE, t.UI_SIZE_EXPECTED),
                                (t.GUIDE_SCALE, t.GUIDE_SCALE_EXPECTED),
                                (t.SUBTITLE_SCALE, t.SUBTITLE_SCALE_EXPECTED),
-                               (t.GARLIC_SIZE, t.GARLIC_SIZE_EXPECTED)):
+                               (t.GARLIC_SIZE, t.GARLIC_SIZE_EXPECTED),
+                               (t.GARLIC_PRO_LEA, t.GARLIC_PRO_LEA_EXPECTED),
+                               *t.GARLIC_PRO_CMOVES):
         offset = address - t.GHIDRA_BASE
         image[offset:offset + len(original)] = original if expected else b'\xcc' * len(original)
     return plain_elf(image)
@@ -128,6 +130,31 @@ class ResolutionPatchTests(unittest.TestCase):
         self.assertEqual(data, bytes.fromhex('41bf') + struct.pack('<I', (2816 + t.GARLIC_EXTRA_MB) << 20))
         with self.assertRaises(ValueError):
             t.garlic_writes(resolution_elf(expected=False))
+
+    def test_gpu_heap_above_4g_only_with_supersampling(self):
+        writes = t.garlic_writes(resolution_elf(), above_4g=True)
+        self.assertEqual(len(writes), 2 + len(t.GARLIC_PRO_CMOVES))
+        self.assertIn(f'-> {2816 + t.GARLIC_EXTRA_MB + t.GARLIC_ABOVE_4G_MB} MB', writes[0][2])
+        self.assertEqual(writes[1][0], t.GARLIC_PRO_LEA - t.GHIDRA_BASE)
+        self.assertEqual(writes[1][1][3:], struct.pack('<I', t.GARLIC_ABOVE_4G_MB << 20))
+        for (address, _), (offset, data, what) in zip(t.GARLIC_PRO_CMOVES, writes[2:]):
+            self.assertEqual(offset, address - t.GHIDRA_BASE)
+            self.assertEqual(data, bytes.fromhex('0f1f4000'))
+            self.assertTrue(what.startswith('garlic above 4 GiB: '))
+
+    def test_prepare_render_size(self):
+        # The Quality row: a smaller render size logs the line the launcher reads; a larger one
+        # (supersampling) also turns on the heap above 4 GiB.
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'eboot.bin').write_bytes(resolution_elf())
+            _, lines = t.prepare(tmp, tmp, '30', resolution='3840x1600', render_resolution='1920x800')
+            self.assertIn('Resolution patch render size: 1920x800', lines)
+            self.assertFalse(any(line.startswith('Patch garlic above 4 GiB') for line in lines))
+            _, lines = t.prepare(tmp, tmp, '30', resolution='3840x1600', render_resolution='7680x3200')
+            self.assertIn('Resolution patch render size: 7680x3200', lines)
+            self.assertTrue(any(line.startswith('Patch garlic above 4 GiB') for line in lines))
+            _, lines = t.prepare(tmp, tmp, '30', resolution='3840x1600', render_resolution='3840x1600')
+            self.assertFalse(any('render size' in line for line in lines))
 
     def test_ultrawide_gets_hor_plus_and_a_wider_ui(self):
         writes = t.resolution_writes(resolution_elf(), (3840, 1600))

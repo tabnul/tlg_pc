@@ -16,6 +16,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -74,6 +75,7 @@ public:
     /// draw's render state (Rasterizer::BeginRendering).
     [[nodiscard]] u64 RedirectState() const noexcept {
         return u64(ui_phase) | u64(display_redirect) << 1 | u64(done_this_frame) << 2 |
+               u64(engine_ui) << 3 |
                u64(ui_color.index) << 8 | u64(ui_depth.index) << 36;
     }
 
@@ -104,7 +106,9 @@ public:
 
     /// After identifying this draw's targets, before drawing any UI pixels. Menus use
     /// spatial background copy and native UI, without needing scene depth or FSR history.
-    void OnDraw(u64 vs_hash, VideoCore::ImageId color, VideoCore::ImageId depth,
+    /// True when the draw was replaced (engine upscale: DLSS stood in for PS_Upscale) and
+    /// must be skipped.
+    bool OnDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color, VideoCore::ImageId depth,
                 bool native_viewport);
 
     /// A pass's first color target: the last render-size RGBA8 target before the UI is the
@@ -116,6 +120,7 @@ public:
         vk::ImageLayout layout;
         u32 width, height;
         bool native_ui = false;
+        bool output_space = false; ///< HDR engine UI: the guest draws in output-size coordinates
     };
     /// Render target redirection (UI passes, display pass): false when not redirected.
     /// `view` is the game's view of the image: redirected views mirror its format (sRGB) and,
@@ -128,8 +133,11 @@ public:
                          vk::ImageView& view, vk::ImageLayout& layout);
     /// Whether RedirectSampled would replace `image` (it may record a barrier then).
     [[nodiscard]] bool RedirectsSampled(VideoCore::ImageId image) const {
-        return display_redirect && image == ui_color;
+        return (display_redirect && image == ui_color) || EngineRedirects(image);
     }
+    /// HDR engine upscale: during the PS_Upscale draw, any render-size RGBA8 image it samples
+    /// (the game may read the LDR frame through another image id than its render target).
+    [[nodiscard]] bool EngineRedirects(VideoCore::ImageId image) const;
 
     /// Presenter: the output-size display buffer standing in for the guest one at `address`.
     struct Display {
@@ -173,6 +181,25 @@ private:
 
     void Run();
     void RunGameMotion();
+    /// tlg: engine upscale (TLG_RENDER_RESOLUTION below TLG_RESOLUTION_PATCH): the game renders
+    /// at the smaller size and its PS_Upscale pass enlarges the finished frame. `OnEngineDraw`
+    /// recognises that draw (the first output-size draw after the last render-size LDR target
+    /// of a scene frame, or TLG_UPSCALE_PS); `RunGameUpscale` runs DLSS from the LDR frame,
+    /// the game's motion vectors and depth into the draw's target instead.
+    bool OnEngineDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color);
+    /// `hdr`: the result goes to engine_hdr_image (8-bit, gamma encoded like the game's LDR
+    /// frame) and the game's own PS_Upscale runs on it, so it still does its HDR (PQ) encoding.
+    bool RunGameUpscale(VideoCore::ImageId ldr, VideoCore::ImageId target, bool hdr = false);
+    bool StartEngineHdrUi(VideoCore::ImageId color, VideoCore::ImageId depth, u64 vs_hash);
+
+public:
+    /// After OnDraw returned true and the rasterizer prepared the target (BeginRendering):
+    /// runs DLSS and blits into the target, which is left in colour-attachment layout. False
+    /// when it could not run (the draw must then go ahead).
+    bool RunEngineUpscale(std::span<const VideoCore::ImageId> sampled);
+
+private:
+    [[nodiscard]] bool EngineUpscale() const;
     void AdvanceJitter();
     void RunScaled();
     void RunUiOnly(VideoCore::ImageId color, VideoCore::ImageId depth);
@@ -208,14 +235,18 @@ private:
                     bool hdr, std::array<float, 2> frame_jitter);
     /// Records FSR 4 into output_image; on a permanent failure FSR 3 takes over.
     bool RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color, Fsr4Upscaler::Image depth,
-                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms);
+                    u32 w, u32 h, u32 ow, u32 oh, float frame_ms, std::array<float, 2> frame_jitter);
     /// Records the portable FSR 3.1 context into output_image (HDR color, General layouts).
     bool RecordFsr3(vk::CommandBuffer cmdbuf, vk::Image color, vk::Format color_format,
                     vk::ImageUsageFlags color_usage, vk::Image depth, vk::Format depth_format,
                     vk::ImageUsageFlags depth_usage, u32 w, u32 h, u32 ow, u32 oh, float frame_ms,
                     bool has_reactive, std::array<float, 2> frame_jitter);
-    /// tlg: FSR 3.1 at native size on the game's motion (the anti-aliasing row).
+    /// tlg: FSR 3.1 or FSR 4 at native size on the game's motion (the anti-aliasing row).
     [[nodiscard]] bool FsrNativeAa() const;
+    /// Our own TAA (taa.comp) at native size on the game's motion, like DLAA (user test 11-07).
+    [[nodiscard]] bool TaaNativeAa() const;
+    /// The AA step's own sharpener, for the log (presenter: "Sharpening: ...").
+    [[nodiscard]] const char* SharpenerName() const;
     void RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color, vk::ImageView depth);
     /// Sharpness above 1 for FSR 3/4 (their RCAS stops at 1): one more RCAS pass over the target
     /// (output_image, or the 8-bit UI image with ldr) in General layout after the upscaler.
@@ -277,6 +308,32 @@ private:
     } game_frame;
     std::array<u32, 2> game_size{};
     VideoCore::ImageId ldr_target{};
+    // tlg: engine upscale (see OnEngineDraw).
+    bool engine_upscale = false;
+    bool engine_failed = false;
+    u32 engine_render_w = 0, engine_render_h = 0;
+    u32 engine_output_w = 0, engine_output_h = 0;
+    u64 engine_upscale_ps = 0; ///< the PS_Upscale pixel shader, once seen (or TLG_UPSCALE_PS)
+    VideoCore::ImageId engine_ldr{}; ///< the last render-size LDR target this frame
+    VideoCore::ImageId engine_pending_ldr{}, engine_pending_target{}; ///< decided in OnDraw
+    VideoCore::ImageId engine_redirect{}; ///< HDR: the LDR frame PS_Upscale reads, redirected
+    bool engine_redirect_hit = false;
+    bool engine_pending_hdr = false; ///< the pending PS_Upscale draws into an HDR target
+    // HDR: the game draws its UI into the render-size frame before PS_Upscale. DLSS runs at the
+    // first UI draw instead, and the UI draws onto the output-size DLSS image.
+    bool engine_hdr_seen = false; ///< the last PS_Upscale drew into an HDR target
+    bool engine_ui = false;       ///< this frame's UI draws go to engine_hdr_image
+    VideoCore::ImageId engine_ui_color{};
+    bool engine_hdr_post_done = false;
+    /// HDR: the UI went into engine_hdr_image before the frame reset; PS_Upscale (after the
+    /// reset, like the SDR display pass) must read it as is, not run DLSS over it again.
+    bool engine_ui_carried = false;
+    /// HDR: the render-size float frame (#19); HDR frames draw no 8-bit frame for engine_ldr.
+    VideoCore::ImageId engine_hdr_src{}; ///< the game's last image pass into the HDR frame ran ///< the render-size frame the UI draws into
+    bool engine_ui_read_barrier = false;
+    VideoCore::UniqueImage engine_hdr_image; ///< HDR: DLSS result at output size (RGBA16F)
+    u32 engine_hdr_w = 0, engine_hdr_h = 0; ///< output size (the written corner)
+    vk::Format engine_hdr_format = vk::Format::eR16G16B16A16Sfloat;
     VideoCore::ImageId ui_color{}, ui_depth{};
     bool ui_phase = false;         ///< from the upscale to the next display pass
     bool display_redirect = false; ///< the display pass of an upscaled frame
@@ -300,6 +357,7 @@ private:
     vk::ImageView Mirror(vk::Image image, std::vector<MirrorView>& views, vk::Format format,
                          vk::ComponentMapping mapping);
     std::vector<MirrorView> ui_views;
+    std::vector<MirrorView> engine_hdr_views; ///< views of engine_hdr_image
     struct DisplayImage {
         VideoCore::UniqueImage image;
         std::vector<MirrorView> views;

@@ -1,4 +1,10 @@
-# DLAA and FSR 3.1 Native AA
+# DLSS, FSR 4 and FSR 3.1: anti-aliasing and upscaling
+
+All three run in two ways. At **Native AA** the game renders at your screen size and they only
+smooth the edges (below). At **Quality, Balanced, Performance or Ultra Performance** the game
+renders below your screen size and DLSS or FSR builds the full picture, for more FPS; menus and
+subtitles are drawn at full size. Render sizes, costs and how it works:
+[port/docs/upscaling.md](../port/docs/upscaling.md).
 
 DLAA is NVIDIA's DLSS anti-aliasing at native resolution. The port feeds it the game's own motion
 vectors and uses it instead of the game's SMAA: foliage, feathers and fences stop shimmering.
@@ -6,6 +12,15 @@ vectors and uses it instead of the game's SMAA: foliage, feathers and fences sto
 FSR 3.1 Native AA is the same with AMD FSR 3.1 (through
 [UniversalScalers-Vulkan](https://github.com/FireBurn/UniversalScalers-Vulkan) by @FireBurn): it runs on any card and needs
 no extra files. On an RTX card both are available; pick the one you like.
+
+FSR 4 Native AA is the same with AMD FSR 4: sharper and steadier than FSR 3.1, above all in rain
+and on fine moving detail. It runs on Windows and Linux on cards with the shader features it needs
+(recent AMD cards, and many NVIDIA and Intel cards); on other cards it is greyed out. The open FSR 4
+model (MIT, `LICENSE-FSR4-v07.txt`) comes with the packages in `fsr4_shaders\`.
+
+The first time the game starts on a card that runs FSR 4, it moves FSR 3.1 Native AA (or DLAA
+without DLSS) to FSR 4 Native AA, once. After that your choice stays; `fsr4_default=1` in
+`tlg.ini` records that it happened.
 
 ## Playing
 
@@ -22,16 +37,19 @@ next to the game's exe:
 
 DLAA is **on by default**. Nothing needs to be downloaded or copied.
 
-- **Launcher:** the *Anti-aliasing* row: Off, DLAA or FSR 3.1 Native AA.
-- **In game:** the overlay menu (Insert) > *Image* > *Anti-aliasing*, the same choice.
+- **Launcher:** *Upscaler* (Built-in, DLSS, FSR 3.1, FSR 4, TAA) and *Quality* (Native AA,
+  Quality, Balanced, Performance, Ultra Performance). The upscaler is the anti-aliasing; Built-in
+  keeps the game's own.
+- **In game:** the overlay menu (Insert) > *Upscaling and anti-aliasing*, the same choices.
+  Quality needs a restart (*Apply and restart*); the rest changes live.
 - **F8** switches between that choice and the game's SMAA and saves it; a label in the top right
   shows which one is active.
 
 On other cards, on Linux, or when a DLL is missing, DLAA is greyed out with the reason; FSR 3.1
-Native AA still works.
+Native AA still works. FSR 4 falls back to FSR 3.1 when its model files are missing.
 
-`tlg.ini` keys: `dlaa=1` turns the anti-aliasing on, `upscaler=dlss` or `upscaler=fsr3` picks
-it. `fsr_velocity` (0..1, default 1, AMD's value) sets how much motion cuts FSR's history: lower
+`tlg.ini` keys: `upscaler=dlss`, `upscaler=fsr4`, `upscaler=fsr3`, `upscaler=taa` or
+`upscaler=off` (Built-in) picks it, `preset=0` (Native AA) to `4` (Ultra Performance) the Quality; the game writes `fsr4_supported` for the launcher. `fsr_velocity` (0..1, default 1, AMD's value) sets how much motion cuts FSR's history: lower
 keeps moving hair and fur smoother, at the risk of ghosting.
 
 ## Building from source

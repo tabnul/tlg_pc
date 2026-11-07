@@ -743,6 +743,9 @@ bool GraphicsPipelineKey::Deserialize(Serialization::Archive& ar) {
     Serialization::Reader key{ar};
 
     key.Read(this, sizeof(*this));
+    // tlg: keys saved before the pad fields can hold junk there.
+    pad_after_color_samples = 0;
+    pad_tail = 0;
     return true;
 }
 

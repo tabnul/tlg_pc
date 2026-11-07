@@ -1342,11 +1342,13 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         upscaler->OnGameMotionPass(cb_descs[0].first, cb_descs[2].first, db_desc.first);
         ReadJitterControl();
     }
+    bool draw_replaced = false;
     if (upscaler->Enabled() && std::popcount(pipeline->GetGraphicsKey().mrt_mask) == 1) {
         const auto& viewport = Regs().viewports[0];
-        upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
-                         cb_descs[0].first, db_desc.first,
-                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
+        draw_replaced = upscaler->OnDraw(
+            pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash, pipeline->FragmentHash(),
+            cb_descs[0].first, db_desc.first,
+            UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
     }
     const PreparedDraw* draw_prepared = bind_prepared;
     // tlg: vertex and index buffers are resolved while the helper binds textures (their
@@ -1359,7 +1361,16 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     if (!bound) {
         return;
     }
-    const auto state = BeginRendering(pipeline);
+    auto state = BeginRendering(pipeline);
+    if (draw_replaced) {
+        // tlg engine upscale: DLSS output into the prepared target; the pass then loads it.
+        if (upscaler->RunEngineUpscale(bound_images)) {
+            state.color_attachments[0].is_clear = 0;
+            state.color_attachments[0].image_layout = vk::ImageLayout::eColorAttachmentOptimal;
+        } else {
+            draw_replaced = false;
+        }
+    }
 
     if (!inputs_resolved) {
         ResolveVertexBuffers(pipeline, draw_prepared);
@@ -1541,7 +1552,8 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     const vk::Pipeline handle = pipeline->Handle();
     const vk::Pipeline square = SquarePass(*pipeline);
     const bool clear_smaa_weights = upscaler->SkipGameSmaa(vs_info.pgm_hash);
-    const bool skipped = !jitter_control.skip.empty() && SkippedShader(pipeline->FragmentHash());
+    const bool skipped = draw_replaced ||
+                         (!jitter_control.skip.empty() && SkippedShader(pipeline->FragmentHash()));
     const vk::Rect2D render_area{{0, 0}, {state.width, state.height}};
     const u32 num_indices = regs.num_indices;
     const u32 num_instances = regs.num_instances.NumInstances();
@@ -1644,8 +1656,10 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
     }
     if (upscaler->Enabled() && std::popcount(pipeline->GetGraphicsKey().mrt_mask) == 1) {
         const auto& viewport = Regs().viewports[0];
+        // Indirect draws: an engine-upscale replacement is not expected here (PS_Upscale is
+        // a direct draw); the return value is ignored.
         upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
-                         cb_descs[0].first, db_desc.first,
+                         pipeline->FragmentHash(), cb_descs[0].first, db_desc.first,
                          UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
     }
     if (!BindResources(pipeline)) {
@@ -2615,8 +2629,12 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            if (vsharp.GetSize() == 864 && gbuffer_draw &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
+            // Look for the camera only until this frame's camera is found, and never in a
+            // GPU-written buffer: reading one forces a download plus a full GPU wait on the
+            // recording thread, and the camera is never found there.
+            if (vsharp.GetSize() == 864 && gbuffer_draw && !camera_motion->HasCamera() &&
+                memory->IsValidGpuMapping(vsharp.base_address, 0) &&
+                !buffer_cache.IsRegionGpuModified(vsharp.base_address, 864)) {
                 camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.
@@ -3194,6 +3212,7 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
             attachment_feedback_loop = false;
             push_data.scene_size = begin_memo.scene_size;
             target_scale = begin_memo.target_scale;
+            target_expand = begin_memo.target_expand;
             return begin_memo.state;
         }
         ++begin_memo_misses;
@@ -3210,7 +3229,7 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         if (!clears) {
             // Recomputed after the full path: it may have started the scene (scene_started).
             begin_memo = {true, MakeBeginSignature(pipeline), state, push_data.scene_size,
-                          target_scale};
+                          target_scale, target_expand};
         }
     }
     return state;
@@ -3497,6 +3516,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     // tlg: a pass drawn into the upscaler's output-size images (UI, display pass): every
     // attachment must be redirected, viewports and scissors are scaled.
     target_scale = {1.0f, 1.0f};
+    target_expand = {};
     if (color_redirected || depth_redirected) {
         u32 color_targets = 0;
         for (u32 cb = 0; cb < state.num_color_attachments; ++cb) {
@@ -3539,6 +3559,20 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
             // A native viewport (or native window-space UI vertices) must not be doubled
             // again. The final display copy still uses the guest render-size coordinates.
             const auto& viewport = regs.viewports[0];
+            if (redirect.output_space) {
+                // HDR UI before PS_Upscale: the game already draws at output size into its
+                // render-size frame; only a pass over the whole render-size frame is enlarged.
+                const bool guest_viewport =
+                    !regs.IsClipDisabled() &&
+                    std::abs(std::abs(viewport.xscale * 2) - float(guest_extent.first)) < 0.5f &&
+                    std::abs(std::abs(viewport.yscale * 2) - float(guest_extent.second)) < 0.5f;
+                target_scale = guest_viewport
+                                   ? UiComposition::Scale(guest_extent.first, guest_extent.second,
+                                                          redirect.width, redirect.height, false)
+                                   : std::array{1.0f, 1.0f};
+                target_expand = {guest_extent.first, guest_extent.second, redirect.width,
+                                 redirect.height};
+            } else {
             const bool native_coordinates = redirect.native_ui &&
                 (UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2) ||
                  (regs.IsClipDisabled() && !regs.viewport_control.xscale_enable &&
@@ -3546,6 +3580,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
             target_scale = UiComposition::Scale(guest_extent.first, guest_extent.second,
                                                 redirect.width, redirect.height,
                                                 native_coordinates);
+            }
         }
     }
 
@@ -3935,6 +3970,14 @@ void Rasterizer::UpdateViewportScissorState() const {
             scissors.push_back({
                 .offset = {x0, y0},
                 .extent = {u32(std::max(x1 - x0, 0)), u32(std::max(y1 - y0, 0))},
+            });
+        } else if (target_expand[0] && vp_scsr.top_left_x <= 0 && vp_scsr.top_left_y <= 0 &&
+                   vp_scsr.top_left_x + s32(vp_scsr.GetWidth()) >= s32(target_expand[0]) &&
+                   vp_scsr.top_left_y + s32(vp_scsr.GetHeight()) >= s32(target_expand[1])) {
+            scissors.push_back({
+                .offset = {0, 0},
+                .extent = {std::max(vp_scsr.GetWidth(), target_expand[2]),
+                           std::max(vp_scsr.GetHeight(), target_expand[3])},
             });
         } else {
             scissors.push_back({

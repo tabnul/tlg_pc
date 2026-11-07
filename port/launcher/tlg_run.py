@@ -180,8 +180,8 @@ DEFAULT_ENV = {
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
     'TLG_READBACK_LINEAR': '1',    # small/linear render targets back to the CPU: auto exposure (#38, #40)
     'TLG_GC_BUDGET_MB': '7000',    # texture cache budget; higher only piles up old textures (#104)
-    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA or FSR 3.1 native AA).
-    'TLG_JITTER': '1',             # jitter only while DLAA or FSR 3.1 native AA runs
+    # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA, FSR 3.1 or FSR 4 native AA).
+    'TLG_JITTER': '1',             # jitter only while DLAA or FSR native AA runs
     'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
 }
@@ -239,6 +239,8 @@ RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
 applied_frame_rate = '30'
 # The size the resolution patch really applied (None: the game's own 1920x1080).
 applied_resolution = None
+# The render size the Quality row applied (None: the output size).
+applied_render_resolution = None
 # MiB the Garlic heap patch added to the game's GPU heap (0: none); the direct memory grows with it.
 applied_garlic_extra = 0
 
@@ -521,6 +523,44 @@ def resolution(settings):
     return os.environ.get('TLG_RESOLUTION') or str(settings.get('resolution', '1920x1080'))
 
 
+# The Quality row (tlg.ini preset, TlgSettings::Preset): the render size is the output size divided
+# by this on each side. Supersampling (5, 6) renders larger than the output (experimental).
+PRESET_SCALES = (1.0, 1.5, 1.7, 2.0, 3.0, 1 / 1.5, 0.5)
+PRESET_KEYS = ('preset_native', 'preset_quality', 'preset_balanced', 'preset_performance',
+               'preset_ultra', 'preset_super150', 'preset_super200')
+# The launchers list Native AA .. Ultra Performance; supersampling (experimental) is tlg.ini
+# preset=5/6 or TLG_UPSCALE_PRESET only, and listed while selected.
+MENU_PRESETS = 5
+
+
+def menu_preset_keys(preset):
+    """The Quality choices to show: the menu ones, plus the supersampling ones while selected."""
+    return PRESET_KEYS if preset >= MENU_PRESETS else PRESET_KEYS[:MENU_PRESETS]
+
+
+def quality_preset(ini):
+    """The tlg.ini Quality row (0 Native AA .. 6 Supersampling 200%); TLG_UPSCALE_PRESET wins."""
+    value = os.environ.get('TLG_UPSCALE_PRESET') or ini.get('preset', '0')
+    try:
+        return min(max(int(value), 0), len(PRESET_SCALES) - 1)
+    except ValueError:
+        return 0
+
+
+def render_resolution(size, preset):
+    """The render size "WxH" of a quality preset for an output size (each side rounded to even,
+    as TlgSettings::PresetRenderSize), or None at Native AA."""
+    if preset <= 0:
+        return None
+    width, height = (int(n) for n in size.split('x'))
+    scale = PRESET_SCALES[preset]
+    return f'{int(width / scale / 2 + 0.5) * 2}x{int(height / scale / 2 + 0.5) * 2}'
+
+
+def supersampling(preset):
+    return preset in (5, 6)
+
+
 def resolution_label(size):
     """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
     width, height = (int(n) for n in size.split('x'))
@@ -568,10 +608,18 @@ def set_mod_enabled(key, enabled):
 def prepare(settings, log=print):
     """Builds out/boot-linked.bin, out/content.bin and out/patches.bin (frame rate patches and
     any enabled mod); returns the module list that was linked."""
-    global applied_frame_rate, applied_resolution, applied_garlic_extra
+    global applied_frame_rate, applied_resolution, applied_render_resolution, applied_garlic_extra
     applied_resolution = None
+    applied_render_resolution = None
     applied_garlic_extra = 0
+    # Values derived on the previous start ("Apply and restart" inherits the environment) are
+    # derived again from the new options; an explicit TLG_RENDER_RESOLUTION still wins.
+    for key in os.environ.pop('TLG_DERIVED', '').split(','):
+        os.environ.pop(key, None)
     game = settings['game_dir']
+    # The Quality row (tlg.ini): the render size below (DLSS / FSR upscale) or above (supersampling,
+    # experimental, with the GPU heap above 4 GiB) the output size.
+    render = render_resolution(resolution(settings), quality_preset(read_ini(user_dir() / 'tlg.ini')))
     scripts = PORT_DIR / 'scripts'
     modules = ['libc.prx', 'libSceFios2.prx']
     ngs2 = ngs2_module(settings)
@@ -583,6 +631,7 @@ def prepare(settings, log=print):
         [*python_command(scripts / 'content_profile.py'), game, '--out', str(OUT_DIR)],
         [*python_command(scripts / 'tlg_patches.py'), game, '--out', str(OUT_DIR), '--mode', frame_rate(settings),
          '--mods-dir', str(mods_dir()), '--mods-config', str(mods_config()), '--resolution', resolution(settings),
+         *(['--render-resolution', render] if render else []),
          *(['--skip-logos'] if settings.get('skip_logos') else []),
          '--menu-confirm', menu_confirm(settings)],
     ]
@@ -598,6 +647,8 @@ def prepare(settings, log=print):
                 applied_frame_rate = line.split()[2]
             if line.startswith('Resolution patch resolution: '):
                 applied_resolution = line.split()[-2]  # '... 1920x1080 -> WxH (bytes)'
+            if line.startswith('Resolution patch render size: '):
+                applied_render_resolution = line.split()[-1]
             if line.startswith('Patch garlic: '):
                 words = line.split()  # '... GPU heap 2816 -> N MB (bytes)'
                 applied_garlic_extra = int(words[-3]) - int(words[-5])
@@ -781,6 +832,10 @@ def build_env(settings, extra=None):
     env['TLG_CONFIG'] = str(user_dir() / 'tlg.ini')
     if 'TLG_TEXPACK_DIR' not in env:
         env['TLG_TEXPACK_DIR'] = str(texpack_dir(settings))
+    # FSR 4 native AA: the game runs in the data folder; the model ships next to the launcher.
+    fsr4 = PORT_DIR / 'fsr4_shaders'
+    if 'TLG_FSR4_DIR' not in env and fsr4.is_dir():
+        env['TLG_FSR4_DIR'] = str(fsr4)
     # A dev run on Windows loads the game's DLLs (SDL3, FFmpeg, libc++) from the MSYS2 toolchain;
     # without it on PATH the game exits before its first log line.
     toolchain = Path(os.environ.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'
@@ -802,6 +857,14 @@ def build_env(settings, extra=None):
     # The game renders natively at the patched size: the upscaler stays off (vk_temporal_upscaler).
     if applied_resolution:
         env['TLG_RESOLUTION_PATCH'] = applied_resolution
+    # The Quality row: the game renders at this size and DLSS / FSR (or the game's own pass)
+    # scales it to the output (vk_temporal_upscaler, TlgSettings::EngineUpscaleMode).
+    env.pop('TLG_DERIVED', None)
+    if applied_render_resolution:
+        env['TLG_RENDER_RESOLUTION'] = applied_render_resolution
+        env['TLG_DERIVED'] = 'TLG_RENDER_RESOLUTION'
+    else:
+        env.pop('TLG_RENDER_RESOLUTION', None)
     # The larger Garlic heap comes out of direct memory (runtime_memory.c: 5056 MiB retail).
     if applied_garlic_extra:
         env.setdefault('TLG_DMEM_MB', str(5056 + applied_garlic_extra))

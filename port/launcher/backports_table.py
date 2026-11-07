@@ -47,22 +47,32 @@ MENU = [
     _menu('Image', 'fsr1', 'bool', '0', ('Upscale with FSR 1', 'Ampliar com FSR 1'),
           ('Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).',
            'Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor).')),
-    _menu('Image', 'rcas', 'bool', '1', ('Sharpening (RCAS)', 'Nitidez (RCAS)'),
-          ('Sharpens the final image. Needs FSR 1 when the game image is smaller than the window.',
-           'Deixa a imagem final mais nítida. Precisa do FSR 1 quando a imagem do jogo é menor que a janela.')),
-    _menu('Image', 'rcas_strength', 'int', '75', ('Sharpening strength', 'Intensidade da nitidez'),
-          ('How strong the RCAS sharpening is.', 'Quão forte é a nitidez do RCAS.'), lo=0, hi=100, unit='%'),
-    _menu('Image', 'cas', 'bool', '1', ('AMD CAS sharpening', 'Nitidez AMD CAS'),
-          ('Contrast-adaptive sharpening at any image size; replaces RCAS while on.',
-           'Nitidez adaptativa ao contraste em qualquer tamanho de imagem; substitui o RCAS enquanto ligada.')),
-    _menu('Image', 'cas_strength', 'int', '100', ('CAS strength', 'Intensidade do CAS'),
-          ('How strong the CAS sharpening is.', 'Quão forte é a nitidez do CAS.'), lo=0, hi=100, unit='%'),
+    # One Sharpening setting (2026-11-07): the AA step's own RCAS with DLSS / FSR / TAA, AMD CAS on
+    # the final picture with Built-in. The old rcas / cas keys are still read but no longer used.
+    _menu('Image', 'sharpen', 'bool', '1', ('Sharpening', 'Nitidez'),
+          ('Sharpens the image: with DLSS, FSR or TAA their own sharpening (scene only), with Built-in AMD CAS.',
+           'Deixa a imagem mais nítida: com DLSS, FSR ou TAA a nitidez deles (só a cena), com Do jogo o AMD CAS.')),
+    _menu('Image', 'sharpness', 'float', '1.75', ('Sharpening strength', 'Intensidade da nitidez'),
+          ('1.5 is the default; above 1 an extra pass with DLSS / FSR / TAA (CAS stops at 1).',
+           '1,5 é o padrão; acima de 1 uma passada extra com DLSS / FSR / TAA (o CAS para em 1).'),
+          lo=0.0, hi=4.0),
     _menu('Image', 'smaa', 'bool', '0', ('SMAA 1x anti-aliasing', 'Antisserrilhado SMAA 1x'),
           ('Smooths jagged edges on the final image (a little GPU time).',
            'Suaviza as bordas serrilhadas da imagem final (um pouco de tempo de GPU).')),
-    _menu('Image', 'dlaa', 'bool', '1', ('DLAA anti-aliasing', 'Anti-aliasing DLAA'),
-          ("NVIDIA RTX: stable foliage edges; F8 switches to the game's own SMAA.",
-           'NVIDIA RTX: bordas estáveis na folhagem; F8 troca para o SMAA do próprio jogo.')),
+    _menu('Image', 'upscaler', 'choice', 'dlss', ('Upscaler', 'Ampliador'),
+          ('Draws the image at the chosen quality: DLSS (NVIDIA RTX), FSR 4 (any recent card), FSR 3.1 (any card), TAA (any card, lighter, native size only) '
+           "or the game's own pass (Built-in). At Native AA quality it is the anti-aliasing.",
+           'Desenha a imagem na qualidade escolhida: DLSS (NVIDIA RTX), FSR 4 (qualquer placa recente), FSR 3.1 (qualquer placa), TAA (qualquer placa, mais leve, só nativo) '
+           'ou a ampliação do próprio jogo. Na qualidade AA nativo ele é o anti-aliasing.'),
+          choices=(('off', 'Built-in (game)', 'Do jogo'), ('dlss', 'DLSS', 'DLSS'),
+                   ('fsr3', 'FSR 3.1', 'FSR 3.1'), ('fsr4', 'FSR 4', 'FSR 4'), ('taa', 'TAA', 'TAA'))),
+    _menu('Image', 'preset', 'choice', '0', ('Quality (requires restart)', 'Qualidade (exige reiniciar)'),
+          ('The render size: Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output '
+           'on each side, upscaled by the upscaler. Applied at start.',
+           'O tamanho de renderização: Qualidade 1/1,5, Equilibrado 1/1,7, Desempenho 1/2, Ultra desempenho 1/3 da '
+           'saída em cada lado, ampliado pelo ampliador. Aplicado no início.'),
+          choices=(('0', 'Native AA', 'AA nativo'), ('1', 'Quality', 'Qualidade'), ('2', 'Balanced', 'Equilibrado'),
+                   ('3', 'Performance', 'Desempenho'), ('4', 'Ultra Performance', 'Ultra desempenho'))),
     _menu('Image', 'frame_generation', 'choice', '0', ('Frame generation', 'Geração de quadros'),
           ('Shows one made-up image between two game frames: smoother motion, a little more input delay. '
            'DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
@@ -75,9 +85,11 @@ MENU = [
            'Recomendado: ligado.')),
     _menu('Effects', 'shadow_scale', 'choice', '1', ('Shadow resolution', 'Resolução das sombras'),
           ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much less shimmer of "
-           'tree and leaf shadows, with any anti-aliasing. 8192 costs about 8 FPS and 1 GB of video memory; recommended with headroom.',
+           'tree and leaf shadows, with any anti-aliasing. '
+           '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.',
            'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é muito menos '
-           'tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. 8192 custa cerca de 8 FPS e 1 GB; recomendado com folga.'),
+           'tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. '
+           '8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos.'),
           choices=(('1', 'Game (2048)', 'Jogo (2048)'), ('2', '4096', '4096'), ('4', '8192', '8192'))),
     _menu('Effects', 'ssao', 'int', '100', ('Ambient occlusion', 'Oclusão de ambiente'),
           ('Strength of the contact shadows in corners and under grass. 0% turns the pass off (saves a little GPU '
@@ -141,9 +153,9 @@ MENU = [
           ('1 is the game\'s own.', '1 é o do jogo.'), lo=0.5, hi=1.5),
     _menu('Color', 'color_saturation', 'float', '1', ('Saturation', 'Saturação'),
           ('1 is the game\'s own, 0 is black and white.', '1 é a do jogo, 0 é preto e branco.'), lo=0.0, hi=2.0),
-    _menu('Color', 'color_gamma', 'float', '0.75', ('Gamma', 'Gama'),
-          ('Default 0.75: the game\'s SDR image is over-lit outdoors. 1 is the game\'s own.',
-           'Padrão 0,75: a imagem SDR do jogo é clara demais ao ar livre. 1 é a do jogo.'), lo=0.5, hi=2.0),
+    _menu('Color', 'color_gamma', 'float', '1', ('Gamma', 'Gama'),
+          ('Default 1, the game\'s own; 0.75 tames the over-lit SDR image outdoors.',
+           'Padrão 1, a do jogo; 0,75 suaviza a imagem SDR clara demais ao ar livre.'), lo=0.5, hi=2.0),
     _menu('Performance', 'fps_limit', 'choice', '0', ('Frame rate limit', 'Limite de FPS'),
           ('Caps the presented frames (never above the game frame rate chosen above).',
            'Limita os quadros apresentados (nunca acima da taxa de quadros do jogo escolhida acima).'),
@@ -376,7 +388,7 @@ def normalize(item, value):
 
 
 # Slider steps of the 'float' items (launchers).
-FLOAT_STEPS = {'color_brightness': 0.05, 'color_contrast': 0.05, 'color_saturation': 0.05, 'color_gamma': 0.05}
+FLOAT_STEPS = {'sharpness': 0.05, 'color_brightness': 0.05, 'color_contrast': 0.05, 'color_saturation': 0.05, 'color_gamma': 0.05}
 
 
 def effective(item, states):

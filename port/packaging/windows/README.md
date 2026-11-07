@@ -38,18 +38,24 @@ game directly with the saved settings.
 `patches.py` applies the built-in patches only to the game build they were checked against
 (CUSA01623 01.02, by eboot.bin sha256; `TLG_FORCE_PATCHES=1` overrides); other builds run unpatched.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
-`bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux.
+`bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux. `package.sh` runs it with
+`TLG_FSR4_MODELS=native` and ships the native FSR 4 model, the two helper shaders and
+`LICENSE-FSR4-v07.txt` (MIT) in `fsr4_shaders\` (packaging idea from @FelipePrado0's SpartanPort,
+files from @FireBurn's UniversalScalers-Vulkan / Q2RTX); `tlg_run.py` points `TLG_FSR4_DIR` at it.
+FSR 4 Native AA (`upscaler=fsr4`) runs on the same motion vectors and jitter as DLAA; the game
+switches FSR 3.1 to it once on a card that runs it (`fsr4_default=1` records that).
 
 DLAA (optional, NVIDIA RTX): `DLSS_SDK_ROOT=<checkout of github.com/NVIDIA/DLSS, tag v310.9.16>
 bash packaging/windows/build_dlss.sh` builds `tlg_dlss.dll` (`gpu/dlss_bridge`, the only code that
 uses the NVIDIA SDK, compiled with MSVC 2022 or 2026) and copies it with `nvngx_dlss.dll` and
 `NVIDIA-DLSS-LICENSE.txt` next to `out/tlg-probe.exe`; `package.sh` ships all three when present
 (`TLG_REQUIRE_DLSS=1` makes their absence an error, as in CI, which fetches the SDK itself). The
-renderer loads the bridge at run time (`vk_dlss.cpp`). DLSS runs at native resolution (DLAA) on
-the game's own motion vectors (sky pass), with a sub-pixel jitter on the scene draws, before the
-first post pass. Without the DLLs, or on a GPU without DLSS, the menu greys the DLAA setting out
-and the game keeps its own anti-aliasing. Settings: `dlaa` in `tlg.ini` (menu: Image ›
-Anti-aliasing; F8 toggles in game), `TLG_DLAA=0`, `TLG_DLSS=0`.
+renderer loads the bridge at run time (`vk_dlss.cpp`). DLSS runs on the game's own motion
+vectors (sky pass), with a sub-pixel jitter on the scene draws: at native resolution (DLAA) before
+the first post pass, or, at a Quality below Native AA, in place of the game's own upscale pass
+(DLSS, FSR 3.1 and FSR 4 alike; see `port/docs/upscaling.md`). Without the DLLs, or on a GPU
+without DLSS, the menu greys DLSS out and FSR 3.1 is used. Settings: `upscaler` and `preset` in
+`tlg.ini` (menu: Upscaling and anti-aliasing; F8 toggles in game), `TLG_DLAA=0`, `TLG_DLSS=0`.
 
 The NVIDIA DLSS SDK is NVIDIA's proprietary software under its own license
 (`NVIDIA-DLSS-LICENSE.txt`), not under this repository's license; only the NVIDIA binaries ship,
