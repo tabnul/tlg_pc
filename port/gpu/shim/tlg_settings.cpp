@@ -330,6 +330,12 @@ void Load() {
                          v.upscaler != UpscalerFsr4 && v.upscaler != UpscalerOff)) {
         v.upscaler = UpscalerDlss;
     }
+    // tlg: the AA row is gone (2026-11-07); a file with AA off keeps its picture as Built-in.
+    if (!v.dlaa && v.upscaler != UpscalerOff) {
+        std::printf("Settings: anti-aliasing was off; upscaler set to Built-in\n");
+        v.upscaler = UpscalerOff;
+    }
+    v.dlaa = v.upscaler != UpscalerOff;
     DlssFallback(v);
     // Environment overrides (scripts, A/B tests).
     if (const char* env = std::getenv("TLG_UPSCALER")) {
@@ -539,9 +545,19 @@ int SelectedUpscaler() {
     return selected_upscaler >= 0 && v.upscaler == UpscalerFsr3 ? selected_upscaler : v.upscaler.load();
 }
 
+int DefaultAaUpscaler() {
+    const auto& v = Get();
+    return v.dlss_supported ? UpscalerDlss : v.fsr4_supported ? UpscalerFsr4 : UpscalerFsr3;
+}
+
 void SetUpscaler(int upscaler) {
-    Get().upscaler = std::clamp(upscaler, 0, UpscalerCount - 1);
+    // tlg: the upscaler choice is the anti-aliasing too (user, 2026-11-07: no separate AA row):
+    // Built-in = the game's own, any other = its AA (native) or upscaling (below native).
+    auto& v = Get();
+    v.upscaler = std::clamp(upscaler, 0, UpscalerCount - 1);
+    v.dlaa = v.upscaler != UpscalerOff;
     selected_upscaler = -1;
+    if (v.upscaler == UpscalerDlss && !v.dlss_supported) FallBackToFsr3();
 }
 
 bool FixedRenderSession() {
@@ -739,7 +755,13 @@ std::vector<std::string> GraphicsPresetNames() {
 }
 
 void ApplyGraphicsPreset(int index) {
-    if (index >= 0 && index < int(Presets().size())) ApplyLines(Get(), Presets()[index].text);
+    if (index < 0 || index >= int(Presets().size())) return;
+    auto& v = Get();
+    ApplyLines(v, Presets()[index].text);
+    // dlaa is the upscaler choice now (no AA row): Stock (dlaa=0) is Built-in, a preset with
+    // dlaa=1 on Built-in picks the card's best upscaler.
+    if (!v.dlaa && SelectedUpscaler() != UpscalerOff) SetUpscaler(UpscalerOff);
+    if (v.dlaa && v.upscaler == UpscalerOff) SetUpscaler(DefaultAaUpscaler());
 }
 
 int MatchingGraphicsPreset() {

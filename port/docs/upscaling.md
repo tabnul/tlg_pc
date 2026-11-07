@@ -9,7 +9,7 @@ and `dlaa`.
 | Upscaler | Built-in (game), DLSS (NVIDIA only), FSR 3.1 (any card), FSR 4 (any recent card), TAA (any card, native size only) | yes |
 | Quality | Native AA, Quality, Balanced, Performance, Ultra Performance | **no, requires restart** (Apply and restart in the F7 menu) |
 | Anti-aliasing | on / off | yes, but forced on while upscaling |
-| Sharpening | on / off + strength 0-400% (default 150%) | yes |
+| Sharpening | on / off + strength 0-400% (default 175%; up to 100% the upscaler's own sharpening, every 100% above adds one RCAS pass) | yes |
 
 ## How the pieces fit
 
@@ -23,15 +23,17 @@ and `dlaa`.
 - **TAA** is our own light temporal anti-aliasing on the game's motion vectors. It only
   works at native size and does not upscale. It costs about as much as FSR 3.1 native AA,
   less than DLAA or FSR 4; which of the two looks better is a matter of taste.
-- **Anti-aliasing** is DLAA with DLSS, FSR native AA with FSR and TAA with TAA. It is always on while an
-  upscaler is scaling up (the upscaler is the anti-aliasing), can be switched with Native
-  AA, and does nothing with the Built-in upscaler.
+- **Anti-aliasing** has no switch of its own: the upscaler choice is the anti-aliasing. DLSS
+  is DLAA at Native AA quality, FSR is FSR native AA, TAA is TAA; while scaling up the
+  upscaler smooths the edges too. Built-in keeps only the game's own. F8 in game switches
+  between Built-in and your choice. A settings file from before with anti-aliasing off
+  loads as Built-in.
 - **Sharpening** is one setting for every upscaler. With DLSS, FSR 3.1, FSR 4 or TAA it is
   their own sharpening inside the anti-aliasing step, so it only touches the scene and the
   menus stay crisp. With Built-in it is AMD CAS on the final picture (CAS stops at 100%).
   Above 100% DLSS / FSR / TAA add an extra pass. The older separate RCAS / CAS choice is gone.
 
-Frame generation works with every combination.
+Frame generation together with upscaling: see the release notes for what was checked.
 
 ## Render size per output and preset
 

@@ -513,7 +513,7 @@ void ImageTab() {
             if (ImGui::SliderFloat("##value", &pct, 0.0f, 400.0f, "%.0f%%", ImGuiSliderFlags_AlwaysClamp)) {
                 Store(s.sharpness, std::clamp(std::round(pct) / 100.0f, 0.0f, 4.0f), true);
             }
-            Help(aa_sharpens ? TL("How strong the sharpening is. Above 100% an extra pass adds more.", "Quão forte é a nitidez. Acima de 100% uma passada extra adiciona mais.")
+            Help(aa_sharpens ? TL("How strong the sharpening is. Up to 100%: the upscaler's own sharpening; every 100% above adds one more sharpening pass.", "Quão forte é a nitidez. Até 100%: a nitidez do próprio upscaler; cada 100% acima adiciona mais uma passada.")
                              : TL("How strong the sharpening is. CAS stops at 100%.", "Quão forte é a nitidez. O CAS para em 100%."), marks);
             ResetButtons(s.sharpness, d.sharpness.load(), std::optional<float>(), marks);
             ImGui::PopID();
@@ -557,8 +557,8 @@ void ImageTab() {
         }
         Help(!s.dlss_supported && s.dlss_problem.load()
                  ? s.dlss_problem.load()
-                 : TL("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). At Native AA quality the choice is the anti-aliasing (DLAA or FSR native AA, with the AA row on).",
-                      "Qual ampliador desenha a imagem na qualidade escolhida: DLSS (placas NVIDIA RTX), FSR 4 (qualquer placa recente, não só AMD; mais nítido e estável que o FSR 3.1), FSR 3.1 (qualquer placa) ou a ampliação do próprio jogo. TAA é um anti-aliasing mais leve e suave, só no tamanho nativo. Na qualidade AA nativo a escolha é o anti-aliasing (DLAA ou FSR AA nativo, com a linha AA ligada)."),
+                 : TL("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). The choice is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA; Built-in keeps only the game's own. F8 switches between Built-in and your choice in game.",
+                      "Qual ampliador desenha a imagem na qualidade escolhida: DLSS (placas NVIDIA RTX), FSR 4 (qualquer placa recente, não só AMD; mais nítido e estável que o FSR 3.1), FSR 3.1 (qualquer placa) ou a ampliação do próprio jogo. TAA é um anti-aliasing mais leve e suave, só no tamanho nativo. A escolha também é o anti-aliasing: na qualidade AA nativo o DLSS é DLAA e o FSR é FSR AA nativo; Do jogo mantém só o do jogo. F8 alterna entre Do jogo e a sua escolha no jogo."),
              {s.dlss_supported ? "DLSS (NVIDIA)" : up_labels[s.fsr4_supported ? 3 : 2], ""});
         ImGui::PopID();
         static const char* const quality_labels[S::PresetCount] = {
@@ -591,16 +591,6 @@ void ImageTab() {
         // Supersampling (experimental, tlg.ini / TLG_UPSCALE_PRESET) is listed only while selected.
         ChoiceRow(TL("Quality (requires restart)", "Qualidade (exige reiniciar)"), s.preset, quality_labels, nullptr,
                   S::IsSupersampling(s.preset) ? S::PresetCount : S::MenuPresetCount, quality_help.c_str(), S::NativeAA);
-        const bool aa_forced = S::EngineUpscaleMode();
-        const bool aa_na = s.upscaler == S::UpscalerOff && !aa_forced;
-        ImGui::BeginDisabled(aa_forced || aa_na);
-        CheckRow(TL("Anti-aliasing (DLAA / FSR native AA)", "Anti-aliasing (DLAA / FSR AA nativo)"), s.dlaa,
-                 aa_forced ? TL("Always on here: below native size the upscaler is the anti-aliasing.", "Sempre ligado aqui: abaixo do tamanho nativo o ampliador é o anti-aliasing.")
-                 : aa_na   ? TL("Needs an upscaler: the Built-in choice has no anti-aliasing of its own (the game's SMAA runs either way).", "Precisa de um ampliador: a opção Do jogo não tem anti-aliasing próprio (o SMAA do jogo roda de qualquer forma).")
-                           : TL("Stable, smooth edges on foliage, feathers and railings, at native resolution on the game's own motion vectors, by the chosen upscaler: DLAA (DLSS) or FSR native AA. Off: the game's own anti-aliasing only. F8 switches it in game.",
-                                "Bordas estáveis e suaves em folhagem, penas e grades, na resolução nativa com os vetores de movimento do próprio jogo, pelo ampliador escolhido: DLAA (DLSS) ou FSR AA nativo. Desligado: só o anti-aliasing do jogo. F8 alterna no jogo."),
-                 d.dlaa, false);
-        ImGui::EndDisabled();
         CheckRow("SMAA 1x", s.smaa,
                  TL("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).",
                     "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060)."), d.smaa, false);
@@ -2213,8 +2203,15 @@ bool HandleEvent(const SDL_Event& event) {
         // tlg: F8 switches between the anti-aliasing choice and the game's own SMAA (saved; the
         // label shows briefly).
         if (down && !event.key.repeat && event.key.key == SDLK_F8) {
-            auto& settings = TlgSettings::Get();
-            settings.dlaa = !settings.dlaa;
+            // Switches between Built-in and the last other upscaler (DLSS, else FSR 4, else FSR 3.1).
+            static int last_upscaler = -1;
+            const int current = TlgSettings::SelectedUpscaler();
+            if (current != TlgSettings::UpscalerOff) {
+                last_upscaler = current;
+                TlgSettings::SetUpscaler(TlgSettings::UpscalerOff);
+            } else {
+                TlgSettings::SetUpscaler(last_upscaler >= 0 ? last_upscaler : TlgSettings::DefaultAaUpscaler());
+            }
             aa_label_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
             std::printf("AA: %s (F8)\n", TlgSettings::AaOn() ? TlgSettings::AaModeName(TlgSettings::AaModeOf()) : "game SMAA");
             TlgSettings::Save();

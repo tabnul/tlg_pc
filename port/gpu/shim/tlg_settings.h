@@ -41,7 +41,7 @@ struct Values {
     std::atomic<int> upscaler{UpscalerFsr3};
     std::atomic<int> preset{NativeAA};
     std::atomic<bool> sharpen{true};
-    std::atomic<float> sharpness{1.5f};
+    std::atomic<float> sharpness{1.75f};
     std::atomic<bool> jitter{true};
     /// Debug (TLG_JITTER_DEBUG=1): F6 asks the rasterizer for a marked draw map of one frame.
     std::atomic<bool> jitter_mark{false};
@@ -259,6 +259,8 @@ bool QualityNeedsRestart();
 /// The upscaler row: the selection (a fallback to FSR 3.1 keeps it) and setting it.
 int SelectedUpscaler();
 void SetUpscaler(int upscaler);
+/// DLSS, else FSR 4, else FSR 3.1: what F8 and a preset with AA on pick from Built-in.
+int DefaultAaUpscaler();
 
 /// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler (native size).
 enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaFsr4Native, AaModeCount };

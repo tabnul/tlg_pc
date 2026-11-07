@@ -52,7 +52,7 @@ MENU = [
     _menu('Image', 'sharpen', 'bool', '1', ('Sharpening', 'Nitidez'),
           ('Sharpens the image: with DLSS, FSR or TAA their own sharpening (scene only), with Built-in AMD CAS.',
            'Deixa a imagem mais nítida: com DLSS, FSR ou TAA a nitidez deles (só a cena), com Do jogo o AMD CAS.')),
-    _menu('Image', 'sharpness', 'float', '1.5', ('Sharpening strength', 'Intensidade da nitidez'),
+    _menu('Image', 'sharpness', 'float', '1.75', ('Sharpening strength', 'Intensidade da nitidez'),
           ('1.5 is the default; above 1 an extra pass with DLSS / FSR / TAA (CAS stops at 1).',
            '1,5 é o padrão; acima de 1 uma passada extra com DLSS / FSR / TAA (o CAS para em 1).'),
           lo=0.0, hi=4.0),
@@ -73,11 +73,6 @@ MENU = [
            'saída em cada lado, ampliado pelo ampliador. Aplicado no início.'),
           choices=(('0', 'Native AA', 'AA nativo'), ('1', 'Quality', 'Qualidade'), ('2', 'Balanced', 'Equilibrado'),
                    ('3', 'Performance', 'Desempenho'), ('4', 'Ultra Performance', 'Ultra desempenho'))),
-    _menu('Image', 'dlaa', 'bool', '1', ('Anti-aliasing (DLAA / FSR native AA)', 'Anti-aliasing (DLAA / FSR AA nativo)'),
-          ("Stable foliage edges at native size by the chosen upscaler; F8 switches to the game's own SMAA. "
-           'Always on below native size.',
-           'Bordas estáveis na folhagem no tamanho nativo pelo ampliador escolhido; F8 troca para o SMAA do próprio jogo. '
-           'Sempre ligado abaixo do tamanho nativo.')),
     _menu('Image', 'frame_generation', 'choice', '0', ('Frame generation', 'Geração de quadros'),
           ('Shows one made-up image between two game frames: smoother motion, a little more input delay. '
            'DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
