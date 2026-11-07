@@ -32,7 +32,7 @@ Nada disso vai no download; você precisa da sua própria cópia. Use **The Last
 
 1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
 2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, DLAA, HDR, efeitos).
+3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, upscaling DLSS e FSR, HDR, efeitos).
    - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
 4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
 5. Escolha um dos idiomas oferecidos para sua pasta do jogo e clique em **Jogar**. A primeira partida demora um pouco mais.
@@ -45,7 +45,7 @@ No Linux, `./install_desktop.sh` adiciona o jogo ao menu de aplicativos.
 
 - **F10**: liga e desliga o contador de FPS
 - **Insert** (ou R3 + L2 no controle): abre o menu do port (imagem, desempenho, overlay)
-- **F8**: alterna entre o anti-aliasing escolhido e o anti-aliasing do próprio jogo. O DLAA (NVIDIA DLSS na resolução nativa, placas RTX) deixa a folhagem e as bordas finas estáveis; vem ligado e pode ser trocado no launcher ou em Imagem › Anti-aliasing no menu do port. O FSR 4 AA nativo faz o mesmo com o FSR 4 da AMD em placas recentes (Windows e Linux) e é escolhido uma vez sozinho numa placa que o roda; o FSR 3.1 AA nativo roda em qualquer placa.
+- **F8**: alterna entre o upscaler escolhido e o anti-aliasing do próprio jogo. DLSS (placas RTX), FSR 4 (placas recentes, Windows e Linux) ou FSR 3.1 (qualquer placa) deixam a folhagem e as bordas finas estáveis. Na qualidade AA nativo (o padrão, DLSS em placas RTX) o jogo renderiza no tamanho da sua tela; em Qualidade, Equilibrado, Desempenho ou Ultra desempenho ele renderiza menor e o DLSS ou FSR amplia a imagem, para mais FPS. Troque no launcher ou em Ampliação e anti-aliasing no menu do port (a qualidade exige reiniciar). O FSR 4 é escolhido uma vez sozinho numa placa que o roda.
 - Controles de PS4/PS5, Xbox e 8BitDo funcionam via SDL3, por USB ou Bluetooth.
 
 ### Teclado e mouse
@@ -110,7 +110,7 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
-3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLAA, HDR, effects).
+3. Open **The Last Guardian** (`The Last Guardian.exe` on Windows): the launcher, with all graphics options (resolution/widescreen, DLSS and FSR upscaling, HDR, effects).
    - On Windows, if "Windows protected your PC" appears, click *More info*, then *Run anyway*. The program is not digitally signed.
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick one of the languages offered for your game folder and click **Play**. The first start takes a little longer.
@@ -123,7 +123,7 @@ On Linux, `./install_desktop.sh` adds the game to the applications menu.
 
 - **F10**: toggles the FPS counter
 - **Insert** (or R3 + L2 on a controller): opens the port's menu (image, performance, overlay)
-- **F8**: switches between the chosen anti-aliasing and the game's own. DLAA (NVIDIA DLSS at native resolution, RTX cards) keeps foliage and thin edges stable; it is on by default and can be changed in the launcher or under Image › Anti-aliasing in the port's menu. FSR 4 Native AA does the same with AMD's FSR 4 on recent cards (Windows and Linux) and is chosen once by itself on a card that runs it; FSR 3.1 Native AA runs on any card.
+- **F8**: switches between the chosen upscaler and the game's own anti-aliasing. DLSS (RTX cards), FSR 4 (recent cards, Windows and Linux) or FSR 3.1 (any card) keep foliage and thin edges stable. At the Native AA quality (the default, DLSS on RTX cards) the game renders at your screen size; at Quality, Balanced, Performance or Ultra Performance it renders smaller and DLSS or FSR upscale it, for more FPS. Change it in the launcher or under Upscaling and anti-aliasing in the port's menu (Quality needs a restart). FSR 4 is chosen once by itself on a card that runs it.
 - PS4/PS5, Xbox and 8BitDo controllers work through SDL3, over USB or Bluetooth.
 
 ### Keyboard and mouse

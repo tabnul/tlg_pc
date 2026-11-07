@@ -1,14 +1,12 @@
 # Upscaler, Quality and anti-aliasing
 
-Three settings control the image. They live in the launcher (Video page), the legacy
-launcher and the in-game menu (F7), and are stored in `tlg.ini` as `upscaler`, `preset`
+Three settings control the image. They live in the launcher (Video page) and the in-game menu (Insert), and are stored in `tlg.ini` as `upscaler`, `preset`
 and `dlaa`.
 
 | Setting | Choices | Changes live? |
 |---|---|---|
 | Upscaler | Built-in (game), DLSS (NVIDIA only), FSR 3.1 (any card), FSR 4 (any recent card), TAA (any card, native size only) | yes |
-| Quality | Native AA, Quality, Balanced, Performance, Ultra Performance | **no, requires restart** (Apply and restart in the F7 menu) |
-| Anti-aliasing | on / off | yes, but forced on while upscaling |
+| Quality | Native AA, Quality, Balanced, Performance, Ultra Performance | **no, requires restart** (Apply and restart in the in-game menu) |
 | Sharpening | on / off + strength 0-400% (default 175%; up to 100% the upscaler's own sharpening, every 100% above adds one RCAS pass) | yes |
 
 ## How the pieces fit

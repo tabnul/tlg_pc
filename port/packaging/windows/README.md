@@ -50,11 +50,12 @@ bash packaging/windows/build_dlss.sh` builds `tlg_dlss.dll` (`gpu/dlss_bridge`, 
 uses the NVIDIA SDK, compiled with MSVC 2022 or 2026) and copies it with `nvngx_dlss.dll` and
 `NVIDIA-DLSS-LICENSE.txt` next to `out/tlg-probe.exe`; `package.sh` ships all three when present
 (`TLG_REQUIRE_DLSS=1` makes their absence an error, as in CI, which fetches the SDK itself). The
-renderer loads the bridge at run time (`vk_dlss.cpp`). DLSS runs at native resolution (DLAA) on
-the game's own motion vectors (sky pass), with a sub-pixel jitter on the scene draws, before the
-first post pass. Without the DLLs, or on a GPU without DLSS, the menu greys the DLAA setting out
-and the game keeps its own anti-aliasing. Settings: `dlaa` in `tlg.ini` (menu: Image ›
-Anti-aliasing; F8 toggles in game), `TLG_DLAA=0`, `TLG_DLSS=0`.
+renderer loads the bridge at run time (`vk_dlss.cpp`). DLSS runs on the game's own motion
+vectors (sky pass), with a sub-pixel jitter on the scene draws: at native resolution (DLAA) before
+the first post pass, or, at a Quality below Native AA, in place of the game's own upscale pass
+(DLSS, FSR 3.1 and FSR 4 alike; see `port/docs/upscaling.md`). Without the DLLs, or on a GPU
+without DLSS, the menu greys DLSS out and FSR 3.1 is used. Settings: `upscaler` and `preset` in
+`tlg.ini` (menu: Upscaling and anti-aliasing; F8 toggles in game), `TLG_DLAA=0`, `TLG_DLSS=0`.
 
 The NVIDIA DLSS SDK is NVIDIA's proprietary software under its own license
 (`NVIDIA-DLSS-LICENSE.txt`), not under this repository's license; only the NVIDIA binaries ship,
