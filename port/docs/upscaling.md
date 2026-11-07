@@ -33,7 +33,7 @@ and `dlaa`.
   menus stay crisp. With Built-in it is AMD CAS on the final picture (CAS stops at 100%).
   Above 100% DLSS / FSR / TAA add an extra pass. The older separate RCAS / CAS choice is gone.
 
-Frame generation together with upscaling: see the release notes for what was checked.
+Frame generation (DLSS or FSR 3.1) works with every upscaler and Quality setting: it takes the render-size depth and motion and the full-size picture with menus.
 
 ## Render size per output and preset
 
