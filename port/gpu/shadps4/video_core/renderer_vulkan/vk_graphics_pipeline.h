@@ -4,6 +4,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 
 #include <boost/container/static_vector.hpp>
 #include <xxhash.h>
@@ -44,6 +45,11 @@ struct GraphicsPipelineKey {
     u8 num_samples;
     u8 depth_samples;
     std::array<u8, AmdGpu::NUM_COLOR_BUFFERS> color_samples;
+    // tlg: the key is hashed and compared as raw bytes, so it must have no padding. Copies
+    // need not keep padding bytes: on Windows (clang64) the map's stored copy got junk in the
+    // tail padding, the stored key no longer matched its own hash and pipelines were rebuilt
+    // all the time. Named fields are always copied; Deserialize zeroes them for old cache keys.
+    u16 pad_after_color_samples;
     u32 mrt_mask;
     u32 motion_vectors = 0;
     struct {
@@ -58,6 +64,7 @@ struct GraphicsPipelineKey {
         AmdGpu::ProvokingVtxLast provoking_vtx_last : 1;
         u32 depth_clip_enable : 1;
     };
+    u32 pad_tail; ///< tlg: see pad_after_color_samples
 
     GraphicsPipelineKey() {
         std::memset(this, 0, sizeof(*this));
@@ -70,6 +77,11 @@ struct GraphicsPipelineKey {
     void Serialize(Serialization::Archive& ar) const;
     bool Deserialize(Serialization::Archive& ar);
 };
+// tlg: same layout as before the pad fields, so existing pipeline caches stay valid.
+static_assert(sizeof(GraphicsPipelineKey) == 352);
+static_assert(offsetof(GraphicsPipelineKey, pad_tail) + sizeof(u32) == sizeof(GraphicsPipelineKey));
+static_assert(offsetof(GraphicsPipelineKey, pad_after_color_samples) + sizeof(u16) ==
+              offsetof(GraphicsPipelineKey, mrt_mask));
 
 class GraphicsPipeline : public Pipeline {
 public:
