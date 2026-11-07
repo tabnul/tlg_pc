@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // RCAS on the resolved scene only. The unsharpened history and HUD are untouched.
-// Strength 0..2: above 1 the RCAS change is extrapolated (stronger than AMD's maximum). The
+// Strength 0..4: above 1 the RCAS change is extrapolated (stronger than AMD's maximum). The
 // same pass sharpens FSR 3/4 output beyond their own RCAS (LDR_OUTPUT: the 8-bit UI image),
 // and DLSS output like FSR 3's own RCAS. Blend: how much of the RCAS change is applied (DLSS:
 // 1 up to strength 1, as AMD's; the others: the strength).
@@ -29,7 +29,7 @@ void FsrRcasInputF(inout AF1 r, inout AF1 g, inout AF1 b) {}
 void main() {
     ivec2 p = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(p, imageSize(result_img)))) return;
-    float amount = clamp(strength, 0.0, 2.0);
+    float amount = clamp(strength, 0.0, 4.0);
     vec3 center = loadColor(p);
     if (amount == 0.0) {
         imageStore(result_img, p, vec4(center, 1));
@@ -49,6 +49,6 @@ void main() {
     uvec4 constants = uvec4(floatBitsToUint(exp2(-2.0*(1.0-min(amount, 1.0)))), 0, 0, 0);
     vec3 sharpened;
     FsrRcasF(sharpened.r, sharpened.g, sharpened.b, uvec2(p), constants);
-    imageStore(result_img, p, vec4(clamp(mix(center, sharpened*color_scale, clamp(blend, 0.0, 2.0)),
+    imageStore(result_img, p, vec4(clamp(mix(center, sharpened*color_scale, clamp(blend, 0.0, 4.0)),
                                       vec3(0), vec3(color_scale)), 1));
 }

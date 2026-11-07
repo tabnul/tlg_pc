@@ -84,6 +84,11 @@ inline float CasSharpness(int strength) {
     return float(ParseRcasStrength(strength, 100)) / 100.0f;
 }
 
+/// CAS sharpness (0 to 1) from the one Sharpening slider (0 to 4; CAS stops at 1).
+inline float CasFromSharpness(float sharpness) {
+    return sharpness != sharpness ? 0.0f : sharpness < 0.0f ? 0.0f : sharpness > 1.0f ? 1.0f : sharpness;
+}
+
 /// Color adjustments (post_process.frag): range and neutral value of each slider.
 struct ColorRange {
     float min, max, neutral;

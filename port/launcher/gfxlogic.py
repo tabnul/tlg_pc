@@ -16,8 +16,8 @@ import backports_table
 # Keys a preset sets (anything a preset does not list goes back to the default of the table).
 # Only options this port's game really reads (backports_table.MENU, checked against gpu/shim).
 PRESET_SETTINGS = ('vsync',)
-PRESET_ITEMS = ('menu:fps_limit', 'menu:frames_queued', 'menu:fsr1', 'menu:rcas', 'menu:rcas_strength',
-                'menu:smaa', 'menu:cas')
+PRESET_ITEMS = ('menu:fps_limit', 'menu:frames_queued', 'menu:fsr1', 'menu:sharpen', 'menu:sharpness',
+                'menu:smaa')
 # Imported files (preset_share.py) are applied as "full" presets: they may also set these.
 FULL_PRESETS = {}
 # Defaults of the launcher settings a preset may set (tlg_run.DEFAULT_SETTINGS; a test keeps them equal).
@@ -27,7 +27,7 @@ PRESETS = (
     ('performance', {'vsync': False}, {'menu:frames_queued': '2', 'menu:fsr1': '1'}),
     ('balanced', {}, {}),
     ('quality', {}, {'menu:fsr1': '1', 'menu:smaa': '1'}),
-    ('ps4', {}, {'menu:fps_limit': '30', 'menu:fsr1': '0', 'menu:rcas': '0'}),
+    ('ps4', {}, {'menu:fps_limit': '30', 'menu:fsr1': '0', 'menu:sharpen': '0'}),
 )
 DEFAULT_PRESET = 'balanced'
 

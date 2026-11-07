@@ -19,7 +19,16 @@ enum Upscaler : int { UpscalerOff = 0, UpscalerFsr3 = 1, UpscalerFsr4 = 2, Upsca
 inline bool IsFsr4(int upscaler) {
     return upscaler == UpscalerFsr4 || upscaler == UpscalerFsr411;
 }
-enum Preset : int { NativeAA = 0, Quality, Balanced, Performance, UltraPerformance, PresetCount };
+/// Quality: the render size relative to the output. Native AA renders at the output size;
+/// Quality .. Ultra Performance render smaller and the upscaler (DLSS, FSR 3.1, FSR 4 or the
+/// game's own pass) enlarges; Super150 / Super200 (experimental) render larger and the game's
+/// own pass shrinks (needs the GPU heap above 4 GiB, scripts/tlg_patches.py). The render size
+/// is a startup patch: a change takes a restart.
+enum Preset : int { NativeAA = 0, Quality, Balanced, Performance, UltraPerformance, Super150, Super200,
+                    PresetCount };
+/// The menus offer Native AA .. Ultra Performance; supersampling is experimental (tlg.ini
+/// preset=5/6 or TLG_UPSCALE_PRESET) and only listed while selected.
+constexpr int MenuPresetCount = Super150;
 enum DebugView : int { DebugNone = 0, DebugReactive = 1, DebugMotion = 2, DebugViewCount };
 
 /// Live output resolutions: the upscaler's output and the UI host targets.
@@ -32,7 +41,7 @@ struct Values {
     std::atomic<int> upscaler{UpscalerFsr3};
     std::atomic<int> preset{NativeAA};
     std::atomic<bool> sharpen{true};
-    std::atomic<float> sharpness{0.3f};
+    std::atomic<float> sharpness{1.5f};
     std::atomic<bool> jitter{true};
     /// Debug (TLG_JITTER_DEBUG=1): F6 asks the rasterizer for a marked draw map of one frame.
     std::atomic<bool> jitter_mark{false};
@@ -218,10 +227,38 @@ void ReloadIfRequested();
 /// Writes the file (menu changes).
 void Save();
 
-/// Render resolution divisor of a preset (1.0 native, 1.5 quality, ...).
+/// Render resolution divisor of a preset (1.0 native, 1.5 quality, ..., 0.5 supersampling 200%).
 float PresetScale(int preset);
 const char* PresetName(int preset);
 const char* UpscalerName(int upscaler);
+/// The render size of a quality preset for an output size (both sides rounded to even).
+void PresetRenderSize(int preset, int output_width, int output_height, int& width, int& height);
+/// The preset renders larger than the output (supersampling, experimental).
+inline bool IsSupersampling(int preset) {
+    return preset == Super150 || preset == Super200;
+}
+/// This launch renders smaller than its output with DLSS or FSR replacing the game's own
+/// upscale pass (TLG_RENDER_RESOLUTION below TLG_RESOLUTION_PATCH; the upscaler row not
+/// Built-in). The upscaler is the anti-aliasing then: the AA row does not apply.
+bool EngineUpscaleMode();
+/// The output size of this launch (TLG_RESOLUTION_PATCH, else 1920x1080).
+void OutputSize(int& width, int& height);
+/// The render size of this launch (TLG_RENDER_RESOLUTION, else the output size).
+void StartupRenderSize(int& width, int& height);
+/// DLAA / FSR native AA runs: the AA row, or forced by the engine upscale mode.
+bool AaOn();
+/// The AA step (DLSS / FSR / TAA) ran and sharpened with its own RCAS: the menu's one
+/// Sharpening slider then belongs to it, and the presenter leaves CAS off (2026-11-07).
+void MarkAaSharpened(const char* sharpener);
+/// The sharpener named by the last MarkAaSharpened (a string literal).
+const char* AaSharpenerName();
+/// The AA step ran within the last quarter second.
+bool AaSharpenedRecently();
+/// The quality (render size) differs from the one this launch started with.
+bool QualityNeedsRestart();
+/// The upscaler row: the selection (a fallback to FSR 3.1 keeps it) and setting it.
+int SelectedUpscaler();
+void SetUpscaler(int upscaler);
 
 /// tlg: the anti-aliasing row (menu, launcher): one choice over dlaa + upscaler (native size).
 enum AaMode : int { AaOff = 0, AaDlaa, AaFsr3Native, AaFsr4Native, AaModeCount };
