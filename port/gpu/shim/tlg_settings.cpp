@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -123,7 +125,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "sharpen") {
         v.sharpen = i != 0;
     } else if (key == "sharpness") {
-        v.sharpness = Clamp(f, 0.0f, 2.0f);
+        v.sharpness = Clamp(f, 0.0f, 4.0f);
     } else if (key == "jitter") {
         v.jitter = i != 0;
     } else if (key == "reactive") {
@@ -320,14 +322,15 @@ void Load() {
     if (ReadFile(v)) {
         std::printf("Settings: %s\n", Path());
     }
-    // tlg: the anti-aliasing row runs DLAA, FSR 3.1 or FSR 4 at native size (AaMode); files from
-    // before it, and other upscalers, load as DLAA.
+    // tlg: the upscaler row: Built-in (off), DLSS, FSR 3.1 or FSR 4; at Native AA quality the
+    // choice is the anti-aliasing (DLAA, FSR native AA). Files from before the AA row, and
+    // other upscalers, load as DLSS. The quality (preset) is the render size the launcher
+    // patches in (startup); the menu keeps it for the next launch.
     if (!aa_row_file || (v.upscaler != UpscalerTaa && v.upscaler != UpscalerFsr3 &&
-                         v.upscaler != UpscalerFsr4)) {
+                         v.upscaler != UpscalerFsr4 && v.upscaler != UpscalerOff)) {
         v.upscaler = UpscalerDlss;
     }
     DlssFallback(v);
-    if (v.upscaler != UpscalerTaa) v.preset = NativeAA;
     // Environment overrides (scripts, A/B tests).
     if (const char* env = std::getenv("TLG_UPSCALER")) {
         v.upscaler = UpscalerOff;
@@ -383,7 +386,72 @@ bool GraphicsNeedRestart() {
     return v.render_resolution != v.startup_render_resolution ||
            v.engine_fps != v.startup_engine_fps ||
            v.deferred_readback != v.startup_deferred_readback ||
-           v.stale_readback != v.startup_stale_readback || v.hdr != v.startup_hdr;
+           v.stale_readback != v.startup_stale_readback || v.hdr != v.startup_hdr ||
+           QualityNeedsRestart();
+}
+
+bool QualityNeedsRestart() {
+    const auto& v = Get();
+    return v.preset != v.startup_preset;
+}
+
+void OutputSize(int& width, int& height) {
+    width = 1920;
+    height = 1080;
+    if (const char* patch = std::getenv("TLG_RESOLUTION_PATCH"); patch && patch[0]) {
+        if (std::sscanf(patch, "%dx%d", &width, &height) != 2 || width <= 0 || height <= 0) {
+            width = 1920;
+            height = 1080;
+        }
+    }
+}
+
+void StartupRenderSize(int& width, int& height) {
+    OutputSize(width, height);
+    if (const char* render = std::getenv("TLG_RENDER_RESOLUTION"); render && render[0]) {
+        int w = 0, h = 0;
+        if (std::sscanf(render, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
+            width = w;
+            height = h;
+        }
+    }
+}
+
+bool EngineUpscaleMode() {
+    static const bool smaller = [] {
+        int ow, oh, rw, rh;
+        OutputSize(ow, oh);
+        StartupRenderSize(rw, rh);
+        return rw <= ow && rh <= oh && (rw < ow || rh < oh);
+    }();
+    return smaller && Get().upscaler != UpscalerOff;
+}
+
+bool AaOn() {
+    return Get().dlaa || EngineUpscaleMode();
+}
+
+namespace {
+std::atomic<long long> aa_sharpened_ms{-1000000};
+std::atomic<const char*> aa_sharpener{"AA step"};
+long long NowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+} // namespace
+
+void MarkAaSharpened(const char* sharpener) {
+    aa_sharpener.store(sharpener, std::memory_order_relaxed);
+    aa_sharpened_ms.store(NowMs(), std::memory_order_relaxed);
+}
+
+const char* AaSharpenerName() {
+    return aa_sharpener.load(std::memory_order_relaxed);
+}
+
+bool AaSharpenedRecently() {
+    return NowMs() - aa_sharpened_ms.load(std::memory_order_relaxed) < 250;
 }
 
 namespace {
@@ -466,6 +534,16 @@ void FallBackToFsr3() {
     v.upscaler = UpscalerFsr3;
 }
 
+int SelectedUpscaler() {
+    const auto& v = Get();
+    return selected_upscaler >= 0 && v.upscaler == UpscalerFsr3 ? selected_upscaler : v.upscaler.load();
+}
+
+void SetUpscaler(int upscaler) {
+    Get().upscaler = std::clamp(upscaler, 0, UpscalerCount - 1);
+    selected_upscaler = -1;
+}
+
 bool FixedRenderSession() {
     const char* size = std::getenv("TLG_RENDER_RES");
     return size && size[0];
@@ -523,12 +601,12 @@ void Save() {
                  v.overlay_opacity.load(), v.overlay_layout.load(), v.menu_tab.load());
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\n"
-                 "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
+                 "fsr1=%d\nframes_queued=%d\n"
                  "readback_batch=%d\ntexture_cleanup=%d\nrender_resolution=%s\nengine_fps=%d\nhdr=%d\n"
                  "deferred_readback=%d\nstale_readback=%d\nrestart_unconfirmed=%d\n",
                  TlgGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
                  int(v.vsync.load()), v.fps_limit.load(),
-                 int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
+                 int(v.fsr1.load()), v.frames_queued.load(),
                  v.readback_batch.load(), int(v.texture_cleanup.load()), TlgGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
@@ -542,9 +620,9 @@ void Save() {
                  int(v.mouse_enabled.load()), v.mouse_sensitivity.load(), int(v.mouse_invert_y.load()),
                  v.mouse_smoothing.load(), v.mouse_accel.load(), v.mouse_deadzone.load(), v.key_map.c_str());
     std::fprintf(file,
-                 "dlaa=%d\nshadow_scale=%d\nsmaa=%d\ncas=%d\ncas_strength=%d\ncolor_adjust=%d\n"
+                 "dlaa=%d\nshadow_scale=%d\nsmaa=%d\ncolor_adjust=%d\n"
                  "color_brightness=%.2f\ncolor_contrast=%.2f\ncolor_saturation=%.2f\ncolor_gamma=%.2f\n",
-                 int(v.dlaa.load()),v.shadow_scale.load(), int(v.smaa.load()), int(v.cas.load()), v.cas_strength.load(),
+                 int(v.dlaa.load()),v.shadow_scale.load(), int(v.smaa.load()),
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
@@ -568,7 +646,7 @@ void Save() {
 
 namespace {
 // The game as shipped: none of the port's filters, the game's own shadows, filtering and textures.
-constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nrcas=0\ncas=0\nshadow_scale=1\nfov=70\n"
+constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nsharpen=0\nshadow_scale=1\nfov=70\n"
                                    "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\n";
 
 void ApplyLines(Values& v, const std::string& lines) {
@@ -597,10 +675,9 @@ std::string GraphicsText(const Values& v) {
     add("dlaa", v.dlaa);
     add("smaa", v.smaa);
     add("fsr1", v.fsr1);
-    add("rcas", v.rcas);
-    add("rcas_strength", v.rcas_strength);
-    add("cas", v.cas);
-    add("cas_strength", v.cas_strength);
+    // One Sharpening setting (2026-11-07): rcas / cas keys are still read but no longer used.
+    add("sharpen", v.sharpen);
+    add_float("sharpness", v.sharpness);
     add("shadow_scale", v.shadow_scale);
     add("fov", v.fov);
     for (const auto& [name, member] : EffectKeys)
@@ -700,14 +777,23 @@ void DeleteGraphicsPreset(int index) {
 }
 
 float PresetScale(int preset) {
-    static constexpr float scales[PresetCount] = {1.0f, 1.5f, 1.7f, 2.0f, 3.0f};
+    static constexpr float scales[PresetCount] = {1.0f, 1.5f, 1.7f, 2.0f, 3.0f, 1.0f / 1.5f, 0.5f};
     return scales[std::clamp(preset, 0, PresetCount - 1)];
 }
 
 const char* PresetName(int preset) {
-    static constexpr const char* names[PresetCount] = {"Native AA", "Quality", "Balanced",
-                                                       "Performance", "Ultra Performance"};
+    static constexpr const char* names[PresetCount] = {
+        "Native AA", "Quality", "Balanced", "Performance", "Ultra Performance",
+        "Supersampling 150% (experimental)", "Supersampling 200% (experimental)"};
     return names[std::clamp(preset, 0, PresetCount - 1)];
+}
+
+void PresetRenderSize(int preset, int output_width, int output_height, int& width, int& height) {
+    // The same rule as the launcher (tlg_run.render_resolution): output / scale, each side
+    // rounded to the nearest even number.
+    const float scale = PresetScale(preset);
+    width = int(std::lround(output_width / scale / 2.0f)) * 2;
+    height = int(std::lround(output_height / scale / 2.0f)) * 2;
 }
 
 const char* UpscalerName(int upscaler) {
@@ -717,7 +803,7 @@ const char* UpscalerName(int upscaler) {
 
 int AaModeOf() {
     const auto& v = Get();
-    if (!v.dlaa || v.upscaler == UpscalerTaa) return AaOff;
+    if (!AaOn() || v.upscaler == UpscalerTaa || v.upscaler == UpscalerOff) return AaOff;
     if (v.upscaler == UpscalerFsr3) return AaFsr3Native;
     return v.upscaler == UpscalerFsr4 ? AaFsr4Native : AaDlaa;
 }

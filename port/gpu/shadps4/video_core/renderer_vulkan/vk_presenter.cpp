@@ -695,14 +695,34 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
                                       !pp_settings.srgb_input);
         filtered_image = smaa_pass.OutputImage();
     }
-    // CAS replaces RCAS: FSR 1 still upscales first when it is on.
-    const bool use_cas = graphics.cas;
+    // One Sharpening setting (2026-11-07): the AA step's RCAS when DLSS / FSR / TAA ran on this
+    // frame, else CAS here on the final picture (Built-in). FSR 1 upscales without its RCAS.
+    const bool aa_sharpened = TlgSettings::AaSharpenedRecently();
+    const bool use_cas = TlgSettings::Get().sharpen && !aa_sharpened;
+    {
+        // tlg: one log line whenever the sharpener or its strength changes (user check 11-07).
+        static std::string last_sharpening;
+        const int pct = int(std::lround(TlgSettings::Get().sharpness.load() * 100.0f));
+        char text[128];
+        if (!TlgSettings::Get().sharpen) {
+            std::snprintf(text, sizeof(text), "off");
+        } else if (aa_sharpened) {
+            std::snprintf(text, sizeof(text), "%s in the AA step, %d%%, no CAS",
+                          TlgSettings::AaSharpenerName(), pct);
+        } else {
+            std::snprintf(text, sizeof(text), "CAS on the final picture, %d%% (CAS %d%%)", pct,
+                          std::min(pct, 100));
+        }
+        if (last_sharpening != text) {
+            last_sharpening = text;
+            std::printf("Sharpening: %s\n", text);
+        }
+    }
     if (timed) {
         postfx_timer.Stamp(cmdbuf, HostPasses::PostFxTimer::Smaa);
     }
     fsr_settings.enable = graphics.fsr1;
-    fsr_settings.use_rcas = graphics.rcas && !use_cas;
-    fsr_settings.rcas_attenuation = TlgGraphics::RcasAttenuation(graphics.rcas_strength);
+    fsr_settings.use_rcas = false;
     TlgSettings::Get().image_width = int(image_size.width);
     TlgSettings::Get().image_height = int(image_size.height);
     TlgSettings::Get().window_width = int(frame->width);
@@ -710,11 +730,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     const bool fsr_runs =
         TlgGraphics::FsrPassRuns(fsr_settings.enable, fsr_settings.use_rcas, int(image_size.width),
                                  int(image_size.height), int(frame->width), int(frame->height));
-    TlgSettings::Get().rcas_applied =
-        use_cas || (fsr_settings.use_rcas &&
-                    TlgGraphics::FsrPassRuns(fsr_settings.enable, true, int(image_size.width),
-                                             int(image_size.height), int(frame->width),
-                                             int(frame->height)));
+    TlgSettings::Get().rcas_applied = use_cas;
     image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
                                  fsr_settings, frame->is_hdr);
     if (timed) {
@@ -724,7 +740,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     const vk::Extent2D filtered_size = fsr_runs ? vk::Extent2D{frame->width, frame->height} : image_size;
     if (use_cas) {
         image_view = cas_pass.Render(cmdbuf, draw_scheduler, image_view, filtered_size,
-                                     TlgGraphics::CasSharpness(graphics.cas_strength));
+                                     TlgGraphics::CasFromSharpness(TlgSettings::Get().sharpness));
         filtered_image = cas_pass.OutputImage();
     }
     if (frame_dump && filtered_image && !fsr_runs) {

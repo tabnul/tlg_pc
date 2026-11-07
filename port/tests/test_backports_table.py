@@ -74,17 +74,17 @@ class TableTest(unittest.TestCase):
         self.assertEqual(bt.ADVANCED, [])
 
     def test_states_round_trip_and_defaults_store_nothing(self):
-        ini = {'fsr1': '1', 'rcas_strength': '75', 'color_contrast': '1.20', 'overlay_corner': '9'}
+        ini = {'fsr1': '1', 'sharpness': '1.5', 'color_contrast': '1.20', 'overlay_corner': '9'}
         states = bt.read_states(ini, {'deferred_readback': False, 'background_warmup': True})
         self.assertEqual(states['menu:fsr1'], '1')
-        self.assertIsNone(states['menu:rcas_strength'])          # equal to the default
+        self.assertIsNone(states['menu:sharpness'])          # equal to the default
         self.assertEqual(states['menu:color_contrast'], '1.2')
         self.assertIsNone(states['menu:overlay_corner'])         # invalid choice
         self.assertEqual(states['TLG_DEFERRED_READBACK'], '0')
         self.assertIsNone(states['TLG_BACKGROUND_WARMUP'])
         updates = bt.ini_updates(states)
         self.assertEqual(updates['fsr1'], '1')
-        self.assertIsNone(updates['rcas_strength'])
+        self.assertIsNone(updates['sharpness'])
         self.assertNotIn('deferred_readback', updates)           # kept in settings.json
 
     def test_environment_only_for_changes_and_outside_values_win(self):
