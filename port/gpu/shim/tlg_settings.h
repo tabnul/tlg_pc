@@ -178,6 +178,10 @@ struct Values {
     std::atomic<float> mouse_sensitivity{1.0f}, mouse_smoothing{0.5f}, mouse_accel{0.0f}, mouse_deadzone{0.1f};
     /// Keyboard and mouse button remap (TLG_KEY_MAP syntax); written by Load only, read once.
     std::string key_map;
+    /// Sound output (src/runtime_audio.c through tlggpu_audio_settings), applied at the next start:
+    /// the playback device's name (empty = system default) and "always send 7.1".
+    std::string audio_device;
+    std::atomic<bool> audio_surround{false};
 
     /// Startup settings for the explicit TLG_RENDER_RES compatibility patch only.
     int startup_preset = NativeAA;

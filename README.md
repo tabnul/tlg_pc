@@ -21,7 +21,7 @@ No game files are included. You need your own copy, dumped from your own PS4.
 [![Stock vs modded (YouTube)](https://img.youtube.com/vi/16rYLJlGy6A/maxresdefault.jpg)](https://www.youtube.com/watch?v=16rYLJlGy6A)
 
 **Contents:** [Get started](#get-started) · [Graphics](#graphics) ·
-[Cut and hidden content](#cut-and-hidden-content) · [Soundtrack](#soundtrack) ·
+[Cut and hidden content](#cut-and-hidden-content) · [Sound](#sound) · [Soundtrack](#soundtrack) ·
 [Controllers and languages](#controllers-and-languages) · [For testers](#for-testers) ·
 [Building](#building) · [Credits](#credits)
 
@@ -180,6 +180,14 @@ The rest:
 extras the game keeps locked behind its trophies.
 
 <p align="center"><b><a href="docs/fun.md">More pictures, the full story behind each find, and how to use them: docs/fun.md</a></b></p>
+
+## Sound
+
+The game mixes in 7.1. Set Windows (or your Linux sound server) to 5.1 or 7.1 and every channel
+goes to its own speaker; on a stereo device you get a stereo mix-down. In the launcher (Settings,
+Audio) or the in-game menu (Controls, Sound) you can pick the **output device** and turn on
+**Always send 7.1**: then a stereo headset gets all 8 channels, so Windows Sonic or Dolby Atmos for
+Headphones turn them into headphone surround. Both apply at the next start.
 
 ## Soundtrack
 

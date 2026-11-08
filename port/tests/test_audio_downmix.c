@@ -8,6 +8,8 @@ uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *n
     (void)table; (void)count; (void)name;
     return 0;
 }
+void tlggpu_audio_settings(TlgGpuAudioSettings *s) { memset(s,0,sizeof(*s)); }
+const char *runtime_file_user_dir(void) { return ""; }
 
 static int near(float a, float b) { return fabsf(a-b)<1e-3f; }
 
