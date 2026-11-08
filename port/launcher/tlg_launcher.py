@@ -236,6 +236,11 @@ TEXT = {
     'color_gamma': 'Gamma (1 = unchanged)',
     'audio': 'Audio',
     'native_audio': 'Native audio (libSceNgs2.sprx from your console)',
+    'audio_device': 'Output device',
+    'audio_default': 'System default',
+    'audio_surround': 'Always send 7.1 (for Windows Sonic / Dolby Atmos headphones)',
+    'audio_hint': ('Applies at the next start. The list fills after the game ran once; an unplugged '
+                   'device falls back to the system default.'),
     'controls': 'Controls',
     'menu_confirm': 'Menu confirm button (next launch)',
     'mouse_enabled': 'Mouse turns the camera',
@@ -1108,6 +1113,7 @@ class Launcher:
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
+        self.build_sound_output(audio)
         self.build_drool(left)
 
         lang = section(right, self.t('language'))
@@ -1128,6 +1134,33 @@ class Launcher:
         self.hint(debug, 0, 3, 'debug_hint')
         self.check(debug, 2, 'debug_logging')
         self.hint(debug, 2, 3, 'debug_logging_hint')
+
+    def build_sound_output(self, parent):
+        """Output device and 'Always send 7.1' (tlg.ini audio_device / audio_surround, also in the
+        in-game menu's Controls tab). Kept in tlg.ini only, so a change made in the game stays. The
+        device names come from user/audio_devices.txt, which the game writes at every start."""
+        ini_path = tlg_run.USER_DIR / 'tlg.ini'
+        ini = tlg_run.read_ini(ini_path)
+        try:
+            names = [n for n in (tlg_run.USER_DIR / 'audio_devices.txt').read_text(encoding='utf-8').splitlines() if n]
+        except OSError:
+            names = []
+        current = ini.get('audio_device', '')
+        if current and current not in names:
+            names.append(current)
+        values = [''] + names
+        ttk.Label(parent, text=self.t('audio_device')).grid(row=1, column=0, sticky='w', pady=(6, 0))
+        box = ttk.Combobox(parent, values=[self.t('audio_default')] + names, state='readonly', width=36)
+        box.current(values.index(current) if current in values else 0)
+        box.grid(row=2, column=0, sticky='w', pady=2)
+        box.bind('<<ComboboxSelected>>',
+                 lambda _: tlg_run.update_ini(ini_path, {'audio_device': values[box.current()]}))
+        surround = tk.BooleanVar(value=ini.get('audio_surround', '0') == '1')
+        ttk.Checkbutton(parent, text=self.t('audio_surround'), variable=surround,
+                        command=lambda: tlg_run.update_ini(ini_path, {'audio_surround': int(surround.get())})
+                        ).grid(row=3, column=0, sticky='w', pady=2)
+        ttk.Label(parent, text=self.t('audio_hint'), foreground=MUTED, wraplength=380).grid(
+            row=4, column=0, sticky='w')
 
     def build_drool(self, parent):
         """Trico's drool on the Settings page, with its story in plain sight: the developers built it

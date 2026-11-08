@@ -873,6 +873,42 @@ void OverlayTab() {
     }
 }
 
+// Sound output (src/runtime_audio.c, tlg.ini audio_device / audio_surround). The game opens its
+// audio at boot, so both apply at the next start. The device list is SDL's (the runtime's own).
+void SoundRows() {
+    auto& s = TlgSettings::Get();
+    ImGui::SeparatorText(TR("Sound"));
+    if (!BeginRows("##sound")) {
+        return;
+    }
+    Row(TR("Output device"));
+    const std::string current = s.audio_device.empty() ? std::string(TR("System default")) : s.audio_device;
+    if (ImGui::BeginCombo("##value", current.c_str())) {
+        if (ImGui::Selectable(TR("System default"), s.audio_device.empty()) && !s.audio_device.empty()) {
+            s.audio_device.clear();
+            dirty = true;
+        }
+        int count = 0;
+        SDL_AudioDeviceID* ids = SDL_GetAudioPlaybackDevices(&count);
+        for (int i = 0; ids && i < count; ++i) {
+            const char* name = SDL_GetAudioDeviceName(ids[i]);
+            if (name && ImGui::Selectable(name, s.audio_device == name) && s.audio_device != name) {
+                s.audio_device = name;
+                dirty = true;
+            }
+        }
+        SDL_free(ids);
+        ImGui::EndCombo();
+    }
+    Help(TR("Where the game's sound goes. Applies at the next start; an unplugged device falls back to the system default."));
+    ImGui::PopID();
+    CheckRow(TR("Always send 7.1"), s.audio_surround,
+             TR("Sends all 8 channels even to a stereo device. Turn on for Windows Sonic or Dolby Atmos for "
+                "Headphones (headphone surround). Off: stereo devices get a stereo mix. Applies at the next start."),
+             false);
+    ImGui::EndTable();
+}
+
 // Startup options changed since this launch (applied by "Apply and restart").
 // Mouse and keyboard (src/runtime_pad.c): the mouse settings apply at once; the layout is the
 // default one unless the launcher's Controls (tlg.ini key_map) or TLG_KEY_MAP changed it.
@@ -921,6 +957,7 @@ void ControlsTab() {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", TR("Remap keys and mouse buttons in the launcher (Controls); it applies at the next start."));
     ImGui::PopTextWrapPos();
+    SoundRows();
 }
 
 // tlg: Fun tab: jump to any start point of the story (as the game's QA menu does, without

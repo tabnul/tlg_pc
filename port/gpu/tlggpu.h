@@ -80,6 +80,14 @@ typedef struct {
     char key_map[512];
 } TlgGpuInputSettings;
 void tlggpu_input_settings(TlgGpuInputSettings *settings);
+/* Sound output (tlg.ini audio_device, audio_surround), read when an audio port opens. device: the
+ * playback device name, empty = the system default. surround: always open 7.1, also when the device
+ * reports stereo (Windows Sonic / Dolby Atmos for Headphones turn it into headphone surround). */
+typedef struct {
+    int32_t surround;
+    char device[256];
+} TlgGpuAudioSettings;
+void tlggpu_audio_settings(TlgGpuAudioSettings *settings);
 /* Freeze report (src/runtime_freeze.c): the GPU library marks its blocking calls (event queue,
  * GPU idle and vblank waits, GPU thread commands, readbacks, page faults) through these hooks. */
 typedef void (*TlgGpuWaitBegin)(const char *kind, const void *object, const char *name, uintptr_t frame);

@@ -435,6 +435,12 @@ extern "C" int tlggpu_overlay_captures_input(void) {
     return TlgOverlay::CapturesInput() ? 1 : 0;
 }
 
+extern "C" void tlggpu_audio_settings(TlgGpuAudioSettings* out) {
+    const auto& s = TlgSettings::Get();
+    out->surround = s.audio_surround ? 1 : 0;
+    std::snprintf(out->device, sizeof(out->device), "%s", s.audio_device.c_str());
+}
+
 extern "C" void tlggpu_input_settings(TlgGpuInputSettings* out) {
     const auto& s = TlgSettings::Get();
     out->mouse_enabled = s.mouse_enabled ? 1 : 0;

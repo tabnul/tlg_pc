@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <SDL3/SDL.h>
+#include "gpu/tlggpu.h"
 
 #define PORTS 25
 #define ERR_NOT_OPENED ((int32_t)0x80260001)
@@ -34,7 +35,7 @@
 #define PAD_SPEAKER_GAIN 0.17783f
 
 typedef struct {
-    int used, type, channels, is_float, frames, sample_bytes, std_layout, downmix;
+    int used, type, channels, is_float, frames, sample_bytes, std_layout, downmix, surround;
     int32_t volume[8];
     SDL_AudioStream *stream;
     uint64_t next_deadline_ns; /* next return of sceAudioOutOutput */
@@ -64,11 +65,30 @@ static void sleep_until(uint64_t deadline) {
     while (clock_nanosleep(CLOCK_MONOTONIC,TIMER_ABSTIME,&t,NULL)) {}
 #endif
 }
+/* user/audio_devices.txt: one playback device name per line, written at every start, for the
+ * launcher's Output device list (SDL is linked into the game, the launcher cannot ask it). */
+static void write_device_list(void) {
+    const char *dir=runtime_file_user_dir();
+    if (!dir || !*dir) return;
+    char path[4096];
+    snprintf(path,sizeof(path),"%s/audio_devices.txt",dir);
+    FILE *f=fopen(path,"wb");
+    if (!f) return;
+    int count=0;
+    SDL_AudioDeviceID *ids=SDL_GetAudioPlaybackDevices(&count);
+    for (int i=0;ids && i<count;++i) {
+        const char *n=SDL_GetAudioDeviceName(ids[i]);
+        if (n && *n) fprintf(f,"%s\n",n);
+    }
+    SDL_free(ids);
+    fclose(f);
+}
 static int sdl_audio(void) {
     if (sdl_ready<0) {
         const char *mode=getenv("TLG_AUDIO");
         sdl_ready = (!mode || strcmp(mode,"none")) && SDL_InitSubSystem(SDL_INIT_AUDIO);
         printf("Runtime: audio backend %s\n", sdl_ready ? SDL_GetCurrentAudioDriver() : "timer (silent)");
+        if (sdl_ready) write_device_list();
     }
     return sdl_ready;
 }
@@ -119,6 +139,25 @@ static ABI int32_t audio_init(void) {
     pthread_mutex_unlock(&table_lock);
     return r;
 }
+/* tlg.ini audio_device: the playback device with that name, or the system default when it is
+ * empty or no longer there (unplugged headset). Looked up per port open, so a rename is harmless. */
+static SDL_AudioDeviceID output_device(const char *name) {
+    SDL_AudioDeviceID found=SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+    if (!name || !*name) return found;
+    int count=0;
+    SDL_AudioDeviceID *ids=SDL_GetAudioPlaybackDevices(&count);
+    for (int i=0;ids && i<count;++i) {
+        const char *n=SDL_GetAudioDeviceName(ids[i]);
+        if (n && !strcmp(n,name)) { found=ids[i]; break; }
+    }
+    SDL_free(ids);
+    static int warned;
+    if (found==SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK && !warned++)
+        fprintf(stderr,"Runtime: audio device \"%s\" not found; using the default device\n",name);
+    else if (found!=SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK && !warned++)
+        printf("Runtime: audio device \"%s\"\n",name);
+    return found;
+}
 static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_t length, uint32_t freq, uint32_t param) {
     (void)user; (void)index;
     if (!initialized) return ERR_NOT_INIT;
@@ -140,11 +179,22 @@ static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_
     p->sample_bytes=p->is_float ? 4 : 2; p->frames=(int)length; p->std_layout=format>=6;
     for (int c=0;c<8;++c) p->volume[c]=VOLUME_0DB;
     if (sdl_audio()) {
+        TlgGpuAudioSettings out;
+        memset(&out,0,sizeof(out));
+        tlggpu_audio_settings(&out);
+        SDL_AudioDeviceID dev=output_device(out.device);
         SDL_AudioSpec device; int device_frames;
-        p->downmix=p->channels==8 && SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&device,&device_frames)
+        /* "Always send 7.1" (audio_surround) keeps all 8 channels on a stereo device: Windows Sonic
+         * or Dolby Atmos for Headphones then make headphone surround of them. */
+        p->downmix=p->channels==8 && !out.surround && SDL_GetAudioDeviceFormat(dev,&device,&device_frames)
                    && device.channels==2;
+        p->surround=p->channels==8 && out.surround;
         SDL_AudioSpec spec={p->is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16, p->downmix ? 2 : p->channels, 48000};
-        p->stream=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+        p->stream=SDL_OpenAudioDeviceStream(dev,&spec,NULL,NULL);
+        if (!p->stream && dev!=SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK) {
+            fprintf(stderr,"Runtime: audio device \"%s\" failed (%s); using the default device\n",out.device,SDL_GetError());
+            p->stream=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+        }
         if (p->stream) SDL_ResumeAudioStreamDevice(p->stream);
         else fprintf(stderr,"Runtime: SDL audio stream failed (%s); port %d uses the timer sink\n",SDL_GetError(),id);
     }
@@ -158,7 +208,7 @@ static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_
     ++ports_opened;
     pthread_mutex_unlock(&table_lock);
     printf("Runtime: audio port %d opened (type %d, %d ch, %s, %u frames%s)\n",id,type,p->channels,p->is_float ? "float" : "s16",length,
-           p->downmix ? ", downmixed to stereo" : "");
+           p->downmix ? ", downmixed to stereo" : p->surround ? ", 7.1 kept (always send 7.1)" : "");
     return (type<<16) | id | 0x20000000;
 }
 static ABI int32_t audio_close(int32_t handle) {
