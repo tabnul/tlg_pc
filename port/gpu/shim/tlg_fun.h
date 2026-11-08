@@ -129,7 +129,6 @@ enum class PilotCam { Near = 0, Middle = 1, Far = 2, Game = 3 };
 void TricopilotCamera(PilotCam cam);
 PilotCam TricopilotCamera();
 inline constexpr const char* PilotCamNames[] = {"Near", "Middle", "Far", "Game camera"};
-inline constexpr const char* PilotCamNamesPt[] = {"Perto", "Médio", "Longe", "Câmera do jogo"};
 inline constexpr const char* PilotCamKeys[] = {"near", "middle", "far", "game"};
 inline constexpr const char* TricopilotCamHelp =
     "Near keeps Trico big in the picture and is the best of the four in open scenes. Middle is the "
@@ -137,12 +136,6 @@ inline constexpr const char* TricopilotCamHelp =
     "place the camera can end up inside the rock. Far looks down on the whole area, which is lovely "
     "in a valley and useless indoors, because Trico becomes a dot. Game camera leaves your normal "
     "camera alone: it keeps following the boy while Trico wanders off on his own.";
-inline constexpr const char* TricopilotCamHelpPt =
-    "Perto mantém o Trico grande na tela e é a melhor das quatro em cenas abertas. Médio é a que a "
-    "ferramenta dos desenvolvedores escolhe sozinha: uma vista de cima clássica, mas num lugar "
-    "estreito ou coberto a câmera pode acabar dentro da rocha. Longe mostra a área inteira, bonito "
-    "num vale e inútil em interiores, porque o Trico vira um ponto. Câmera do jogo não mexe na sua "
-    "câmera: ela continua seguindo o menino enquanto o Trico passeia sozinho.";
 // The Fun tab, both launchers and the docs show this text.
 inline constexpr const char* TricopilotHelp =
     "Trico drives himself: he wanders the scene, looks for edges to climb or jump, and the camera "
@@ -154,11 +147,5 @@ inline constexpr const char* TricopilotHelp =
     "game quietly skips those, which is why he sometimes picks an odd route). Turning it off gives "
     "you the camera and Trico back. For fun only: he ignores the story, he can wander into water or "
     "into a load trigger, and the story keeps running around him.";
-inline constexpr const char* TricopilotHelpPt =
-    "Trico se dirige sozinho: ele vagueia pela cena, procura bordas para escalar ou pular, e a câmera "
-    "o segue. É a ferramenta de depuração dos próprios desenvolvedores, ainda presente no jogo. Eles "
-    "a usavam para deixar o jogo rodando sozinho por horas: o script até o leva para a cena seguinte "
-    "e conhece os pontos de início de todas as fases. Só por diversão: ele ignora a história, pode "
-    "entrar na água ou num gatilho de carregamento, e a história continua ao redor dele.";
 bool EyeCustom();
 } // namespace TlgFun

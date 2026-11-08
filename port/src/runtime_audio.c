@@ -29,8 +29,8 @@
 #define ERR_NOT_INIT ((int32_t)0x8026000F)
 #define VOLUME_0DB 32768
 /* Pad speaker ports (type 4) play on the main output. Games master them for the DualShock 4's
-   small speaker, so they peak at full scale (GoW3 weapon upgrade: ~14 dB over the loudest
-   gameplay, SpartanPort #464). -15 dB puts them at the main mix's level; tune by ear. */
+   small speaker, so they peak at full scale (~14 dB over the loudest gameplay, SpartanPort
+   #464). -15 dB puts them at the main mix's level; tune by ear. */
 #define PAD_SPEAKER_GAIN 0.17783f
 
 typedef struct {

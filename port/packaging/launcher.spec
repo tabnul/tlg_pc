@@ -16,6 +16,8 @@ paths = [str(root / 'scripts'), str(root / 'launcher')]
 
 # The benchmark's clean start save (launcher/benchmark.py reads it from _MEIPASS when frozen).
 datas = [(str(root / 'tools' / 'scene-check' / 'start.save'), 'scene-check/start.save')]
+# The shipped language packs and the menu text list (launcher/langpack.py: HERE / 'lang').
+datas += [(str(path), 'lang') for path in sorted((root / 'launcher' / 'lang').glob('*.json'))]
 
 a = Analysis([str(root / 'launcher' / os.environ['TLG_SPEC_TK'])], pathex=paths, datas=datas,
              hiddenimports=hidden, excludes=['PySide6', 'shiboken6'], noarchive=False)

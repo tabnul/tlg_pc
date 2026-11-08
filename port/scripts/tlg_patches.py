@@ -358,11 +358,11 @@ def menu_writes(eboot, preference):
 
 
 def write_patch_file(path, writes):
-    """G3PATCH2 (probe.c apply_patches): base 0 (no pointer slots), then (offset, length, bytes).
+    """TLGPATCH (probe.c apply_patches): base 0 (no pointer slots), then (offset, length, bytes).
     Base 0 only matters for a write that lands exactly on a relocated pointer slot (none of the
     built-in frame rate patches or typical shadPS4/GoldHEN literal-value mods do); it does not
     change plain byte/float writes either way."""
-    blob = struct.pack('<8sQQ', b'G3PATCH2', 0, len(writes))
+    blob = struct.pack('<8sQQ', b'TLGPATCH', 0, len(writes))
     for offset, data, _ in writes:
         blob += struct.pack('<QQ', offset, len(data)) + data
     Path(path).write_bytes(blob)

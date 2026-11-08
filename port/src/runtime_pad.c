@@ -108,9 +108,9 @@ static uint16_t touch_axis(float v, int max) {
 
 /* A click without a touch surface (Back/View, Tab, Backspace, the pad file) is played like a
  * finger: the touch is reported CLICK_LEAD_US before the button, the button stays at least
- * CLICK_HOLD_US, and the touch lingers CLICK_TAIL_US after the release. God of War III opens
- * photo mode on the release of a left click with the finger still down, and ignores a touch
- * that comes and goes with the button. The side is chosen when the click starts and kept: the
+ * CLICK_HOLD_US, and the touch lingers CLICK_TAIL_US after the release. Games can act on the
+ * release of a left click with the finger still down, and ignore a touch that comes and goes
+ * with the button. The side is chosen when the click starts and kept: the
  * right source with L1 held is a left click (photo mode on pads without a touchpad). */
 enum { CLICK_LEAD_US=50000, CLICK_HOLD_US=50000, CLICK_TAIL_US=100000 };
 static struct { int side; uint64_t pressed, released; } click={-1,0,0};
@@ -378,11 +378,8 @@ static void sample_motion(PadData *d, SDL_Gamepad *g, const bool *k) {
         const int toggle=sticks || (motion_button()>=0 && SDL_GetGamepadButton(g,(SDL_GamepadButton)motion_button()));
         if (toggle && !motion.toggle_held) {
             motion.mode=!motion.mode;
-            const char *lang=getenv("TLG_UI_LANG");
-            const int pt=!(lang && !strncmp(lang,"en",2));
-            tlggpu_overlay_notice(motion.mode ? (pt ? "Modo sensor LIGADO: analógico esquerdo inclina, X/A sacode"
-                                                    : "Sensor mode ON: left stick tilts, cross/A shakes")
-                                              : (pt ? "Modo sensor desligado" : "Sensor mode off"), 3.0f);
+            tlggpu_overlay_notice(motion.mode ? "Sensor mode ON: left stick tilts, cross/A shakes"
+                                              : "Sensor mode off", 3.0f);
             printf("Runtime: sensor mode %s\n",motion.mode ? "on" : "off");
         }
         motion.toggle_held=toggle;

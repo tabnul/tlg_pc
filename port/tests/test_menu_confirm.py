@@ -57,7 +57,7 @@ class MenuConfirmTests(unittest.TestCase):
             self.assertEqual(mode, '30')
             self.assertTrue(any('gameplay unchanged' in line for line in lines))
             blob = Path(tmp, 'patches.bin').read_bytes()
-            self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'G3PATCH2', 0, 1))
+            self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'TLGPATCH', 0, 1))
             self.assertEqual(struct.unpack_from('<QQ', blob, 24), (t.MENU_OFFSET, 8))
             self.assertEqual(blob[40:], bytes.fromhex('41c1e20441c1e504'))
             self.assertEqual(source.read_bytes(), elf)
@@ -69,7 +69,7 @@ class MenuConfirmTests(unittest.TestCase):
             self.assertEqual(mode, '30')
             self.assertTrue(any('game-menu patch not applied' in line for line in lines))
             self.assertEqual(struct.unpack('<8sQQ', Path(tmp, 'patches.bin').read_bytes()),
-                             (b'G3PATCH2', 0, 0))
+                             (b'TLGPATCH', 0, 0))
 
     def test_conflicting_mod_cannot_overwrite_menu_policy(self):
         elf = fixture_elf()

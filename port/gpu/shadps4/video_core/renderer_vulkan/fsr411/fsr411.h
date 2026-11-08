@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tlg: FSR 4.1.1 (AMD's INT8 model of the 4.1.1 upscaler DLL) on Vulkan, replaying what the DLL
-// does on D3D12 (docs/upscaler.md; tools/fsr4cap records it, tools/fsr4cap/extract.py builds
+// does on D3D12 (tools/fsr4cap records it, tools/fsr4cap/extract.py builds
 // the asset sets: SPIR-V of every pass and the model weights).
 //
 // Plain Vulkan (no renderer types) so that the game (vk_fsr4.cpp) and the benchmark

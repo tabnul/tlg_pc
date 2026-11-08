@@ -18,7 +18,7 @@ class ModTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.game = self.root / 'CUSA01623'
+        self.game = self.root / 'CUSA03627'
         self.assets = self.game / 'dvdroot_ps4' / 'data'
         self.assets.mkdir(parents=True)
         (self.game / 'eboot.bin').write_bytes(b'original executable')
@@ -133,27 +133,3 @@ class ModTests(unittest.TestCase):
         config.write_text('{"disabled":"A"}')
         with self.assertRaises(ValueError):
             mods.selected(self.moddir, config)
-
-    def test_run_uses_overlay_propagates_exit_and_cleans_view(self):
-        self.mod('A')
-        python = self.root / 'python'
-        python.write_text(f'#!{sys.executable}\nimport subprocess,sys\n'
-            'if sys.argv[1] == "scripts/mods.py" or sys.argv[1] == "-c":\n'
-            '    sys.exit(subprocess.call([sys.executable,*sys.argv[1:]]))\n')
-        python.chmod(0o755)
-        probe = self.root / 'probe'
-        probe.write_text(f'#!{sys.executable}\nimport json,sys,os\nfrom pathlib import Path\n'
-            'game=Path(sys.argv[sys.argv.index("--app0")+1])\n'
-            'Path(os.environ["TLG_DATA_DIR"],"mounted.json").write_text(json.dumps({\n'
-            '"path":str(game),"content":(game/"dvdroot_ps4/data/a.wad").read_text()}))\n'
-            'sys.exit(7)\n')
-        probe.chmod(0o755)
-        env = dict(os.environ, TLG_PREBUILT='1', TLG_PROBE=str(probe), PYTHON=str(python),
-            TLG_DATA_DIR=str(self.root), TLG_GAME_DIR=str(self.game),
-            TLG_MODS_DIR=str(self.moddir), TLG_MODS_ENABLED='1', TLG_MODS_CONFIG=str(self.root/'mods.json'))
-        result = subprocess.run(['bash', 'run.sh'], cwd=ROOT, env=env, capture_output=True, timeout=30)
-        self.assertEqual(result.returncode, 7, result.stderr)
-        mounted = json.loads((self.root / 'mounted.json').read_text())
-        self.assertEqual(mounted['content'], 'mod')
-        self.assertFalse(Path(mounted['path']).exists())
-        self.assertEqual((self.assets/'a.wad').read_bytes(), b'original')

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Finds God of War III's frame pieces in a frame capture (in-game menu, Diagnostics, Capture
+"""Finds the game's frame pieces in a frame capture (in-game menu, Diagnostics, Capture
 frame): scene depth, camera view-projection, scene color before the HUD and the HUD passes.
 These are the inputs a temporal upscaler or frame generation needs.
 

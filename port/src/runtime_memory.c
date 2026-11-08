@@ -25,7 +25,7 @@
 #include <unistd.h>
 #endif
 /* sceKernelGetDirectMemorySize on retail PS4: 5056 MiB. TLG_DMEM_MB raises it (the resolution
- * patches above 1080p need about 4 GiB more; run.sh sets it). */
+ * patches above 1080p need about 4 GiB more; the launcher sets it). */
 static uint64_t pool_size_bytes(void) {
     static uint64_t size;
     if (!size) {

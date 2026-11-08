@@ -1,94 +1,12 @@
-# The Last Guardian — port para PC / PC port
+# The Last Guardian — PC port
 
-Código / Code: [github.com/tabnul/tlg_pc](https://github.com/tabnul/tlg_pc) · Baseado no port de / Based on the port by [HayatoG](https://github.com/HayatoG/tlg_pc)
+Code: [github.com/tabnul/the-last-guardian-definitive](https://github.com/tabnul/the-last-guardian-definitive) · Based on the port by [HayatoG](https://github.com/HayatoG/tlg_pc)
 
-**Nenhum arquivo do jogo vem neste pacote.** Você precisa da sua própria cópia de The Last Guardian para PS4. / **No game files are included.** You need your own copy of The Last Guardian for PS4.
+**No game files are included.** You need your own copy of The Last Guardian for PS4.
 
-Versão experimental: o jogo roda do início ao gameplay, mas ainda pode travar em áreas não testadas. / Experimental build: the game runs from boot to gameplay, but may still crash in untested areas.
+Experimental build: the game runs from boot to gameplay, but may still crash in untested areas.
 
----
-
-## Português
-
-### Arquivos do jogo necessários
-
-Nada disso vai no download; você precisa da sua própria cópia. Use **The Last Guardian CUSA03627 (EUA) com o update 01.03**, montado numa pasta só, com o jogo base e o update por cima. São ~25 GB.
-
-| Arquivo | Vem de | Tamanho | Para quê |
-|---|---|---|---|
-| `eboot.bin` | update 01.03 | 89 MB | o código do jogo (tem que ser o do 1.03) |
-| `sce_module/libc.prx`, `sce_module/libSceFios2.prx` | update 01.03 | 1,5 MB | bibliotecas do próprio jogo |
-| `sce_sys/` (`param.sfo`, `playgo-chunk.dat`, `icon0.png`, `pic0.png`, `pic1.png`) | jogo base + update | ~5 MB | metadados, instalação e a arte do launcher |
-| `trico_boot.psarc`, `trico_001.psarc`, `trico_002.psarc`, `trico_003.psarc` | jogo base | 2,8 + 5,8 + 5,4 + 6,8 GB | conteúdo principal |
-| `trico_bootp.psarc`, `trico_001p.psarc`, `trico_002p.psarc`, `trico_003p.psarc` | update 01.03 | ~1,6 GB | correções do update |
-| `trico_enu.psarc` / `trico_ptb.psarc` / `trico_esl.psarc` / `trico_frc.psarc` (+ os `…p.psarc` do update) | base + update | ~280 MB cada | vozes e textos: inglês, português, espanhol, francês |
-| `sce_discmap.plt`, `sce_discmap_patch.plt` | base, update | pequenos | mapa de arquivos (recomendado) |
-
-**Do firmware do console (opcional, para o áudio nativo):** `libSceNgs2.sprx` (372 KB). Ele vai na pasta `system_lib/` ao lado do executável.
-
-**PC:** Windows 10 (1903+)/11 64 bits ou Linux x86-64 (glibc 2.39+), placa de vídeo com Vulkan 1.3 (6 GB de VRAM recomendados).
-
-### Como jogar
-
-1. Extraia o pacote numa pasta qualquer (no Windows, fora do .zip).
-2. Coloque o `libSceNgs2.sprx` na pasta `system_lib/`, ao lado do executável (opcional: sem ele, o port usa o seu próprio mixer de áudio, ainda experimental).
-3. Abra **The Last Guardian** (`The Last Guardian.exe` no Windows): é o launcher, com todas as opções gráficas (resolução/widescreen, upscaling DLSS e FSR, HDR, efeitos).
-   - No Windows, se aparecer "O Windows protegeu o computador", clique em *Mais informações* e depois em *Executar assim mesmo*. O programa não é assinado digitalmente.
-4. Em **Pasta do jogo**, escolha a pasta que tem o `eboot.bin`.
-5. Escolha um dos idiomas oferecidos para sua pasta do jogo e clique em **Jogar**. A primeira partida demora um pouco mais.
-
-**Texto japonês experimental (EU 01.03):** com CUSA03745 e a atualização 01.03 aplicada na mesma pasta, escolha **日本語 (EU 1.03 text fallback)**. Não mova nem apague os arquivos franceses: o port os oculta apenas da visão do jogo nesta execução. Para voltar ao francês, escolha Français e inicie novamente. É necessário um launcher e runtime que incluam esse recurso; isso não adiciona suporte ao executável da edição japonesa do disco. Menus e dicas de jogo em japonês foram verificados; áudio/texto do jogo inteiro ainda não foram testados. Os botões de controle não são trocados.
-
-No Linux, `./install_desktop.sh` adiciona o jogo ao menu de aplicativos.
-
-### Durante o jogo
-
-- **F10**: liga e desliga o contador de FPS
-- **Insert** (ou R3 + L2 no controle): abre o menu do port (imagem, desempenho, overlay)
-- **F8**: alterna entre o upscaler escolhido e o anti-aliasing do próprio jogo. DLSS (placas RTX), FSR 4 (placas recentes, Windows e Linux) ou FSR 3.1 (qualquer placa) deixam a folhagem e as bordas finas estáveis. Na qualidade AA nativo (o padrão, DLSS em placas RTX) o jogo renderiza no tamanho da sua tela; em Qualidade, Equilibrado, Desempenho ou Ultra desempenho ele renderiza menor e o DLSS ou FSR amplia a imagem, para mais FPS. Troque no launcher ou em Ampliação e anti-aliasing no menu do port (a qualidade exige reiniciar). O FSR 4 é escolhido uma vez sozinho numa placa que o roda.
-- Controles de PS4/PS5, Xbox e 8BitDo funcionam via SDL3, por USB ou Bluetooth.
-
-### Teclado e mouse
-
-Com a janela do jogo em foco, o mouse fica preso e gira a câmera. **Esc** solta o mouse; um clique na janela prende de novo. Abrir o menu do port (Insert) também solta o mouse.
-
-| Ação no jogo | Botão do PS4 | Teclado e mouse |
-|---|---|---|
-| Andar | Analógico esquerdo | W A S D |
-| Câmera | Analógico direito | Mouse (ou as setas) |
-| Pular | X | Espaço |
-| Agarrar, segurar | Triângulo | Clique esquerdo ou Q |
-| Chamar o Trico | R1 | Clique direito ou 3 |
-| | Quadrado | E ou clique do meio |
-| | Círculo | Shift esquerdo |
-| | L1 / L2 / R2 | 1 / R / F |
-| | L3 / R3 | Z / C |
-| | Direcional | I J K L |
-| Menu | Options | Enter |
-| Modo foto / pausa | Touchpad (esquerda / direita) | Tab / Backspace |
-
-- No launcher, a caixa **Controles** liga o mouse, muda a sensibilidade e inverte o eixo Y. **Teclas e botões do mouse…** remapeia cada botão: clique em *Definir* e aperte a tecla ou o botão do mouse (os botões laterais e a roda também servem). Vale na próxima vez que o jogo abrir.
-- No jogo, a aba **Controles** do menu do port (Insert) ajusta sensibilidade, eixo Y, suavização, aceleração e anti-zona morta na hora.
-
-### Onde ficam as coisas
-
-- Saves: `user/savedata/`, ao lado do executável (guarde essa pasta ao atualizar)
-- Logs: `out/logs/` (`out/last_run.log` é o da última sessão; mande ele junto se reportar um problema)
-- Configurações do launcher: `~/.config/tlg-launcher/` (Linux) ou `%APPDATA%\tlg-launcher` (Windows). Se você escolher outra pasta de dados em **Saves e dados**, o caminho fica em `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` no Windows)
-- Fundo do launcher: por padrão a imagem dos seus arquivos do jogo (`sce_sys/pic1.png`). Para usar outra, salve-a como `launcher_background.png` (ou `.jpg`) na pasta `user/`; ela é ajustada à janela. Exemplo: [a arte da capa do jogo](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
-
-### Problemas
-
-- **Som incompleto ou estranho**: sem o `libSceNgs2.sprx` em `system_lib/`, o port usa o seu próprio mixer, ainda experimental (sem reverb e sem filtros). Com o arquivo, o áudio é o nativo.
-- **"Erro 4551" ou bloqueado pelo Controle Inteligente de Aplicativos (Smart App Control)**: o Windows 11 bloqueia programas sem assinatura digital, e o port não é assinado. Desligue em Segurança do Windows > Controle de aplicativos e do navegador > Configurações do Controle Inteligente de Aplicativos. Em algumas versões do Windows só dá para religar reinstalando o Windows.
-- **Não abre ou fecha sozinho**: veja a caixa de log no launcher e mande o `out/last_run.log` numa [issue](https://github.com/tabnul/tlg_pc/issues).
-- **NVIDIA**: use um driver recente.
-
----
-
-## English
-
-### Required game files
+## Required game files
 
 None of it is in the download; you need your own copy. Use **The Last Guardian CUSA03627 (US) with update 01.03**, merged into one folder, with the base game and the update on top. About 25 GB.
 
@@ -106,7 +24,7 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 
 **PC:** 64-bit Windows 10 (1903+)/11 or x86-64 Linux (glibc 2.39+), a graphics card with Vulkan 1.3 (6 GB of VRAM recommended).
 
-### How to play
+## How to play
 
 1. Extract the package anywhere (on Windows, outside the .zip).
 2. Put `libSceNgs2.sprx` in the `system_lib/` folder next to the executable (optional: without it, the port uses its own audio mixer, still experimental).
@@ -115,18 +33,20 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 4. Under **Game folder**, choose the folder that has `eboot.bin`.
 5. Pick one of the languages offered for your game folder and click **Play**. The first start takes a little longer.
 
+**Launcher and menu language:** English by default. Under **Settings > Language > Launcher and menu language** you can pick German, French, Spanish, Brazilian Portuguese, Japanese or Simplified Chinese, or **Auto** for your system language. This changes the launcher and the port's in-game menu, not the game's own text and voices. Packs you make or fix yourself go in `user/lang/`; see [docs/language-packs.md](https://github.com/tabnul/the-last-guardian-definitive/blob/master/port/docs/language-packs.md).
+
 **Experimental Japanese text (EU 01.03):** with CUSA03745 and update 01.03 applied to the same folder, select **日本語 (EU 1.03 text fallback)**. Do not move or delete the French archives: the port hides them only from the game's view for that launch. To return to French, select Français and launch again. Both launcher and runtime must contain this feature; it does not add Japanese-region disc executable support. Japanese menus and gameplay prompts were verified, not full-game audio/text coverage. Controller buttons are not swapped.
 
 On Linux, `./install_desktop.sh` adds the game to the applications menu.
 
-### While playing
+## While playing
 
 - **F10**: toggles the FPS counter
 - **Insert** (or R3 + L2 on a controller): opens the port's menu (image, performance, overlay)
 - **F8**: switches between the chosen upscaler and the game's own anti-aliasing. DLSS (RTX cards), FSR 4 (recent cards, Windows and Linux) or FSR 3.1 (any card) keep foliage and thin edges stable. At the Native AA quality (the default, DLSS on RTX cards) the game renders at your screen size; at Quality, Balanced, Performance or Ultra Performance it renders smaller and DLSS or FSR upscale it, for more FPS. Change it in the launcher or under Upscaling and anti-aliasing in the port's menu (Quality needs a restart). FSR 4 is chosen once by itself on a card that runs it.
 - PS4/PS5, Xbox and 8BitDo controllers work through SDL3, over USB or Bluetooth.
 
-### Keyboard and mouse
+## Keyboard and mouse
 
 While the game window has focus, it takes the mouse and the mouse turns the camera. **Esc** releases the mouse; a click in the window takes it back. Opening the port's menu (Insert) also releases it.
 
@@ -148,24 +68,24 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 - In the launcher, the **Controls** box turns the mouse on or off, sets its sensitivity and inverts the Y axis. **Keyboard and mouse buttons…** remaps each button: click *Set* and press the key or mouse button (the side buttons and the wheel work too). It applies at the next start.
 - In game, the **Controls** tab of the port's menu (Insert) changes sensitivity, Y axis, smoothing, acceleration and anti-dead zone at once.
 
-### Where things are
+## Where things are
 
 - Saves: `user/savedata/` next to the executable (keep this folder when updating)
 - Logs: `out/logs/` (`out/last_run.log` is the latest session; attach it to bug reports)
 - Launcher settings: `~/.config/tlg-launcher/` (Linux) or `%APPDATA%\tlg-launcher` (Windows). If you pick another data folder in **Saves & data**, its path is kept in `~/.config/tlg-pc/launcher.json` (`%APPDATA%\TLG-PC` on Windows)
 - Launcher background: by default the picture from your own game files (`sce_sys/pic1.png`). To use another one, save it as `launcher_background.png` (or `.jpg`) in the `user/` folder; it is fitted to the window. Example: [the game's cover art](https://tpi-public.s3.eu-central-1.amazonaws.com/tlg_cover.png) (3840×2160).
 
-### Problems
+## Problems
 
 - **Incomplete or odd sound**: without `libSceNgs2.sprx` in `system_lib/`, the port uses its own mixer, still experimental (no reverb or filters yet). With the file, audio is native.
 - **"Error 4551" or blocked by Smart App Control**: Windows 11 blocks programs without a digital signature, and the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control settings. On some Windows versions it can only be turned back on by reinstalling Windows.
-- **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/tlg_pc/issues).
+- **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/the-last-guardian-definitive/issues).
 - **NVIDIA**: use a recent driver.
 
 ---
 
-This project is not affiliated with Sony Interactive Entertainment, SIE Japan Studio or genDESIGN. The Last Guardian is a trademark of Sony Interactive Entertainment. / Este projeto não tem vínculo com a Sony Interactive Entertainment, SIE Japan Studio ou genDESIGN.
+This project is not affiliated with Sony Interactive Entertainment, SIE Japan Studio or genDESIGN. The Last Guardian is a trademark of Sony Interactive Entertainment.
 
-The Windows package contains NVIDIA DLSS (`out/nvngx_dlss.dll`) under NVIDIA's license (`out/NVIDIA-DLSS-LICENSE.txt`). NVIDIA, RTX and DLSS are trademarks of NVIDIA Corporation. / O pacote Windows contém o NVIDIA DLSS (`out/nvngx_dlss.dll`) sob a licença da NVIDIA (`out/NVIDIA-DLSS-LICENSE.txt`). NVIDIA, RTX e DLSS são marcas da NVIDIA Corporation.
+The Windows package contains NVIDIA DLSS (`out/nvngx_dlss.dll`) under NVIDIA's license (`out/NVIDIA-DLSS-LICENSE.txt`). NVIDIA, RTX and DLSS are trademarks of NVIDIA Corporation.
 
-The packages contain the open AMD FSR 4 model (`fsr4_shaders/`, MIT, `LICENSE-FSR4-v07.txt`), built by @FireBurn's Q2RTX from AMD's FidelityFX SDK. AMD and FSR are trademarks of Advanced Micro Devices, Inc. / Os pacotes contêm o modelo aberto do AMD FSR 4 (`fsr4_shaders/`, MIT, `LICENSE-FSR4-v07.txt`), gerado pelo Q2RTX do @FireBurn a partir do FidelityFX SDK da AMD. AMD e FSR são marcas da Advanced Micro Devices, Inc.
+The packages contain the open AMD FSR 4 model (`fsr4_shaders/`, MIT, `LICENSE-FSR4-v07.txt`), built by @FireBurn's Q2RTX from AMD's FidelityFX SDK. AMD and FSR are trademarks of Advanced Micro Devices, Inc.

@@ -58,8 +58,8 @@ int main(void) {
 
     /* A click without a touch surface (Back, Tab, Backspace, the pad file) plays like a finger:
      * the touch comes first, the button CLICK_LEAD_US later, and the touch stays CLICK_TAIL_US
-     * after the release. God of War III opens photo mode on the release of a left click with
-     * the finger still down; a touch that appears and vanishes with the button is ignored. */
+     * after the release. Games can act on the release of a left click with the finger still
+     * down; a touch that appears and vanishes with the button is ignored. */
     inject(path,"cross l3 touchpad_left");
     PadData data=read_pad();
     assert((data.buttons & (BTN_CROSS|BTN_L3))==(BTN_CROSS|BTN_L3));

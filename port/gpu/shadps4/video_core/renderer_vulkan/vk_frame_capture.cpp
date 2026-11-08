@@ -222,7 +222,7 @@ void FrameCapture::BeginPass(const VideoCore::ImageInfo* const* colors, u32 num_
         }
     }
     // Frame boundaries in the command stream: the pass that writes a display buffer as its only
-    // target. tlg: God of War III also draws scene passes (two targets) into display buffers.
+    // target. tlg: a game can also draw scene passes (two targets) into display buffers.
     display = display && targets.size() == 1;
     const bool new_pass = !(pass_open && !entries.empty() && !entries.back().compute &&
                             entries.back().colors == targets);

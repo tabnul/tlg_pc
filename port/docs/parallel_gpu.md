@@ -235,7 +235,7 @@ into it) and, when `pgo/` holds a profile, with `-fprofile-use` (`-fprofile-part
 -fprofile-correction`; functions changed since the profile compile without it). No `-march`:
 the same build runs on the Steam Deck.
 
-Collecting a profile: `TLG_PGO=generate bash run.sh` builds an instrumented library
+Collecting a profile: `TLG_PGO=generate bash build.sh` builds an instrumented library
 (`-fprofile-generate -fprofile-update=atomic`) that writes `pgo/` every 30 s (`bb:pgo` thread:
 `__gcov_dump` + `__gcov_reset`, since the game often ends through `_exit`); play a few minutes
 of ordinary gameplay. The next plain build uses it. `TLG_PGO=off` / `TLG_LTO=OFF` disable them.

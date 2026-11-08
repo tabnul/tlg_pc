@@ -63,7 +63,7 @@ class TableTest(unittest.TestCase):
     def test_items_are_bilingual_and_unique(self):
         self.assertEqual(len({i.id for i in bt.ITEMS}), len(bt.ITEMS))
         for item in bt.ITEMS:
-            self.assertTrue(all(item.name) and all(item.what), item.id)
+            self.assertTrue(item.name and item.what, item.id)
             self.assertIn(item.store, ('ini', 'launcher'))
             if item.vtype in ('int', 'float'):
                 self.assertLessEqual(item.lo, float(item.default), item.id)
@@ -155,8 +155,8 @@ class TableTest(unittest.TestCase):
 class ReadbackTest(unittest.TestCase):
     def test_every_readback_row_says_why_and_no_preset_sets_one(self):
         self.assertEqual(set(bt.READBACK_WHY), bt.NOT_IN_PRESETS)
-        for en, pt in bt.READBACK_WHY.values():
-            self.assertTrue(en and pt)
+        for why in bt.READBACK_WHY.values():
+            self.assertTrue(why)
         self.assertFalse(bt.NOT_IN_PRESETS & set(gfxlogic.PRESET_ITEMS))
         for preset_id, _, items in gfxlogic.PRESETS:
             self.assertFalse(bt.NOT_IN_PRESETS & set(items), preset_id)

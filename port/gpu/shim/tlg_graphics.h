@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tlg: graphics options of the in-game menu (Insert / R3+L2), kept in tlg.ini. The live ones
-// apply on the next frame; the startup ones (patches, GPU readback modes) are read by run.py and
+// apply on the next frame; the startup ones (patches, GPU readback modes) are read by tlg_run.py and
 // apply through "Apply and restart". The launcher reads and writes the same keys.
 #pragma once
 

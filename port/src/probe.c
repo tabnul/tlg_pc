@@ -988,13 +988,13 @@ mismatch:
     printf("Re-init lock: unavailable (code signature mismatch)\n");
 }
 
-/* G3PATCH2 (patches.py): the patches' image base, then byte writes at image offsets, applied
+/* TLGPATCH (tlg_patches.py): the patches' image base, then byte writes at image offsets, applied
  * after relocation. A write may replace a whole base-relative pointer slot (60/90 FPS++ swap
  * function pointers): the patch holds the address at the patches' base, rebased here. */
 static void apply_patches(const char *path, Segment *segments, uint64_t ns, const Reloc *relocs, uint64_t nr) {
     FILE *f=fopen(path,"rb");
     char magic[8];
-    if (!f || fread(magic,1,8,f)!=8 || memcmp(magic,"G3PATCH2",8)) fail("invalid patch file");
+    if (!f || fread(magic,1,8,f)!=8 || memcmp(magic,"TLGPATCH",8)) fail("invalid patch file");
     uint64_t base=read64(f), count=read64(f), bytes=0, rebased=0;
     unsigned char data[4096];
     for (uint64_t i=0;i<count;++i) {
@@ -1024,16 +1024,15 @@ static void apply_patches(const char *path, Segment *segments, uint64_t ns, cons
     fclose(f);
     printf("Patches: %" PRIu64 " writes, %" PRIu64 " bytes applied, %" PRIu64 " pointers rebased\n",count,bytes,rebased);
 }
-/* Restarts the game through run.sh (the settings menu: a new render resolution is a patch
- * applied at start). Descriptors are closed first so the old GPU device and its memory are
+/* Restarts the game with TLG_RESTART_COMMAND, the launch command line (the settings menu: a new
+ * render resolution is a patch applied at start). Descriptors are closed first so the old GPU device and its memory are
  * released before the new process opens its own. */
 void runtime_restart(void) {
     tlggpu_flush_cache();
     fflush(NULL);
 #ifdef _WIN32
-    /* run.py sets TLG_RESTART_COMMAND: the launch command line, started again (new patches). */
     const char *command=getenv("TLG_RESTART_COMMAND");
-    puts("Runtime: restarting through run.py");
+    puts("Runtime: restarting through TLG_RESTART_COMMAND");
     if (!command || !*command) { fputs("runtime_restart: TLG_RESTART_COMMAND is not set\n",stderr); _exit(1); }
     char *line=_strdup(command);
     /* Same output handles: a launcher reading the game's log keeps reading the new launch. */
@@ -1045,22 +1044,14 @@ void runtime_restart(void) {
         fprintf(stderr,"runtime_restart: CreateProcess failed (%lu)\n",GetLastError()); _exit(1);
     }
     CloseHandle(process.hThread); CloseHandle(process.hProcess);
-    /* The new launch waits for this process's GPU device to go away (run.py --after). */
     TerminateProcess(GetCurrentProcess(),0);
 #else
-    /* Packaged builds have no run.sh: run.py/tlg_run.py sets TLG_RESTART_COMMAND to the launch
-     * command line (the same as Windows). Fall back to run.sh for a source checkout. */
     const char *command=getenv("TLG_RESTART_COMMAND");
-    if (command && *command) {
-        puts("Runtime: restarting through TLG_RESTART_COMMAND");
-        syscall(SYS_close_range, 3u, ~0u, 0u);
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        perror("runtime_restart: exec");
-        _exit(1);
-    }
-    puts("Runtime: restarting through run.sh");
+    if (!command || !*command) { fputs("runtime_restart: TLG_RESTART_COMMAND is not set
+",stderr); _exit(1); }
+    puts("Runtime: restarting through TLG_RESTART_COMMAND");
     syscall(SYS_close_range, 3u, ~0u, 0u);
-    execlp("bash", "bash", "run.sh", (char *)NULL);
+    execl("/bin/sh", "sh", "-c", command, (char *)NULL);
     perror("runtime_restart: exec");
     _exit(1);
 #endif
@@ -1346,7 +1337,7 @@ int main(int argc, char **argv) {
         red_zone_on = 0;
     }
     if (!cpu_only) {
-        char title[128]="God of War III", serial[16]="UNKNOWN", sfo[4096];
+        char title[128]="The Last Guardian", serial[16]="UNKNOWN", sfo[4096];
         uint32_t attributes=0;
         snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0 ? app0 : ".");
         sfo_value(sfo,"TITLE",title,sizeof(title),NULL);

@@ -331,7 +331,7 @@ bool TemporalUpscaler::OnFrameStart() {
             std::fclose(f);
         }
     }
-    // tlg: TLG_RESOLUTION_PATCH=WxH (run.py, another size than 1920x1080) makes the game render
+    // tlg: TLG_RESOLUTION_PATCH=WxH (tlg_run.py, another size than 1920x1080) makes the game render
     // natively at that size. The scene targets only know the 1920x1080 buffers (reduced presets
     // misplace the half-resolution layers), so the upscaler stays off; at 1920x1080 it works.
     static const char* resolution_patch = std::getenv("TLG_RESOLUTION_PATCH");
@@ -349,7 +349,7 @@ bool TemporalUpscaler::OnFrameStart() {
     }
     const auto& settings = TlgSettings::Get();
     // The guest's startup resolution patch remains in effect until restart. Keep the FSR
-    // model at the applied preset while the menu saves the requested one for run.sh.
+    // model at the applied preset while the menu saves the requested one for the next launch.
     const int preset = TlgSettings::RenderPreset();
     if (applied_preset != preset || settings.upscaler == TlgSettings::UpscalerOff) failed = false;
     const bool active = Active();
@@ -478,7 +478,7 @@ void TemporalUpscaler::OnDispatch(u64 cs_hash) {
         game_frame.valid = false;
         return;
     }
-    // tlg: DLSS only runs as DLAA on the game's motion (above); the GoW3 scene path made it shake.
+    // tlg: DLSS only runs as DLAA on the game's motion (above); the generic scene path made it shake.
     // FSR 3.1 native AA runs there too.
     if (cs_hash != trigger_hash || done_this_frame || failed || Scaled() || GameMotion() ||
         TlgSettings::Get().upscaler == TlgSettings::UpscalerDlss) {

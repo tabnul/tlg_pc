@@ -154,7 +154,7 @@ through a patch or HLE. Treat this as research, not a quick switch.
 SotC went from 120 to 240 Hz vblanks: same average FPS, frames over 33 ms 17 -> 8. TLG's
 "unlocked" mode already used 480 Hz (`TLG_VBLANK_HZ=0`); the 30 and 60 FPS modes ran at 60 Hz,
 where a frame that just misses a vblank waits a whole 16.7 ms more (judder below 60 FPS).
-Now the launcher and run.py default to 240 Hz there, and the present thread limits "Unlimited"
+Now the launcher defaults to 240 Hz there, and the present thread limits "Unlimited"
 to the engine rate (`TLG_ENGINE_FPS`, 30 or 60) whenever the vblank is faster (driver.cpp), so
 the game never speeds up. `TLG_VBLANK_HZ=60` gives the old behaviour.
 

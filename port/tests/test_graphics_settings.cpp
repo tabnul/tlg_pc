@@ -62,7 +62,7 @@ int main() {
     assert(v.brightness == 0.10f && v.contrast == 1.20f && v.saturation == 0.80f);
     assert(!TlgSettings::GraphicsNeedRestart());
     assert(v.applied_engine_fps == 240);  // no TLG_ENGINE_FPS: the configured rate
-    _putenv_s("TLG_ENGINE_FPS", "60");    // run.py: the frame rate patch did not apply
+    _putenv_s("TLG_ENGINE_FPS", "60");    // tlg_run.py: the frame rate patch did not apply
     TlgSettings::Load();
     assert(v.engine_fps == 240 && v.applied_engine_fps == 60 && !TlgSettings::GraphicsNeedRestart());
     _putenv_s("TLG_ENGINE_FPS", "");

@@ -107,51 +107,42 @@ def game_preset_matches(ini, values):
 Problem = namedtuple('Problem', 'code detail fatal')
 
 TEXT = {
-    'ps_export': ('Export configuration…', 'Exportar configuração…'),
-    'ps_import': ('Import configuration…', 'Importar configuração…'),
-    'ps_export_title': ('Export configuration', 'Exportar configuração'),
+    'ps_export': 'Export configuration…',
+    'ps_import': 'Import configuration…',
+    'ps_export_title': 'Export configuration',
     'ps_export_hint': ('Saves your graphics options and fixes in a file you can share. It has nothing of '
-                       'your PC (no VRAM budget, window mode, folders or saves).',
-                       'Grava suas opções de gráficos e correções num arquivo que você pode compartilhar. Não leva '
-                       'nada do seu PC (nem orçamento de VRAM, modo de janela, pastas ou saves).'),
-    'ps_name': ('Name', 'Nome'),
-    'ps_what': ('Description', 'Descrição'),
-    'ps_choose_file': ('Choose the file…', 'Escolher o arquivo…'),
-    'ps_cancel': ('Cancel', 'Cancelar'),
-    'ps_filter': ('The Last Guardian configuration (*.tlg-preset.json *.json)',
-                  'Configuração do The Last Guardian (*.tlg-preset.json *.json)'),
-    'ps_save_title': ('Save the configuration', 'Salvar a configuração'),
-    'ps_open_title': ('Choose a configuration file', 'Escolher um arquivo de configuração'),
-    'ps_exported': ('Configuration saved: {path}', 'Configuração salva: {path}'),
-    'ps_export_failed': ('Could not save the file: {detail}', 'Não foi possível salvar o arquivo: {detail}'),
-    'ps_import_title': ('Import configuration', 'Importar configuração'),
-    'ps_import_body': ('“{name}”: {n} options will change.', '“{name}”: {n} opções vão mudar.'),
-    'ps_import_what': ('Description: {what}', 'Descrição: {what}'),
-    'ps_import_nothing': ('“{name}” matches your current options: nothing to change.',
-                          '“{name}” é igual às suas opções atuais: nada a mudar.'),
-    'ps_apply': ('Apply', 'Aplicar'),
-    'ps_close': ('Close', 'Fechar'),
-    'ps_imported': ('Configuration “{name}” applied: {n} options changed.',
-                    'Configuração “{name}” aplicada: {n} opções mudaram.'),
-    'ps_profile_imported': ('Profile: custom ({name})', 'Perfil: personalizado ({name})'),
-    'ps_change': ('{label}: {old} → {new}', '{label}: {old} → {new}'),
-    'ps_more': ('… and {n} more', '… e mais {n}'),
-    'ps_p_unreadable': ('The file cannot be read: {detail}', 'Não foi possível ler o arquivo: {detail}'),
-    'ps_p_too_big': ('This is not a configuration file (too big).', 'Isto não é um arquivo de configuração (grande demais).'),
-    'ps_p_not_json': ('The file is not valid JSON: {detail}', 'O arquivo não é um JSON válido: {detail}'),
-    'ps_p_format': ('This is not an The Last Guardian configuration file (the "format" field should be "tlg-preset").',
-                    'Isto não é um arquivo de configuração do The Last Guardian (o campo "format" deveria ser "tlg-preset").'),
-    'ps_p_version': ('Unsupported file version: {detail}.', 'Versão de arquivo sem suporte: {detail}.'),
-    'ps_p_newer': ('The file is from a newer version of the port ({detail}). Update the launcher first.',
-                   'O arquivo é de uma versão mais nova do port ({detail}). Atualize o launcher antes.'),
-    'ps_p_empty': ('The file has no "settings" or "items" to apply.', 'O arquivo não tem "settings" nem "items" para aplicar.'),
-    'ps_p_game': ('Warning: the file is for another game ({detail}); this port is for ' + GAME + '.',
-                  'Atenção: o arquivo é de outro jogo ({detail}); este port é para ' + GAME + '.'),
-    'ps_p_unknown_item': ('Ignored, unknown option: {detail}', 'Ignorada, opção desconhecida: {detail}'),
-    'ps_p_unknown_setting': ('Ignored, unknown or machine-specific setting: {detail}',
-                             'Ignorada, configuração desconhecida ou da máquina: {detail}'),
-    'ps_p_bad_item': ('Refused, invalid value: {detail}', 'Recusada, valor inválido: {detail}'),
-    'ps_p_bad_setting': ('Refused, invalid value: {detail}', 'Recusada, valor inválido: {detail}'),
+                       'your PC (no VRAM budget, window mode, folders or saves).'),
+    'ps_name': 'Name',
+    'ps_what': 'Description',
+    'ps_choose_file': 'Choose the file…',
+    'ps_cancel': 'Cancel',
+    'ps_filter': 'The Last Guardian configuration (*.tlg-preset.json *.json)',
+    'ps_save_title': 'Save the configuration',
+    'ps_open_title': 'Choose a configuration file',
+    'ps_exported': 'Configuration saved: {path}',
+    'ps_export_failed': 'Could not save the file: {detail}',
+    'ps_import_title': 'Import configuration',
+    'ps_import_body': '“{name}”: {n} options will change.',
+    'ps_import_what': 'Description: {what}',
+    'ps_import_nothing': '“{name}” matches your current options: nothing to change.',
+    'ps_apply': 'Apply',
+    'ps_close': 'Close',
+    'ps_imported': 'Configuration “{name}” applied: {n} options changed.',
+    'ps_profile_imported': 'Profile: custom ({name})',
+    'ps_change': '{label}: {old} → {new}',
+    'ps_more': '… and {n} more',
+    'ps_p_unreadable': 'The file cannot be read: {detail}',
+    'ps_p_too_big': 'This is not a configuration file (too big).',
+    'ps_p_not_json': 'The file is not valid JSON: {detail}',
+    'ps_p_format': 'This is not an The Last Guardian configuration file (the "format" field should be "tlg-preset").',
+    'ps_p_version': 'Unsupported file version: {detail}.',
+    'ps_p_newer': 'The file is from a newer version of the port ({detail}). Update the launcher first.',
+    'ps_p_empty': 'The file has no "settings" or "items" to apply.',
+    'ps_p_game': 'Warning: the file is for another game ({detail}); this port is for ' + GAME + '.',
+    'ps_p_unknown_item': 'Ignored, unknown option: {detail}',
+    'ps_p_unknown_setting': 'Ignored, unknown or machine-specific setting: {detail}',
+    'ps_p_bad_item': 'Refused, invalid value: {detail}',
+    'ps_p_bad_setting': 'Refused, invalid value: {detail}',
 }
 
 
@@ -301,7 +292,7 @@ def parse_preset(data, profile=''):
             problems.append(Problem('bad_item', f'{item_id} = {_short(value)}', False))
     name = data.get('name') if isinstance(data.get('name'), str) else ''
     what = data.get('what') if isinstance(data.get('what'), str) else ''
-    preset = {'id': 'imported', 'names': {'en': name, 'pt': name}, 'what': {'en': what, 'pt': what},
+    preset = {'id': 'imported', 'names': {'en': name}, 'what': {'en': what},
               'exported': str(data.get('exported', '')), 'game': str(game or ''),
               'port_version': str(data.get('port_version', '')), 'profile': profile or name,
               'settings': settings, 'items': items}
@@ -341,7 +332,7 @@ def problem_text(problem, t):
     return t('ps_p_' + problem.code, detail=problem.detail)
 
 
-def _value_text(item, value, t, pt):
+def _value_text(item, value, t):
     if value is None:
         return t('exp_auto')
     if item is None:
@@ -349,13 +340,13 @@ def _value_text(item, value, t, pt):
     if item.vtype == 'bool':
         return t('exp_on') if value == '1' else t('exp_off')
     if item.vtype == 'choice':
-        for v, en, pt_name in item.choices:
+        for v, en in item.choices:
             if v == value:
-                return pt_name if pt else en
+                return en
     return f'{value}{item.unit}'
 
 
-def change_text(change, t, pt):
+def change_text(change, t):
     kind, key, old, new = change
     if kind == 'setting':
         try:
@@ -365,13 +356,13 @@ def change_text(change, t, pt):
         if key == 'frame_rate':
             old, new = t('fps_' + str(old)), t('fps_' + str(new))
             return t('ps_change', label=label, old=old, new=new)
-        return t('ps_change', label=label, old=_value_text(None, old, t, pt), new=_value_text(None, new, t, pt))
+        return t('ps_change', label=label, old=_value_text(None, old, t), new=_value_text(None, new, t))
     item = next(i for i in backports_table.ITEMS if i.id == key)
-    label = item.name[1] if pt else item.name[0]
-    return t('ps_change', label=label, old=_value_text(item, old, t, pt), new=_value_text(item, new, t, pt))
+    label = item.name
+    return t('ps_change', label=label, old=_value_text(item, old, t), new=_value_text(item, new, t))
 
 
-def summary_lines(preset, problems, changes, t, pt, limit=8):
+def summary_lines(preset, problems, changes, t, limit=8):
     """(body, lines) for the import confirmation: counts, the first changes, then every problem."""
     name = preset['profile'] or preset['names']['en'] or '?'
     if changes:
@@ -380,7 +371,7 @@ def summary_lines(preset, problems, changes, t, pt, limit=8):
         body = t('ps_import_nothing', name=name)
     if preset['what']['en']:
         body += '\n' + t('ps_import_what', what=preset['what']['en'])
-    lines = [change_text(c, t, pt) for c in changes[:limit]]
+    lines = [change_text(c, t) for c in changes[:limit]]
     if len(changes) > limit:
         lines.append(t('ps_more', n=len(changes) - limit))
     lines += [problem_text(p, t) for p in problems]

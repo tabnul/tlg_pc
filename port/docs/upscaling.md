@@ -69,5 +69,4 @@ texture memory pressure on 8 GB cards are not helped by a lower Quality preset.
 - `TLG_UPSCALE_PRESET=0..6` picks the preset for one run.
 - `TLG_UPSCALER=off|dlss|fsr3|fsr4`, `TLG_DLAA=0|1` as before.
 
-Credits: the DLSS and FSR integration builds on the upstream TLG port's temporal upscaler;
-see `docs/upscaler.md` for the frame analysis behind it.
+Credits: the DLSS and FSR integration builds on the upstream TLG port's temporal upscaler.

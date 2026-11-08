@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Backups of the game's saves: <user>/savedata copied to <user>/savedata_backups/<time>.
 
-run.py makes one before every start; the launcher lists them and restores one. A restore
+tlg_run.py makes one before every start; the launcher lists them and restores one. A restore
 first backs up the current saves, so it can always be undone.
 """
 import datetime

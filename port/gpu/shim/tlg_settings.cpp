@@ -566,7 +566,7 @@ bool FixedRenderSession() {
 }
 
 int RenderPreset() {
-    // The resolution patch (TLG_RESOLUTION_PATCH, run.py) renders natively: no reduced presets.
+    // The resolution patch (TLG_RESOLUTION_PATCH, tlg_run.py) renders natively: no reduced presets.
     static const bool resolution_patch = std::getenv("TLG_RESOLUTION_PATCH") != nullptr;
     if (resolution_patch) return NativeAA;
     const auto& v = Get();
@@ -576,7 +576,7 @@ int RenderPreset() {
 
 bool ResolutionNeedsRestart() {
     const auto& v = Get();
-    // TAA needs the live path (native guest targets): run.sh selects it on restart.
+    // TAA needs the live path (native guest targets): the launcher selects it on restart.
     return FixedRenderSession() &&
         (v.preset != v.startup_preset || v.output_res != v.startup_output_res ||
          (v.upscaler == UpscalerOff) != (v.startup_upscaler == UpscalerOff) ||
@@ -654,7 +654,7 @@ void Save() {
         std::fprintf(file, "dlss_supported=%d\n", dlss_checked ? int(v.dlss_supported.load()) : dlss_supported_file);
     if (fsr4_supported_file >= 0) std::fprintf(file, "fsr4_supported=%d\n", fsr4_supported_file);
     if (fsr4_default_done) std::fprintf(file, "fsr4_default=1\n");
-    // Read by run.sh at start.
+    // Read by the launcher at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
     std::fclose(file);
@@ -663,7 +663,7 @@ void Save() {
 namespace {
 // The game as shipped: none of the port's filters, the game's own shadows, filtering and textures.
 constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nsharpen=0\nshadow_scale=1\nfov=70\n"
-                                   "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\n";
+                                   "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\nhaze_fringe=100\n";
 
 void ApplyLines(Values& v, const std::string& lines) {
     std::istringstream stream{lines};

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Desempenho de uma sessão a partir de um log do port (TLG_FRAME_STATS=1, uma amostra a cada 5 s):
-FPS, pior quadro e draws por quadro ao longo do tempo. Uso: session_chart.py <log> <saída.png>"""
+"""Performance of a session from a port log (TLG_FRAME_STATS=1, one sample every 5 s):
+FPS, worst frame and draws per frame over time. Usage: session_chart.py <log> <out.png>"""
 import re
 import statistics
 import sys
@@ -31,22 +31,22 @@ a.plot(t, fps, color=accent, lw=1.8)
 a.axhline(30, color=muted, lw=0.8, ls='--')
 a.set_ylim(0, 36)
 a.set_ylabel('FPS')
-a.text(t[-1], 31.2, 'trava do jogo: 30 FPS', ha='right', color=muted, fontsize=9)
+a.text(t[-1], 31.2, 'game cap: 30 FPS', ha='right', color=muted, fontsize=9)
 b.plot(t, worst, color=warn, lw=1.4)
 b.axhline(33.3, color=muted, lw=0.8, ls='--')
 b.set_ylim(0, max(100, max(worst) * 1.1))
-b.set_ylabel('pior quadro (ms)')
-b.text(t[-1], 36, 'quadro ideal: 33,3 ms', ha='right', va='bottom', color=muted, fontsize=9)
+b.set_ylabel('worst frame (ms)')
+b.text(t[-1], 36, 'target frame: 33.3 ms', ha='right', va='bottom', color=muted, fontsize=9)
 c.plot(t, draws, color='#059669', lw=1.4)
-c.set_ylabel('draws/quadro')
-c.set_xlabel('minutos de sessão')
+c.set_ylabel('draws/frame')
+c.set_xlabel('session minutes')
 steady = [f for f in fps[6:]] or fps
 at30 = sum(1 for f in steady if f >= 29.5) / len(steady) * 100
 p99 = statistics.median(p[2] for p in pacing) if pacing else float('nan')
-fig.suptitle('The Last Guardian no PC — sessão de %.0f min (Linux, Vulkan, RTX 2060 6 GB)' % t[-1],
+fig.suptitle('The Last Guardian on PC — %.0f min session (Linux, Vulkan, RTX 2060 6 GB)' % t[-1],
              x=0.07, ha='left', color=ink, fontsize=13, fontweight='bold')
-fig.text(0.07, 0.915, '%.0f%% das janelas de 5 s a 30 FPS · p99 do quadro %.1f ms · %d a %d draws por quadro'
+fig.text(0.07, 0.915, '%.0f%% of 5 s windows at 30 FPS · frame p99 %.1f ms · %d to %d draws per frame'
          % (at30, p99, min(draws), max(draws)), color=muted, fontsize=10)
 fig.tight_layout(rect=(0, 0, 1, 0.92))
 fig.savefig(sys.argv[2], dpi=110)
-print(f'{len(stats)} amostras, {at30:.0f}% a 30 FPS, p99 {p99:.2f} ms, draws {min(draws):.0f}-{max(draws):.0f}')
+print(f'{len(stats)} samples, {at30:.0f}% at 30 FPS, p99 {p99:.2f} ms, draws {min(draws):.0f}-{max(draws):.0f}')

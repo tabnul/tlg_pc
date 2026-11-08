@@ -48,12 +48,12 @@ class FrameRatePatchTests(unittest.TestCase):
         applied, lines, blob = self.prepare(self_dump(text_with(t.MODES['60'])), '60')
         self.assertEqual(applied, '60')
         self.assertIn('Frame rate: 60 FPS mode, 5 patch writes', lines)
-        self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'G3PATCH2', 0, 5))
+        self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'TLGPATCH', 0, 5))
 
     def test_self_dump_of_another_build_stays_at_30(self):
         applied, lines, blob = self.prepare(self_dump(text_with(t.MODES['unlocked'], expected=False)), 'unlocked')
         self.assertEqual(applied, '30')
-        self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'G3PATCH2', 0, 0))
+        self.assertEqual(struct.unpack_from('<8sQQ', blob), (b'TLGPATCH', 0, 0))
 
     def test_unreadable_self_stays_at_30(self):
         applied, lines, _ = self.prepare(t.SELF_MAGIC + bytes(60), '60')
@@ -68,7 +68,7 @@ class FrameRatePatchTests(unittest.TestCase):
 
     def test_30_writes_an_empty_patch_file(self):
         applied, lines, blob = self.prepare(b'', '30')
-        self.assertEqual((applied, struct.unpack_from('<8sQQ', blob)), ('30', (b'G3PATCH2', 0, 0)))
+        self.assertEqual((applied, struct.unpack_from('<8sQQ', blob)), ('30', (b'TLGPATCH', 0, 0)))
 
 
 class ModTitleIdTests(unittest.TestCase):

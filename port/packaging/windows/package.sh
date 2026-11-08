@@ -97,8 +97,7 @@ cp fsr4_shaders/LICENSE-FSR4-v07.txt "$dest/"
 cp -r scripts "$dest/"
 find "$dest" -name __pycache__ -prune -exec rm -r {} +
 cp LICENSE packaging/README-player.md "$dest/"
-printf '%s\r\n' 'Coloque aqui o libSceNgs2.sprx do firmware do seu PS4 (/system/common/lib) para ter som.' \
-    'Put libSceNgs2.sprx from your PS4 firmware (/system/common/lib) here for audio.' > "$dest/system_lib/LEIA-ME.txt"
+printf '%s\r\n' 'Put libSceNgs2.sprx from your PS4 firmware (/system/common/lib) here for audio.' > "$dest/system_lib/README.txt"
 # The release name (vYYYY.MM.DD-<commit> or the pushed v* tag, as the CI publishes it): the launcher
 # shows it and compares it with the latest release.
 if [[ ${GITHUB_REF:-} == refs/tags/v* ]]; then echo "$GITHUB_REF_NAME" > "$dest/VERSION"

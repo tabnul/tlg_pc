@@ -22,12 +22,12 @@ class OpenExternalTests(unittest.TestCase):
             for key in ('LD_LIBRARY_PATH', 'LD_LIBRARY_PATH_ORIG'):
                 if key not in env:
                     os.environ.pop(key, None)
-            self.assertTrue(tlg_run.open_external('https://github.com/tabnul/tlg_pc'))
+            self.assertTrue(tlg_run.open_external('https://github.com/tabnul/the-last-guardian-definitive'))
         return calls[0]
 
     def test_frozen_restores_the_original_library_path(self):
         (argv,), kw = self.opened(True, {'LD_LIBRARY_PATH': '/pkg/_internal', 'LD_LIBRARY_PATH_ORIG': '/usr/local/lib'})
-        self.assertEqual(['xdg-open' if sys.platform != 'darwin' else 'open', 'https://github.com/tabnul/tlg_pc'], argv)
+        self.assertEqual(['xdg-open' if sys.platform != 'darwin' else 'open', 'https://github.com/tabnul/the-last-guardian-definitive'], argv)
         self.assertEqual('/usr/local/lib', kw['env']['LD_LIBRARY_PATH'])
         self.assertNotIn('LD_LIBRARY_PATH_ORIG', kw['env'])
         self.assertTrue(kw['start_new_session'])
