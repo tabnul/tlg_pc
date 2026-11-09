@@ -45,7 +45,6 @@ Control. On some Windows versions it can only be turned back on by reinstalling 
 |---|---|
 | Insert (R3 + L2) | The port's menu |
 | F8 | Switch between DLSS/FSR and the game's own anti-aliasing |
-| F9 | Add a Trico |
 | F10 | FPS counter |
 | F12 | Trico Tricks bar |
 | Esc | Release the mouse |
@@ -157,7 +156,7 @@ The rest:
 - **Trico Tricks** (**F12**): a bar with 30 of Trico's own moves, such as yawn, sneeze, roar, sit
   and roll over, plus the throw-up animation the developers sealed in July 2016. More moves are
   in the menu, but some of them may not work. Trico doesn't always listen.
-- **Extra Tricos** (**F9**): up to 8 more, including the armoured one.
+- **Extra Tricos**: up to 8 more, including the armoured one.
 - **Size:** from half to twice his size.
 - **Eyes:** the hidden disco-eye effect, or any colour.
 - **Free camera:** the developers' own camera.

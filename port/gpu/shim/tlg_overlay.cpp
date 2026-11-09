@@ -946,7 +946,6 @@ void ControlsTab() {
         InfoRow("Options", "Enter");
         InfoRow(TR("Touchpad (photo / pause)"), "Tab / Backspace");
         InfoRow(TR("Release the mouse"), "Esc");
-        InfoRow(TR("Add a Trico (Fun tab)"), "F9");
         const char* env = std::getenv("TLG_KEY_MAP");
         const std::string remap = env && env[0] ? std::string(env) : s.key_map;
         if (!remap.empty()) {
@@ -961,7 +960,7 @@ void ControlsTab() {
 }
 
 // tlg: Fun tab: jump to any start point of the story (as the game's QA menu does, without
-// turning it on) and extra Tricos (also F9). Commands run at the game's next settings tick.
+// turning it on) and extra Tricos. Commands run at the game's next settings tick.
 // The move bar: the working moves of TlgFun::Actions (before "May not work"), one row per group,
 // each an icon (TlgFunIcons, same order) with its name under it and as a tooltip. Fun tab and F12.
 void MakeMoveIcons() {
@@ -1167,7 +1166,7 @@ void FunTab() {
         ImGui::EndTable();
     }
     ImGui::BeginDisabled(tricos >= TlgFun::MaxTricos);
-    if (ImGui::Button(TR("Add a Trico (F9)"))) {
+    if (ImGui::Button(TR("Add a Trico"))) {
         TlgFun::AddTrico();
     }
     ImGui::SameLine();
@@ -2227,17 +2226,6 @@ bool HandleEvent(const SDL_Event& event) {
             std::printf("Jitter mark %d (F6, jitter %s)\n", marks,
                         TlgSettings::Get().jitter ? "on" : "off");
             std::fflush(stdout);
-            return true;
-        }
-        // tlg: F9 adds a Trico (Fun tab).
-        if (down && !event.key.repeat && event.key.key == SDLK_F9) {
-            if (TlgFun::Tricos() >= TlgFun::MaxTricos) {
-                notice_text = "Trico limit (" + std::to_string(TlgFun::MaxTricos) + ")";
-            } else {
-                TlgFun::AddTrico();
-                notice_text = "Trico +1";
-            }
-            notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
             return true;
         }
         // tlg: F12 shows or hides the Fun move bar; the mouse then picks a move.
