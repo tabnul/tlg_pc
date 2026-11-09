@@ -192,7 +192,7 @@ DEFAULT_ENV = {
     # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA, FSR 3.1 or FSR 4 native AA).
     'TLG_JITTER': '1',             # jitter only while DLAA or FSR native AA runs
     'TLG_OBJECT_MOTION': '0',
-    'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (scripts/watch_session.sh heartbeat)
+    'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (read by bench and scene-check tools)
 }
 # The launcher's "Advanced logging", for bug reports. Off the write path only: no TLG_WRITE_LOG=1,
 # which changes the timing of the writes it logs.
@@ -213,6 +213,7 @@ DEFAULT_SETTINGS = {
     'texpack_dir': '',             # texture packs folder; empty = texpack_dir()'s default
     'show_fps': False,
     'menu_music': True,            # the launcher plays the game's own menu tune (sce_sys/snd0.at9)
+    'update_check': True,          # update_check.py: ask GitHub for a newer release at launcher start
     'ui_language': 'en',           # language pack for launcher + in-game menu: en | auto (system) | pack code
     'skip_logos': False,           # scripts/tlg_patches.py --skip-logos; TLG_SKIP_LOGOS=1 too
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
@@ -360,7 +361,7 @@ def save_settings(settings):
 # Messages about the player's game folder the Qt launcher can show; none blocks only as a
 # warning in this port (check_game reports missing files and the unbuilt probe).
 TEXT = {}
-WARNINGS = set()
+WARNINGS = {'old_version'}   # check_game: shown, but Play stays enabled
 
 
 def message(key, **fmt):
@@ -408,9 +409,46 @@ def check_game(game_dir):
     for archive in ('trico_boot.psarc', 'trico_001.psarc', 'trico_002.psarc', 'trico_003.psarc'):
         if not (game / archive).is_file():
             problems.append(('missing', archive))
+    version = game_version(game)
+    if version is not None:
+        problems.append(('old_version', version))
     if not PROBE.is_file():
         problems.append(('not_built', str(PROBE)))
     return problems
+
+
+EBOOT_103_SHA256 = '91dce685be81f8f6bc88097d4fc7a62e97ca08d109621c57fe9371ae125feb3c'  # tlg_patches.py
+_version_cache = {}
+
+
+def game_version(game):
+    """The game's version (APP_VER of sce_sys/param.sfo) when it is older than update 01.03 and
+    eboot.bin is not the plain 1.03 build either; None when the folder is 1.03 or cannot be read.
+    The port is made for the 1.03 eboot: older ones start at 30 FPS without the port's patches.
+    A merged dump can keep the base game's param.sfo, so the eboot hash has the last word."""
+    try:
+        sfo, eboot = game / 'sce_sys' / 'param.sfo', game / 'eboot.bin'
+        stamp = (str(game), sfo.stat().st_mtime_ns, eboot.stat().st_mtime_ns, eboot.stat().st_size)
+    except OSError:
+        return None
+    if stamp in _version_cache:
+        return _version_cache[stamp]
+    result = None
+    try:
+        from prepare import sfo as read_sfo
+        app_ver = str(read_sfo(sfo.read_bytes()).get('APP_VER', ''))
+        if re.fullmatch(r'\d{2}\.\d{2}', app_ver) and app_ver < '01.03':
+            import hashlib
+            digest = hashlib.sha256()
+            with eboot.open('rb') as f:
+                for block in iter(lambda: f.read(1 << 20), b''):
+                    digest.update(block)
+            if digest.hexdigest() != EBOOT_103_SHA256:
+                result = app_ver
+    except (OSError, ValueError, ImportError, struct.error):
+        result = None
+    _version_cache[stamp] = result
+    return result
 
 
 def ngs2_module(settings):

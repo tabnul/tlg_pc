@@ -28,6 +28,7 @@ import logtail  # noqa: E402
 import pad_page  # noqa: E402
 import preset_share  # noqa: E402
 import tlg_run  # noqa: E402
+import update_check  # noqa: E402
 import savemanager  # noqa: E402,F401  (puts scripts/ on sys.path)
 import soundtrack  # noqa: E402
 import practice_save  # noqa: E402
@@ -134,6 +135,9 @@ TEXT = {
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
                  '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60'),
     'skip_logos': 'Skip the boot logos',
+    'update_check': 'Check for new releases at start',
+    'update_available': 'New release {tag} is out: click to open the download page',
+    'old_version': 'Game version {version}: install update 01.03 (the port is made for it)',
     'debug': 'Debug (at start)',
     'bench_title': 'Benchmark',
     'bench_text': ('Measures how fast the game runs on this PC, scene by scene, all by itself: each scene is '
@@ -1083,6 +1087,19 @@ class Launcher:
         page = getattr(self, 'page', 'home')
         self.show_page(page if page in ('home', 'settings', 'video', 'graphics', 'controls', 'logs', 'soundtrack') else 'home')
         self.refresh_status()
+        self.start_update_check()
+
+    def start_update_check(self):
+        """Once per launcher start, in the background; silent when off, offline or not a release."""
+        if getattr(self, 'update_checked', False) or not self.settings.get('update_check', True):
+            return
+        self.update_checked = True
+
+        def work():
+            found = update_check.check(tlg_run.PORT_DIR)
+            if found:
+                self.root.after(0, lambda: (setattr(self, 'update_found', found), self.schedule_home()))
+        threading.Thread(target=work, daemon=True).start()
 
     def build_settings(self):
         """Settings: Game + Audio | Language + Launcher + Debug."""
@@ -1128,6 +1145,10 @@ class Launcher:
         ttk.Button(launcher, text=self.t('home_picture'), command=self.pick_background).pack(side='left')
         ttk.Button(launcher, text=self.t('home_picture_reset'), command=self.reset_background).pack(
             side='left', padx=(6, 0))
+        update_var = tk.BooleanVar(value=bool(self.settings.get('update_check', True)))
+        self.vars['update_check'] = update_var
+        ttk.Checkbutton(launcher, text=self.t('update_check'), variable=update_var,
+                        command=self.changed).pack(side='left', padx=(12, 0))
         debug = section(right, self.t('debug'))
         debug.grid(sticky='ew')
         self.check(debug, 0, 'level_select')
@@ -1667,6 +1688,14 @@ class Launcher:
         c.tag_bind('music', '<Enter>', lambda _: (c.itemconfig(music, fill=ACCENT), c.configure(cursor='hand2')))
         c.tag_bind('music', '<Leave>', lambda _: (c.itemconfig(music, fill=DIM), c.configure(cursor='')))
         c.tag_bind('music', '<Button-1>', lambda _: self.toggle_music(music))
+        # A newer release on GitHub (update_check.py): one clickable line above the status.
+        if getattr(self, 'update_found', None):
+            tag, url = self.update_found
+            note = c.create_text(left, status_y - 24, anchor='w', fill=ACCENT, font=(SERIF, 10),
+                                 tags='update', text=self.t('update_available').format(tag=tag))
+            c.tag_bind('update', '<Enter>', lambda _: c.configure(cursor='hand2'))
+            c.tag_bind('update', '<Leave>', lambda _: c.configure(cursor=''))
+            c.tag_bind('update', '<Button-1>', lambda _: __import__('webbrowser').open(url))
         self.home_items.update(play_box=box, play_label=label)
         # A small square next to PLAY copies the start command (Steam, SteamOS).
         if home:
@@ -2429,13 +2458,14 @@ class Launcher:
     def refresh_status(self):
         problems = tlg_run.check_game(self.settings['game_dir'])
         if problems:
-            text = '; '.join(self.t('not_built') if k == 'not_built' else f"{self.t('missing')}: {d}"
-                             for k, d in problems)
+            text = '; '.join(self.t('not_built') if k == 'not_built'
+                             else self.t('old_version').format(version=d) if k == 'old_version'
+                             else f"{self.t('missing')}: {d}" for k, d in problems)
         else:
             text = self.t('ready')
         audio = self.t('audio_native') if tlg_run.ngs2_module(self.settings) else self.t('audio_builtin')
         self.status.configure(text=f'{text}  {audio}')
-        self.play_button.configure(state='disabled' if problems or self.process else 'normal')
+        self.play_button.configure(state='disabled' if tlg_run.blocking(problems) or self.process else 'normal')
         self.cache_button.configure(state='disabled' if self.process else 'normal')
         self.refresh_home()
 

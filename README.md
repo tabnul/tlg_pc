@@ -29,7 +29,8 @@ No game files are included. You need your own copy, dumped from your own PS4.
 
 1. Download the latest build from [Releases](https://github.com/tabnul/the-last-guardian-definitive/releases).
 2. Put the game files in one folder: CUSA03627 (US) or CUSA03745 (EU) with update 01.03, about
-   25 GB. The full list is in [docs/game-files.md](docs/game-files.md).
+   25 GB. The full list is in [docs/game-files.md](docs/game-files.md). How to dump your own copy:
+   [Dumping your own copy](port/packaging/README-player.md#dumping-your-own-copy).
 3. For audio, copy `libSceNgs2.sprx` from your PS4 firmware into `system_lib/` next to the executable.
 4. Start the launcher, pick the game folder and press **Play**.
 
