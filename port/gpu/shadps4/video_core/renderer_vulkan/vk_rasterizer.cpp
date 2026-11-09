@@ -4073,7 +4073,6 @@ void Rasterizer::UpdateViewportScissorState() const {
     // 1920x1080 and would stretch over the whole frame. Map those draws into the largest 16:9
     // area in the middle. Full-screen pictures (ui_fill_quad) instead cover the frame, evenly
     // enlarged and cropped at the long side, so they get no black bars.
-    // (Idea from SulphurS16/TLG-Port; our own code.)
     if (!regs.IsClipDisabled() && regs.primitive_type == AmdGpu::PrimitiveType::TriangleList &&
         !regs.depth_control.depth_enable && regs.color_buffers[0] && !viewports.empty() &&
         FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
