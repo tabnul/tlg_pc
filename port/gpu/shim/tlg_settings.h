@@ -142,18 +142,18 @@ struct Values {
     std::atomic<int> trico_drool{0};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
-    // Startup: run.py turns them into patches and environment variables; "Apply and restart".
+    // Startup: tlg_run.py turns them into patches and environment variables; "Apply and restart".
     std::atomic<int> render_resolution{0};
     std::atomic<int> engine_fps{120};
     std::atomic<bool> deferred_readback{true};
     std::atomic<bool> stale_readback{true};
     /// The game's own HDR10 output (BT.2020 PQ) when Windows HDR is on (TLG_HDR overrides).
     std::atomic<bool> hdr{true};
-    /// Set before an "Apply and restart"; cleared once the new launch shows the game. run.py
+    /// Set before an "Apply and restart"; cleared once the new launch shows the game. tlg_run.py
     /// restores the previous startup options when a launch never cleared it.
     std::atomic<bool> restart_unconfirmed{false};
     int startup_render_resolution = 0, startup_engine_fps = 120;
-    /// The engine rate this launch really runs at (run.py's TLG_ENGINE_FPS): 60 when the frame
+    /// The engine rate this launch really runs at (tlg_run.py's TLG_ENGINE_FPS): 60 when the frame
     /// rate patch does not apply to this game build.
     std::atomic<int> applied_engine_fps{120};
     bool startup_deferred_readback = true, startup_stale_readback = true, startup_hdr = true;
@@ -162,7 +162,7 @@ struct Values {
     std::atomic<bool> fsr4_invert_jitter{false};
     std::atomic<int> active_render_width{1920}, active_render_height{1080};
     std::atomic<int> output_res{OutputDefault}; ///< index into OutputWidths
-    /// Live resolution and preset changes (run.sh): 0 off by default (startup patch, fastest
+    /// Live resolution and preset changes (launcher): 0 off by default (startup patch, fastest
     /// on the Steam Deck and older GPUs), -1 auto (strong discrete GPUs), 1 on. On restart.
     std::atomic<int> live_resolution{0};
     /// Why FSR 4 cannot run (assets, device features), or null. Set by the renderer.
@@ -178,6 +178,10 @@ struct Values {
     std::atomic<float> mouse_sensitivity{1.0f}, mouse_smoothing{0.5f}, mouse_accel{0.0f}, mouse_deadzone{0.1f};
     /// Keyboard and mouse button remap (TLG_KEY_MAP syntax); written by Load only, read once.
     std::string key_map;
+    /// Sound output (src/runtime_audio.c through tlggpu_audio_settings), applied at the next start:
+    /// the playback device's name (empty = system default) and "always send 7.1".
+    std::string audio_device;
+    std::atomic<bool> audio_surround{false};
 
     /// Startup settings for the explicit TLG_RENDER_RES compatibility patch only.
     int startup_preset = NativeAA;
@@ -215,7 +219,7 @@ void ConfigureUpscalerSupport(bool fsr4, bool fsr411);
 void ConfigureDlssSupport(bool available, const char* problem);
 /// The selected upscaler does not work here: runs FSR 3.1, while Save keeps the selection.
 void FallBackToFsr3();
-/// Startup-patched scene dimensions cannot change until run.sh prepares a new image.
+/// Startup-patched scene dimensions cannot change until the launcher prepares a new image.
 bool FixedRenderSession();
 int RenderPreset();
 bool ResolutionNeedsRestart();

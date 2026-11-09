@@ -23,21 +23,17 @@ Then, in the repository:
 ```bash
 git submodule update --init --recursive
 bash build.sh                      # out/tlg-probe.exe, out/tlg-gpu-capabilities.exe
-TLG_GAME_DIR=F:/path/to/CUSA01623 python run.py
-python launcher/tlg_launcher_win.py
+python launcher/tlg_launcher.py
 bash packaging/windows/package.sh  # dist/tlg-windows-x86_64.zip: The Last Guardian.exe + DLLs
 ```
 
-`run.py` is the Windows `run.sh` (same variables; works from a plain Windows Python too).
 The package freezes the launcher with PyInstaller (a private venv in `out/pyenv`, from a
-python.org Python) into `The Last Guardian.exe`, which also runs `run.py` (`--run`), the
+python.org Python) into `The Last Guardian.exe`, which also runs the
 preparation scripts (`--script`) and the game without the window (`--play`): players need no Python.
 `Play The Last Guardian.exe` (`packaging/windows/play.c`) is a small native program that runs
 `The Last Guardian.exe --play` from its folder and waits for it, for players who want to start the
 game directly with the saved settings.
-`patches.py` applies the built-in patches only to the game build they were checked against
-(CUSA01623 01.02, by eboot.bin sha256; `TLG_FORCE_PATCHES=1` overrides); other builds run unpatched.
-From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
+From a source tree the launcher adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
 `bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux. `package.sh` runs it with
 `TLG_FSR4_MODELS=native` and ships the native FSR 4 model, the two helper shaders and
 `LICENSE-FSR4-v07.txt` (MIT) in `fsr4_shaders\` (packaging idea from @FelipePrado0's SpartanPort,
@@ -61,11 +57,10 @@ The NVIDIA DLSS SDK is NVIDIA's proprietary software under its own license
 (`NVIDIA-DLSS-LICENSE.txt`), not under this repository's license; only the NVIDIA binaries ship,
 and the SDK sources are not part of this repository.
 
-The launcher texts are written in English with the Russian beside them; the other languages
-are in `launcher/tlg_lang.py` (one list per language in the order of `KEYS`; a missing or
-empty text falls back to English). The icon (`launcher/tlg.ico`/`.png`) is drawn by
-`packaging/windows/make_icon.py` and built into `God of War III.exe`, `tlg-probe.exe` (the game
-window) and `tlg-gpu-capabilities.exe`.
+The launcher and menu texts are written in English; other languages come from language packs
+(`launcher/lang/*.json`, see `port/docs/language-packs.md`). The icon (`launcher/tlg.ico`/`.png`)
+is drawn by `packaging/windows/make_icon.py` and built into `The Last Guardian.exe`,
+`tlg-probe.exe` (the game window) and `tlg-gpu-capabilities.exe`.
 
 ## What is different from Linux
 
@@ -78,7 +73,7 @@ window) and `tlg-gpu-capabilities.exe`.
 | Guest thread stacks from `runtime_low_map` | Windows allocates them, fully committed (`pthread_attr_setstacksize`): guest code has no stack probes and would skip the guard page. The main thread stack is 16 MiB committed. |
 | glibc `nanosleep`, monotonic condition variables | High-resolution waitable timers (`compat_sleep_ns`; winpthreads' sleep rounds to 15.6 ms); semaphore deadlines use `CLOCK_REALTIME` (winpthreads rejects monotonic condition variables). |
 | `libtlggpu.so` | `libtlggpu.a`, linked into `tlg-probe.exe` by CMake (`gpu/CMakeLists.txt`), with a manifest for UTF-8 paths and long paths. |
-| `execlp bash run.sh` (in-game restart) | `run.py` puts its command line in `TLG_RESTART_COMMAND`; the new launch waits for the old process (`--after PID`). The launcher keeps the game in a job object. |
+| In-game restart | `tlg_run.py` puts its command line in `TLG_RESTART_COMMAND`; the new launch waits for the old process. The launcher keeps the game in a job object. |
 | Mod overlay with symlinks | Symlinks when allowed (Developer Mode), else junctions for folders and hard links for files. |
 
 Diagnostics added on the way: `TLG_FRAME_DUMP_TRIGGER=<file>` writes the guest display buffer

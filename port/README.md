@@ -1,12 +1,12 @@
-# port/ — loader, runtime e núcleo de vídeo do The Last Guardian para PC
+# port/ — loader, runtime and video core of The Last Guardian for PC
 
-Este diretório tem o código que roda o `eboot.bin` original do TLG (PS4, CUSA03627 v1.03) no PC:
+This folder holds the code that runs TLG's original `eboot.bin` (PS4, CUSA03627 v1.03) on PC:
 
-- `scripts/`: preparação e link do eboot com os módulos do jogo e do console (`prepare.py`, `link_modules.py`);
-- `src/`: loader (`probe.c`) e runtime que reimplementa as bibliotecas do PS4 (`runtime_*.c`, `runtime_tlg.c`);
-- `gpu/`: tradução de GPU para Vulkan (núcleo do shadPS4, mais o overlay/menu em `gpu/shim/`);
-- `launcher/`: launcher gráfico (`tlg_launcher.py`) e núcleo de execução (`tlg_run.py`).
+- `scripts/`: prepares and links the eboot with the game's and the console's modules (`prepare.py`, `link_modules.py`);
+- `src/`: the loader (`probe.c`) and the runtime that reimplements the PS4 libraries (`runtime_*.c`, `runtime_tlg.c`);
+- `gpu/`: GPU translation to Vulkan (the shadPS4 core, plus the overlay/menu in `gpu/shim/`);
+- `launcher/`: the graphical launcher (`tlg_launcher.py`) and the run core (`tlg_run.py`).
 
-Documentação, status e instruções de uso estão no [README principal](../README.md).
-A origem do código (gow3_pc → bloodborne_pc, shadPS4) e a licença (GPL-2.0-or-later) estão em
-[UPSTREAM.md](UPSTREAM.md) e [LICENSE](LICENSE).
+Documentation, status and usage are in the [main README](../README.md).
+Where the code comes from (gow3_pc → bloodborne_pc, shadPS4) and the license (GPL-2.0-or-later) are in
+[UPSTREAM.md](UPSTREAM.md) and [LICENSE](LICENSE).

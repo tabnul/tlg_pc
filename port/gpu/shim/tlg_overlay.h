@@ -51,7 +51,7 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 
 /// The game's save dialogs (sceSaveDataDialog). kind: 1 save, 2 load, 3 delete (0: a save made
 /// without a dialog). Rows carry the game's text for each save; the dates, sizes and every other
-/// word are the port's, in the menu language (pt_BR / en_US).
+/// word are the port's, in the menu language (English, or the language pack).
 struct SaveRow {
     std::string title, subtitle, detail;
     s64 mtime = 0;  // 0: unknown

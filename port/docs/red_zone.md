@@ -186,4 +186,4 @@ CUSA03627 1.03, Ryzen 5700X3D, Linux, from the player's save (cross pressed at 3
   - the counts;
   - whether the image has `.eh_frame_hdr` tables (all PS4 SDK binaries we have seen do);
   - each port's environment prefix (`ISS_`, `GR2_`, ...);
-  - the launcher policy (`infamous_run.py`).
+  - the launcher policy (`tlg_run.py`).

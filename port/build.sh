@@ -115,7 +115,7 @@ fi
 "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -mgeneral-regs-only -c src/isa_emulate.c -o out/isa_emulate.o
 "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc src/probe.c "${runtime[@]}" src/input_timing.c src/cpu_check.c src/vulkan_smoke.c out/isa_emulate.o src/isa_rewrite.c out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/tlg-probe
 echo "Built $PWD/out/tlg-probe"
-# GPU check for run.sh (live_resolution=auto): links only the Vulkan loader.
+# GPU check for the launcher (live_resolution=auto): links only the Vulkan loader.
 "$CC" -std=c11 -O2 -Wall -Wextra -Werror tools/gpu_capabilities.c "${libraries[@]}" -o out/tlg-gpu-capabilities
 # Controller helper for the launcher's Controller page: links only SDL3.
 "$CC" -std=c11 -O2 -Wall -Wextra -Werror "${includes[@]}" tools/pad_tool.c "${libraries[@]}" -o out/tlg-pad-tool

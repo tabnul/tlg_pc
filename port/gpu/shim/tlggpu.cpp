@@ -289,7 +289,7 @@ extern "C" int tlggpu_init(const TlgGpuConfig* config) {
     if (config->user_dir) setenv("TLG_GPU_USER_DIR", config->user_dir, 0);
 #endif
     Core::Emulator::FillElfInfo(*config);
-    const std::string title = config->title ? config->title : "God of War III";
+    const std::string title = config->title ? config->title : "The Last Guardian";
     const s32 width = config->width, height = config->height;
     g_window_thread = std::thread([title, width, height] {
         Common::SetCurrentThreadName("tlg:window");
@@ -433,6 +433,12 @@ extern "C" void tlggpu_overlay_notice(const char* text, float seconds) {
 
 extern "C" int tlggpu_overlay_captures_input(void) {
     return TlgOverlay::CapturesInput() ? 1 : 0;
+}
+
+extern "C" void tlggpu_audio_settings(TlgGpuAudioSettings* out) {
+    const auto& s = TlgSettings::Get();
+    out->surround = s.audio_surround ? 1 : 0;
+    std::snprintf(out->device, sizeof(out->device), "%s", s.audio_device.c_str());
 }
 
 extern "C" void tlggpu_input_settings(TlgGpuInputSettings* out) {

@@ -80,8 +80,7 @@ cp packaging/linux/install_desktop.sh "$dest/"
 # shows it and compares it with the latest release.
 if [[ ${GITHUB_REF:-} == refs/tags/v* ]]; then echo "$GITHUB_REF_NAME" > "$dest/VERSION"
 elif [[ -n ${GITHUB_SHA:-} ]]; then printf 'v%s-%s\n' "$(date -u +%Y.%m.%d)" "${GITHUB_SHA::7}" > "$dest/VERSION"; fi
-cat > "$dest/system_lib/LEIA-ME.txt" <<'TXT'
-Coloque aqui o libSceNgs2.sprx do firmware do seu PS4 (/system/common/lib) para ter som.
+cat > "$dest/system_lib/README.txt" <<'TXT'
 Put libSceNgs2.sprx from your PS4 firmware (/system/common/lib) here for audio.
 TXT
 bash packaging/check_package.sh "$dest"

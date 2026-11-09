@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""The Last Guardian launcher (Tkinter, Linux and Windows), in pt_BR and en_US.
+"""The Last Guardian launcher (Tkinter, Linux and Windows), in English plus language packs.
 
 Game folder, game and interface language, display, FPS overlay, VRAM budget and native audio;
 Play starts the game through tlg_run.py (the same code path as run_tlg.sh) and shows its log.
@@ -19,7 +19,11 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Started as a script this module is __main__; without this alias `import tlg_launcher` (langpack)
+# would load a second copy, and the language pack would change that copy's TEXT, not the one shown.
+sys.modules.setdefault('tlg_launcher', sys.modules[__name__])
 import backports_table  # noqa: E402
+import langpack  # noqa: E402
 import logtail  # noqa: E402
 import pad_page  # noqa: E402
 import preset_share  # noqa: E402
@@ -36,498 +40,374 @@ SERIF = 'Georgia' if sys.platform == 'win32' else 'serif'
 HOME_SIZE = (1100, 620)
 BACKGROUND_NAMES = ('launcher_background.png', 'launcher_background.jpg')
 
+# The port's name stays English in every language pack, like a brand name.
+EDITION = 'Definitive Edition'
+TITLE = f'The Last Guardian — {EDITION}'
+
 TEXT = {
-    'title': ('The Last Guardian — PC', 'The Last Guardian — PC'),
-    'home_settings': ('Settings', 'Configurações'),
-    'home_graphics': ('Graphics', 'Gráficos'),
-    'home_advanced': ('Advanced', 'Avançado'),
-    'home_controller': ('Controller', 'Controle'),
-    'home_keys': ('Keys & mouse', 'Teclas e mouse'),
-    'home_mods': ('Mods & cheats', 'Mods e cheats'),
-    'home_video': ('Video', 'Vídeo'),
-    'home_controls': ('Controls', 'Controles'),
-    'mouse_section': ('Mouse', 'Mouse'),
-    'memory': ('Video memory', 'Memória de vídeo'),
-    'display': ('Display', 'Tela'),
-    'launcher_section': ('Launcher', 'Launcher'),
-    'scene_section': ('Display, shadows and textures', 'Tela, sombras e texturas'),
-    'home_logs': ('Debug', 'Depuração'),
-    'tab_log': ('Log', 'Log'),
-    'tab_bench': ('Benchmark', 'Benchmark'),
-    'home_soundtrack': ('Soundtrack', 'Trilha sonora'),
+    'home_settings': 'Settings',
+    'home_graphics': 'Graphics',
+    'home_advanced': 'Advanced',
+    'home_controller': 'Controller',
+    'home_keys': 'Keys & mouse',
+    'home_mods': 'Mods & cheats',
+    'home_video': 'Video',
+    'home_controls': 'Controls',
+    'mouse_section': 'Mouse',
+    'memory': 'Video memory',
+    'display': 'Display',
+    'launcher_section': 'Launcher',
+    'scene_section': 'Display, shadows and textures',
+    'home_logs': 'Debug',
+    'tab_log': 'Log',
+    'tab_bench': 'Benchmark',
+    'home_soundtrack': 'Soundtrack',
     'soundtrack_hint': ("All the game's music, read from your own game folder. The game has no track titles: each piece is "
                         "named by the stage it plays in, with the game's own working name where it has one. The music is "
-                        "mixed in surround: pick Stereo for two speakers or headphones, 5.1 surround for a surround set.",
-                        "Toda a música do jogo, lida da sua própria pasta do jogo. O jogo não tem títulos de faixas: cada peça "
-                        "leva o nome da fase em que toca, com o nome de trabalho do próprio jogo quando existe. A música é "
-                        "mixada em surround: escolha Estéreo para duas caixas ou fones, Surround 5.1 para um sistema surround."),
-    'soundtrack_piece': ('Piece {n}', 'Peça {n}'),
-    'soundtrack_length': ('Length', 'Duração'),
-    'soundtrack_play': ('Play', 'Tocar'),
-    'soundtrack_pause': ('Pause', 'Pausar'),
-    'soundtrack_next': ('Next', 'Próxima'),
-    'soundtrack_stop': ('Stop', 'Parar'),
-    'soundtrack_volume': ('Volume', 'Volume'),
-    'soundtrack_speakers': ('Speakers', 'Caixas de som'),
-    'soundtrack_stereo': ('Stereo', 'Estéreo'),
-    'soundtrack_surround': ('5.1 surround', 'Surround 5.1'),
-    'soundtrack_loading': ('Reading the music from the game folder…', 'Lendo a música da pasta do jogo…'),
-    'soundtrack_count': ('{count} pieces, {minutes} minutes', '{count} peças, {minutes} minutos'),
-    'soundtrack_none': ('No music found. Set the game folder in Settings first.',
-                        'Nenhuma música encontrada. Defina primeiro a pasta do jogo nas Configurações.'),
-    'soundtrack_failed': ('This piece could not be played.', 'Esta peça não pôde ser tocada.'),
-    'home_start': ('Start at…', 'Começar em…'),
-    'start_title': ('Start at a point', 'Começar num ponto'),
-    'start_hint': ("Starts the game at the chosen start point: it continues your save, then jumps there.\n\nYour saves are copied before the game starts and put back when it closes, so nothing from this run is kept. If the launcher or the PC stops first, the next launcher start puts them back.",
-                   "Inicia o jogo no ponto escolhido: continua o seu save e depois salta para lá.\n\nOs seus saves são copiados antes do jogo iniciar e devolvidos quando ele fecha; nada desta sessão fica. Se o launcher ou o PC parar antes, o próximo início do launcher devolve os saves."),
-    'start_stage': ('Stage', 'Fase'),
-    'start_point': ('Start point', 'Ponto de início'),
-    'start_go': ('Start here', 'Começar aqui'),
-    'start_note': ('Practice run: your saves are put back when the game closes. Use Play for normal play.',
-                   'Sessão de treino: os seus saves voltam quando o jogo fecha. Use Jogar para jogar normalmente.'),
-    'start_no_save': ('Needs a save to continue from. Play normally until the game has saved once, then come back.',
-                      'Precisa de um save para continuar. Jogue normalmente até o jogo salvar uma vez e volte.'),
-    'start_starting': ('Practice start at {point}: saves copied.', 'Início de treino em {point}: saves copiados.'),
-    'start_restored': ('Your saves from before the practice start are back.',
-                       'Os seus saves de antes do início de treino voltaram.'),
+                        "mixed in surround: pick Stereo for two speakers or headphones, 5.1 surround for a surround set."),
+    'soundtrack_piece': 'Piece {n}',
+    'soundtrack_length': 'Length',
+    'soundtrack_play': 'Play',
+    'soundtrack_pause': 'Pause',
+    'soundtrack_next': 'Next',
+    'soundtrack_stop': 'Stop',
+    'soundtrack_volume': 'Volume',
+    'soundtrack_speakers': 'Speakers',
+    'soundtrack_stereo': 'Stereo',
+    'soundtrack_surround': '5.1 surround',
+    'soundtrack_loading': 'Reading the music from the game folder…',
+    'soundtrack_count': '{count} pieces, {minutes} minutes',
+    'soundtrack_none': 'No music found. Set the game folder in Settings first.',
+    'soundtrack_failed': 'This piece could not be played.',
+    'home_start': 'Start at…',
+    'start_title': 'Start at a point',
+    'start_hint': "Starts the game at the chosen start point: it continues your save, then jumps there.\n\nYour saves are copied before the game starts and put back when it closes, so nothing from this run is kept. If the launcher or the PC stops first, the next launcher start puts them back.",
+    'start_stage': 'Stage',
+    'start_point': 'Start point',
+    'start_go': 'Start here',
+    'start_note': 'Practice run: your saves are put back when the game closes. Use Play for normal play.',
+    'start_no_save': 'Needs a save to continue from. Play normally until the game has saved once, then come back.',
+    'start_starting': 'Practice start at {point}: saves copied.',
+    'start_restored': 'Your saves from before the practice start are back.',
     'start_restore_failed': ('Could not put your saves back yet ({error}). They are safe in {path}; the '
-                             'launcher tries again at its next start.',
-                             'Ainda não foi possível devolver os saves ({error}). Eles estão seguros em {path}; '
-                             'o launcher tenta de novo no próximo início.'),
-    'home_quit': ('Quit', 'Sair'),
-    'home_back': ('‹  Back', '‹  Voltar'),
-    'home_picture': ('Background picture…', 'Imagem de fundo…'),
-    'home_picture_reset': ('Default picture', 'Imagem padrão'),
-    'home_cache': ('Clear shader cache', 'Limpar cache de shaders'),
+                             'launcher tries again at its next start.'),
+    'home_quit': 'Quit',
+    'home_back': '‹  Back',
+    'home_picture': 'Background picture…',
+    'home_picture_reset': 'Default picture',
+    'home_cache': 'Clear shader cache',
     'copy_command_tip': ('Copies the command that starts the game with the current settings, without this '
-                         'launcher (for use in, for instance, Steam: Add a Non-Steam Game).',
-                         'Copia o comando que inicia o jogo com as configurações atuais, sem este launcher '
-                         '(para usar, por exemplo, no Steam: Adicionar jogo não-Steam).'),
-    'copy_command': ('Start command copied: paste it in Steam (Add a Non-Steam Game > Properties > Target).',
-                     'Comando de início copiado: cole no Steam (Adicionar jogo não-Steam > Propriedades > Destino).'),
-    'home_music_on': ('♪ Music on', '♪ Música ligada'),
-    'home_music_off': ('♪ Music off', '♪ Música desligada'),
-    'home_running': ('Running', 'Rodando'),
-    'game': ('Game', 'Jogo'),
-    'game_dir': ('Game folder', 'Pasta do jogo'),
-    'system_lib_dir': ('Console system modules', 'Módulos do sistema do console'),
-    'browse': ('Browse…', 'Procurar…'),
-    'texpack_dir': ('Texture packs folder (empty = default)', 'Pasta dos pacotes de texturas (vazio = padrão)'),
-    'texture_pack': ('Texture pack', 'Pacote de texturas'),
-    'texture_pack_off': ('Off (original textures)', 'Desligado (texturas originais)'),
+                         'launcher (for use in, for instance, Steam: Add a Non-Steam Game).'),
+    'copy_command': 'Start command copied: paste it in Steam (Add a Non-Steam Game > Properties > Target).',
+    'home_music_on': '♪ Music on',
+    'home_music_off': '♪ Music off',
+    'home_running': 'Running',
+    'game': 'Game',
+    'game_dir': 'Game folder',
+    'system_lib_dir': 'Console system modules',
+    'browse': 'Browse…',
+    'texpack_dir': 'Texture packs folder (empty = default)',
+    'texture_pack': 'Texture pack',
+    'texture_pack_off': 'Off (original textures)',
     'texture_pack_hint': ('Default: off. Packs are folders with an index.txt in the texture packs folder; '
                           'make one with ps4-texturepack-generator (docs/texture-pack.md). Takes effect at the next start '
-                          '(switch live in the in-game menu, Image tab).',
-                          'Padrão: desligado. Pacotes são pastas com um index.txt na pasta dos pacotes; '
-                          'crie um com ps4-texturepack-generator (docs/texture-pack.md). Vale no próximo início '
-                          '(troque ao vivo no menu do jogo, aba Imagem).'),
-    'language': ('Language', 'Idioma'),
-    'game_language': ('Game language (voice and text)', 'Idioma do jogo (voz e texto)'),
-    'ui_language': ('Interface language', 'Idioma da interface'),
-    'auto': ('Automatic (system)', 'Automático (sistema)'),
-    'video': ('Video', 'Vídeo'),
-    'image': ('Image', 'Imagem'),
-    'display_mode': ('Display mode', 'Modo de exibição'),
-    'Windowed': ('Windowed', 'Janela'),
-    'Borderless': ('Borderless window', 'Janela sem borda'),
-    'Fullscreen': ('Fullscreen', 'Tela cheia'),
-    'vsync': ('VSync', 'VSync'),
-    'frame_rate': ('Frame rate (experimental)', 'Taxa de quadros (experimental)'),
-    'resolution': ('Resolution', 'Resolução'),
-    'resolution_hint': ('Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
-                        'Renderizado nativamente; mais largo que 16:9 mostra mais da cena e leva o HUD às bordas'),
-    'fps_30': ('30 FPS (as on PS4)', '30 FPS (como no PS4)'),
-    'fps_60': ('60 FPS', '60 FPS'),
-    'fps_unlocked': ('Unlocked (up to the display)', 'Livre (até a taxa do monitor)'),
+                          '(switch live in the in-game menu, Image tab).'),
+    'language': 'Language',
+    'game_language': 'Game language (voice and text)',
+    'ui_language': 'Launcher and menu language',
+    'ui_language_hint': ('Language packs: port/docs/language-packs.md. A pack can leave texts out; those stay '
+                         'English. The in-game menu follows at the next game start.'),
+    'auto': 'Automatic (system)',
+    'video': 'Video',
+    'image': 'Image',
+    'display_mode': 'Display mode',
+    'Windowed': 'Windowed',
+    'Borderless': 'Borderless window',
+    'Fullscreen': 'Fullscreen',
+    'vsync': 'VSync',
+    'frame_rate': 'Frame rate (experimental)',
+    'resolution': 'Resolution',
+    'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
+    'fps_30': '30 FPS (as on PS4)',
+    'fps_60': '60 FPS',
+    'fps_unlocked': 'Unlocked (up to the display)',
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
-                 '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60',
-                 '60/livre alteram o eboot 1.03 na memória. Livre reduz a taxa base em cerca de 10 FPS '
-                 'em relação a 60 no mesmo lugar; escolha 60, a não ser que seu PC rode bem acima de 60'),
-    'skip_logos': ('Skip the boot logos', 'Pular os logotipos de abertura'),
-    'debug': ('Debug (at start)', 'Depuração (ao iniciar)'),
-    'bench_title': ('Benchmark', 'Benchmark'),
+                 '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60'),
+    'skip_logos': 'Skip the boot logos',
+    'debug': 'Debug (at start)',
+    'bench_title': 'Benchmark',
     'bench_text': ('Measures how fast the game runs on this PC, scene by scene, all by itself: each scene is '
                    'loaded from a clean save, the camera stands still, and the frame rate of every second is '
                    'recorded. Your own saves are set aside first and put back afterwards.\n\n'
                    'Hands off while it runs: the game opens full screen for every scene, about a minute each. '
                    'The result is a single .zip report file — attach it to a GitHub issue so the developers can '
-                   'see exactly how each scene runs on your PC.',
-                   'Mede a velocidade do jogo neste PC, cena por cena, sozinho: cada cena é carregada de um '
-                   'save limpo, a câmera fica parada e a taxa de quadros de cada segundo é registrada. Seus '
-                   'próprios saves são guardados antes e devolvidos depois.\n\n'
-                   'Não mexa enquanto roda: o jogo abre em tela cheia para cada cena, cerca de um minuto cada. '
-                   'O resultado é um único arquivo .zip — anexe-o a uma issue no GitHub para os desenvolvedores '
-                   'verem exatamente como cada cena roda no seu PC.'),
-    'bench_full': ('All scenes ({count})', 'Todas as cenas ({count})'),
-    'bench_pick': ('Pick scenes from the list', 'Escolher cenas da lista'),
-    'bench_custom': ('Custom list (paste)', 'Lista própria (colar)'),
+                   'see exactly how each scene runs on your PC.'),
+    'bench_full': 'All scenes ({count})',
+    'bench_pick': 'Pick scenes from the list',
+    'bench_custom': 'Custom list (paste)',
     'bench_custom_hint': ('One scene per line, as stage:start point. The list to run usually comes from a '
-                          'developer on GitHub; the lines below are examples.',
-                          'Uma cena por linha, como fase:ponto de início. A lista geralmente vem de um '
-                          'desenvolvedor no GitHub; as linhas abaixo são exemplos.'),
-    'bench_seconds': ('Seconds measured per scene', 'Segundos medidos por cena'),
-    'bench_estimate': ('Estimated time: about {minutes} min for {count} scenes',
-                       'Tempo estimado: cerca de {minutes} min para {count} cenas'),
-    'bench_pilot': ('Let Trico drive (Tricopilot)', 'Deixar o Trico dirigir (Tricopiloto)'),
-    'bench_pilot_help': (
-        "Every scene is measured with Trico walking around instead of standing still, so the "
+                          'developer on GitHub; the lines below are examples.'),
+    'bench_seconds': 'Seconds measured per scene',
+    'bench_estimate': 'Estimated time: about {minutes} min for {count} scenes',
+    'bench_pilot': 'Let Trico drive (Tricopilot)',
+    'bench_pilot_help': ("Every scene is measured with Trico walking around instead of standing still, so the "
         "numbers include his animation, his physics and the camera following him. Tricopilot is the "
         "developers' own debug tool, still in the game: they left the game running by itself for "
         "hours with it. Keep it off to compare with other people's runs, and say it was on when you "
-        "share a run with it (the report notes it too).",
-        'Cada cena é medida com o Trico andando em vez de parado, então os números incluem a '
-        'animação dele, a física e a câmera que o segue. O Tricopiloto é a ferramenta de depuração '
-        'dos próprios desenvolvedores, ainda presente no jogo. Deixe desligado para comparar com as '
-        'medições de outras pessoas (o relatório também anota isso).'),
-    'bench_pilot_cam': ('Camera', 'Câmera'),
-    'bench_cam_near': ('Near', 'Perto'),
-    'bench_cam_middle': ('Middle', 'Médio'),
-    'bench_cam_far': ('Far', 'Longe'),
-    'bench_cam_game': ('Game camera', 'Câmera do jogo'),
-    'bench_pilot_cam_help': (
-        "Which camera watches Trico while he drives. Near keeps him big in the picture and is the "
+        "share a run with it (the report notes it too)."),
+    'bench_pilot_cam': 'Camera',
+    'bench_cam_near': 'Near',
+    'bench_cam_middle': 'Middle',
+    'bench_cam_far': 'Far',
+    'bench_cam_game': 'Game camera',
+    'bench_pilot_cam_help': ("Which camera watches Trico while he drives. Near keeps him big in the picture and is the "
         "best of the four in open scenes. Middle is the one the developers' tool picks itself: a "
         "classic top-down view, but in a narrow or roofed place the camera can end up inside the "
         "rock. Far looks down on the whole area, lovely in a valley and useless indoors, because "
         "Trico becomes a dot. Game camera leaves the normal camera alone, so it keeps following the "
-        "boy while Trico wanders off. It only changes what you see, not what is measured.",
-        'Qual câmera acompanha o Trico enquanto ele dirige. Perto o mantém grande na tela e é a '
-        'melhor das quatro em cenas abertas. Médio é a que a ferramenta dos desenvolvedores escolhe '
-        'sozinha: uma vista de cima clássica, mas num lugar estreito ou coberto a câmera pode '
-        'acabar dentro da rocha. Longe mostra a área inteira, bonito num vale e inútil em '
-        'interiores. Câmera do jogo não mexe na câmera normal, que continua seguindo o menino. '
-        'Só muda o que você vê, não o que é medido.'),
-    'bench_start': ('Start', 'Iniciar'),
-    'bench_stop': ('Stop', 'Parar'),
-    'bench_open_folder': ('Open the report folder', 'Abrir a pasta do relatório'),
-    'bench_running': ('Scene {index} of {total}: {point}', 'Cena {index} de {total}: {point}'),
-    'bench_done': ('Done. Report: {name}', 'Concluído. Relatório: {name}'),
-    'bench_stopped': ('Stopped. A partial report was still written.',
-                      'Parado. Um relatório parcial foi gravado mesmo assim.'),
-    'bench_bad_points': ('Not in the scene list: {points}', 'Fora da lista de cenas: {points}'),
-    'bench_no_points': ('The custom list is empty.', 'A lista própria está vazia.'),
-    'bench_game_running': ('Close the game first.', 'Feche o jogo primeiro.'),
-    'bench_busy': ('A benchmark is running.', 'Um benchmark está em andamento.'),
-    'level_select': ('Level select and QA menu', 'Seleção de fases e menu de QA'),
-    'debug_logging': ('Advanced logging (for bug reports)', 'Registro avançado (para relatar erros)'),
+        "boy while Trico wanders off. It only changes what you see, not what is measured."),
+    'bench_start': 'Start',
+    'bench_stop': 'Stop',
+    'bench_open_folder': 'Open the report folder',
+    'bench_running': 'Scene {index} of {total}: {point}',
+    'bench_done': 'Done. Report: {name}',
+    'bench_stopped': 'Stopped. A partial report was still written.',
+    'bench_bad_points': 'Not in the scene list: {points}',
+    'bench_no_points': 'The custom list is empty.',
+    'bench_game_running': 'Close the game first.',
+    'bench_busy': 'A benchmark is running.',
+    'level_select': 'Level select and QA menu',
+    'debug_logging': 'Advanced logging (for bug reports)',
     'debug_logging_hint': ('Can cost some FPS and makes the log bigger. Turn it on, make the problem happen, close the game, '
-                           'send the newest file from the Logs folder, then turn it off again.',
-                           'Pode reduzir um pouco o FPS e deixa o log maior. Ligue, faça o problema acontecer, feche o jogo, '
-                           'envie o arquivo mais recente da Pasta de logs e depois desligue.'),
+                           'send the newest file from the Logs folder, then turn it off again.'),
     'debug_hint': ('Level select: hold L1 while the title menu closes (Continue/New Game). QA menu: in game, hold L1 and press L3. '
-                   'GoldHEN patches by illusionyy and DanielSvoboda.',
-                   'Seleção de fases: segure L1 enquanto o menu inicial fecha (Continuar/Novo jogo). Menu de QA: no jogo, segure L1 e aperte L3. '
-                   'Patches GoldHEN de illusionyy e DanielSvoboda.'),
-    'show_fps': ('Show FPS overlay at start (F10 toggles)', 'Mostrar overlay de FPS ao iniciar (F10 alterna)'),
-    'vram': ('Texture cache budget (MB of VRAM)', 'Orçamento do cache de texturas (MB de VRAM)'),
+                   'GoldHEN patches by illusionyy and DanielSvoboda.'),
+    'show_fps': 'Show FPS overlay at start (F10 toggles)',
+    'vram': 'Texture cache budget (MB of VRAM)',
     'vram_hint': ('7000 suits every card with 8 GB or more: keep it there, also on a big card. A low budget throws textures away all the time; higher is not faster: the cache is only cleaned when it gets full, '
                   'so a high budget lets old textures pile up and slows the game down over a long session. '
-                  'Only lower it if your card has less than 8 GB of VRAM (6 GB: 5600, 4 GB: 3700). This is video card memory (VRAM), not RAM.',
-                  '7000 serve para toda placa com 8 GB ou mais: deixe assim, também numa placa grande. Um orçamento baixo descarta texturas o tempo todo; mais alto não é mais rápido: o cache só é limpo quando enche, '
-                  'então um orçamento alto deixa texturas antigas se acumularem e deixa o jogo mais lento numa sessão longa. '
-                  'Só diminua se a sua placa tiver menos de 8 GB de VRAM (6 GB: 5600, 4 GB: 3700). É a memória da placa de vídeo (VRAM), não a RAM.'),
-    'texture_cleanup': ('Clean up textures after each load',
-                        'Limpar texturas após cada carregamento'),
-    'arena_release': ('Debug: give back freed buffer memory', 'Debug: devolver memória de buffer liberada'),
-    'arena_release_hint': ('Since v0.5.2: when the game frees memory, its graphics card copy goes too. Test switch (issue #38): turn it off to check whether a problem started with v0.5.2. Off is the behaviour before v0.5.2. From the Shadow of the Colossus PC port (@AjncSystem, @Oussama268). Also in the in-game menu (Insert → Performance).', 'Desde a v0.5.2: quando o jogo libera memória, a cópia na placa de vídeo vai junto. Chave de teste (issue #38): desligue para ver se um problema começou na v0.5.2. Desligado é o comportamento antes da v0.5.2. Do port de Shadow of the Colossus para PC (@AjncSystem, @Oussama268). Também no menu do jogo (Insert → Desempenho).'),
-    'gc_live_budget': ('Debug: texture cleanup follows the driver', 'Debug: limpeza de texturas segue o driver'),
-    'gc_live_budget_hint': ('Since v0.5.2: texture cleanup starts at the video memory the driver offers now, never below the start-up limits. Test switch (issue #38): off uses only the start-up limits (the behaviour before v0.5.2), so textures are cleaned up sooner. Also in the in-game menu (Insert → Performance).', 'Desde a v0.5.2: a limpeza de texturas começa pela memória de vídeo que o driver oferece agora, nunca abaixo dos limites do início. Chave de teste (issue #38): desligado usa só os limites do início (o comportamento antes da v0.5.2), então as texturas são limpas mais cedo. Também no menu do jogo (Insert → Desempenho).'),
-    'keep_gpu_textures': ('Keep GPU-only textures', 'Manter texturas só na GPU'),
-    'keep_gpu_textures_hint': ('Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often. Also in the in-game menu (Insert → Performance).',
-                               'Mantém uma textura desenhada pela GPU enquanto a única cópia correta está na GPU (uma escrita do jogo logo ao lado impede a cópia de volta), até a memória de vídeo quase encher. Sem isso, a limpeza pode descartar essa imagem e o jogo recebe dados antigos. Do SpartanPort (@maze1377). Ligado por padrão; desligue se a memória de vídeo encher com mais frequência. Também no menu do jogo (Insert → Desempenho).'),
+                  'Only lower it if your card has less than 8 GB of VRAM (6 GB: 5600, 4 GB: 3700). This is video card memory (VRAM), not RAM.'),
+    'texture_cleanup': 'Clean up textures after each load',
+    'arena_release': 'Debug: give back freed buffer memory',
+    'arena_release_hint': 'Since v0.5.2: when the game frees memory, its graphics card copy goes too. Test switch (issue #38): turn it off to check whether a problem started with v0.5.2. Off is the behaviour before v0.5.2. From the Shadow of the Colossus PC port (@AjncSystem, @Oussama268). Also in the in-game menu (Insert → Performance).',
+    'gc_live_budget': 'Debug: texture cleanup follows the driver',
+    'gc_live_budget_hint': 'Since v0.5.2: texture cleanup starts at the video memory the driver offers now, never below the start-up limits. Test switch (issue #38): off uses only the start-up limits (the behaviour before v0.5.2), so textures are cleaned up sooner. Also in the in-game menu (Insert → Performance).',
+    'keep_gpu_textures': 'Keep GPU-only textures',
+    'keep_gpu_textures_hint': 'Keeps a texture the GPU drew into while its only correct copy is on the GPU (a game write right next to it blocks the copy back), until video memory is almost full. Without it, cleanup can throw that picture away and the game gets old data back. From SpartanPort (@maze1377). On by default; turn it off if video memory runs full more often. Also in the in-game menu (Insert → Performance).',
     'texture_cleanup_hint': ('Frees the textures of earlier stages all at once after each stage or checkpoint load. Not needed any more: since the texture cache '
                              'cleanup was fixed (issue #104), old textures no longer pile up. It can cause a short stutter after a load, '
-                             'so it is off by default. Also in the in-game menu (Insert → Performance).',
-                             'Libera de uma vez as texturas de fases anteriores após cada carregamento de fase ou de checkpoint. Não é mais necessário: desde que a limpeza '
-                             'do cache de texturas foi corrigida (issue #104), texturas antigas não se acumulam mais. Pode causar um breve travamento '
-                             'após um carregamento, então vem desligado. Também no menu do jogo (Insert → Desempenho).'),
-    'filters': ('Image filters (live in the in-game menu too, Insert → Image)',
-                'Filtros de imagem (também no menu do jogo, Insert → Imagem)'),
-    'smaa': ('SMAA anti-aliasing (smooths edges; the HUD too)', 'Anti-aliasing SMAA (suaviza bordas; o HUD também)'),
-    'aa_off': ('Off', 'Desligado'),
-    'upscaler': ('Upscaler', 'Ampliador'),
-    'up_off': ('Built-in (game)', 'Do jogo'),
-    'up_dlss': ('DLSS (NVIDIA RTX)', 'DLSS (NVIDIA RTX)'),
-    'up_fsr3': ('FSR 3.1 (any card)', 'FSR 3.1 (qualquer placa)'),
-    'up_fsr4': ('FSR 4 (any recent card)', 'FSR 4 (qualquer placa recente)'),
-    'up_taa': ('TAA (any card, native only)', 'TAA (qualquer placa, só nativo)'),
-    'upscaler_hint': ('Which upscaler draws the image at the chosen quality. It is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA. TAA: a lighter, softer anti-aliasing, at native size only. Built-in: only the game\'s own upscale pass and anti-aliasing. F8 in game switches between Built-in and your choice.',
-                      'Qual ampliador desenha a imagem na qualidade escolhida. Ele também é o anti-aliasing: na qualidade AA nativo o DLSS é DLAA e o FSR é FSR AA nativo. TAA: um anti-aliasing mais leve e suave, só no tamanho nativo. Do jogo: só a ampliação e o anti-aliasing do próprio jogo. F8 no jogo alterna entre Do jogo e a sua escolha.'),
-    'quality': ('Quality', 'Qualidade'),
-    'preset_native': ('Native AA', 'AA nativo'),
-    'preset_quality': ('Quality', 'Qualidade'),
-    'preset_balanced': ('Balanced', 'Equilibrado'),
-    'preset_performance': ('Performance', 'Desempenho'),
-    'preset_ultra': ('Ultra Performance', 'Ultra desempenho'),
-    'preset_super150': ('Supersampling 150% (experimental)', 'Supersampling 150% (experimental)'),
-    'preset_super200': ('Supersampling 200% (experimental)', 'Supersampling 200% (experimental)'),
-    'quality_native': ('{preset}: renders at the output size, {output}.', '{preset}: desenha no tamanho de saída, {output}.'),
-    'quality_up': ('{preset}: renders at {render}, upscaled to {output}.', '{preset}: desenha em {render}, ampliado para {output}.'),
-    'quality_super': ('{preset}: renders at {render}, shrunk to {output}.', '{preset}: desenha em {render}, reduzido para {output}.'),
+                             'so it is off by default. Also in the in-game menu (Insert → Performance).'),
+    'filters': 'Image filters (live in the in-game menu too, Insert → Image)',
+    'smaa': 'SMAA anti-aliasing (smooths edges; the HUD too)',
+    'aa_off': 'Off',
+    'upscaler': 'Upscaler',
+    'up_off': 'Built-in (game)',
+    'up_dlss': 'DLSS (NVIDIA RTX)',
+    'up_fsr3': 'FSR 3.1 (any card)',
+    'up_fsr4': 'FSR 4 (any recent card)',
+    'up_taa': 'TAA (any card, native only)',
+    'upscaler_hint': 'Which upscaler draws the image at the chosen quality. It is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA. TAA: a lighter, softer anti-aliasing, at native size only. Built-in: only the game\'s own upscale pass and anti-aliasing. F8 in game switches between Built-in and your choice.',
+    'quality': 'Quality',
+    'preset_native': 'Native AA',
+    'preset_quality': 'Quality',
+    'preset_balanced': 'Balanced',
+    'preset_performance': 'Performance',
+    'preset_ultra': 'Ultra Performance',
+    'preset_super150': 'Supersampling 150% (experimental)',
+    'preset_super200': 'Supersampling 200% (experimental)',
+    'quality_native': '{preset}: renders at the output size, {output}.',
+    'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
+    'quality_super': '{preset}: renders at {render}, shrunk to {output}.',
     'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
-                      'Applied at start: the game restarts for a change.',
-                      'Qualidade 1/1,5, Equilibrado 1/1,7, Desempenho 1/2, Ultra desempenho 1/3 da saída em cada lado; o ampliador completa o resto. '
-                      'Aplicado no início: o jogo reinicia para mudar.'),
-    'fg_mode': ('Frame generation', 'Geração de quadros'),
-    'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
-                'Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.'),
-    'aa_no_dlss': ('No DLSS on this GPU: it runs as FSR 3.1',
-                   'Sem DLSS nesta GPU: roda como FSR 3.1'),
-    'aa_no_fsr4': ('This GPU cannot run FSR 4: it runs as FSR 3.1',
-                   'Esta GPU não roda o FSR 4: roda como FSR 3.1'),
-    'smaa_hint': ('Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
-                  'Não recomendado: o DLAA e o FSR já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.'),
-    'sharpening': ('Sharpening', 'Nitidez'),
+                      'Applied at start: the game restarts for a change.'),
+    'fg_mode': 'Frame generation',
+    'fg_hint': 'One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
+    'aa_no_dlss': 'No DLSS on this GPU: it runs as FSR 3.1',
+    'aa_no_fsr4': 'This GPU cannot run FSR 4: it runs as FSR 3.1',
+    'smaa_hint': 'Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
+    'sharpening': 'Sharpening',
     'sharpening_hint': ('Sharpens the image. With DLSS, FSR or TAA it is their own sharpening (scene only); with '
                         "Built-in it is AMD CAS on the final picture. Up to 100% the upscaler's own sharpening; "
-                        'every 100% above adds one more pass (CAS stops at 100%). Default 175%.',
-                        'Deixa a imagem mais nítida. Com DLSS, FSR ou TAA é a nitidez deles (só a cena); com Do jogo '
-                        'é o AMD CAS na imagem final. Até 100% a nitidez do próprio upscaler; cada 100% acima adiciona mais uma passada (o CAS para em 100%). Padrão 175%.'),
-    'color_adjust': ('Color adjustments', 'Ajustes de cor'),
-    'color_brightness': ('Brightness (0 = unchanged)', 'Brilho (0 = sem alteração)'),
-    'color_contrast': ('Contrast (1 = unchanged)', 'Contraste (1 = sem alteração)'),
-    'color_saturation': ('Saturation (1 = unchanged)', 'Saturação (1 = sem alteração)'),
-    'color_gamma': ('Gamma (1 = unchanged)', 'Gama (1 = sem alteração)'),
-    'audio': ('Audio', 'Áudio'),
-    'native_audio': ('Native audio (libSceNgs2.sprx from your console)', 'Áudio nativo (libSceNgs2.sprx do seu console)'),
-    'controls': ('Controls', 'Controles'),
-    'menu_confirm': ('Menu confirm button (next launch)', 'Botão de confirmação (próxima inicialização)'),
-    'mouse_enabled': ('Mouse turns the camera', 'Mouse gira a câmera'),
-    'mouse_invert_y': ('Invert mouse Y axis', 'Inverter eixo Y do mouse'),
-    'mouse_sensitivity': ('Mouse sensitivity', 'Sensibilidade do mouse'),
-    'mouse_hint': ('Esc releases the mouse; a click in the game window takes it back.',
-                   'Esc solta o mouse; um clique na janela do jogo prende de novo.'),
-    'remap': ('Keyboard and mouse buttons…', 'Teclas e botões do mouse…'),
-    'remap_title': ('Keyboard and mouse buttons', 'Teclas e botões do mouse'),
+                        'every 100% above adds one more pass (CAS stops at 100%). Default 175%.'),
+    'color_adjust': 'Color adjustments',
+    'color_brightness': 'Brightness (0 = unchanged)',
+    'color_contrast': 'Contrast (1 = unchanged)',
+    'color_saturation': 'Saturation (1 = unchanged)',
+    'color_gamma': 'Gamma (1 = unchanged)',
+    'audio': 'Audio',
+    'native_audio': 'Native audio (libSceNgs2.sprx from your console)',
+    'audio_device': 'Output device',
+    'audio_default': 'System default',
+    'audio_surround': 'Always send 7.1 (for Windows Sonic / Dolby Atmos headphones)',
+    'audio_hint': ('Applies at the next start. The list fills after the game ran once; an unplugged '
+                   'device falls back to the system default.'),
+    'controls': 'Controls',
+    'menu_confirm': 'Menu confirm button (next launch)',
+    'mouse_enabled': 'Mouse turns the camera',
+    'mouse_invert_y': 'Invert mouse Y axis',
+    'mouse_sensitivity': 'Mouse sensitivity',
+    'mouse_hint': 'Esc releases the mouse; a click in the game window takes it back.',
+    'remap': 'Keyboard and mouse buttons…',
+    'remap_title': 'Keyboard and mouse buttons',
     'remap_help': ('Click Set and press a key or mouse button, or type SDL names (Space, Left Shift, '
                    'Mouse Left, Mouse X1, Wheel Up…). "|" gives several: Q|Mouse Left. "none": no key. '
-                   'Empty: the default (grey). Applies at the next start.',
-                   'Clique em Definir e aperte uma tecla ou botão do mouse, ou digite nomes do SDL (Space, Left Shift, '
-                   'Mouse Left, Mouse X1, Wheel Up…). "|" junta vários: Q|Mouse Left. "none": nenhuma tecla. '
-                   'Vazio: o padrão (cinza). Vale na próxima vez que o jogo abrir.'),
-    'button': ('PS4 button', 'Botão do PS4'),
-    'keys': ('Keys / mouse', 'Teclas / mouse'),
-    'default': ('Default', 'Padrão'),
-    'set': ('Set', 'Definir'),
-    'press': ('Press a key…', 'Aperte uma tecla…'),
-    'reset': ('Reset all', 'Restaurar tudo'),
-    'textures': ('Textures', 'Texturas'),
-    'lod_bias': ('Texture LOD bias (DLAA)', 'LOD bias das texturas (DLAA)'),
+                   'Empty: the default (grey). Applies at the next start.'),
+    'button': 'PS4 button',
+    'keys': 'Keys / mouse',
+    'default': 'Default',
+    'set': 'Set',
+    'press': 'Press a key…',
+    'reset': 'Reset all',
+    'textures': 'Textures',
+    'lod_bias': 'Texture LOD bias (DLAA)',
     'lod_bias_hint': ("Sharper (below 0) or softer (above 0) scene textures under DLAA; no effect without DLAA. "
                       "-1.00 is NVIDIA's advice for native resolution. Lower brings out fine detail, mostly on "
-                      'grass (-3.00 has 31% more fine detail than +1.00), but can shimmer in motion.',
-                      'Texturas da cena mais nítidas (abaixo de 0) ou mais suaves (acima de 0) com DLAA; sem efeito '
-                      'sem DLAA. -1,00 é o conselho da NVIDIA para resolução nativa. Mais baixo realça detalhes '
-                      'finos, sobretudo na grama (-3,00 tem 31% mais detalhe fino que +1,00), mas pode cintilar em '
-                      'movimento.'),
-    'aniso': ('Anisotropic filtering', 'Filtragem anisotrópica'),
-    'aniso_game': ('Game', 'Jogo'),
+                      'grass (-3.00 has 31% more fine detail than +1.00), but can shimmer in motion.'),
+    'aniso': 'Anisotropic filtering',
+    'aniso_game': 'Game',
     'aniso_hint': ('Keeps ground and wall textures sharp at shallow angles. The game uses trilinear and 4x. In our '
                    'tests (a stone path, a pillar hall) 16x looked the same as Game; it stays on because the cost '
-                   'is very small.',
-                   'Mantém nítidas as texturas do chão e das paredes em ângulos rasos. O jogo usa trilinear e 4x. '
-                   'Nos nossos testes (um caminho de pedra, um salão de pilares) 16x ficou igual ao Jogo; fica '
-                   'ligado porque o custo é muito pequeno.'),
+                   'is very small.'),
     'texture_pack_dialog_hint': ("AI-upscaled versions of the game's textures, made from your own copy of the game "
                                  '(ps4-texturepack-generator, docs/texture-pack.md); the game files are not changed. In game it '
-                                 'switches live; textures appear as they load (a second or two).',
-                                 'Versões ampliadas por IA das texturas do jogo, feitas da sua própria cópia do jogo '
-                                 '(ps4-texturepack-generator, docs/texture-pack.md); os arquivos do jogo não são alterados. No jogo '
-                                 'troca ao vivo; as texturas aparecem conforme carregam (um ou dois segundos).'),
-    'close': ('Close', 'Fechar'),
-    'mark_default': ('Default: {value}', 'Padrão: {value}'),
-    'mark_default_button': ('Default', 'Padrão'),
-    'mark_on': ('on', 'ligado'),
-    'mark_off': ('off', 'desligado'),
-    'play': ('Play', 'Jogar'),
-    'saves': ('Saves folder', 'Pasta de saves'),
-    'logs': ('Logs folder', 'Pasta de logs'),
-    'report_issue': ('Report a problem on GitHub', 'Relatar um problema no GitHub'),
-    'rep_unknown': ('unknown', 'desconhecido'),
-    'rep_yes': ('yes', 'sim'),
-    'rep_no': ('no', 'não'),
-    'rep_row_version': ('Port version', 'Versão do port'),
-    'rep_row_game': ('Game', 'Jogo'),
-    'rep_row_os': ('System', 'Sistema'),
-    'rep_row_cpu': ('CPU', 'CPU'),
-    'rep_row_ram': ('RAM', 'RAM'),
-    'rep_row_gpu': ('GPU', 'GPU'),
-    'rep_row_driver': ('Driver', 'Driver'),
-    'rep_gpu_none': ('not detected (vulkaninfo missing or no Vulkan driver)', 'não detectada (sem vulkaninfo ou sem driver Vulkan)'),
-    'rep_h_hw': ('Hardware and version', 'Hardware e versão'),
-    'rep_h_log': ('Log summary', 'Resumo do log'),
-    'rep_h_known': ('Known problems for this GPU', 'Problemas conhecidos para esta GPU'),
-    'rep_no_log': ('No log attached.', 'Nenhum log anexado.'),
-    'rep_footer': ('Report generated locally by the launcher; user names in paths were replaced by <user>.', 'Relatório gerado localmente pelo launcher; nomes de usuário em caminhos foram trocados por <user>.'),
-    'rep_attach_zip': ('The full report is long: please attach the .zip saved by the launcher to this issue.', 'O relatório completo é longo: anexe a esta issue o .zip salvo pelo launcher.'),
-    'rep_fps': ('FPS: average {avg} (lowest {lo}, highest {hi}; {n} samples)', 'FPS: média {avg} (mínimo {lo}, máximo {hi}; {n} amostras)'),
-    'rep_worst': ('Worst frame: {ms} ms', 'Pior quadro: {ms} ms'),
-    'rep_no_fps': ('FPS: no "Frame stats" lines in this log', 'FPS: este log não tem linhas "Frame stats"'),
-    'rep_no_events': ('No Fault:, STOP: or FREEZE: lines in this log.', 'Nenhuma linha Fault:, STOP: ou FREEZE: neste log.'),
-    'rep_issue_title': ('Problem report: {gpu}', 'Relato de problema: {gpu}'),
-    'report_busy': ('Collecting the report…', 'Coletando o relatório…'),
-    'report_done': ('Issue form opened in the browser. Attach {zip} from the logs folder (log with user names removed).',
-                    'Formulário aberto no navegador. Anexe {zip} da pasta de logs (log sem nomes de usuário).'),
-    'clear_cache': ('Clear shader cache', 'Limpar cache de shaders'),
+                                 'switches live; textures appear as they load (a second or two).'),
+    'close': 'Close',
+    'mark_default': 'Default: {value}',
+    'mark_default_button': 'Default',
+    'mark_on': 'on',
+    'mark_off': 'off',
+    'play': 'Play',
+    'saves': 'Saves folder',
+    'logs': 'Logs folder',
+    'report_issue': 'Report a problem on GitHub',
+    'rep_unknown': 'unknown',
+    'rep_yes': 'yes',
+    'rep_no': 'no',
+    'rep_row_version': 'Port version',
+    'rep_row_game': 'Game',
+    'rep_row_os': 'System',
+    'rep_row_cpu': 'CPU',
+    'rep_row_ram': 'RAM',
+    'rep_row_gpu': 'GPU',
+    'rep_row_driver': 'Driver',
+    'rep_gpu_none': 'not detected (vulkaninfo missing or no Vulkan driver)',
+    'rep_h_hw': 'Hardware and version',
+    'rep_h_log': 'Log summary',
+    'rep_h_known': 'Known problems for this GPU',
+    'rep_no_log': 'No log attached.',
+    'rep_footer': 'Report generated locally by the launcher; user names in paths were replaced by <user>.',
+    'rep_attach_zip': 'The full report is long: please attach the .zip saved by the launcher to this issue.',
+    'rep_fps': 'FPS: average {avg} (lowest {lo}, highest {hi}; {n} samples)',
+    'rep_worst': 'Worst frame: {ms} ms',
+    'rep_no_fps': 'FPS: no "Frame stats" lines in this log',
+    'rep_no_events': 'No Fault:, STOP: or FREEZE: lines in this log.',
+    'rep_issue_title': 'Problem report: {gpu}',
+    'report_busy': 'Collecting the report…',
+    'report_done': 'Issue form opened in the browser. Attach {zip} from the logs folder (log with user names removed).',
+    'clear_cache': 'Clear shader cache',
     'clear_cache_ask': ('This deletes the compiled shaders ({size}); the next start takes longer to load and '
-                        'may stutter at first. Continue?',
-                        'Isso apaga os shaders compilados ({size}); a próxima partida demora mais para carregar e '
-                        'pode engasgar no começo. Continuar?'),
-    'clear_cache_empty': ('The shader cache is already empty.', 'O cache de shaders já está vazio.'),
-    'clear_cache_done': ('Shader cache cleared: {size} freed.', 'Cache de shaders limpo: {size} liberados.'),
+                        'may stutter at first. Continue?'),
+    'clear_cache_empty': 'The shader cache is already empty.',
+    'clear_cache_done': 'Shader cache cleared: {size} freed.',
     'clear_cache_failed': ('{size} freed, but {count} file(s) could not be deleted (in use? Close the game '
-                           'and try again).',
-                           '{size} liberados, mas {count} arquivo(s) não puderam ser apagados (em uso? Feche o '
-                           'jogo e tente de novo).'),
-    'mods': ('Mods / Cheats…', 'Mods / Cheats…'),
+                           'and try again).'),
+    'mods': 'Mods / Cheats…',
     'menu_note': ("Two menus in game. Insert: the port's graphics menu (every setting applies live). "
                   "Development menu (the game's own QA menu): turn on 'Level select and QA menu' under Debug, "
-                  'then in game hold L1 and press L3 (keyboard: hold 1, press Z).',
-                  'Dois menus no jogo. Insert: o menu de gráficos do port (tudo vale na hora). '
-                  'Menu de desenvolvimento (o menu de QA do próprio jogo): ligue "Seleção de fases e menu de QA" '
-                  'em Depuração, depois no jogo segure L1 e aperte L3 (teclado: segure 1, aperte Z).'),
-    'graphics': ('Graphics…', 'Gráficos…'),
-    'graphics_title': ('Graphics', 'Gráficos'),
-    'advanced': ('Advanced…', 'Avançado…'),
-    'advanced_title': ('Advanced settings', 'Configurações avançadas'),
+                  'then in game hold L1 and press L3 (keyboard: hold 1, press Z).'),
+    'graphics': 'Graphics…',
+    'graphics_title': 'Graphics',
+    'advanced': 'Advanced…',
+    'advanced_title': 'Advanced settings',
     'advanced_hint': ('GPU readbacks: how the game gets back what the GPU wrote. Keep the defaults unless a scene '
                       'breaks or you are testing. Changes apply at the next start (the readback batch at once). '
-                      'Graphics presets never change these.',
-                      'Leituras da GPU: como o jogo recebe de volta o que a GPU escreveu. Mantenha os padrões, a '
-                      'não ser que uma cena quebre ou você esteja testando. As mudanças valem no próximo início (o '
-                      'lote de leituras na hora). Os presets de gráficos nunca mudam estas opções.'),
-    'gpu_readbacks': ('GPU readback mode', 'Modo de leitura da GPU'),
-    'gpu_readbacks_hint': ('How strictly CPU reads of GPU-written memory wait for the GPU.',
-                           'Quão rigorosamente leituras da CPU de memória escrita pela GPU esperam a GPU.'),
+                      'Graphics presets never change these.'),
+    'gpu_readbacks': 'GPU readback mode',
+    'gpu_readbacks_hint': 'How strictly CPU reads of GPU-written memory wait for the GPU.',
     'gpu_readbacks_why': ('The game reads GPU compute results on the CPU: Relaxed can give it stale data, Off none '
-                          'at all.',
-                          'O jogo lê resultados de compute da GPU na CPU: Relaxado pode dar dados velhos, '
-                          'Desligado nenhum.'),
-    'readbacks_2': ('Precise', 'Preciso'),
-    'readbacks_1': ('Relaxed', 'Relaxado'),
-    'readbacks_0': ('Off', 'Desligado'),
-    'readback_batch_hint': ('When the game reads GPU-written memory, also copy back the GPU-written data around it.',
-                            'Quando o jogo lê memória escrita pela GPU, copia também os dados escritos pela GPU ao redor.'),
-    'graphics_tips': ('Tip: tweak while playing', 'Dica: ajuste jogando'),
+                          'at all.'),
+    'readbacks_2': 'Precise',
+    'readbacks_1': 'Relaxed',
+    'readbacks_0': 'Off',
+    'readback_batch_hint': 'When the game reads GPU-written memory, also copy back the GPU-written data around it.',
+    'graphics_tips': 'Tip: tweak while playing',
     'graphics_hint': ('Best set in game: the in-game graphics menu has these settings and more (filters, colour, '
                       'Lab), and every change shows right away on the scene you are looking at. Go somewhere '
                       'outdoors with Trico in view, open the menu and compare. Changes are saved for the next start. '
-                      '100% is the game as shipped.',
-                      'Melhor ajustar no jogo: o menu de gráficos do jogo tem estas opções e mais (filtros, cor, '
-                      'Lab), e cada mudança aparece na hora na cena que você está vendo. Vá para um lugar aberto com '
-                      'o Trico à vista, abra o menu e compare. As mudanças ficam salvas para o próximo início. '
-                      '100% é o jogo original.'),
+                      '100% is the game as shipped.'),
     'graphics_keys': ('Insert          open / close the graphics menu (Esc closes)\n'
                       'L2 + R3         controller: hold L2, press R3\n'
                       'Q / E, L1 / R1  previous / next tab\n'
                       'F8              switch anti-aliasing (DLAA, FSR) / SMAA\n'
-                      'F10             show / hide the FPS counter',
-                      'Insert          abre / fecha o menu de gráficos (Esc fecha)\n'
-                      'L2 + R3         controle: segure L2, aperte R3\n'
-                      'Q / E, L1 / R1  aba anterior / próxima\n'
-                      'F8              alterna anti-aliasing (DLAA, FSR) / SMAA\n'
-                      'F10             mostra / esconde o contador de FPS'),
-    'hdr_hint': ("The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
-                 'A saída HDR10 do próprio jogo, usada quando o HDR está ligado nas configurações de tela do Windows. '
-                 'Recomendado: ligado.'),
-    'shadow_scale': ('Shadow resolution', 'Resolução das sombras'),
-    'shadow_game': ('Game (2048)', 'Jogo (2048)'),
-    'graphics_preset': ('Graphics preset', 'Predefinição gráfica'),
+                      'F10             show / hide the FPS counter'),
+    'hdr_hint': "The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
+    'shadow_scale': 'Shadow resolution',
+    'shadow_game': 'Game (2048)',
+    'graphics_preset': 'Graphics preset',
     'graphics_preset_hint': ('All look settings and the texture pack at once. Stock is the game as shipped; '
-                             'save your own here or in the in-game menu (Insert, Image tab).',
-                             'Todas as opções de imagem e o pacote de texturas de uma vez. Original é o jogo '
-                             'como lançado; salve as suas aqui ou no menu do jogo (Insert, aba Imagem).'),
-    'preset_save': ('Save as preset', 'Salvar como predefinição'),
-    'preset_save_button': ('Save', 'Salvar'),
-    'preset_save_bad': ('Type a name (letters, digits, space, - or _; not Stock or Recommended).',
-                        'Digite um nome (letras, números, espaço, - ou _; não Original nem Recomendado).'),
-    'preset_stock': ('Stock (as shipped)', 'Original (como lançado)'),
-    'preset_recommended': ('Recommended (default)', 'Recomendado (padrão)'),
-    'preset_custom': ('Custom', 'Personalizado'),
+                             'save your own here or in the in-game menu (Insert, Image tab).'),
+    'preset_save': 'Save as preset',
+    'preset_save_button': 'Save',
+    'preset_save_bad': 'Type a name (letters, digits, space, - or _; not Stock or Recommended).',
+    'preset_stock': 'Stock (as shipped)',
+    'preset_recommended': 'Recommended (default)',
+    'preset_custom': 'Custom',
     'shadow_hint': ("Draws the shadow maps at 2x or 4x the game's 2048x2048 (default: Game). The main gain is much "
                     'less shimmer of tree and leaf shadows, with any anti-aliasing. '
-                    '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.',
-                    'Desenha os mapas de sombra em 2x ou 4x os 2048x2048 do jogo (padrão: Jogo). O ganho principal é '
-                    'muito menos tremulação das sombras de árvores e folhas, com qualquer anti-aliasing. '
-                    '8192 custa cerca de 8 FPS e até cerca de 2 GB de memória de vídeo (4096 cerca de um quarto disso). Com 8 GB de memória de vídeo ou menos mantenha Jogo: a falta de memória causa engasgos e travamentos.'),
-    'grass_smooth': ('Grass animated every frame (default)', 'Grama animada todo quadro (padrão)'),
+                    '8192 costs about 8 FPS and up to about 2 GB of video memory (4096 about a quarter of that). With 8 GB of video memory or less keep Game: running out causes stutter and crashes.'),
+    'grass_smooth': 'Grass animated every frame (default)',
     'grass_hint': ('The game moves most grass only every 4th frame, which looks choppy at high frame rates. '
-                   'Off is as shipped.',
-                   'O jogo move a maior parte da grama só a cada 4 quadros, o que fica truncado em taxas altas. '
-                   'Desligado é o original.'),
-    'effect_fog_distance': ('Fog distance', 'Distância da neblina'),
+                   'Off is as shipped.'),
+    'effect_fog_distance': 'Fog distance',
     'effect_fog_distance_hint': ('Where the fog starts and reaches full strength. Default 100% is as shipped; lower '
-                                 'brings the fog closer.',
-                                 'Onde a neblina começa e chega à força total. Padrão 100% é o original; mais baixo '
-                                 'traz a neblina mais perto.'),
-    'effect_haze_fringe': ('Haze color fringe', 'Franja colorida na névoa'),
+                                 'brings the fog closer.'),
+    'effect_haze_fringe': 'Haze color fringe',
     'effect_haze_fringe_hint': ("The game's chromatic aberration on the light haze: yellow and blue edges around "
                                 'objects against fog, strongest toward the screen edges. Sharp anti-aliasing (DLAA, '
-                                'DLSS) makes it stand out more. Default 0% gives clean edges; 100% is as shipped.',
-                                'A aberração cromática do jogo na névoa de luz: bordas amarelas e azuis em volta de '
-                                'objetos contra a neblina, mais fortes perto das bordas da tela. O anti-aliasing '
-                                'nítido (DLAA, DLSS) a deixa mais visível. Padrão 0% deixa as bordas limpas; 100% é o '
-                                'original.'),
-    'effect_boy_wind': ('Boy wind (hair + clothing)', 'Vento no menino (cabelo + roupa)'),
+                                'DLSS) makes it stand out more. Default 0% gives clean edges; 100% is as shipped.'),
+    'effect_boy_wind': 'Boy wind (hair + clothing)',
     'effect_boy_wind_hint': ("How strongly the wind moves the boy's hair and clothing. Default 100% is as shipped and "
-                             'can look like a storm; 50% is recommended, 30% is calm.',
-                             'Quanto o vento mexe o cabelo e a roupa do menino. Padrão 100% é o original e pode '
-                             'parecer uma tempestade; 50% é o recomendado, 30% é calmo.'),
-    'effect_tree_wind': ('Tree wind', 'Vento nas árvores'),
+                             'can look like a storm; 50% is recommended, 30% is calm.'),
+    'effect_tree_wind': 'Tree wind',
     'effect_tree_wind_hint': ('How strongly the wind moves trees, leaves and ivy. Default 100% is as shipped; 50% '
-                              'looks more natural (recommended), 0% keeps them still.',
-                              'Quanto o vento mexe árvores, folhas e hera. Padrão 100% é o original; 50% parece mais '
-                              'natural (recomendado), 0% as deixa paradas.'),
-    'effects': ('Game effects (100% = as shipped)', 'Efeitos do jogo (100% = original)'),
-    'effect_ssao': ('Ambient occlusion', 'Oclusão de ambiente'),
+                              'looks more natural (recommended), 0% keeps them still.'),
+    'effects': 'Game effects (100% = as shipped)',
+    'effect_ssao': 'Ambient occlusion',
     'effect_ssao_hint': ('Strength of the contact shadows in corners and under grass. 0% turns the pass off (saves a '
-                         'little GPU time). Above 150% the half-resolution AO shows blocky halos.',
-                         'Força das sombras de contato em cantos e sob a grama. 0% desliga o passe (economiza um pouco '
-                         'de GPU). Acima de 150% a AO em meia resolução mostra halos em blocos.'),
-    'effect_bloom': ('Bloom', 'Bloom'),
-    'effect_bloom_hint': ('Glow around bright light. 0% turns the pass off.', 'Brilho em volta da luz forte. 0% desliga o passe.'),
-    'effect_ssr': ('Screen-space reflections', 'Reflexos em espaço de tela'),
-    'effect_ssr_hint': ('Reflections and light glare on water and wet stone. 0% turns the pass off.',
-                        'Reflexos e brilho de luz na água e na pedra molhada. 0% desliga o passe.'),
-    'effect_motion_blur': ('Motion blur', 'Desfoque de movimento'),
-    'effect_motion_blur_hint': ('Camera motion blur. 0% turns the pass off.', 'Desfoque ao mover a câmera. 0% desliga o passe.'),
-    'effect_vignette_add': ('Vignette', 'Vinheta'),
-    'effect_vignette_add_hint': ('Darkened screen corners. The game ships with this off: 0% is as shipped and recommended.',
-                                 'Cantos da tela escurecidos. O jogo vem com isto desligado: 0% é o original e o recomendado.'),
-    'effect_game_sharpen': ('Game sharpening', 'Nitidez do jogo'),
-    'effect_game_sharpen_hint': ("The game's own sharpening filter. On by default: 100% is the original and the maximum (recommended).",
-                                 'O filtro de nitidez do próprio jogo. Ligado por padrão: 100% é o original e o máximo (recomendado).'),
-    'effect_fov': ('Field of view', 'Campo de visão'),
-    'effect_fov_hint': ('Camera field of view. Default 70° is as shipped; higher shows more around the boy.',
-                        'Campo de visão da câmera. Padrão 70° é o original; mais alto mostra mais em volta do menino.'),
-    'effect_trico_feathers': ('Trico feather wind', 'Vento nas penas do Trico'),
-    'effect_trico_feathers_hint': ("How strongly the wind moves Trico's feathers. Default 100% is as shipped; 0% keeps them still.",
-                                   'Quanto o vento mexe as penas do Trico. Padrão 100% é o original; 0% as deixa paradas.'),
-    'mods_title': ('Mods / Cheats', 'Mods / Cheats'),
+                         'little GPU time). Above 150% the half-resolution AO shows blocky halos.'),
+    'effect_bloom': 'Bloom',
+    'effect_bloom_hint': 'Glow around bright light. 0% turns the pass off.',
+    'effect_ssr': 'Screen-space reflections',
+    'effect_ssr_hint': 'Reflections and light glare on water and wet stone. 0% turns the pass off.',
+    'effect_motion_blur': 'Motion blur',
+    'effect_motion_blur_hint': 'Camera motion blur. 0% turns the pass off.',
+    'effect_vignette_add': 'Vignette',
+    'effect_vignette_add_hint': 'Darkened screen corners. The game ships with this off: 0% is as shipped and recommended.',
+    'effect_game_sharpen': 'Game sharpening',
+    'effect_game_sharpen_hint': "The game's own sharpening filter. On by default: 100% is the original and the maximum (recommended).",
+    'effect_fov': 'Field of view',
+    'effect_fov_hint': 'Camera field of view. Default 70° is as shipped; higher shows more around the boy.',
+    'effect_trico_feathers': 'Trico feather wind',
+    'effect_trico_feathers_hint': "How strongly the wind moves Trico's feathers. Default 100% is as shipped; 0% keeps them still.",
+    'mods_title': 'Mods / Cheats',
     'mods_hint': ('Drop shadPS4/GoldHEN cheat XML files in the mods folder, then turn them on here. '
-                  'Nothing here changes the game until you enable it.',
-                  'Solte arquivos de cheat XML no formato shadPS4/GoldHEN na pasta de mods e ligue aqui. '
-                  'Nada muda no jogo até você ativar.'),
-    'mods_warning': ('A cheat can crash the game or behave oddly; if that happens, turn it off here.',
-                     'Um cheat pode travar o jogo ou se comportar de forma estranha; se isso acontecer, desligue aqui.'),
-    'mods_folder': ('Open mods folder', 'Abrir pasta de mods'),
-    'mods_refresh': ('Refresh list', 'Atualizar lista'),
-    'mods_empty': ('No cheat XML files found in the mods folder yet.',
-                   'Nenhum arquivo de cheat XML encontrado na pasta de mods ainda.'),
-    'quit': ('Quit', 'Sair'),
-    'ready': ('Ready to play.', 'Pronto para jogar.'),
-    'audio_native': ('Audio: native (console module found).', 'Áudio: nativo (módulo do console encontrado).'),
-    'audio_builtin': ('Audio: built-in mixer, experimental (libSceNgs2.sprx not found or not selected).',
-                      'Áudio: mixer próprio, experimental (libSceNgs2.sprx não encontrado ou desmarcado).'),
-    'missing': ('Missing', 'Faltando'),
-    'not_built': ('Port not built (run build.sh)', 'Port não compilado (rode o build.sh)'),
-    'preparing': ('Preparing the game…', 'Preparando o jogo…'),
-    'running': ('Playing — log:', 'Jogando — log:'),
-    'ended': ('Game closed (exit code {code}).', 'Jogo fechado (código {code}).'),
-    'crashed': ('The game closed with an error (code {code}). The log has the details.',
-                'O jogo fechou com erro (código {code}). Os detalhes estão no log.'),
-    'already': ('The game is already running.', 'O jogo já está rodando.'),
-    'error': ('Error', 'Erro'),
+                  'Nothing here changes the game until you enable it.'),
+    'mods_warning': 'A cheat can crash the game or behave oddly; if that happens, turn it off here.',
+    'mods_folder': 'Open mods folder',
+    'mods_refresh': 'Refresh list',
+    'mods_empty': 'No cheat XML files found in the mods folder yet.',
+    'quit': 'Quit',
+    'ready': 'Ready to play.',
+    'audio_native': 'Audio: native (console module found).',
+    'audio_builtin': 'Audio: built-in mixer, experimental (libSceNgs2.sprx not found or not selected).',
+    'missing': 'Missing',
+    'not_built': 'Port not built (run build.sh)',
+    'preparing': 'Preparing the game…',
+    'running': 'Playing — log:',
+    'ended': 'Game closed (exit code {code}).',
+    'crashed': 'The game closed with an error (code {code}). The log has the details.',
+    'already': 'The game is already running.',
+    'error': 'Error',
 }
 GAME_LANGUAGE_NAMES = {'ja': tlg_run.JAPANESE_FALLBACK_LABEL,
                        'en': 'English', 'fr': 'Français', 'es_ES': 'Español (España)',
@@ -538,19 +418,17 @@ GAME_LANGUAGE_NAMES = {'ja': tlg_run.JAPANESE_FALLBACK_LABEL,
                        'pt_BR': 'Português (Brasil)', 'es_LA': 'Español (Latinoamérica)',
                        'fr_CA': 'Français (Canada)', 'ko': '한국어', 'zh_TW': '繁體中文',
                        'zh_CN': '简体中文'}
-UI_LANGUAGES = ['auto', 'pt_BR', 'en_US']
-UI_LANGUAGE_NAMES = {'pt_BR': 'Português (Brasil)', 'en_US': 'English (US)'}
 DISPLAY_MODES = ['Windowed', 'Borderless', 'Fullscreen']
 
 
 # The PS4 buttons the remap dialog lists, with what they do in The Last Guardian when known.
 PS4_BUTTONS = [
-    ('cross', 'Cross (X)', ('jump', 'pular')), ('circle', 'Circle', None), ('square', 'Square', None),
-    ('triangle', 'Triangle', ('grab, hold on', 'agarrar, segurar')), ('l1', 'L1', None),
-    ('r1', 'R1', ('call Trico', 'chamar o Trico')), ('l2', 'L2', None), ('r2', 'R2', None), ('l3', 'L3', None),
-    ('r3', 'R3', None), ('options', 'Options', ('menu', 'menu')),
-    ('touchpad_left', 'Touchpad (left)', ('photo mode', 'modo foto')),
-    ('touchpad_right', 'Touchpad (right)', ('pause', 'pausa')),
+    ('cross', 'Cross (X)', 'jump'), ('circle', 'Circle', None), ('square', 'Square', None),
+    ('triangle', 'Triangle', 'grab, hold on'), ('l1', 'L1', None),
+    ('r1', 'R1', 'call Trico'), ('l2', 'L2', None), ('r2', 'R2', None), ('l3', 'L3', None),
+    ('r3', 'R3', None), ('options', 'Options', 'menu'),
+    ('touchpad_left', 'Touchpad (left)', 'photo mode'),
+    ('touchpad_right', 'Touchpad (right)', 'pause'),
     ('up', 'D-pad up', None), ('down', 'D-pad down', None), ('left', 'D-pad left', None), ('right', 'D-pad right', None),
 ]
 # Tk key names -> SDL key names (src/runtime_pad.c reads SDL names); letters and digits are the same.
@@ -944,17 +822,6 @@ def art_path(settings, name):
     return None
 
 
-def system_is_portuguese():
-    for name in ('LC_ALL', 'LC_MESSAGES', 'LANG'):
-        value = os.environ.get(name)
-        if value:
-            return value.lower().startswith('pt')
-    try:
-        return (locale.getlocale()[0] or '').lower().startswith('pt')
-    except ValueError:
-        return False
-
-
 def apply_theme(root):
     """Dark warm ttk look on top of clam, for the settings page and every dialog."""
     style = ttk.Style(root)
@@ -1108,6 +975,7 @@ class Launcher:
     def __init__(self, root):
         self.root = root
         self.settings = tlg_run.load_settings()
+        langpack.apply(langpack.resolve(self.settings.get('ui_language', 'en')))
         self.process = None
         self.lines = queue.Queue()
         for sequence in ('<MouseWheel>', '<Button-4>', '<Button-5>', '<Shift-MouseWheel>'):
@@ -1132,14 +1000,9 @@ class Launcher:
         else:
             widget.yview_scroll(steps, 'units')
 
-    # -- language ---------------------------------------------------------------------------
-    def pt(self):
-        choice = self.settings.get('ui_language', 'en_US')
-        return system_is_portuguese() if choice == 'auto' else choice == 'pt_BR'
-
+    # -- text ---------------------------------------------------------------------------------
     def t(self, key, **fmt):
-        en, pt = TEXT[key]
-        return (pt if self.pt() else en).format(**fmt)
+        return TEXT[key].format(**fmt)
 
     def update_strength(self, ini):
         """The one Sharpening slider (sharpness 0..4 in tlg.ini, shown 0..400%), steps of 5%."""
@@ -1194,7 +1057,7 @@ class Launcher:
             child.destroy()
         self.building = False
         root = self.root
-        root.title(self.t('title'))
+        root.title(TITLE)
         self.load_art()
         self.home = tk.Canvas(root, highlightthickness=0, bd=0, background=BG,
                               width=HOME_SIZE[0], height=HOME_SIZE[1])
@@ -1225,7 +1088,7 @@ class Launcher:
         """Settings: Game + Audio | Language + Launcher + Debug."""
         win = self.settings_window = Page(self, 'settings')
         win.title(self.t('home_settings'))
-        ttk.Label(win, text='PC — CUSA03627 v1.03', foreground=DIM).pack(anchor='w', padx=12)
+        ttk.Label(win, text=f'{EDITION} — CUSA03627 v1.03', foreground=DIM).pack(anchor='w', padx=12)
         main = scroll_area(win)
         for column in (0, 1):
             main.columnconfigure(column, weight=1, uniform='cols')
@@ -1250,6 +1113,7 @@ class Launcher:
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
+        self.build_sound_output(audio)
         self.build_drool(left)
 
         lang = section(right, self.t('language'))
@@ -1257,8 +1121,7 @@ class Launcher:
         lang.columnconfigure(1, weight=1)
         self.game_lang_box = None
         self.build_game_language(lang)
-        self.combo(lang, 1, 'ui_language', UI_LANGUAGES,
-                   lambda k: self.t('auto') if k == 'auto' else UI_LANGUAGE_NAMES[k], on_change=self.build)
+        self.build_ui_language(lang, 1)
         self.check(lang, 2, 'skip_logos')
         launcher = section(right, self.t('launcher_section'))
         launcher.grid(sticky='ew', pady=(0, 8))
@@ -1272,16 +1135,42 @@ class Launcher:
         self.check(debug, 2, 'debug_logging')
         self.hint(debug, 2, 3, 'debug_logging_hint')
 
+    def build_sound_output(self, parent):
+        """Output device and 'Always send 7.1' (tlg.ini audio_device / audio_surround, also in the
+        in-game menu's Controls tab). Kept in tlg.ini only, so a change made in the game stays. The
+        device names come from user/audio_devices.txt, which the game writes at every start."""
+        ini_path = tlg_run.USER_DIR / 'tlg.ini'
+        ini = tlg_run.read_ini(ini_path)
+        try:
+            names = [n for n in (tlg_run.USER_DIR / 'audio_devices.txt').read_text(encoding='utf-8').splitlines() if n]
+        except OSError:
+            names = []
+        current = ini.get('audio_device', '')
+        if current and current not in names:
+            names.append(current)
+        values = [''] + names
+        ttk.Label(parent, text=self.t('audio_device')).grid(row=1, column=0, sticky='w', pady=(6, 0))
+        box = ttk.Combobox(parent, values=[self.t('audio_default')] + names, state='readonly', width=36)
+        box.current(values.index(current) if current in values else 0)
+        box.grid(row=2, column=0, sticky='w', pady=2)
+        box.bind('<<ComboboxSelected>>',
+                 lambda _: tlg_run.update_ini(ini_path, {'audio_device': values[box.current()]}))
+        surround = tk.BooleanVar(value=ini.get('audio_surround', '0') == '1')
+        ttk.Checkbutton(parent, text=self.t('audio_surround'), variable=surround,
+                        command=lambda: tlg_run.update_ini(ini_path, {'audio_surround': int(surround.get())})
+                        ).grid(row=3, column=0, sticky='w', pady=2)
+        ttk.Label(parent, text=self.t('audio_hint'), foreground=MUTED, wraplength=380).grid(
+            row=4, column=0, sticky='w')
+
     def build_drool(self, parent):
         """Trico's drool on the Settings page, with its story in plain sight: the developers built it
         and switched it off just before release (tlg.ini trico_drool; the game reads it live, also from
         the in-game Fun tab)."""
         drool = next(item for item in backports_table.MENU if item.key == 'trico_drool')
-        box = section(parent, drool.name[0])
+        box = section(parent, drool.name)
         box.grid(sticky='ew', pady=(8, 0))
         values = [choice[0] for choice in drool.choices]
-        lang = 1 if self.pt() else 0
-        combo = ttk.Combobox(box, values=[choice[1 + lang] for choice in drool.choices], state='readonly', width=28)
+        combo = ttk.Combobox(box, values=[choice[1] for choice in drool.choices], state='readonly', width=28)
         chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('trico_drool', drool.default)
         combo.current(values.index(chosen) if chosen in values else 0)
         combo.grid(row=0, column=0, sticky='w')
@@ -1292,7 +1181,7 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
 
         combo.bind('<<ComboboxSelected>>', lambda _: picked())
-        ttk.Label(box, text=drool.what[lang], foreground=DIM, wraplength=420, justify='left').grid(
+        ttk.Label(box, text=drool.what, foreground=DIM, wraplength=420, justify='left').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
 
     def build_video(self):
@@ -1718,8 +1607,11 @@ class Launcher:
         line_y = top + (84 if home else 56)
         c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
         if home:
-            c.create_text(left, 198, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
+            c.create_text(left, 198, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
+                          anchor='w', fill=ACCENT, font=(SERIF, 10))
+            c.create_text(left, 222, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
                           fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11))
+            c.create_line(left, 244, left + 46, 244, fill=ACCENT)
         else:
             c.tag_bind('title', '<Button-1>', lambda _: self.show_page('home'))
             c.tag_bind('title', '<Enter>', lambda _: c.configure(cursor='hand2'))
@@ -1733,7 +1625,7 @@ class Launcher:
                  ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
                  ('home_quit', None, self.quit)]
-        first = 250 if home else 170
+        first = 274 if home else 170
         step = min(38 if home else 36, max(28, (height - first - 120) // len(items)))
         for index, (key, page, action) in enumerate(items):
             y = first + index * step
@@ -1846,7 +1738,7 @@ class Launcher:
 
     def pick_background(self):
         path = filedialog.askopenfilename(title=self.t('home_picture'),
-                                          filetypes=[('Images', '*.png *.jpg *.jpeg')])
+                                          filetypes=['Images'])
         if not path:
             return
         tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
@@ -2092,6 +1984,25 @@ class Launcher:
         return box
 
     # -- game language (depends on the loaded CUSA) ---------------------------------------------
+    def build_ui_language(self, parent, row):
+        """Launcher + in-game menu language: Automatic, English and every pack found (langpack.py)."""
+        packs = langpack.available()
+        values = list(packs) + ['auto']
+        current = self.settings.get('ui_language', 'en')
+        if current not in values:   # a pack that was removed, or an old en_US / pt_BR setting
+            values.append(current)
+
+        def label(code):
+            if code == 'auto':
+                return f"{self.t('auto')}: {packs.get(langpack.resolve('auto'), ('English',))[0]}"
+            return packs[code][0] if code in packs else f'{code} (not installed: English)'
+
+        def changed():
+            langpack.apply(langpack.resolve(self.settings.get('ui_language', 'en')))
+            self.root.after_idle(self.build)
+        self.combo(parent, row, 'ui_language', values, label, on_change=changed)
+        help_mark(parent, self.t('ui_language_hint')).grid(row=row, column=2, sticky='w', padx=(4, 0))
+
     def build_game_language(self, parent):
         """Game language: the ones the loaded CUSA ships (by its title id), US by default."""
         ttk.Label(parent, text=self.t('game_language')).grid(row=0, column=0, sticky='w')
@@ -2171,7 +2082,7 @@ class Launcher:
 
         for index, (button, name, action) in enumerate(PS4_BUTTONS):
             row, column = index % half + 1, 0 if index < half else 4
-            label = name if not action else f'{name} — {action[1] if self.pt() else action[0]}'
+            label = name if not action else f'{name} — {action}'
             ttk.Label(frame, text=label).grid(row=row, column=column, sticky='w', padx=(0, 6), pady=1)
             entry = ttk.Entry(frame, width=20)
             entry.insert(0, mapping.get(button, ''))
@@ -2396,7 +2307,6 @@ class Launcher:
         win.title(self.t('advanced_title'), self.t('advanced_hint'))
         frame = scroll_area(win)
         self.show_page('advanced')
-        lang = int(self.pt())
         columns = ttk.Frame(frame), ttk.Frame(frame)
         for index, column in enumerate(columns):
             column.grid(row=1, column=index, sticky='nw', padx=(0 if index == 0 else 10, 0 if index == 1 else 10))
@@ -2444,17 +2354,17 @@ class Launcher:
             def toggled(item=item, var=var, default=default):
                 save(item.key, var.get(), default)
 
-            ttk.Checkbutton(parent, text=item.name[lang], variable=var, command=toggled).grid(
+            ttk.Checkbutton(parent, text=item.name, variable=var, command=toggled).grid(
                 row=row, column=0, columnspan=2, sticky='w')
-            note(parent, row, item.what[lang], self.t('mark_on' if default else 'mark_off'),
-                 backports_table.READBACK_WHY[item.id][lang])
+            note(parent, row, item.what, self.t('mark_on' if default else 'mark_off'),
+                 backports_table.READBACK_WHY[item.id])
             resets.append(lambda var=var, default=default, toggled=toggled: (var.set(default), toggled()))
         # The in-game menu's readback batch (tlg.ini, applies at once).
         batch = next(item for item in backports_table.MENU if item.key == 'readback_batch')
         parent, row = place(1)
-        ttk.Label(parent, text=batch.name[lang]).grid(row=row, column=0, sticky='w')
+        ttk.Label(parent, text=batch.name).grid(row=row, column=0, sticky='w')
         sizes = [choice[0] for choice in batch.choices]
-        size = ttk.Combobox(parent, values=[choice[1 + lang] for choice in batch.choices], state='readonly', width=24)
+        size = ttk.Combobox(parent, values=[choice[1] for choice in batch.choices], state='readonly', width=24)
         chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('readback_batch', batch.default)
         size.current(sizes.index(chosen) if chosen in sizes else sizes.index(batch.default))
         size.grid(row=row, column=1, sticky='w', padx=6)
@@ -2465,15 +2375,15 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
 
         size.bind('<<ComboboxSelected>>', lambda _: size_picked())
-        note(parent, row, self.t('readback_batch_hint'), batch.choices[sizes.index(batch.default)][1 + lang],
-             backports_table.READBACK_WHY[batch.id][lang])
+        note(parent, row, self.t('readback_batch_hint'), batch.choices[sizes.index(batch.default)][1],
+             backports_table.READBACK_WHY[batch.id])
         resets.append(lambda: (size.current(sizes.index(batch.default)), size_picked()))
         # Slow-motion freeze fix (tlg.ini slow_motion, read when a scene loads).
         slow = next(item for item in backports_table.MENU if item.key == 'slow_motion')
         parent, row = place(1)
-        ttk.Label(parent, text=slow.name[lang]).grid(row=row, column=0, sticky='w')
+        ttk.Label(parent, text=slow.name).grid(row=row, column=0, sticky='w')
         slow_values = [choice[0] for choice in slow.choices]
-        slow_box = ttk.Combobox(parent, values=[choice[1 + lang] for choice in slow.choices], state='readonly',
+        slow_box = ttk.Combobox(parent, values=[choice[1] for choice in slow.choices], state='readonly',
                                 width=28)
         chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('slow_motion', slow.default)
         slow_box.current(slow_values.index(chosen) if chosen in slow_values else slow_values.index(slow.default))
@@ -2485,7 +2395,7 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
 
         slow_box.bind('<<ComboboxSelected>>', lambda _: slow_picked())
-        help_mark(parent, slow.what[lang]).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
+        help_mark(parent, slow.what).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
         resets.append(lambda: (slow_box.current(slow_values.index(slow.default)), slow_picked()))
 
         bottom = ttk.Frame(frame)
@@ -2541,7 +2451,7 @@ class Launcher:
     def clear_cache(self):
         """Clear shader cache: asks first, never while the game runs; shows how much was freed."""
         if self.process:
-            messagebox.showinfo(self.t('title'), self.t('already'))
+            messagebox.showinfo(TITLE, self.t('already'))
             return
         size = tlg_run.shader_cache_size(self.settings)
         if not size:
@@ -2641,10 +2551,10 @@ class Launcher:
         """point 'stage:area' = a practice start (Start at...): saves copied before, put back after."""
         window = getattr(self, 'bench_window', None)
         if window and window.running:
-            messagebox.showinfo(self.t('title'), self.t('bench_busy'))
+            messagebox.showinfo(TITLE, self.t('bench_busy'))
             return
         if self.process:
-            messagebox.showinfo(self.t('title'), self.t('already'))
+            messagebox.showinfo(TITLE, self.t('already'))
             return
         self.changed()
         self.append(self.t('preparing'))
@@ -2707,7 +2617,7 @@ class Launcher:
                         message = self.t('ended' if value in (0, -15) else 'crashed', code=value)
                         self.append(message)
                         if value not in (0, -15):
-                            messagebox.showwarning(self.t('title'), message)
+                            messagebox.showwarning(TITLE, message)
                     self.refresh_status()
                 else:
                     self.append(item)
@@ -2749,7 +2659,7 @@ class Launcher:
             gpu = info.get('gpu') if info else None
             known = report.known_for(report.load_known_issues(), gpu)
             for k in known:
-                k['title'] = k['title']['pt' if self.pt() else 'en']
+                k['title'] = k['title']['en']
             full = report.redact(report.markdown_report(rows, summary, log_name, known, '', self.t), names)[0]
             short = report.redact(report.short_report(rows, summary, self.t), names)[0]
             title = self.t('rep_issue_title', gpu=gpu['name'] if gpu else self.t('rep_unknown'))

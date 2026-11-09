@@ -345,7 +345,7 @@ private:
     Common::SharedFirstMutex mapped_ranges_mutex;
     PipelineCache pipeline_cache;
     std::unique_ptr<DrawPreparation> draw_prep;
-    std::unique_ptr<CameraMotion> camera_motion; // tlg: motion vectors (docs/upscaler.md)
+    std::unique_ptr<CameraMotion> camera_motion; // tlg: motion vectors (docs/upscaling.md)
     std::unique_ptr<SceneTargets> scene_targets;
     std::unique_ptr<TexturePack> texture_pack;
     bool scene_started = false;
@@ -353,7 +353,7 @@ private:
     bool motion_draw = false;
     u64 motion_geometry{};    ///< vertex-stream identity of the current direct draw
     bool gbuffer_draw = false;
-    std::unique_ptr<TemporalUpscaler> upscaler; // tlg: FSR (docs/upscaler.md)
+    std::unique_ptr<TemporalUpscaler> upscaler; // tlg: DLSS and FSR (docs/upscaling.md)
     std::array<float, 2> draw_jitter{};         ///< viewport offset of the current draw, pixels
     std::array<float, 2> target_scale{1.0f, 1.0f}; ///< pass drawn into the upscaler's output-size images
     /// HDR engine UI: guest w/h and output w/h; a scissor over the whole guest frame opens up
@@ -515,6 +515,9 @@ private:
     u32 pending_checks = 0;
     u64 proxy_samples = 0; ///< texture bindings that read a scene proxy (statistics)
     float sampler_lod_bias = 0.0f; ///< tlg: extra bias of this draw's samplers
+    mutable float ui_cx = 0.f; ///< tlg: UI piece centre x (clip space if ui_clip, else layout px)
+    mutable bool ui_clip = true;
+    mutable bool ui_fill_quad = false; ///< tlg: this interface draw is one full-screen picture
     bool scene_debug_frame = false; ///< TLG_SCENE_DEBUG: this frame's passes are printed
     bool PendingWriteOverlaps(VAddr address, u64 size);
     /// Stage B: the ring bindings of the stages of the packet being recorded.

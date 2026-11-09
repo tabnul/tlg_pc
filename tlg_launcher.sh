@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Abre o launcher do The Last Guardian (configurações, idioma, jogar).
+# Opens The Last Guardian launcher (settings, language, play).
 exec python3 "$(dirname -- "$(realpath -- "$0")")/port/launcher/tlg_launcher.py" "$@"

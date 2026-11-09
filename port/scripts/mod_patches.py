@@ -5,7 +5,7 @@
 Reads third-party patch XML files (the "PATCHES" format shadPS4/GoldHEN cheat tools use) from
 a user-writable mods directory, keeps only the ones that match this game's title ID and app
 version, and compiles their literal byte writes into (offset, bytes, description) triples the
-caller merges into its own G3PATCH2 patch file (the loader, probe.c apply_patches, already
+caller merges into its own TLGPATCH patch file (the loader, probe.c apply_patches, already
 applies that format). A patch whose lines fall outside the eboot's segments is skipped on its
 own, never aborting the others or the port's own built-in patches.
 

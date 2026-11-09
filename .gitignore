@@ -1,4 +1,4 @@
-# Arquivos do jogo (copyright da Sony/genDESIGN): NUNCA versionar
+# Game files (copyright Sony/genDESIGN): NEVER commit
 /dump
 *.psarc
 *.bin
@@ -15,7 +15,7 @@
 # Ferramentas de terceiros (Ghidra, JDK, GhidraOrbis): instaladas localmente
 /tools/
 
-# Saída bruta de descompilação (código derivado do jogo) e caches do REA/Ghidra
+# Raw decompiler output (code derived from the game) and REA/Ghidra caches
 analysis/raw/
 analysis/*.c
 *.rea-snapshot
@@ -27,7 +27,7 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Saídas de build do port e dados locais do jogo preparados
+# Port build output and prepared local game data
 port/out/
 port/pgo/*
 !port/pgo/tlggpu.profdata

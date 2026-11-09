@@ -1,5 +1,5 @@
 import struct, sys, re, collections, json
-# uso: sce_imports.py <eboot.elf> <nid_db.xml> <saida.json>  — lista importações SCE por biblioteca, resolvendo NIDs
+# usage: sce_imports.py <eboot.elf> <nid_db.xml> <out.json>  — lists SCE imports per library, resolving NIDs
 path, nidxml, out = sys.argv[1], sys.argv[2], sys.argv[3]
 d = open(path,'rb').read()
 phoff = struct.unpack_from('<Q', d, 0x20)[0]; phnum = struct.unpack_from('<H', d, 0x38)[0]

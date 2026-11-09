@@ -21,7 +21,7 @@ DEFAULTS = dict(tlg_run.DEFAULT_SETTINGS)
 
 
 def t(key, **fmt):
-    en, _ = {**preset_share.TEXT, **tlg_run.TEXT}.get(key, (key, key))
+    en = {**preset_share.TEXT, **tlg_run.TEXT}.get(key, key)
     return en.format(**fmt) if fmt else en
 
 
@@ -134,7 +134,7 @@ class RoundTripTests(Base):
         changes = preset_share.diff(preset, dict(DEFAULTS), {i.id: None for i in backports_table.ITEMS})
         self.assertEqual(sorted((k, i) for k, i, _, _ in changes),
                          [('item', 'menu:color_contrast'), ('item', 'menu:fsr1'), ('setting', 'vsync')])
-        body, lines = preset_share.summary_lines(preset, [], changes, t, False)
+        body, lines = preset_share.summary_lines(preset, [], changes, t)
         self.assertIn('3', body)
         self.assertEqual(len(lines), 3)
         self.assertTrue(any('Contrast' in line and '1.3' in line for line in lines))
@@ -227,13 +227,12 @@ class ValidationTests(Base):
         _, stored = gfxlogic.custom_targets({'items': items})
         self.assertFalse(set(stored) & backports_table.NOT_IN_PRESETS)
 
-    def test_every_problem_code_has_a_text_in_both_languages(self):
+    def test_every_problem_code_has_a_text(self):
         for code in ('unreadable', 'too_big', 'not_json', 'format', 'version', 'newer', 'empty', 'game',
                      'unknown_item', 'unknown_setting', 'bad_item', 'bad_setting'):
-            en, pt = preset_share.TEXT['ps_p_' + code]
-            self.assertTrue(en and pt)
-        for key, (en, pt) in preset_share.TEXT.items():
-            self.assertTrue(en and pt, key)
+            self.assertTrue(preset_share.TEXT['ps_p_' + code])
+        for key, text in preset_share.TEXT.items():
+            self.assertTrue(text, key)
 
 
 if __name__ == '__main__':

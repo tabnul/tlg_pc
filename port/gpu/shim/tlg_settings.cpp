@@ -114,6 +114,14 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.key_map = value;
         return;
     }
+    if (key == "audio_device") {
+        v.audio_device = value;
+        return;
+    }
+    if (key == "audio_surround") {
+        v.audio_surround = std::atoi(value.c_str()) != 0;
+        return;
+    }
     if (key == "upscaler") {
         for (int u = 0; u < UpscalerCount; ++u) {
             if (value == UpscalerName(u)) {
@@ -566,7 +574,7 @@ bool FixedRenderSession() {
 }
 
 int RenderPreset() {
-    // The resolution patch (TLG_RESOLUTION_PATCH, run.py) renders natively: no reduced presets.
+    // The resolution patch (TLG_RESOLUTION_PATCH, tlg_run.py) renders natively: no reduced presets.
     static const bool resolution_patch = std::getenv("TLG_RESOLUTION_PATCH") != nullptr;
     if (resolution_patch) return NativeAA;
     const auto& v = Get();
@@ -576,7 +584,7 @@ int RenderPreset() {
 
 bool ResolutionNeedsRestart() {
     const auto& v = Get();
-    // TAA needs the live path (native guest targets): run.sh selects it on restart.
+    // TAA needs the live path (native guest targets): the launcher selects it on restart.
     return FixedRenderSession() &&
         (v.preset != v.startup_preset || v.output_res != v.startup_output_res ||
          (v.upscaler == UpscalerOff) != (v.startup_upscaler == UpscalerOff) ||
@@ -627,6 +635,7 @@ void Save() {
                  v.engine_fps.load(), int(v.hdr.load()), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     std::fprintf(file, "frame_generation=%d\n", v.frame_generation.load());
+    std::fprintf(file, "audio_device=%s\naudio_surround=%d\n", v.audio_device.c_str(), int(v.audio_surround.load()));
     std::fprintf(file, "keep_gpu_textures=%d\n", int(v.keep_gpu_textures.load()));
     std::fprintf(file, "arena_release=%d\ngc_live_budget=%d\n", int(v.arena_release.load()),
                  int(v.gc_live_budget.load()));
@@ -654,7 +663,7 @@ void Save() {
         std::fprintf(file, "dlss_supported=%d\n", dlss_checked ? int(v.dlss_supported.load()) : dlss_supported_file);
     if (fsr4_supported_file >= 0) std::fprintf(file, "fsr4_supported=%d\n", fsr4_supported_file);
     if (fsr4_default_done) std::fprintf(file, "fsr4_default=1\n");
-    // Read by run.sh at start.
+    // Read by the launcher at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
     std::fclose(file);
@@ -663,7 +672,7 @@ void Save() {
 namespace {
 // The game as shipped: none of the port's filters, the game's own shadows, filtering and textures.
 constexpr const char* StockLines = "dlaa=0\nsmaa=0\nfsr1=0\nsharpen=0\nshadow_scale=1\nfov=70\n"
-                                   "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\n";
+                                   "color_adjust=0\nlod_bias=0\naniso=0\ntexture_pack=off\ngrass_smooth=0\nhaze_fringe=100\n";
 
 void ApplyLines(Values& v, const std::string& lines) {
     std::istringstream stream{lines};

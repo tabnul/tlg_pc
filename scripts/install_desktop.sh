@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Instala o atalho do launcher no menu de aplicativos (Linux, padrão freedesktop: GNOME, KDE...).
-# O ícone é o do port (port/packaging/icon/tlg-icon-1024.png, arte original do projeto).
-# Uso: scripts/install_desktop.sh [--remove]
+# Installs the launcher shortcut in the applications menu (Linux, freedesktop standard: GNOME, KDE...).
+# The icon is the port's own (port/packaging/icon/tlg-icon-1024.png, original project art).
+# Usage: scripts/install_desktop.sh [--remove]
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 apps=${XDG_DATA_HOME:-$HOME/.local/share}/applications
@@ -26,7 +26,6 @@ cat > "$desktop" <<DESK
 Type=Application
 Name=The Last Guardian
 Comment=Native PC port launcher (your own PS4 dump)
-Comment[pt_BR]=Launcher do port nativo para PC (com o seu dump do PS4)
 Exec=$root/tlg_launcher.sh
 Path=$root
 Icon=$icon

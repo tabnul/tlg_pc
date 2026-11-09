@@ -11,10 +11,10 @@ while true; do
   if [ $pct5 -ne $last ]; then
     dt=$((now-prevt)); rate=$(( dt>0 ? (B-prevb)/dt/1000000 : 0 ))
     eta=$( [ $rate -gt 0 ] && echo "$(( (TOTAL-B)/1000000/rate/60 )) min" || echo "?")
-    printf "Dump USB: %d%% (%.1f / %.1f GB) ~%d MB/s, ETA %s\n" $pct $(echo "$B/1000000000" | bc -l) $(echo "$TOTAL/1000000000" | bc -l) $rate "$eta"
+    printf "USB dump: %d%% (%.1f / %.1f GB) ~%d MB/s, ETA %s\n" $pct $(echo "$B/1000000000" | bc -l) $(echo "$TOTAL/1000000000" | bc -l) $rate "$eta"
     last=$pct5; prevb=$B; prevt=$now; stall=0
   else stall=$((stall+1)); fi
-  [ $pct -ge 100 ] && { echo "Dump USB: tamanho total atingido — confira no Itemzflow se terminou"; exit 0; }
-  [ $stall -eq 20 ] && echo "Dump USB: sem progresso há ~10 min (parado em $pct%) — terminou ou travou?"
+  [ $pct -ge 100 ] && { echo "USB dump: full size reached — check in Itemzflow that it finished"; exit 0; }
+  [ $stall -eq 20 ] && echo "USB dump: no progress for ~10 min (stuck at $pct%) — finished or hung?"
   sleep 30
 done

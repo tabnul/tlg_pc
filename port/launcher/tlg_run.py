@@ -160,6 +160,15 @@ def resolve_game_language(settings, environ=None):
     return 'en'
 
 
+def language_pack_path(settings):
+    """The JSON file of the launcher/menu language pack in use, or None for English (langpack.py)."""
+    try:
+        import langpack
+        return langpack.available().get(langpack.resolve(settings.get('ui_language', 'en')), (None, None))[1]
+    except Exception:
+        return None
+
+
 def game_language_environment(settings, environ=None):
     """Select the internal French id plus a non-destructive guest archive mask for Japanese.
 
@@ -174,7 +183,7 @@ def game_language_environment(settings, environ=None):
             'TLG_JAPANESE_FALLBACK': '1' if language == 'ja' and selected == '2' else '0'}
 
 
-# TLG defaults (see README "Opções" and the reasons in each comment).
+# TLG defaults (see the README options and the reasons in each comment).
 DEFAULT_ENV = {
     'TLG_PIPELINE_BINARIES': '0',  # VK_KHR_pipeline_binary crashes on the NVIDIA 595 driver
     'TLG_READBACKS': '2',          # the game reads GPU compute results on the CPU (AsyncMap)
@@ -200,11 +209,11 @@ DEFAULT_SETTINGS = {
     # picks the game folder; libSceNgs2.sprx goes in system_lib/ next to the executable.
     'game_dir': '' if FROZEN else str(REPO_DIR / 'game' / 'CUSA03627'),
     'system_lib_dir': str(PORT_DIR / 'system_lib') if FROZEN else str(REPO_DIR / 'dump' / 'system_lib'),
-    'game_language': 'pt_BR',
+    'game_language': 'en',
     'texpack_dir': '',             # texture packs folder; empty = texpack_dir()'s default
-    'ui_language': 'en_US',        # auto (system language) | pt_BR | en_US
     'show_fps': False,
     'menu_music': True,            # the launcher plays the game's own menu tune (sce_sys/snd0.at9)
+    'ui_language': 'en',           # language pack for launcher + in-game menu: en | auto (system) | pack code
     'skip_logos': False,           # scripts/tlg_patches.py --skip-logos; TLG_SKIP_LOGOS=1 too
     'display_mode': 'Windowed',    # Windowed | Borderless | Fullscreen (tlg.ini)
     'vsync': True,
@@ -234,7 +243,8 @@ FRAME_RATES = ['30', '60', 'unlocked']
 # experimental: the game runs, but some overlays sit to the left and menu parts are stretched.
 RESOLUTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160',
                '2560x1080', '3440x1440', '3840x1600', '5120x2160',
-               '3840x1080', '5120x1440', '7680x2160']
+               '3840x1080', '5120x1440', '7680x2160',
+               '1280x800', '1920x1200', '2560x1600']
 # The frame rate mode prepare() really applied (another eboot build stays at 30).
 applied_frame_rate = '30'
 # The size the resolution patch really applied (None: the game's own 1920x1080).
@@ -347,17 +357,14 @@ def save_settings(settings):
     path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
 
-# Messages about the player's game folder (en, pt) the Qt launcher can show; none blocks only as a
+# Messages about the player's game folder the Qt launcher can show; none blocks only as a
 # warning in this port (check_game reports missing files and the unbuilt probe).
 TEXT = {}
 WARNINGS = set()
 
 
-def message(key, portuguese=None, **fmt):
-    en, pt = TEXT[key]
-    if portuguese is None:
-        return f'{pt.format(**fmt)}\n{en.format(**fmt)}'
-    return (pt if portuguese else en).format(**fmt)
+def message(key, **fmt):
+    return TEXT[key].format(**fmt)
 
 
 class GameError(RuntimeError):
@@ -565,7 +572,8 @@ def resolution_label(size):
     """'3440x1440 (21:9)': ultrawide sizes are 64:27 (2560x1080) or 43:18 (3440x1440), sold as 21:9."""
     width, height = (int(n) for n in size.split('x'))
     ratio = width / height
-    name = '32:9, experimental' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9'
+    name = ('32:9, experimental' if ratio > 3.4 else '21:9' if ratio > 2.2 else '16:9' if ratio > 1.7
+            else '16:10')
     return f'{width} × {height} ({name})'
 
 
@@ -825,8 +833,9 @@ def build_env(settings, extra=None):
     if pad_map:
         env.setdefault('TLG_PAD_MAP', ','.join(f'{button}={names}' for button, names in pad_map.items()))
     env.update(game_language_environment(settings))
-    if settings.get('ui_language', 'en_US') != 'auto':
-        env['TLG_UI_LANG'] = settings['ui_language']
+    pack = language_pack_path(settings)
+    if pack:
+        env['TLG_LANG_PACK'] = str(pack)   # in-game menu texts (gpu/shim/tlg_lang.h)
     # Without the console module the port's own mixer (runtime_ngs2.c) plays the audio.
     env['TLG_NGS2'] = 'native' if ngs2_module(settings) else 'hle'
     env['TLG_CONFIG'] = str(user_dir() / 'tlg.ini')
@@ -1043,7 +1052,7 @@ def main(argv=None):
         freed, failures = clear_shader_cache(settings)
         print(f'Cache de shaders: {shader_cache.human_size(freed)} liberados', flush=True)
         for path, error in failures:
-            print(f'Não apagado (em uso? feche o jogo): {path}: {error}', file=sys.stderr)
+            print(f'Not deleted (in use? close the game): {path}: {error}', file=sys.stderr)
         return 1 if failures else 0
     if os.environ.get('TLG_NGS2') == 'hle':
         settings['native_audio'] = False

@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -3844,6 +3845,86 @@ void Rasterizer::UnmapMemory(VAddr addr, u64 size) {
 }
 
 void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool is_indexed) const {
+    // tlg: an interface draw whose vertices span the whole 1920x1080 layout (or the
+    // whole clip space) is a full-screen picture: UpdateViewportScissorState fills the frame
+    // with it instead of boxing it into 16:9.
+    ui_fill_quad = false;
+    const auto& regs = Regs();
+    if (regs.num_indices >= 6 && !regs.depth_control.depth_enable && regs.color_buffers[0] &&
+        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
+        const auto& fetch = pipeline->GetFetchShader();
+        if (fetch && !fetch->attributes.empty()) {
+            const auto& vs = pipeline->GetStage(Shader::SwStage::Vertex);
+            const auto vb = fetch->attributes[0].GetSharp(vs);
+            const u32 stride = vb.GetStride();
+            const auto* base = reinterpret_cast<const u8*>(vb.base_address);
+            float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+            if (base && stride >= 8 && vb.num_records >= 3 &&
+                vb.GetNumberFmt() == AmdGpu::NumberFormat::Float) {
+                // The quad's own vertices: the buffer is a shared ring, so go through the
+                // draw's vertex offset and (when indexed) its index buffer.
+                const u32 first = GetDrawOffsets(regs, vs, fetch).first;
+                const u32 index_size =
+                    regs.index_buffer_type.index_type == AmdGpu::IndexType::Index16 ? 2u : 4u;
+                const auto* indices =
+                    is_indexed ? reinterpret_cast<const u8*>(
+                                     regs.index_base_address.Address<VAddr>() +
+                                     u64(draw_inputs.index_offset) * index_size)
+                               : nullptr;
+                const u32 count = std::min<u32>(regs.num_indices, 16384);
+                for (u32 i = 0; i < count; ++i) {
+                    u32 v = i;
+                    if (indices) {
+                        if (index_size == 2) {
+                            u16 x;
+                            std::memcpy(&x, indices + i * 2, 2);
+                            v = x;
+                        } else {
+                            std::memcpy(&v, indices + i * 4, 4);
+                        }
+                    }
+                    v += first;
+                    if (v >= vb.num_records) {
+                        x0 = 1e9f;
+                        break;
+                    }
+                    float p[2];
+                    std::memcpy(p, base + u64(v) * stride, sizeof(p));
+                    x0 = std::min(x0, p[0]), x1 = std::max(x1, p[0]);
+                    y0 = std::min(y0, p[1]), y1 = std::max(y1, p[1]);
+                }
+                const bool clip = x0 <= -0.98f && x1 >= 0.98f && y0 <= -0.98f && y1 >= 0.98f &&
+                                  x1 <= 1.5f && y1 <= 1.5f;
+                // Pixel layout: covers (nearly) the whole 1920x1080 canvas, like a picture or
+                // the glyph layer of the loading animation; text and prompts stay boxed.
+                const bool pixels = x1 - x0 >= 1700.f && y1 - y0 >= 900.f;
+                ui_fill_quad = clip || pixels;
+                // Menu text: the quad is local around 0 and the shader moves it; the screen
+                // position (clip space) is floats 16-17 of a 304-byte constant block (w = 1).
+                float off_x = 0.f;
+                if (x0 < x1 && x0 > -0.5f && x1 < 0.5f && std::abs(x0 + x1) < 0.01f) {
+                    for (const auto& res : vs.buffers) {
+                        const auto cb = res.GetSharp(vs);
+                        if (cb.base_address && cb.GetSize() == 304) {
+                            float c[20];
+                            std::memcpy(c, reinterpret_cast<const void*>(cb.base_address), sizeof(c));
+                            if (c[19] == 1.f && std::abs(c[16]) <= 1.f && std::abs(c[17]) <= 1.f)
+                                off_x = c[16];
+                            break;
+                        }
+                    }
+                }
+                // Wide frames: the piece's centre (clip space or 1920x1080 layout pixels).
+                if (ui_fill_quad) {
+                    ui_cx = 0.f;
+                    ui_clip = true;
+                } else if (x0 < x1) {
+                    ui_clip = x0 >= -1.5f && x1 <= 1.5f && y0 >= -1.5f && y1 <= 1.5f;
+                    ui_cx = (x0 + x1) * 0.5f + (ui_clip ? off_x : 0.f);
+                } // unknown position: keep the last piece's
+            }
+        }
+    }
     UpdateViewportScissorState();
     UpdateDepthStencilState();
     UpdatePrimitiveState(is_indexed);
@@ -3984,6 +4065,59 @@ void Rasterizer::UpdateViewportScissorState() const {
                 .offset = {vp_scsr.top_left_x, vp_scsr.top_left_y},
                 .extent = {vp_scsr.GetWidth(), vp_scsr.GetHeight()},
             });
+        }
+    }
+
+    // tlg: on frames not 16:9 (21:9, 16:10) the game's 2D interface (menus, prompts,
+    // subtitles: triangle lists without depth drawn into a display buffer) is laid out for
+    // 1920x1080 and would stretch over the whole frame. Map those draws into the largest 16:9
+    // area in the middle. Full-screen pictures (ui_fill_quad) instead cover the frame, evenly
+    // enlarged and cropped at the long side, so they get no black bars.
+    if (!regs.IsClipDisabled() && regs.primitive_type == AmdGpu::PrimitiveType::TriangleList &&
+        !regs.depth_control.depth_enable && regs.color_buffers[0] && !viewports.empty() &&
+        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
+        // The game's own frame area (the target can be padded, e.g. 1088 lines for 1080).
+        const float w = std::abs(viewports[0].width);
+        const float h = std::abs(viewports[0].height);
+        // 21:9: pieces in the left/right third of the layout follow that screen edge.
+        if (w > 0.f && h > 0.f && w * 9.f > h * 16.f + 16.f && !ui_fill_quad) {
+            // 21:9: the game lays its interface out on a canvas 1080 * frame aspect wide
+            // (tlg_patches.py; with it the hints keep their text), but places right-hand
+            // pieces (hint boxes) for a 1920 wide layout. Move those to the right edge.
+            const float uiw = 1080.f * w / h;
+            const float lx = ui_clip ? (ui_cx + 1.f) * 0.5f * uiw : ui_cx;
+            // Pieces centred on the wide canvas (title prompt, dialogs) stay in the middle.
+            if (lx > 1280.f && std::abs(lx - uiw * 0.5f) > 64.f) {
+                const float ax = w - 1920.f * h / 1080.f;
+                for (auto& v : viewports)
+                    v.x += ax;
+                for (auto& s : scissors) {
+                    const s32 x0 = s32(std::lround(float(s.offset.x) + ax));
+                    s.offset.x = std::max(x0, 0);
+                }
+            }
+        } else if (w > 0.f && h > 0.f && w * 9.f < h * 16.f - 16.f) {
+            const bool wide = w * 9.f > h * 16.f;
+            const bool box_width = wide != ui_fill_quad;
+            const float bw = box_width ? h * 16.f / 9.f : w;
+            const float bh = box_width ? h : w * 9.f / 16.f;
+            const float ax = (w - bw) * 0.5f, ay = (h - bh) * 0.5f;
+            const float kx = bw / w, ky = bh / h;
+            for (auto& v : viewports) {
+                v.x = ax + v.x * kx;
+                v.y = ay + v.y * ky;
+                v.width *= kx;
+                v.height *= ky;
+            }
+            for (auto& s : scissors) {
+                const s32 x0 = s32(std::lround(ax + float(s.offset.x) * kx));
+                const s32 y0 = s32(std::lround(ay + float(s.offset.y) * ky));
+                const s32 x1 = s32(std::lround(ax + float(s.offset.x + s32(s.extent.width)) * kx));
+                const s32 y1 = s32(std::lround(ay + float(s.offset.y + s32(s.extent.height)) * ky));
+                s.offset = vk::Offset2D{std::max(x0, 0), std::max(y0, 0)};
+                s.extent = vk::Extent2D{u32(std::max(x1 - std::max(x0, 0), 0)),
+                                        u32(std::max(y1 - std::max(y0, 0), 0))};
+            }
         }
     }
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// tlg: temporal upscaling of the HDR scene color (docs/upscaler.md). Off for God of War III
-// until its scene color, depth and camera constants are found (run.py). TLG_UPSCALER=fsr3
+// tlg: temporal upscaling of the HDR scene color (docs/upscaling.md). TLG_UPSCALER=fsr3
 // runs FSR 3.1 (FireBurn/UniversalScalers-Vulkan, native Vulkan) on the scene color right before the
 // post-processing combine pass, with the scene depth and camera motion vectors, and writes the
 // result back so the game's own post, tonemap and UI continue unchanged (Native AA preset).

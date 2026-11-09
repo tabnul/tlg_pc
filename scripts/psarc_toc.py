@@ -1,4 +1,4 @@
-# uso: OUT=<dir> psarc_toc.py <arquivo.psarc>...  — lê header/TOC de PSARC e grava o manifest (lista de paths)
+# usage: OUT=<dir> psarc_toc.py <file.psarc>...  — reads the PSARC header/TOC and writes the manifest (list of paths)
 import sys, struct, zlib, lzma, collections, os
 def parse(path, dump_manifest=None):
     f=open(path,'rb'); h=f.read(32)

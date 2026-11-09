@@ -172,7 +172,7 @@ class LoaderTests(unittest.TestCase):
 
 def host_env():
     env = dict(os.environ)
-    # Development builds run from the MSYS2 tree: its CLANG64 DLLs (SDL3, ...), as in run.py.
+    # Development builds run from the MSYS2 tree: its CLANG64 DLLs (SDL3, ...), as in tlg_run.py.
     if sys.platform == 'win32' and not (HOST_EXE.parent / 'SDL3.dll').is_file():
         clang64 = Path(env.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'
         env['PATH'] = f'{clang64}{os.pathsep}{env.get("PATH", "")}'
