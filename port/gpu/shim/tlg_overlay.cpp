@@ -2229,17 +2229,6 @@ bool HandleEvent(const SDL_Event& event) {
             std::fflush(stdout);
             return true;
         }
-        // tlg: F9 adds a Trico (Fun tab).
-        if (down && !event.key.repeat && event.key.key == SDLK_F9) {
-            if (TlgFun::Tricos() >= TlgFun::MaxTricos) {
-                notice_text = "Trico limit (" + std::to_string(TlgFun::MaxTricos) + ")";
-            } else {
-                TlgFun::AddTrico();
-                notice_text = "Trico +1";
-            }
-            notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-            return true;
-        }
         // tlg: F12 shows or hides the Fun move bar; the mouse then picks a move.
         if (down && !event.key.repeat && event.key.key == SDLK_F12) {
             move_bar_open = !move_bar_open;

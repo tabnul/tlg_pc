@@ -1,3 +1,4 @@
+#include <thread>
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tlg: the game's Lua loadbuffer (HavokScript) is redirected here (src/probe.c,
 // install_lua_hook). utils.lua gets a tick that loads "--TLGSET" every 15 frames; that chunk
@@ -290,6 +291,158 @@ void FunQueue(const std::string& code) {
     std::lock_guard lock(fun_mutex);
     fun_queue += "\ndo local ok,e=pcall(function()\n" + code + "\nend) if not ok then L('fun error: '..tostring(e)) end end\n";
 }
+
+// Grip log (TLG_GRIP_LOG=1, AMD fall-off test 2026-11-09): per tick the boy's physics state, what he
+// rides or holds, his and Trico's position and the game's frame time. Quiet while nothing changes;
+// at every state change it prints the last 2 s of ticks and the next 2 s, so a fall shows what
+// Trico's body did under the boy right before it.
+bool GripWanted() {
+    static const bool want = [] {
+        const char* env = std::getenv("TLG_GRIP_LOG");
+        return env && *env && std::string_view(env) != "0";
+    }();
+    return want;
+}
+constexpr std::string_view GripLua = R"(
+if _TLG_GRIP then pcall(UnRegisterTick,_TLG_GRIP) _TLG_GRIP=nil end
+local ring,ri,post,last,tick,errs,lastsum={},0,0,nil,0,0,0
+local lastanim,lastctx,pbl,pbs
+local pb,pc,pp
+local function V(o) if not o then return nil end local ok,p=pcall(function() return o.worldPosition or o.position end)
+ if not ok or p==nil then return nil end local t={} for n in tostring(p):gmatch('[-%d%.e]+') do t[#t+1]=tonumber(n) end
+ if #t<3 then return nil end return t end
+local function F(x) return x and string.format('%.3f',x) or '-' end
+local function Q(f,...) local ok,v=pcall(f,...) if ok then return v end return nil end
+_TLG_GRIP=function()
+ local ok,e=pcall(function()
+  tick=tick+1
+  local dt=Q(MSC_GetGameDelta)
+  local st=tostring(Q(MS.BoyGetDynamicsState))
+  local ride=Q(MS.BoyIsRidingOn,'Condor') local body=Q(MS.BoyIsRidingOn_OnlyBody,'Condor')
+  local boy=Q(FindObject,'Player') local tr=Q(FindObject,'Condor') local sen=Q(FindObject,'Player_sensor-ext')
+  local part,typ='-','-'
+  local pe=sen and Q(function() return sen.TrackingPoint_Entity end)
+  if sen then part=tostring(Q(function() return sen.TrackingPoint_CondorPartsAttribute end)) typ=tostring(Q(function() return sen.TrackingPoint_Type end)) end
+  local b,c,pv=V(boy),V(tr),V(pe)
+  local rel,bm,cm='-','-','-'
+  if b and c then rel=F(b[1]-c[1])..','..F(b[2]-c[2])..','..F(b[3]-c[3]) end
+  if b and pb then bm=F(math.sqrt((b[1]-pb[1])^2+(b[2]-pb[2])^2+(b[3]-pb[3])^2)) end
+  if c and pc then cm=F(math.sqrt((c[1]-pc[1])^2+(c[2]-pc[2])^2+(c[3]-pc[3])^2)) end
+  local prel,pm='-','-'
+  if b and pv then prel=F(b[1]-pv[1])..','..F(b[2]-pv[2])..','..F(b[3]-pv[3]) end
+  if pv and pp then pm=F(math.sqrt((pv[1]-pp[1])^2+(pv[2]-pp[2])^2+(pv[3]-pp[3])^2)) end
+  pb,pc,pp=b,c,pv
+  local anim=tostring(Q(function() return Ai2.Utils.GetAIProps('Condor').currentInfo.mainPlayingAnim end))
+  local w=Q(function() return Ai2.Utils.GetAIProps('Condor').currentInfo.work end)
+  local function VE(n) local o=Q(FindObject,n) if not o then return '-' end local f=tostring(Q(function() return o.Flags end)) return f:find('Disabled') and 'off' or 'ON' end
+  local ux=tostring(Q(MS.BoyCompareStateUserdata,'isClimbRagdoll'))..'/'..tostring(Q(MS.BoyCompareStateUserdata,'isFall'))
+  local ai=Q(function() return Ai2.Utils.GetAIProps('Condor').currentInfo.ai2Ext end)
+  local bl=ai and V(Q(Ai2.Utils.FindBone,ai,'jt_LegUp_Lf')) local bs=ai and V(Q(Ai2.Utils.FindBone,ai,'jt_Spine'))
+  local blm='-' if bl and pbl then blm=F(math.sqrt((bl[1]-pbl[1])^2+(bl[2]-pbl[2])^2+(bl[3]-pbl[3])^2)) end
+  local bsm='-' if bs and pbs then bsm=F(math.sqrt((bs[1]-pbs[1])^2+(bs[2]-pbs[2])^2+(bs[3]-pbs[3])^2)) end
+  local brel='-' if b and bl then brel=F(b[1]-bl[1])..','..F(b[2]-bl[2])..','..F(b[3]-bl[3]) end
+  pbl,pbs=bl,bs
+  local wd,wn='-','-'
+  if ai and b then local best for _,n in ipairs({'jt_Wing_Shoulder_Lf','jt_Wing_ArmUp_Lf','jt_Wing_ArmLow_Lf','jt_Wing_Hand_Lf','jt_Wing_Fing_Lf','jt_Wing_Shoulder_Rt','jt_Wing_ArmUp_Rt','jt_Wing_ArmLow_Rt','jt_Wing_Hand_Rt','jt_Wing_Fing_Rt'}) do
+   local p=V(Q(Ai2.Utils.FindBone,ai,n)) if p then local d=math.sqrt((b[1]-p[1])^2+(b[2]-p[2])^2+(b[3]-p[3])^2) if not best or d<best then best=d wn=n end end end
+   if best then wd=F(best) end end
+  local bones='legmove='..blm..' spinemove='..bsm..' boy-leg='..brel..' wing='..wn..'@'..wd
+  local ctx='sb='..tostring(w and w.TC_ShockBallType)..'/'..tostring(w and w.TC_ShockBallOn)..' wing='..tostring(w and w.TC_WingVolFlag)..' deny='..VE('TC_B_bhv_deny_climb_01')..VE('TC_B_bhv_deny_climb_03')..' ffall='..VE('TC_B_bhv_climb_forcedFall_01')..' climbrag/fall='..ux..' care1='..tostring(w and w.TC_Care1_Clear)
+  if ctx~=lastctx then L('grip ctx '..ctx..' boy='..st..' anim='..anim) lastctx=ctx end
+  if anim~=lastanim then L('grip anim '..tostring(lastanim)..' -> '..anim..' boy='..st) lastanim=anim end
+  local key=st..' ride='..tostring(ride)..' body='..tostring(body)..' part='..part..' type='..typ
+  local clk=Q(os.clock) or 0
+  local line=tick..' t='..F(clk)..' dt='..F(dt and dt*1000)..'ms '..key..' boy='..(b and F(b[1])..','..F(b[2])..','..F(b[3]) or '-')..' rel='..rel..' boymove='..bm..' tricomove='..cm..' partrel='..prel..' partmove='..pm..' anim='..anim..' '..ctx..' '..bones
+  if key~=last then
+   L('grip change '..tostring(last)..' -> '..key)
+   for i=1,120 do local r=ring[(ri+i-1)%120+1] if r then L('grip pre '..r) end end
+   ring={} ri=0 post=120 last=key
+  end
+  local near=ride or body or (b and c and math.abs(b[1]-c[1])+math.abs(b[2]-c[2])+math.abs(b[3]-c[3])<12)
+  if post>0 or near then if post>0 then post=post-1 end L('grip '..line) else ri=ri%120+1 ring[ri]=line end
+  if clk-lastsum>=1 then lastsum=clk L('grip sec '..line) end
+ end)
+ if not ok then errs=errs+1 if errs<5 then L('grip error: '..tostring(e)) end if errs>200 then UnRegisterTick(_TLG_GRIP) _TLG_GRIP=nil L('grip off: errors') end end
+end
+RegisterTick(_TLG_GRIP)
+L('grip log armed')
+)";
+// Grip auto test (TLG_GRIP_AUTO=1): every time the boy is off Trico for 3 s, put him just above
+// Trico's left thigh (offset from the 5090 hold, 2026-11-09) and count what follows.
+bool GripAutoWanted() {
+    static const bool want = [] {
+        const char* env = std::getenv("TLG_GRIP_AUTO");
+        return env && *env && std::string_view(env) != "0";
+    }();
+    return want;
+}
+constexpr std::string_view GripAutoLua = R"(
+if _TLG_GAUTO then pcall(UnRegisterTick,_TLG_GAUTO) _TLG_GAUTO=nil end
+local t0,off,places,rags,hold,lastst,lastsum,pend=nil,nil,0,0,0,nil,0,nil
+local pat,th,td,tf,tr,ntrial,nbad,gp,gat=nil,0,0,0,false,0,0,nil,nil
+local jat,nmiss,jdown,jdone=nil,0,nil,nil
+local function Trial() if not pat then return end ntrial=ntrial+1 local miss=_TLG_GJUMP and not tr local bad=not miss and ((td>th) or tf>0) if bad then nbad=nbad+1 end if miss then nmiss=nmiss+1 end
+ L(string.format('grip auto trial %d hang=%d default=%d fell=%d result=%s (bad %d of %d, miss %d)',ntrial,th,td,tf,miss and 'MISS' or (bad and 'SLIP' or 'HOLD'),nbad,ntrial-nmiss,nmiss)) end
+local function Q(f,...) local ok,v=pcall(f,...) if ok then return v end return nil end
+local function V(o) if not o then return nil end local ok,p=pcall(function() return o.worldPosition or o.position end)
+ if not ok or p==nil then return nil end local t={} for n in tostring(p):gmatch('[-%d%.e]+') do t[#t+1]=tonumber(n) end
+ if #t<3 then return nil end return t end
+_TLG_GAUTO=function()
+ local ok,e=pcall(function()
+  local clk=Q(os.clock) or 0
+  if not t0 then t0=clk end
+  if _TLG_NOCAM and clk-(_TLG_CAMT or -9)>=0.5 then _TLG_CAMT=clk Q(MS.SetDisableVolume,'GameCameraVolume_TC_CommonTricoNotice') Q(MS.SetDisableVolume,'GameCameraVolume_BoyStandAfterDemo') end
+  if _TLG_GREPLAY then local st=tostring(Q(MS.BoyGetDynamicsState)) local ride=Q(MS.BoyIsRidingOn,'Condor') and 1 or 0
+   if st~=_TLG_RST or ride~=_TLG_RRIDE then _TLG_RST=st _TLG_RRIDE=ride local bp=V(Q(FindObject,'Player')) L(string.format('grip replay state %s ride=%d t=%.2f pos=%s',st,ride,_TLG_RGO and clk-_TLG_RGO or -1,bp and string.format('%.2f,%.2f,%.2f',bp[1],bp[2],bp[3]) or '?')) end
+   if st=='Ragdoll' then _TLG_RFELL=true end
+   if not _TLG_RGO and st=='Default' and clk-t0>=1 then _TLG_RGO=clk _TLG_RFELL=nil L('grip replay go') end
+   if _TLG_RGO and not _TLG_RDONE and clk-_TLG_RGO>=26 then _TLG_RDONE=true L(string.format('grip replay result %s (ride=%d fell=%s)',(ride==1 and not _TLG_RFELL) and 'HOLD' or 'SLIP',ride,tostring(_TLG_RFELL))) L('grip auto done') end
+   return end
+  if _TLG_GPASS then return end
+  local st=tostring(Q(MS.BoyGetDynamicsState))
+  local ride=Q(MS.BoyIsRidingOn,'Condor') local body=Q(MS.BoyIsRidingOn_OnlyBody,'Condor')
+  if st=='Ragdoll' and lastst~='Ragdoll' then rags=rags+1 tf=tf+1 L('grip auto ragdoll '..rags) end
+  local ws=_TLG_GJUMP and jdone or pat
+  if ws and not pend and clk-ws<(_TLG_GJUMP and 15 or 4) and (not _TLG_GJUMP or ride or body or tr) then if ride or body then tr=true end if tr then if st=='Hang' then th=th+1 elseif st=='Default' then td=td+1 end end end
+  if jat and clk-jat>=18 and not jdown then jdown=clk L('grip auto jump') elseif jdown and clk-jdown>=0.25 then L('grip auto jumpend') jdown=nil jat=nil jdone=clk off=clk end
+  if _TLG_GJUMP and jdone and pat and clk-jdone>=15 then L(string.format('grip auto result %s (on=%s fell=%d hang=%d default=%d)',((ride or body) and tf==0) and 'HOLD' or (tr and 'SLIP' or 'MISS'),tostring(ride or body),tf,th,td)) pat=nil L('grip auto done') end
+  lastst=st
+  local dt=Q(MSC_GetGameDelta) or 0
+  if ride or body then off=nil hold=hold+dt else off=off or clk end
+  if pend and clk-pend>=(_TLG_GJUMP and 2 or 0.1) then pend=nil Q(MS.BoyMissionCommand,'ctrl_B_respawn','B_stand') L('grip auto release') end
+  if (ride or body) and not pat then _TLG_GRS=_TLG_GRS or clk else _TLG_GRS=nil end
+  local cyc=_TLG_GCYCLE
+  if clk-t0>20 and st=='Default' and not ride and not body and not pend and not gat and (not pat or clk-pat>4) then local bp=V(Q(FindObject,'Player')) if bp then gp=bp end end
+  if gat and (ride or body) and clk-gat>=1.5 and clk-gat<9 and not pend then gat=gat+0.0 Q(MS.BoyRagdollDown) L('grip auto drop again') gat=clk-0.01
+  elseif gat and not (ride or body) and st=='Default' then gat=nil
+  elseif gat and clk-gat>20 then gat=nil
+  elseif cyc and not _TLG_GJUMP and not pat and not pend and not gat and (ride or body) and clk-t0>40 and _TLG_GRS and clk-_TLG_GRS>3 then _TLG_GRS=nil gat=clk Q(MS.BoyRagdollDown) L('grip auto drop (climbed on by himself)')
+  elseif cyc and pat and not pend and not gat and (ride or body) and clk-pat>cyc then
+   Trial() pat=nil gat=clk Q(MS.BoyRagdollDown) L('grip auto drop')
+  elseif not gat and not pend and not jat and not jdown and not (_TLG_GJUMP and places>=1) and clk-t0>15 and st~='Ragdoll' and st~='Boot' and off and clk-off>3 then
+   local ai=Q(function() return Ai2.Utils.GetAIProps('Condor').currentInfo.ai2Ext end)
+   local bl=ai and V(Q(Ai2.Utils.FindBone,ai,'jt_LegUp_Lf'))
+   local bp=_TLG_GJUMP and V(Q(FindObject,'Player'))
+   if bl and _TLG_GJUMP and st=='Default' then local fy=(st=='Default' and bp and bp[2]) or -8.35 Trial() pat=clk th,td,tf,tr=0,0,0,false jdone=nil places=places+1 off=clk
+    local d=_TLG_GJUMP local x,z=bl[1]-0.955*d,bl[3]-0.296*d if _TLG_GSPOT then x,fy,z=_TLG_GSPOT[1],_TLG_GSPOT[2],_TLG_GSPOT[3] end local yaw=math.deg(math.atan2(bl[1]-x,bl[3]-z))
+    Q(MS.BoySetPosition,x,fy+0.05,z) Q(MS.BoySetRotation,0,yaw,0) jat=clk pend=clk
+    L(string.format('grip auto jumpplace %d at %.2f,%.2f,%.2f yaw %.0f',places,x,fy,z,yaw))
+   elseif bl and not _TLG_GJUMP then Trial() pat=clk th,td,tf=0,0,0 places=places+1 off=clk pend=clk
+    Q(MS.BoySetPosition,bl[1]-1.13,bl[2]+0.2,bl[3]-0.35)
+    L(string.format('grip auto place %d at %.2f,%.2f,%.2f',places,bl[1]-1.13,bl[2]+0.2,bl[3]-0.35)) end
+  end
+  if _TLG_GJUMP and clk-(_TLG_MLOG or 0)>=1 then _TLG_MLOG=clk
+   local w=Q(MS.CondorAI2Work) local c2=w and w.TC_Care2_Clear
+   local function vf(n) local o=Q(FindObject,n) if not o then return 'none' end local ok,f=pcall(function() return tostring(o.Flags) end) return ok and f or '?' end
+   L(string.format('grip mood care2=%s deny3=%s deny1=%s ffall=%s shock=%s',tostring(c2),vf('TC_B_bhv_deny_climb_03'),vf('TC_B_bhv_deny_climb_01'),vf('TC_B_bhv_climb_forcedFall_01'),tostring(w and w.TC_ShockBallType))) end
+  if clk-lastsum>=10 then lastsum=clk L(string.format('grip auto sum t=%.0f places=%d ragdolls=%d hold=%.1fs',clk-t0,places,rags,hold)) end
+ end)
+ if not ok then L('grip auto error: '..tostring(e)) end
+end
+RegisterTick(_TLG_GAUTO)
+L('grip auto armed')
+)";
+
 
 // Launcher "Start at..." (TLG_START_POINT=<stage>:<area>): a second after the title screen shows,
 // the next LoadCheckPoint is pointed at the point's scene and CONTINUE is chosen, as the game's
@@ -629,7 +782,31 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     static constexpr std::string_view Empty = "--";
     if (StartsWith(buffer, size, "--TLGLOG ")) {
         const std::string_view text(buffer + 9, size - 9);
-        std::printf("Lua: %.*s\n", static_cast<int>(text.size()), text.data());
+        if (text == "grip replay go") {
+            // tlg grip test: play the recorded run + jump (TLG_PAD_REPLAY) once the boy has control.
+            if (const char* pf = std::getenv("TLG_PAD_FILE"); pf && *pf)
+                if (FILE* f = std::fopen(pf, "w")) { std::fputs("replay ", f); std::fclose(f); }
+        }
+        if (text == "grip auto release" && std::getenv("TLG_GRIP_JUMP")) {
+            // tlg grip test: run forward-right, jump (triangle) after 0.5 s, let go 0.3 s later.
+            if (const char* pf = std::getenv("TLG_PAD_FILE"); pf && *pf) {
+                std::thread([path = std::string(pf)] {
+                    auto put = [&](const char* t) { if (FILE* f = std::fopen(path.c_str(), "w")) { std::fputs(t, f); std::fclose(f); } };
+                    std::this_thread::sleep_for(std::chrono::seconds(15)); // let Trico calm down
+                    put("lx=230 ly=25 ");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    put("lx=230 ly=25 triangle ");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                    put("");
+                }).detach();
+            }
+        }
+        if (text.starts_with("grip ")) {
+            static const auto t0 = std::chrono::steady_clock::now();
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            std::printf("Lua: [%.1f ms] %.*s\n", ms, static_cast<int>(text.size()), text.data());
+        } else
+            std::printf("Lua: %.*s\n", static_cast<int>(text.size()), text.data());
         std::fflush(stdout);
         // tlg: "mission <stage> <scene>" starts a new scene, so diagnostics that report per
         // scene (TLG_WRITE_ATTRIB) can close their window here instead of on a wall clock. Only
@@ -669,6 +846,10 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                 // The title screen counts as a scene too, so a run that warps (TLG_START_POINT)
                 // first arms there and then again in the scene it lands in, which is the one that
                 // matters. Arming is cheap: the pilot's tick waits for Trico and then starts him.
+                if (GripWanted()) {
+                    static std::string grip_for;
+                    if (grip_for != scene) { grip_for = scene; FunQueue(std::string(GripLua)); if (GripAutoWanted()) { const char* cyc = std::getenv("TLG_GRIP_CYCLE"); const char* jmp = std::getenv("TLG_GRIP_JUMP"); FunQueue(std::string("_TLG_GCYCLE=") + (cyc && *cyc ? cyc : "nil") + " _TLG_GJUMP=" + (jmp && *jmp ? jmp : "nil") + (std::getenv("TLG_NO_TRICO_CAM") ? " _TLG_NOCAM=true" : "") + (std::getenv("TLG_GRIP_PASSIVE") ? " _TLG_GPASS=true" : "") + (std::getenv("TLG_GRIP_REPLAY") ? " _TLG_GREPLAY=true" : "") + " _TLG_GSPOT=" + (std::getenv("TLG_GRIP_SPOT") ? std::string("{") + std::getenv("TLG_GRIP_SPOT") + "}" : std::string("nil")) + " " + std::string(GripAutoLua)); } }
+                }
                 if (PilotWanted()) {
                     static std::string armed_for;
                     if (armed_for != scene) {
