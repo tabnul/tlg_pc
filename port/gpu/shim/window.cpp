@@ -44,6 +44,10 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
                            app_id && *app_id ? app_id : "tlg-pc");
         SDL_SetHint(SDL_HINT_APP_ID, app_id && *app_id ? app_id : "tlg-pc");
     }
+    // Exclusive fullscreen: SDL minimizes the window on focus loss by default. When the
+    // launcher keeps the foreground at start (seen on AMD, slower mode switch), the game then
+    // sits in the taskbar and cannot be restored. Keep it up; Alt+Tab still works.
+    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
     // Gamepads are sampled by runtime_pad.c; their events are pumped here with the window's.
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
@@ -268,6 +272,8 @@ void WindowSDL::ApplyDisplayMode(int mode) {
         SDL_SetWindowFullscreen(window, true);
     }
     SDL_SyncWindow(window);
+    // Bring the game to the front after the switch (the launcher may still hold the focus).
+    SDL_RaiseWindow(window);
     std::printf("Window: %s\n", TlgGraphics::DisplayModeNames[mode]);
 }
 
