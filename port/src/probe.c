@@ -1047,8 +1047,7 @@ void runtime_restart(void) {
     TerminateProcess(GetCurrentProcess(),0);
 #else
     const char *command=getenv("TLG_RESTART_COMMAND");
-    if (!command || !*command) { fputs("runtime_restart: TLG_RESTART_COMMAND is not set
-",stderr); _exit(1); }
+    if (!command || !*command) { fputs("runtime_restart: TLG_RESTART_COMMAND is not set\n",stderr); _exit(1); }
     puts("Runtime: restarting through TLG_RESTART_COMMAND");
     syscall(SYS_close_range, 3u, ~0u, 0u);
     execl("/bin/sh", "sh", "-c", command, (char *)NULL);
