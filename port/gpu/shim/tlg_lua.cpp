@@ -467,6 +467,30 @@ bool GameEdits(std::string& patched, std::string_view name) {
                        " self:Disconnect_CommonRegion() end");
         return true;
     }
+    if (name.size() >= 15 && name.substr(name.size() - 15) == "GuideSystem.lua") {
+        // Hint box text: each hint's text picture is loaded inside its .bod's load callback, so
+        // it can arrive after the guide preload is marked done. The boxes were then created
+        // without their pictures (short boxes, no text). When a picture arrives after the
+        // boxes exist, rebuild them once on the next frame.
+        static constexpr std::string_view Anchor = "self:inLoadTexture(data.sequenceName,data";
+        static constexpr std::string_view Late =
+            " if self.isCreateObj and not self.tlgRegen then self.tlgRegen = true"
+            " DelayExec(function() self.tlgRegen = nil GuideSystem:RegenerationGuide() end) end";
+        size_t at = patched.find(Anchor);
+        if (at == std::string::npos) {
+            return false;
+        }
+        int done = 0;
+        for (std::string_view set : {std::string_view("data.sysParam.titleTex = tex or FindObject('_error_texture')"),
+                                     std::string_view("data.sysParam.subTex = tex or FindObject('_error_texture')")}) {
+            const size_t k = patched.find(set, at);
+            if (k != std::string::npos) {
+                patched.insert(k + set.size(), Late);
+                ++done;
+            }
+        }
+        return done == 2;
+    }
     if (s.level_select && name == "data_trico/game/scripts/stages/s01_Opening/missionScript.lua") {
         // Only the test guarding the L1 level select, not the press build's other changes.
         static constexpr std::string_view Test = "if gameConfig_buildId_Press==true then";

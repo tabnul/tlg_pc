@@ -202,6 +202,11 @@ HOR_PLUS_BLOCK_NEW = bytes.fromhex(
     '0000007212c5f82e1d0f0000007708c53a591515000000c39a99d93fcdccec3f398ee33f')
 
 
+# Vert+ (taller frames): the routine's last instruction vmulss xmm10,xmm8,[rip+15h] becomes
+# vmulss xmm8,xmm10,[rip+15h] (same length), and its constant the frame aspect.
+VERT_FROM = bytes.fromhex('c53a591515000000')
+VERT_TO = bytes.fromhex('c52a590515000000')
+
 # UI canvas: the UI init copies {1920, 1080, 1920, 1080} from 0x2525480 (its only reference) into
 # the UI state; the first pair becomes the UI projection size, the second the layout size that
 # anchors elements to the screen edges. For a wider frame both widths become 1080 * frame aspect,
@@ -313,6 +318,20 @@ def resolution_writes(eboot, size, render=None):
         subtitle = checked_offset(eboot, SUBTITLE_SCALE, SUBTITLE_SCALE_EXPECTED)
         writes.append((subtitle, struct.pack('<2f', 1 / ui_width, 1 / 1080),
                        f'UI: {SUBTITLE_SCALE:#x} subtitle scale 1920 -> {ui_width}'))
+    elif width * 9 < height * 16:
+        # Taller than 16:9 (16:10): Vert+, the same routine with its last multiply swapped from
+        # m00 = m11 / frame aspect (Hor+) to m11 = m00 * frame aspect (vmulss xmm8,xmm10,[rip+15h]),
+        # so 16:9 cameras keep their width and show more at the top and bottom. The interface stays
+        # 1920x1080 and the GPU maps it into a centred 16:9 area (vk_rasterizer.cpp).
+        call = checked_offset(eboot, HOR_PLUS_CALL, HOR_PLUS_CALL_EXPECTED)
+        block = checked_offset(eboot, HOR_PLUS_BLOCK, HOR_PLUS_BLOCK_EXPECTED)
+        aspect = width / height
+        assert HOR_PLUS_BLOCK_NEW.count(VERT_FROM) == 1
+        new = HOR_PLUS_BLOCK_NEW.replace(VERT_FROM, VERT_TO)
+        new += struct.pack('<3f', aspect - 0.02, aspect + 0.02, aspect)
+        new += bytes([0xcc]) * (len(HOR_PLUS_BLOCK_EXPECTED) - len(new))
+        writes += [(block, new, f'Vert+: {HOR_PLUS_BLOCK:#x} 16:9 cameras -> {width}:{height}'),
+                   (call, HOR_PLUS_CALL_NEW, f'Vert+: {HOR_PLUS_CALL:#x} calls it')]
     return writes
 
 
