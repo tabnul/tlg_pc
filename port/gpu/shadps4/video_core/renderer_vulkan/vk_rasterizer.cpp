@@ -2630,12 +2630,8 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            // Look for the camera only until this frame's camera is found, and never in a
-            // GPU-written buffer: reading one forces a download plus a full GPU wait on the
-            // recording thread, and the camera is never found there.
-            if (vsharp.GetSize() == 864 && gbuffer_draw && !camera_motion->HasCamera() &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0) &&
-                !buffer_cache.IsRegionGpuModified(vsharp.base_address, 864)) {
+            if (vsharp.GetSize() == 864 && gbuffer_draw &&
+                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
                 camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.

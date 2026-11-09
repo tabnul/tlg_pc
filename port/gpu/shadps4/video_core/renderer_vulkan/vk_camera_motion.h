@@ -42,9 +42,6 @@ public:
         jitter = value;
     }
 
-    [[nodiscard]] bool HasCamera() const noexcept {
-        return frame_has_camera;
-    }
     [[nodiscard]] bool Enabled() const noexcept {
         return debug_overlay || for_upscaler;
     }
