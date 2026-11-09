@@ -24,6 +24,28 @@ None of it is in the download; you need your own copy. Use **The Last Guardian C
 
 **PC:** 64-bit Windows 10 (1903+)/11 or x86-64 Linux (glibc 2.39+), a graphics card with Vulkan 1.3 (6 GB of VRAM recommended).
 
+## Dumping your own copy
+
+The port runs your own copy of the game: a disc or a PSN purchase. No game files are shared or linked here.
+
+You need:
+- a PS4 that can run homebrew with GoldHEN,
+- Itemzflow (or the dumper in GoldHEN),
+- the game with update 01.03 installed,
+- about 25 GB free on an exFAT USB drive or on the PC.
+
+Steps:
+1. Start GoldHEN, then Itemzflow.
+2. Dump the game (CUSA03627 or CUSA03745): the base game and the update into one folder, the update on top. A "merged" dump does this for you.
+3. Copy the folder to the PC, from the USB drive or over FTP (for example FileZilla).
+4. Check the folder against the table under *Required game files*.
+5. Start the launcher and pick that folder.
+
+Pitfalls:
+- **FTP can cut big files off at 4 GB.** Compare the file sizes with the console. When one is short, copy it again from a USB dump.
+- **FAT32 cannot hold files over 4 GB.** Format the USB drive as exFAT.
+- **Without update 01.03 the port does not work properly** (30 FPS, none of the port's fixes). The launcher shows a warning when the folder is older.
+
 ## How to play
 
 1. Extract the package anywhere (on Windows, outside the .zip).
