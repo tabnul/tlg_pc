@@ -139,14 +139,11 @@ class TableTest(unittest.TestCase):
             tlg_run.config_path().parent.mkdir(parents=True)
             for stored, loaded in ((21500, 7000), (5600, 5600), (3700, 3700)):
                 tlg_run.config_path().write_text(json.dumps({'vram_budget_mb': stored}), encoding='utf-8')
-                with mock.patch('gfxlogic.detect_vram_mb', return_value=8192):
-                    self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
-            for vram, loaded in ((8192, 7000), (6144, 5600), (None, 7000)):   # the old default moves up once
-                tlg_run.config_path().write_text(json.dumps({'vram_budget_mb': 5000, 'budget_default_2026_10': True}), encoding='utf-8')
-                with mock.patch('gfxlogic.detect_vram_mb', return_value=vram):
-                    self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
-            with mock.patch('gfxlogic.detect_vram_mb', return_value=8192):
-                settings = tlg_run.load_settings()
+                self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], loaded)
+            tlg_run.config_path().write_text(json.dumps({'vram_budget_mb': 5000, 'budget_default_2026_10': True}), encoding='utf-8')
+            with mock.patch('gfxlogic.detect_vram_mb', side_effect=AssertionError('no memory check at start')):
+                self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], 7000)   # the old default moves up once
+            settings = tlg_run.load_settings()
             settings['vram_budget_mb'] = 8000          # a later choice in the launcher stays
             tlg_run.save_settings(settings)
             self.assertEqual(tlg_run.load_settings()['vram_budget_mb'], 8000)

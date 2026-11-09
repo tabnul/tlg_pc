@@ -320,14 +320,13 @@ def load_settings():
             settings['vram_budget_mb'] = budget
         settings['budget_default_2026_10'] = True
     # Once (2026-11): 5000 was the default until 0.2.0 and throws textures away all the time, so it
-    # moves to 7000 like a new install; a card under 8 GB gets its own value. Any other stored budget
-    # was somebody's choice and stays, and so does a later choice.
+    # moves to the default like a new install (7000, sized for the recommended 8 GB card). Any other
+    # stored budget was somebody's choice and stays, and so does a later choice. (No graphics memory
+    # check here: it started nvidia-smi or vulkaninfo before the window showed and could hold up the
+    # first start for seconds.)
     if not settings.get('budget_default_2026_11'):
-        if settings.get('vram_budget_mb') in (5000, DEFAULT_SETTINGS['vram_budget_mb']):
-            import gfxlogic
-            vram = gfxlogic.detect_vram_mb()
-            settings['vram_budget_mb'] = (gfxlogic.suggested_budget_mb(vram / 1024) if vram
-                                          else DEFAULT_SETTINGS['vram_budget_mb'])
+        if settings.get('vram_budget_mb') == 5000:
+            settings['vram_budget_mb'] = DEFAULT_SETTINGS['vram_budget_mb']
         settings['budget_default_2026_11'] = True
     # The in-game menu may have changed the mouse since: tlg.ini wins for those keys.
     ini = read_ini(user_dir() / 'tlg.ini')
