@@ -80,6 +80,7 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
 pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
 if (NOT WIN32)
     pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
 endif()
@@ -206,6 +207,10 @@ add_library(tlggpu ${TLGGPU_KIND} ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${SHIM_S
     shadps4/core/libraries/kernel/equeue.cpp ${AVPLAYER}
     shadps4/core/libraries/videodec/video_utils.cpp)
 add_dependencies(tlggpu host_shaders)
+# ZArchive (.zar) game images, issue #72: third_party/zarchive (MIT-0, Exzap/ZArchive).
+target_sources(tlggpu PRIVATE third_party/zarchive/src/zarchivereader.cpp
+    third_party/zarchive/src/zarchivewriter.cpp third_party/zarchive/src/sha_256.c)
+target_include_directories(tlggpu PRIVATE third_party/zarchive/include)
 # In-game settings menu: Dear ImGui (third_party/imgui, MIT) with its Vulkan backend, and an
 # embedded Cyrillic font (third_party/fonts).
 target_sources(tlggpu PRIVATE third_party/imgui/imgui.cpp third_party/imgui/imgui_draw.cpp
@@ -226,7 +231,7 @@ endif()
 target_link_libraries(tlggpu PRIVATE ffx-vulkan::portable ffx-vulkan::fsr4-v07-vulkan
     ffx-vulkan::fsr3-vk-framegeneration-3.1.6)
 target_link_libraries(tlggpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
-    tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
+    tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::ZSTD PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
 # xbyak is header-only: the distribution's copy when there is one (Fedora xbyak-devel), else the
 # submodule (MSYS2 and Ubuntu do not package it).
 find_path(XBYAK_SYSTEM_INCLUDE xbyak/xbyak.h)
