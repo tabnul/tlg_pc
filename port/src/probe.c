@@ -561,6 +561,10 @@ static size_t app0_read(const char *app0, const char *path, unsigned char *data,
     return n;
 }
 /* .zar tools for the launcher (issue #72): list, extract one entry, pack a folder. */
+/* Archive paths are short; a truncated name only fails its lookup. GCC cannot see that. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
 static int zar_list(const char *archive_path) {
     ZArchive *a=zarchive_open(archive_path);
     if (!a) { fprintf(stderr,"%s: %s\n",archive_path,zarchive_error()); return 1; }
