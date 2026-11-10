@@ -18,8 +18,6 @@ see [Cut and hidden content](#cut-and-hidden-content) and the [full guide](docs/
 
 No game files are included. You need your own copy, dumped from your own PS4.
 
-[![Stock vs modded (YouTube)](https://img.youtube.com/vi/16rYLJlGy6A/maxresdefault.jpg)](https://www.youtube.com/watch?v=16rYLJlGy6A)
-
 **Contents:** [Get started](#get-started) · [Graphics](#graphics) ·
 [Cut and hidden content](#cut-and-hidden-content) · [Sound](#sound) · [Soundtrack](#soundtrack) ·
 [Controllers and languages](#controllers-and-languages) · [For testers](#for-testers) ·
