@@ -1398,9 +1398,6 @@ class Launcher:
             self.hint(memory, row, 2, hint_key)
 
         ini_check(1, 'texture_cleanup', '0', 'texture_cleanup_hint')
-        ini_check(2, 'keep_gpu_textures', '1', 'keep_gpu_textures_hint')
-        ini_check(3, 'arena_release', '1', 'arena_release_hint')
-        ini_check(4, 'gc_live_budget', '1', 'gc_live_budget_hint')
 
     def build_logs(self):
         """Logs: the game log as it runs, and the logs folder."""
@@ -2528,6 +2525,21 @@ class Launcher:
         slow_box.bind('<<ComboboxSelected>>', lambda _: slow_picked())
         help_mark(parent, slow.what).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
         resets.append(lambda: (slow_box.current(slow_values.index(slow.default)), slow_picked()))
+        # Memory test switches (issue #38; tlg.ini, apply at once), moved from Video (2026-11-10).
+        ini_now = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key in ('keep_gpu_textures', 'arena_release', 'gc_live_budget'):
+            parent, row = place(0)
+            var = tk.BooleanVar(value=ini_now.get(key, '1') != '0')
+
+            def ini_toggled(key=key, var=var):
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
+                self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+            ttk.Checkbutton(parent, text=self.t(key), variable=var, command=ini_toggled).grid(
+                row=row, column=0, columnspan=2, sticky='w')
+            help_mark(parent, self.t(key + '_hint')).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
+            resets.append(lambda var=var, ini_toggled=ini_toggled: (var.set(True), ini_toggled()))
 
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
