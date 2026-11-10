@@ -550,7 +550,7 @@ void ImageTab() {
         static const int up_values[] = {S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3, S::UpscalerFsr4,
                                         S::UpscalerTaa};
         constexpr int up_count = int(std::size(up_values));
-        Row(TR("Upscaler"));
+        Row(TR("Upscaler / anti-aliasing"));
         const int upscaler = S::SelectedUpscaler();
         int up_index = 2;
         for (int i = 0; i < up_count; ++i) {
@@ -571,7 +571,7 @@ void ImageTab() {
         }
         Help(!s.dlss_supported && s.dlss_problem.load()
                  ? s.dlss_problem.load()
-                 : TR("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). The choice is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA; Built-in keeps only the game's own. F8 switches between Built-in and your choice in game."),
+                 : TR("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). The choice is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA; Built-in keeps only the game's own. With supersampling it only does the anti-aliasing, at the larger size. F8 switches between Built-in and your choice in game."),
              {s.dlss_supported ? "DLSS (NVIDIA)" : up_labels[s.fsr4_supported ? 3 : 2], ""});
         ImGui::PopID();
         static const char* const quality_labels[S::PresetCount] = {
