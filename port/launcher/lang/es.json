@@ -365,7 +365,7 @@
     "preset.ps_p_bad_item": "Rechazado, valor no válido: {detail}",
     "preset.ps_p_bad_setting": "Rechazado, valor no válido: {detail}",
     "launcher.fg_blocked": "Desactivada: el juego funciona a 30 FPS (velocidad de fotogramas o límite de fotogramas), demasiado poco para la generación de fotogramas. Tu elección vuelve con una velocidad mayor.",
-    "launcher.quality_super_tip": "El supermuestreo renderiza a un tamaño mayor que la pantalla y reduce la imagen: bordes más finos, pero exige mucho a la tarjeta gráfica y necesita más memoria. Solo para tarjetas potentes."
+    "launcher.quality_super_tip": "El supermuestreo renderiza a un tamaño mayor que la pantalla y reduce la imagen: bordes más finos, pero exige mucho a la tarjeta gráfica y necesita más memoria. Solo para tarjetas potentes. La opción de escalador entonces solo suaviza los bordes; no amplía la imagen."
   },
   "items": {
     "menu:fsr1": {
@@ -968,6 +968,6 @@
     "Game saved": "Partida guardada",
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Desactivada ahora: el juego funciona a 30 FPS (modo de velocidad de fotogramas o límite de fotogramas), demasiado poco para la generación de fotogramas. Tu elección vuelve con una velocidad mayor.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Con VSync activado, la frecuencia de actualización de la pantalla debe ser al menos el doble de la velocidad de fotogramas del juego.",
-    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "El supermuestreo renderiza a un tamaño mayor que la pantalla y reduce la imagen: bordes más finos, pero exige mucho a la tarjeta gráfica y necesita más memoria. Solo para tarjetas potentes."
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.": "El supermuestreo renderiza a un tamaño mayor que la pantalla y reduce la imagen: bordes más finos, pero exige mucho a la tarjeta gráfica y necesita más memoria. Solo para tarjetas potentes. La opción de escalador entonces solo suaviza los bordes; no amplía la imagen."
   }
 }

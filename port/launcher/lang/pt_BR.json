@@ -363,7 +363,7 @@
     "preset.ps_p_bad_item": "Recusada, valor inválido: {detail}",
     "preset.ps_p_bad_setting": "Recusada, valor inválido: {detail}",
     "launcher.fg_blocked": "Desligada: o jogo roda a 30 FPS (taxa de quadros ou limite de taxa de quadros), baixo demais para a geração de quadros. Sua escolha volta com uma taxa maior.",
-    "launcher.quality_super_tip": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes."
+    "launcher.quality_super_tip": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes. A opção de upscaler então só suaviza as bordas; não amplia a imagem."
   },
   "items": {
     "menu:fsr1": {
@@ -960,6 +960,6 @@
     "Game camera": "Câmera do jogo",
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Desligada agora: o jogo roda a 30 FPS (modo de taxa de quadros ou limite de taxa de quadros), baixo demais para a geração de quadros. Sua escolha volta com uma taxa maior.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Com o VSync ligado, a taxa de atualização da tela deve ser pelo menos o dobro da taxa de quadros do jogo.",
-    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes."
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes. A opção de upscaler então só suaviza as bordas; não amplia a imagem."
   }
 }

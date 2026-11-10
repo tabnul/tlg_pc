@@ -365,7 +365,7 @@
     "preset.ps_p_bad_item": "Abgelehnt, ungültiger Wert: {detail}",
     "preset.ps_p_bad_setting": "Abgelehnt, ungültiger Wert: {detail}",
     "launcher.fg_blocked": "Aus: Das Spiel läuft mit 30 FPS (Bildrate oder Bildratenlimit), zu wenig für die Zwischenbildberechnung. Deine Auswahl kehrt bei einer höheren Bildrate zurück.",
-    "launcher.quality_super_tip": "Supersampling rendert größer als der Bildschirm und verkleinert das Bild: feinere Kanten, aber anspruchsvoll für die Grafikkarte und mit höherem Speicherbedarf. Nur für starke Grafikkarten."
+    "launcher.quality_super_tip": "Supersampling rendert größer als der Bildschirm und verkleinert das Bild: feinere Kanten, aber anspruchsvoll für die Grafikkarte und mit höherem Speicherbedarf. Nur für starke Grafikkarten. Die Upscaler-Auswahl glättet dann nur die Kanten; sie vergrößert das Bild nicht."
   },
   "items": {
     "menu:fsr1": {
@@ -968,6 +968,6 @@
     "Game saved": "Spiel gespeichert",
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Jetzt aus: Das Spiel läuft mit 30 FPS (Bildratenmodus oder Bildratenlimit), zu wenig für die Zwischenbildberechnung. Deine Auswahl kehrt bei einer höheren Bildrate zurück.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Mit VSync muss die Bildwiederholrate des Bildschirms mindestens doppelt so hoch sein wie die Bildrate des Spiels.",
-    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "Supersampling rendert größer als der Bildschirm und verkleinert das Bild: feinere Kanten, aber anspruchsvoll für die Grafikkarte und mit höherem Speicherbedarf. Nur für starke Grafikkarten."
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.": "Supersampling rendert größer als der Bildschirm und verkleinert das Bild: feinere Kanten, aber anspruchsvoll für die Grafikkarte und mit höherem Speicherbedarf. Nur für starke Grafikkarten. Die Upscaler-Auswahl glättet dann nur die Kanten; sie vergrößert das Bild nicht."
   }
 }

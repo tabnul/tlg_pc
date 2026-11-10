@@ -365,7 +365,7 @@
     "preset.ps_p_bad_item": "已拒绝，无效的值：{detail}",
     "preset.ps_p_bad_setting": "已拒绝，无效的值：{detail}",
     "launcher.fg_blocked": "已关闭：游戏以 30 FPS 运行（帧率或帧率上限），对帧生成来说太低。提高帧率后会恢复你的选择。",
-    "launcher.quality_super_tip": "超级采样以大于屏幕的尺寸渲染再缩小画面：边缘更细腻，但对显卡负担很重，并且需要更多内存。仅适合高性能显卡。"
+    "launcher.quality_super_tip": "超级采样以大于屏幕的尺寸渲染再缩小画面：边缘更细腻，但对显卡负担很重，并且需要更多内存。仅适合高性能显卡。此时放大器选项只用于平滑边缘，不会放大画面。"
   },
   "items": {
     "menu:fsr1": {
@@ -968,6 +968,6 @@
     "Game saved": "游戏已保存",
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "当前已关闭：游戏以 30 FPS 运行（帧率模式或帧率上限），对帧生成来说太低。提高帧率后会恢复你的选择。",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "开启垂直同步时，屏幕刷新率必须至少是游戏帧率的两倍。",
-    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "超级采样以大于屏幕的尺寸渲染再缩小画面：边缘更细腻，但对显卡负担很重，并且需要更多内存。仅适合高性能显卡。"
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.": "超级采样以大于屏幕的尺寸渲染再缩小画面：边缘更细腻，但对显卡负担很重，并且需要更多内存。仅适合高性能显卡。此时放大器选项只用于平滑边缘，不会放大画面。"
   }
 }

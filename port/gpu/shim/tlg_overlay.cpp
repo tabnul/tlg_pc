@@ -600,7 +600,7 @@ void ImageTab() {
         }
         quality_help += TR(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.");
         quality_help += ' ';
-        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.");
+        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.");
         ChoiceRow(TR("Quality (requires restart)"), s.preset, quality_labels, nullptr, S::PresetCount,
                   quality_help.c_str(), S::NativeAA);
         CheckRow("SMAA 1x", s.smaa,

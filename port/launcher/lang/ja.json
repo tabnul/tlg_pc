@@ -365,7 +365,7 @@
     "preset.ps_p_bad_item": "拒否しました。無効な値：{detail}",
     "preset.ps_p_bad_setting": "拒否しました。無効な値：{detail}",
     "launcher.fg_blocked": "オフ：ゲームが30 FPSで動作しており（フレームレートまたはフレームレート上限）、フレーム生成には低すぎます。フレームレートを上げると選択が戻ります。",
-    "launcher.quality_super_tip": "スーパーサンプリングは画面より大きく描画してから縮小します。輪郭がより細かくなりますが、グラフィックカードへの負荷が高く、メモリも多く必要です。高性能なカード向けです。"
+    "launcher.quality_super_tip": "スーパーサンプリングは画面より大きく描画してから縮小します。輪郭がより細かくなりますが、グラフィックカードへの負荷が高く、メモリも多く必要です。高性能なカード向けです。その場合、アップスケーラーの選択は輪郭を滑らかにするだけで、画像は拡大しません。"
   },
   "items": {
     "menu:fsr1": {
@@ -968,6 +968,6 @@
     "Game saved": "ゲームをセーブしました",
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "現在オフ：ゲームが30 FPSで動作しており（フレームレートモードまたはフレームレート上限）、フレーム生成には低すぎます。フレームレートを上げると選択が戻ります。",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "VSyncがオンの場合、画面のリフレッシュレートはゲームのフレームレートの2倍以上が必要です。",
-    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "スーパーサンプリングは画面より大きく描画してから縮小します。輪郭がより細かくなりますが、グラフィックカードへの負荷が高く、メモリも多く必要です。高性能なカード向けです。"
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.": "スーパーサンプリングは画面より大きく描画してから縮小します。輪郭がより細かくなりますが、グラフィックカードへの負荷が高く、メモリも多く必要です。高性能なカード向けです。その場合、アップスケーラーの選択は輪郭を滑らかにするだけで、画像は拡大しません。"
   }
 }

@@ -222,7 +222,7 @@ TEXT = {
     'quality_native': '{preset}: renders at the output size, {output}.',
     'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
     'quality_super': '{preset}: renders at {render}, shrunk to {output}.',
-    'quality_super_tip': 'Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.',
+    'quality_super_tip': 'Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.',
     'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
                       'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
