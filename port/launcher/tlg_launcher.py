@@ -519,25 +519,45 @@ EFFECTS = {'ssao': (100, 0, 400), 'bloom': (100, 0, 400), 'ssr': (100, 0, 400), 
            'fov': (70, 50, 110, '°')}
 
 
+def open_tip(parent, text, wraplength, place, tip):
+    """Opens a pop-up text window. It is put in tip (the close list) before anything else and stays
+    hidden until placed: otherwise it shows at the screen's top left for a moment, and a Leave in
+    between finds an empty list and the window is never closed (issue #70)."""
+    win = tk.Toplevel(parent)
+    tip.append(win)
+    win.withdraw()
+    win.overrideredirect(True)
+    tk.Label(win, text=text, background=PANEL, foreground=TEXT_COLOR, relief='solid', borderwidth=1,
+             wraplength=wraplength, justify='left', padx=6, pady=4).pack()
+    win.update_idletasks()
+    if win not in tip:   # closed while being built
+        return
+    win.geometry('+%d+%d' % place(win))
+    win.deiconify()
+
+
 def add_tooltip(widget, text):
     """Shows text in a small window next to the pointer while it is over the widget."""
     tip = []
 
     def hide(_=None):
         while tip:
-            tip.pop().destroy()
+            win = tip.pop()
+            try:
+                win.destroy()
+            except tk.TclError:
+                pass
 
     def show(event):
         hide()
-        win = tk.Toplevel(widget)
-        win.overrideredirect(True)
-        tk.Label(win, text=text() if callable(text) else text, background=PANEL, foreground=TEXT_COLOR, relief='solid', borderwidth=1,
-                 wraplength=360, justify='left', padx=6, pady=4).pack()
-        win.update_idletasks()
-        x = min(event.x_root + 14, widget.winfo_screenwidth() - win.winfo_reqwidth() - 4)
-        y = min(event.y_root + 14, widget.winfo_screenheight() - win.winfo_reqheight() - 4)
-        win.geometry(f'+{x}+{y}')
-        tip.append(win)
+        open_tip(widget, text() if callable(text) else text, 360,
+                 lambda win: (min(event.x_root + 14, widget.winfo_screenwidth() - win.winfo_reqwidth() - 4),
+                              min(event.y_root + 14, widget.winfo_screenheight() - win.winfo_reqheight() - 4)),
+                 tip)
+        # The pointer may have left while the text was built: close it then.
+        under = widget.winfo_containing(widget.winfo_pointerx(), widget.winfo_pointery())
+        if tip and (under is None or not str(under).startswith(str(widget))):
+            hide()
 
     widget.bind('<Enter>', show, add='+')
     widget.bind('<Leave>', hide, add='+')
@@ -1712,14 +1732,10 @@ class Launcher:
             c.itemconfig('copycmd_glyph', fill=ACCENT)
             c.configure(cursor='hand2')
             if not tip:
-                win = tk.Toplevel(c)
-                win.overrideredirect(True)
-                tk.Label(win, text=self.t('copy_command_tip'), background=PANEL, foreground=TEXT_COLOR,
-                         relief='solid', borderwidth=1, wraplength=320, justify='left', padx=6, pady=4).pack()
-                win.update_idletasks()
-                x = min(event.x_root + 14, c.winfo_screenwidth() - win.winfo_reqwidth() - 4)
-                win.geometry(f'+{x}+{event.y_root - win.winfo_reqheight() - 10}')
-                tip.append(win)
+                open_tip(c, self.t('copy_command_tip'), 320,
+                         lambda win: (min(event.x_root + 14, c.winfo_screenwidth() - win.winfo_reqwidth() - 4),
+                                      event.y_root - win.winfo_reqheight() - 10),
+                         tip)
 
         def leave(_):
             c.itemconfig('copycmd_glyph', fill=MUTED)
