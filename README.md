@@ -39,7 +39,7 @@ card and FSR 4 a recent card; FSR 3.1 runs on any card.
 
 **Error 4551 on Windows 11:** Smart App Control blocks programs without a digital signature, and
 this port is not signed. Turn it off under Windows Security > App & browser control > Smart App
-Control. On some Windows versions it can only be turned back on by reinstalling Windows.
+Control.
 
 | Key | In game |
 |---|---|

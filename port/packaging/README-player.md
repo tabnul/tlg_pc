@@ -100,7 +100,7 @@ While the game window has focus, it takes the mouse and the mouse turns the came
 ## Problems
 
 - **Incomplete or odd sound**: without `libSceNgs2.sprx` in `system_lib/`, the port uses its own mixer, still experimental (no reverb or filters yet). With the file, audio is native.
-- **"Error 4551" or blocked by Smart App Control**: Windows 11 blocks programs without a digital signature, and the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control settings. On some Windows versions it can only be turned back on by reinstalling Windows.
+- **"Error 4551" or blocked by Smart App Control**: Windows 11 blocks programs without a digital signature, and the port is not signed. Turn it off in Windows Security > App & browser control > Smart App Control settings.
 - **Does not start or closes by itself**: check the log box in the launcher and send `out/last_run.log` in an [issue](https://github.com/tabnul/the-last-guardian-definitive/issues).
 - **NVIDIA**: use a recent driver.
 
