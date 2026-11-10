@@ -190,6 +190,9 @@ private:
     /// frame) and the game's own PS_Upscale runs on it, so it still does its HDR (PQ) encoding.
     bool RunGameUpscale(VideoCore::ImageId ldr, VideoCore::ImageId target, bool hdr = false);
     bool StartEngineHdrUi(VideoCore::ImageId color, VideoCore::ImageId depth, u64 vs_hash);
+    /// HDR without DLSS/FSR: the render-size frame enlarged into engine_hdr_image.
+    bool EnlargeEngineHdr(VideoCore::ImageId src);
+    void EnsureEngineHdrImage(u32 w, u32 h);
 
 public:
     /// After OnDraw returned true and the rasterizer prepared the target (BeginRendering):

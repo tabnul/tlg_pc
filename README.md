@@ -29,7 +29,8 @@ No game files are included. You need your own copy, dumped from your own PS4.
 
 1. Download the latest build from [Releases](https://github.com/tabnul/the-last-guardian-definitive/releases).
 2. Put the game files in one folder: CUSA03627 (US) or CUSA03745 (EU) with update 01.03, about
-   25 GB. The full list is in [docs/game-files.md](docs/game-files.md).
+   25 GB. The full list is in [docs/game-files.md](docs/game-files.md). How to dump your own copy:
+   [Dumping your own copy](port/packaging/README-player.md#dumping-your-own-copy).
 3. For audio, copy `libSceNgs2.sprx` from your PS4 firmware into `system_lib/` next to the executable.
 4. Start the launcher, pick the game folder and press **Play**.
 
@@ -38,13 +39,12 @@ card and FSR 4 a recent card; FSR 3.1 runs on any card.
 
 **Error 4551 on Windows 11:** Smart App Control blocks programs without a digital signature, and
 this port is not signed. Turn it off under Windows Security > App & browser control > Smart App
-Control. On some Windows versions it can only be turned back on by reinstalling Windows.
+Control.
 
 | Key | In game |
 |---|---|
 | Insert (R3 + L2) | The port's menu |
 | F8 | Switch between DLSS/FSR and the game's own anti-aliasing |
-| F9 | Add a Trico |
 | F10 | FPS counter |
 | F12 | Trico Tricks bar |
 | Esc | Release the mouse |
@@ -156,7 +156,7 @@ The rest:
 - **Trico Tricks** (**F12**): a bar with 30 of Trico's own moves, such as yawn, sneeze, roar, sit
   and roll over, plus the throw-up animation the developers sealed in July 2016. More moves are
   in the menu, but some of them may not work. Trico doesn't always listen.
-- **Extra Tricos** (**F9**): up to 8 more, including the armoured one.
+- **Extra Tricos**: up to 8 more, including the armoured one.
 - **Size:** from half to twice his size.
 - **Eyes:** the hidden disco-eye effect, or any colour.
 - **Free camera:** the developers' own camera.

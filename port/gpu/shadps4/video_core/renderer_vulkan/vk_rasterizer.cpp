@@ -2581,6 +2581,9 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                 buffer_infos.emplace_back(gds_buf->Handle(), 0, gds_buf->SizeBytes());
                 gds_barrier |= runtime.IsBufferAccessed(gds_buf, 0, gds_buf->SizeBytes());
                 needs_barrier |= gds_barrier;
+                // Shaders write the GDS buffer (append counters). Record that access, so the
+                // copy that hands a counter to the game waits for the dispatches (issue #67).
+                bound_buffers.emplace_back(gds_buf, 0, gds_buf->SizeBytes(), true);
             } else if (desc.buffer_type == Shader::BufferType::Flatbuf) {
                 auto& vk_buffer = buffer_cache.GetStreamBuffer();
                 const u32 ubo_size = stage.FlatUserData().size() * sizeof(u32);

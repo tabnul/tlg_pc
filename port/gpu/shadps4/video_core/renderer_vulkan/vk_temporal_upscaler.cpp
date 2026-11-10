@@ -1737,8 +1737,7 @@ bool TemporalUpscaler::OnDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color
 
 bool TemporalUpscaler::StartEngineHdrUi(VideoCore::ImageId color, VideoCore::ImageId depth,
                                         u64 vs_hash) {
-    if (engine_hdr_format != vk::Format::eB10G11R11UfloatPack32 || !engine_hdr_image ||
-        !EngineUpscale() || !game_frame.valid) {
+    if (engine_hdr_format != vk::Format::eB10G11R11UfloatPack32 || !engine_hdr_image) {
         static bool logged = false;
         if (!std::exchange(logged, true)) {
             std::printf("Engine upscale: HDR UI stays in the render-size frame (format %d, image %d, "
@@ -1747,7 +1746,11 @@ bool TemporalUpscaler::StartEngineHdrUi(VideoCore::ImageId color, VideoCore::Ima
         }
         return false;
     }
-    if (!RunGameUpscale(color, {}, true)) {
+    // The UI draws with an output-size viewport, so the frame is enlarged before it: by DLSS/FSR,
+    // or plainly for the game's own upscaler (and frames without scene motion). Left in the
+    // render-size frame, only the top-left part of the UI would fit (issue #69).
+    const bool temporal = EngineUpscale() && game_frame.valid;
+    if (temporal ? !RunGameUpscale(color, {}, true) : !EnlargeEngineHdr(color)) {
         return false;
     }
     scheduler.EndRendering();
@@ -1774,16 +1777,103 @@ bool TemporalUpscaler::StartEngineHdrUi(VideoCore::ImageId color, VideoCore::Ima
     engine_ui_read_barrier = false;
     static bool logged = false;
     if (!std::exchange(logged, true)) {
-        std::printf("Engine upscale: HDR, DLSS before the UI (vs %08llx on #%u), the UI draws at "
-                    "%ux%u\n", (unsigned long long)vs_hash, color.index, engine_output_w,
-                    engine_output_h);
+        std::printf("Engine upscale: HDR, %s before the UI (vs %08llx on #%u), the UI draws at "
+                    "%ux%u\n", temporal ? "DLSS/FSR" : "plain enlargement",
+                    (unsigned long long)vs_hash, color.index, engine_output_w, engine_output_h);
     }
+    return true;
+}
+
+bool TemporalUpscaler::EnlargeEngineHdr(VideoCore::ImageId src) {
+    auto& color = texture_cache.GetImage(src);
+    if (!(color.usage_flags & vk::ImageUsageFlagBits::eTransferSrc)) {
+        return false;
+    }
+    scheduler.EndRendering();
+    runtime.Transit(&color, vk::ImageLayout::eTransferSrcOptimal,
+                    vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferRead);
+    runtime.FlushBarriers();
+    const auto cmdbuf = scheduler.CommandBuffer();
+    const auto barrier = [&](vk::ImageLayout old_layout, vk::PipelineStageFlags2 src_stage,
+                             vk::AccessFlags2 src_access, vk::ImageLayout new_layout,
+                             vk::PipelineStageFlags2 dst_stage, vk::AccessFlags2 dst_access) {
+        const vk::ImageMemoryBarrier2 b{
+            .srcStageMask = src_stage,
+            .srcAccessMask = src_access,
+            .dstStageMask = dst_stage,
+            .dstAccessMask = dst_access,
+            .oldLayout = old_layout,
+            .newLayout = new_layout,
+            .image = vk::Image(engine_hdr_image),
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &b});
+    };
+    barrier(vk::ImageLayout::eUndefined, vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eNone, vk::ImageLayout::eTransferDstOptimal,
+            vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite);
+    const vk::ImageBlit region{
+        .srcSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+        .srcOffsets = std::array{vk::Offset3D{0, 0, 0},
+                                 vk::Offset3D{int(color.info.size.width),
+                                              int(color.info.size.height), 1}},
+        .dstSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+        .dstOffsets = std::array{vk::Offset3D{0, 0, 0},
+                                 vk::Offset3D{int(engine_hdr_w), int(engine_hdr_h), 1}},
+    };
+    cmdbuf.blitImage(color.GetImage(), vk::ImageLayout::eTransferSrcOptimal,
+                     vk::Image(engine_hdr_image), vk::ImageLayout::eTransferDstOptimal, region,
+                     vk::Filter::eLinear);
+    barrier(vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite, vk::ImageLayout::eGeneral,
+            vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eShaderRead);
     return true;
 }
 
 bool TemporalUpscaler::EngineUpscale() const {
     // DLSS, FSR 4 or FSR 3.1 (with the AA setting on, like native AA) on the game's motion.
     return engine_upscale && !engine_failed && GameMotion() && (UseDlss() || FsrNativeAa());
+}
+
+void TemporalUpscaler::EnsureEngineHdrImage(u32 w, u32 h) {
+    if (!engine_hdr_image || engine_hdr_w != w || engine_hdr_h != h) {
+        // PS_Upscale samples its whole input (UV 0..1, a full-screen triangle), so the
+        // DLSS image stands in at output size, same format as the game's frame when the
+        // GPU can blit into it (checked 2026-11-07 against the game's own HDR output).
+        const auto feats = instance.GetPhysicalDevice()
+                               .getFormatProperties(vk::Format::eB10G11R11UfloatPack32)
+                               .optimalTilingFeatures;
+        engine_hdr_format = (feats & vk::FormatFeatureFlagBits::eBlitDst) &&
+                                    (feats & vk::FormatFeatureFlagBits::eSampledImage)
+                                ? vk::Format::eB10G11R11UfloatPack32
+                                : vk::Format::eR16G16B16A16Sfloat;
+        if (engine_hdr_image) {
+            scheduler.Finish();
+        }
+        engine_hdr_views.clear();
+        engine_hdr_image =
+            VideoCore::UniqueImage(instance.GetDevice(), instance.GetAllocator());
+        engine_hdr_image.Create(vk::ImageCreateInfo{
+            .imageType = vk::ImageType::e2D,
+            .format = engine_hdr_format,
+            .extent = {w, h, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = vk::SampleCountFlagBits::e1,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled |
+                     vk::ImageUsageFlagBits::eColorAttachment,
+            .initialLayout = vk::ImageLayout::eUndefined,
+        });
+        engine_hdr_w = w;
+        engine_hdr_h = h;
+        std::printf("Engine upscale: HDR, the game's PS_Upscale reads the %s image (%ux%u, "
+                    "format %d)\n",
+                    !EngineUpscale() ? "enlarged" : UseDlss() ? "DLSS" : UseFsr4() ? "FSR 4"
+                                                                       : "FSR 3.1",
+                    w, h,
+                    int(engine_hdr_format));
+    }
 }
 
 bool TemporalUpscaler::OnEngineDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId color) {
@@ -1816,6 +1906,11 @@ bool TemporalUpscaler::OnEngineDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId
     }
     const auto ldr = std::exchange(engine_ldr, VideoCore::ImageId{});
     if (!engine_ui && !engine_ui_carried && (!EngineUpscale() || !game_frame.valid)) {
+        if (!rgba8) {
+            // HDR: the next frame's UI needs the output-size image (StartEngineHdrUi).
+            EnsureEngineHdrImage(w, h);
+            engine_hdr_seen = true;
+        }
         return false; // the game's own enlargement
     }
     if (!rgba8) {
@@ -1823,42 +1918,7 @@ bool TemporalUpscaler::OnEngineDraw(u64 vs_hash, u64 ps_hash, VideoCore::ImageId
         // input (a render-size float frame, not the 8-bit one) is redirected to
         // engine_hdr_image while it binds; RunEngineUpscale fills that with DLSS and the draw
         // goes ahead on it.
-        if (!engine_hdr_image || engine_hdr_w != w || engine_hdr_h != h) {
-            // PS_Upscale samples its whole input (UV 0..1, a full-screen triangle), so the
-            // DLSS image stands in at output size, same format as the game's frame when the
-            // GPU can blit into it (checked 2026-11-07 against the game's own HDR output).
-            const auto feats = instance.GetPhysicalDevice()
-                                   .getFormatProperties(vk::Format::eB10G11R11UfloatPack32)
-                                   .optimalTilingFeatures;
-            engine_hdr_format = (feats & vk::FormatFeatureFlagBits::eBlitDst) &&
-                                        (feats & vk::FormatFeatureFlagBits::eSampledImage)
-                                    ? vk::Format::eB10G11R11UfloatPack32
-                                    : vk::Format::eR16G16B16A16Sfloat;
-            if (engine_hdr_image) {
-                scheduler.Finish();
-            }
-            engine_hdr_views.clear();
-            engine_hdr_image =
-                VideoCore::UniqueImage(instance.GetDevice(), instance.GetAllocator());
-            engine_hdr_image.Create(vk::ImageCreateInfo{
-                .imageType = vk::ImageType::e2D,
-                .format = engine_hdr_format,
-                .extent = {w, h, 1},
-                .mipLevels = 1,
-                .arrayLayers = 1,
-                .samples = vk::SampleCountFlagBits::e1,
-                .tiling = vk::ImageTiling::eOptimal,
-                .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled |
-                         vk::ImageUsageFlagBits::eColorAttachment,
-                .initialLayout = vk::ImageLayout::eUndefined,
-            });
-            engine_hdr_w = w;
-            engine_hdr_h = h;
-            std::printf("Engine upscale: HDR, the game's PS_Upscale reads the %s image (%ux%u, "
-                        "format %d)\n",
-                        UseDlss() ? "DLSS" : UseFsr4() ? "FSR 4" : "FSR 3.1", w, h,
-                        int(engine_hdr_format));
-        }
+        EnsureEngineHdrImage(w, h);
         engine_redirect = ldr;
         engine_redirect_hit = false;
     }
