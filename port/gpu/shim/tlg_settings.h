@@ -26,9 +26,6 @@ inline bool IsFsr4(int upscaler) {
 /// is a startup patch: a change takes a restart.
 enum Preset : int { NativeAA = 0, Quality, Balanced, Performance, UltraPerformance, Super150, Super200,
                     PresetCount };
-/// The menus offer Native AA .. Ultra Performance; supersampling is experimental (tlg.ini
-/// preset=5/6 or TLG_UPSCALE_PRESET) and only listed while selected.
-constexpr int MenuPresetCount = Super150;
 enum DebugView : int { DebugNone = 0, DebugReactive = 1, DebugMotion = 2, DebugViewCount };
 
 /// Live output resolutions: the upscaler's output and the UI host targets.

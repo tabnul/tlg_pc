@@ -153,7 +153,7 @@
     "launcher.quality_super": "{preset} : rendu en {render}, réduit en {output}.",
     "launcher.quality_rules": "Qualité 1/1.5, Équilibré 1/1.7, Performance 1/2, Ultra Performance 1/3 de la sortie sur chaque côté ; la mise à l'échelle complète le reste. Appliqué au démarrage : le jeu redémarre en cas de changement.",
     "launcher.fg_mode": "Génération d'images",
-    "launcher.fg_hint": "Une image inventée entre deux images du jeu : plus fluide, un peu plus de latence. DLSS nécessite une NVIDIA RTX 40 ou plus récente ; FSR n'est lié à aucune marque.",
+    "launcher.fg_hint": "Une image inventée entre deux images du jeu : plus fluide, un peu plus de latence. DLSS nécessite une NVIDIA RTX 40 ou plus récente ; FSR n'est lié à aucune marque. Pas à 30 FPS. Avec la VSync, la fréquence de rafraîchissement de l'écran doit être au moins le double de la fréquence d'images du jeu.",
     "launcher.aa_no_dlss": "Pas de DLSS sur ce GPU : FSR 3.1 est utilisé à la place",
     "launcher.aa_no_fsr4": "Ce GPU ne peut pas utiliser FSR 4 : FSR 3.1 est utilisé à la place",
     "launcher.smaa_hint": "Déconseillé : DLAA et FSR lissent déjà les bords ; le SMAA par-dessus floute l'image et le HUD.",
@@ -363,7 +363,9 @@
     "preset.ps_p_unknown_item": "Ignorée, option inconnue : {detail}",
     "preset.ps_p_unknown_setting": "Ignoré, paramètre inconnu ou propre à la machine : {detail}",
     "preset.ps_p_bad_item": "Refusé, valeur non valide : {detail}",
-    "preset.ps_p_bad_setting": "Refusé, valeur non valide : {detail}"
+    "preset.ps_p_bad_setting": "Refusé, valeur non valide : {detail}",
+    "launcher.fg_blocked": "Désactivée : le jeu tourne à 30 FPS (fréquence d'images ou limite de fréquence d'images), trop peu pour la génération d'images. Votre choix revient avec une fréquence plus élevée.",
+    "launcher.quality_super_tip": "Le suréchantillonnage calcule une image plus grande que l'écran puis la réduit : contours plus fins, mais lourd pour la carte graphique et plus gourmand en mémoire. Réservé aux cartes puissantes."
   },
   "items": {
     "menu:fsr1": {
@@ -963,6 +965,9 @@
     "Do not close the game.": "Ne fermez pas le jeu.",
     "Save loaded": "Sauvegarde chargée",
     "Save deleted": "Sauvegarde supprimée",
-    "Game saved": "Partie sauvegardée"
+    "Game saved": "Partie sauvegardée",
+    "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Désactivée pour l'instant : le jeu tourne à 30 FPS (mode de fréquence d'images ou limite de fréquence d'images), trop peu pour la génération d'images. Votre choix revient avec une fréquence plus élevée.",
+    "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Avec la VSync, la fréquence de rafraîchissement de l'écran doit être au moins le double de la fréquence d'images du jeu.",
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "Le suréchantillonnage calcule une image plus grande que l'écran puis la réduit : contours plus fins, mais lourd pour la carte graphique et plus gourmand en mémoire. Réservé aux cartes puissantes."
   }
 }

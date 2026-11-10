@@ -65,8 +65,12 @@ Each setting shows what the game originally used and what we recommend.
   shimmer on feathers, grass and fences. Quality to Ultra Performance render lower for more FPS,
   while menus and subtitles stay sharp. **F8** switches back to the game's own AA to compare.
   See [port/docs/upscaling.md](port/docs/upscaling.md) and [docs/dlaa.md](docs/dlaa.md).
+- **Supersampling (experimental):** Quality also offers 150% and 200%. The game renders larger
+  than your screen and shrinks the image, for finer edges. It is heavy on the graphics card and
+  needs more memory, so it is meant for strong cards.
 - **Frame generation:** DLSS (RTX 40 or newer) or FSR 3.1 (any card). It shows one generated frame
-  between each pair of real ones, and works with any upscaler setting. Off by default.
+  between each pair of real ones, and works with any upscaler setting, the game's own (Built-in)
+  included. It needs a game frame rate above 30, so it is off at 30 FPS. Off by default.
 - **Frame rate:** 30 (as on PS4), 60 or unlocked. On an RTX 5090, unlocked runs at about 90-120 FPS.
 - **Shader stutter:** shaders are prepared at start from shader recipes (from
   [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by @deadinside28), so new

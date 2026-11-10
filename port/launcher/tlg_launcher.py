@@ -222,6 +222,7 @@ TEXT = {
     'quality_native': '{preset}: renders at the output size, {output}.',
     'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
     'quality_super': '{preset}: renders at {render}, shrunk to {output}.',
+    'quality_super_tip': 'Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.',
     'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
                       'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
@@ -524,7 +525,7 @@ def quality_text(t, size, preset):
     render = tlg_run.render_resolution(size, preset)
     key = 'quality_native' if not render else 'quality_super' if tlg_run.supersampling(preset) else 'quality_up'
     line = t(key).format(preset=t(tlg_run.PRESET_KEYS[preset]), render=render, output=size)
-    return line + '\n' + t('quality_rules')
+    return line + '\n' + t('quality_rules') + ' ' + t('quality_super_tip')
 
 
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
@@ -1294,7 +1295,7 @@ class Launcher:
         self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=MUTED, wraplength=320)
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
         ttk.Label(video, text=self.t('quality')).grid(row=11, column=0, sticky='w', pady=(6, 0))
-        self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.menu_preset_keys(tlg_run.quality_preset(ini))],
+        self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.PRESET_KEYS],
                                         state='readonly', width=30)
         self.quality_box.current(tlg_run.quality_preset(ini))
         self.quality_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))

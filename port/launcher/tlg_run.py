@@ -572,14 +572,6 @@ def resolution(settings):
 PRESET_SCALES = (1.0, 1.5, 1.7, 2.0, 3.0, 1 / 1.5, 0.5)
 PRESET_KEYS = ('preset_native', 'preset_quality', 'preset_balanced', 'preset_performance',
                'preset_ultra', 'preset_super150', 'preset_super200')
-# The launchers list Native AA .. Ultra Performance; supersampling (experimental) is tlg.ini
-# preset=5/6 or TLG_UPSCALE_PRESET only, and listed while selected.
-MENU_PRESETS = 5
-
-
-def menu_preset_keys(preset):
-    """The Quality choices to show: the menu ones, plus the supersampling ones while selected."""
-    return PRESET_KEYS if preset >= MENU_PRESETS else PRESET_KEYS[:MENU_PRESETS]
 
 
 def quality_preset(ini):

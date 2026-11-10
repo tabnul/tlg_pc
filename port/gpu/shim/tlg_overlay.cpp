@@ -599,9 +599,10 @@ void ImageTab() {
                             Format("%d (", ah) + quality_labels[std::clamp(s.startup_preset, 0, S::PresetCount - 1)] + ").";
         }
         quality_help += TR(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.");
-        // Supersampling (experimental, tlg.ini / TLG_UPSCALE_PRESET) is listed only while selected.
-        ChoiceRow(TR("Quality (requires restart)"), s.preset, quality_labels, nullptr,
-                  S::IsSupersampling(s.preset) ? S::PresetCount : S::MenuPresetCount, quality_help.c_str(), S::NativeAA);
+        quality_help += ' ';
+        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.");
+        ChoiceRow(TR("Quality (requires restart)"), s.preset, quality_labels, nullptr, S::PresetCount,
+                  quality_help.c_str(), S::NativeAA);
         CheckRow("SMAA 1x", s.smaa,
                  TR("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060)."), d.smaa, false);
         ImGui::EndTable();

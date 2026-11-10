@@ -151,7 +151,7 @@
     "launcher.quality_super": "{preset}: desenha em {render}, reduzido para {output}.",
     "launcher.quality_rules": "Qualidade 1/1,5, Equilibrado 1/1,7, Desempenho 1/2, Ultra desempenho 1/3 da saída em cada lado; o ampliador completa o resto. Aplicado no início: o jogo reinicia para mudar.",
     "launcher.fg_mode": "Geração de quadros",
-    "launcher.fg_hint": "Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.",
+    "launcher.fg_hint": "Uma imagem gerada entre dois quadros do jogo: mais suave, um pouco mais de atraso. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca. Não funciona a 30 FPS. Com o VSync ligado, a taxa de atualização da tela deve ser pelo menos o dobro da taxa de quadros do jogo.",
     "launcher.aa_no_dlss": "Sem DLSS nesta GPU: roda como FSR 3.1",
     "launcher.aa_no_fsr4": "Esta GPU não roda o FSR 4: roda como FSR 3.1",
     "launcher.smaa_hint": "Não recomendado: o DLAA e o FSR já suavizam as bordas; o SMAA por cima desfoca a imagem e o HUD.",
@@ -361,7 +361,9 @@
     "preset.ps_p_unknown_item": "Ignorada, opção desconhecida: {detail}",
     "preset.ps_p_unknown_setting": "Ignorada, configuração desconhecida ou da máquina: {detail}",
     "preset.ps_p_bad_item": "Recusada, valor inválido: {detail}",
-    "preset.ps_p_bad_setting": "Recusada, valor inválido: {detail}"
+    "preset.ps_p_bad_setting": "Recusada, valor inválido: {detail}",
+    "launcher.fg_blocked": "Desligada: o jogo roda a 30 FPS (taxa de quadros ou limite de taxa de quadros), baixo demais para a geração de quadros. Sua escolha volta com uma taxa maior.",
+    "launcher.quality_super_tip": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes."
   },
   "items": {
     "menu:fsr1": {
@@ -955,6 +957,9 @@
     "Near": "Perto",
     "Middle": "Médio",
     "Far": "Longe",
-    "Game camera": "Câmera do jogo"
+    "Game camera": "Câmera do jogo",
+    "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Desligada agora: o jogo roda a 30 FPS (modo de taxa de quadros ou limite de taxa de quadros), baixo demais para a geração de quadros. Sua escolha volta com uma taxa maior.",
+    "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Com o VSync ligado, a taxa de atualização da tela deve ser pelo menos o dobro da taxa de quadros do jogo.",
+    "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only.": "A superamostragem renderiza maior que a tela e reduz a imagem: bordas mais finas, mas pesa na placa de vídeo e precisa de mais memória. Só para placas potentes."
   }
 }

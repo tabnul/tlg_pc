@@ -33,10 +33,8 @@ class QualityPresetTests(unittest.TestCase):
             os.environ['TLG_UPSCALE_PRESET'] = '2'
             self.assertEqual(tlg_run.quality_preset({'preset': '3'}), 2)
 
-    def test_menu_lists_supersampling_only_while_selected(self):
-        self.assertEqual(len(tlg_run.menu_preset_keys(0)), tlg_run.MENU_PRESETS)
-        self.assertEqual(len(tlg_run.menu_preset_keys(4)), tlg_run.MENU_PRESETS)
-        self.assertEqual(tlg_run.menu_preset_keys(5), tlg_run.PRESET_KEYS)
+    def test_supersampling_presets(self):
+        self.assertEqual(len(tlg_run.PRESET_KEYS), len(tlg_run.PRESET_SCALES))
         self.assertTrue(tlg_run.supersampling(5) and tlg_run.supersampling(6))
         self.assertFalse(tlg_run.supersampling(4))
 
