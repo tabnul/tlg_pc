@@ -26,7 +26,7 @@ SETTING_DEFAULTS = {'vsync': True, 'show_fps': False, 'frame_rate': '30'}
 PRESETS = (
     ('performance', {'vsync': False}, {'menu:frames_queued': '2'}),
     ('balanced', {}, {}),
-    ('quality', {}, {'menu:smaa': '1'}),
+    ('quality', {}, {}),
     ('ps4', {}, {'menu:fps_limit': '30', 'menu:sharpen': '0'}),
 )
 DEFAULT_PRESET = 'balanced'

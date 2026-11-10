@@ -202,7 +202,6 @@ TEXT = {
                              'cleanup was fixed (issue #104), old textures no longer pile up. It can cause a short stutter after a load, '
                              'so it is off by default. Also in the in-game menu (Insert → Performance).'),
     'filters': 'Image filters (live in the in-game menu too, Insert → Image)',
-    'smaa': 'SMAA anti-aliasing (smooths edges; the HUD too)',
     'aa_off': 'Off',
     'upscaler': 'Upscale method',
     'up_off': 'Built-in (game)',
@@ -232,7 +231,6 @@ TEXT = {
     'fg_blocked': 'Off: the game runs at 30 FPS (frame rate or frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.',
     'aa_no_dlss': 'No DLSS on this GPU: it runs as FSR 3.1',
     'aa_no_fsr4': 'This GPU cannot run FSR 4: it runs as FSR 3.1',
-    'smaa_hint': 'Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
     'sharpening': 'Sharpening',
     'sharpening_hint': ('Sharpens the image. With DLSS, FSR or TAA it is their own sharpening (scene only); with '
                         "Built-in it is AMD CAS on the final picture. Up to 100% the upscaler's own sharpening; "
@@ -346,7 +344,7 @@ TEXT = {
     'graphics_keys': ('Insert          open / close the graphics menu (Esc closes)\n'
                       'L2 + R3         controller: hold L2, press R3\n'
                       'Q / E, L1 / R1  previous / next tab\n'
-                      'F8              switch anti-aliasing (DLAA, FSR) / SMAA\n'
+                      'F8              switch your upscaler / Built-in\n'
                       'F10             show / hide the FPS counter'),
     'hdr_hint': "The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
     'shadow_scale': 'Shadow resolution',
@@ -1916,19 +1914,10 @@ class Launcher:
             self.banner = None
 
     def build_aa_filters(self, parent, row):
-        """SMAA and Sharpening on the Video page next to the upscaler (user, 2026-11-07); tlg.ini at once."""
+        """Sharpening on the Video page next to the upscaler (user, 2026-11-07); tlg.ini at once."""
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
         self.ini_vars = getattr(self, 'ini_vars', {})
-        for offset, key in ((0, 'smaa'),):
-            var = tk.BooleanVar(value=ini[key] not in ('0', ''))
-            self.ini_vars[key] = var
-            cell = ttk.Frame(parent)
-            cell.grid(row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
-            box = ttk.Checkbutton(cell, text=self.t(key), variable=var, command=self.filters_changed)
-            box.pack(side='left')
-            if key == 'smaa':
-                self.hint_mark(cell, 'smaa_hint', box).pack(side='left', padx=(4, 0))
         ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 1, column=0, sticky='w')
         cell = ttk.Frame(parent)
         cell.grid(row=row + 1, column=1, sticky='w', padx=6, pady=2)
@@ -1944,11 +1933,11 @@ class Launcher:
         self.update_strength(ini)
 
     def build_filters(self, parent, row):
-        """Color adjustments, read from and written to tlg.ini right away (SMAA and Sharpening: build_aa_filters)."""
+        """Color adjustments, read from and written to tlg.ini right away (Sharpening: build_aa_filters)."""
         ttk.Separator(parent).grid(row=row + 1, column=0, columnspan=3, sticky='ew', pady=(8, 4))
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
-        self.ini_vars = getattr(self, 'ini_vars', {})  # SMAA lives on the Video page (build_aa_filters)
+        self.ini_vars = getattr(self, 'ini_vars', {})
         var = tk.BooleanVar(value=ini['color_adjust'] not in ('0', ''))
         self.ini_vars['color_adjust'] = var
         ttk.Checkbutton(parent, text=self.t('color_adjust'), variable=var, command=self.filters_changed).grid(
@@ -2080,7 +2069,7 @@ class Launcher:
         self.reload_ini()
 
     def filters_changed(self):
-        values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
+        values = {'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'sharpen': int(self.sharpen_var.get())}
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         # Only a pick in the row itself: while it shows Off for another reason (30 FPS, no DLSS
