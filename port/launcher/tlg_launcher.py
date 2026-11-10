@@ -1689,11 +1689,13 @@ class Launcher:
                       font=(SERIF, 34 if home else 22), tags='title')
         line_y = top + (84 if home else 56)
         c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
+        # This port's name and the Japanese title, under the game's title on every page.
+        c.create_text(left, 198 if home else 130, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
+                      anchor='w', fill=ACCENT, font=(SERIF, 10 if home else 7), tags='title')
+        c.create_text(left, 222 if home else 148, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
+                      fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11 if home else 9),
+                      tags='title')
         if home:
-            c.create_text(left, 198, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
-                          anchor='w', fill=ACCENT, font=(SERIF, 10))
-            c.create_text(left, 222, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
-                          fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11))
             c.create_line(left, 244, left + 46, 244, fill=ACCENT)
         else:
             c.tag_bind('title', '<Button-1>', lambda _: self.show_page('home'))
@@ -1708,7 +1710,7 @@ class Launcher:
                  ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
                  ('home_quit', None, self.quit)]
-        first = 274 if home else 170
+        first = 274 if home else 204
         step = min(38 if home else 36, max(28, (height - first - 120) // len(items)))
         for index, (key, page, action) in enumerate(items):
             y = first + index * step
