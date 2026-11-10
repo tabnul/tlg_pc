@@ -578,9 +578,11 @@ def quality_preset(ini):
     """The tlg.ini Quality row (0 Native AA .. 6 Supersampling 200%); TLG_UPSCALE_PRESET wins."""
     value = os.environ.get('TLG_UPSCALE_PRESET') or ini.get('preset', '0')
     try:
-        return min(max(int(value), 0), len(PRESET_SCALES) - 1)
+        preset = min(max(int(value), 0), len(PRESET_SCALES) - 1)
     except ValueError:
         return 0
+    # Supersampling removed from the menus (user 2026-11-10): old files load it as Off.
+    return 0 if supersampling(preset) else preset
 
 
 def render_resolution(size, preset):

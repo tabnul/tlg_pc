@@ -134,7 +134,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
             }
         }
     } else if (key == "preset") {
-        v.preset = std::clamp(i, 0, PresetCount - 1);
+        // Supersampling removed from the menus (user 2026-11-10): old files load it as Off.
+        v.preset = IsSupersampling(i) ? int(NativeAA) : std::clamp(i, 0, PresetCount - 1);
     } else if (key == "sharpen") {
         v.sharpen = i != 0;
     } else if (key == "sharpness") {

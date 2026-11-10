@@ -536,32 +536,30 @@ void ImageTab() {
     if (BeginRows("##antialiasing")) {
         namespace S = TlgSettings;
         // tlg: three rows (user, 2026-11-10, laid out as Ratchet & Clank: Rift Apart). Upscale
-        // method: Off, an upscaler (Built-in, DLSS, FSR 3.1, FSR 4) or Supersampling. Upscale
-        // quality: the render size (the launcher patches it in at start, so it needs a restart).
-        // Anti-aliasing: free to choose only with method Off or Supersampling; an upscaler is its
-        // own anti-aliasing, the row then shows Off, greyed out. Stored as before: preset (0 off,
-        // 1-4 upscaling, 5-6 supersampling) and upscaler (the upscaler, or the anti-aliasing at
-        // method Off / Supersampling). DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a
+        // method: Off or an upscaler (Built-in, DLSS, FSR 3.1, FSR 4); supersampling removed
+        // (user 2026-11-10). Upscale quality: the render size (the launcher patches it in at
+        // start, so it needs a restart). Anti-aliasing: free to choose only with method Off; an
+        // upscaler is its own anti-aliasing, the row then shows Off, greyed out. Stored as before:
+        // preset (0 off, 1-4 upscaling) and upscaler (the upscaler, or the anti-aliasing at
+        // method Off). DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a
         // card with its shader features; both grey out when the card lacks them.
-        // TAA (test 2026-11-07): our own light temporal AA, native size only (not with supersampling).
-        enum Method { MethodOff, MethodBuiltIn, MethodDlss, MethodFsr3, MethodFsr4, MethodSuper, MethodCount };
+        // TAA (test 2026-11-07): our own light temporal AA, native size only.
+        enum Method { MethodOff, MethodBuiltIn, MethodDlss, MethodFsr3, MethodFsr4, MethodCount };
         static const char* const method_labels[MethodCount] = {TR("Off"), TR("Built-in (game)"), "DLSS (NVIDIA)",
-                                                               "FSR 3.1", "FSR 4", TR("Supersampling")};
+                                                               "FSR 3.1", "FSR 4"};
         static const int method_upscalers[MethodCount] = {-1, S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3,
-                                                          S::UpscalerFsr4, -1};
+                                                          S::UpscalerFsr4};
         const int upscaler = S::SelectedUpscaler() == S::UpscalerFsr411 ? int(S::UpscalerFsr4) : S::SelectedUpscaler();
-        const int preset = std::clamp(s.preset.load(), 0, S::PresetCount - 1);
+        const int preset = std::clamp(s.preset.load(), 0, int(S::UltraPerformance));
         int method = MethodOff;
         if (preset == S::NativeAA || upscaler == S::UpscalerTaa) {
             method = MethodOff;  // TAA always runs at native size (RenderPreset)
-        } else if (S::IsSupersampling(preset)) {
-            method = MethodSuper;
         } else {
             for (int i = MethodBuiltIn; i <= MethodFsr4; ++i) {
                 if (method_upscalers[i] == upscaler) method = i;
             }
         }
-        Row(TR("Scaling method"));
+        Row(TR("Upscale method"));
         if (ImGui::BeginCombo("##value", method_labels[method])) {
             for (int i = 0; i < MethodCount; ++i) {
                 const bool supported = (i != MethodDlss || s.dlss_supported) && (i != MethodFsr4 || s.fsr4_supported);
@@ -569,11 +567,8 @@ void ImageTab() {
                 if (ImGui::Selectable(method_labels[i], i == method) && i != method) {
                     if (i == MethodOff) {
                         s.preset = S::NativeAA;
-                    } else if (i == MethodSuper) {
-                        s.preset = S::Super150;
-                        if (upscaler == S::UpscalerTaa) S::SetUpscaler(S::UpscalerOff);
                     } else {
-                        if (method == MethodOff || method == MethodSuper) s.preset = S::Quality;
+                        if (method == MethodOff) s.preset = S::Quality;
                         S::SetUpscaler(method_upscalers[i]);
                     }
                     dirty = true;
@@ -584,18 +579,14 @@ void ImageTab() {
         }
         Help(!s.dlss_supported && s.dlss_problem.load()
                  ? s.dlss_problem.load()
-                 : TR("How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game."),
+                 : TR("How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. F8 switches between Built-in and your choice in game."),
              {method_labels[MethodOff], ""});
         ImGui::PopID();
-        static const char* const quality_labels[S::PresetCount] = {
+        static const char* const quality_labels[S::UltraPerformance + 1] = {
             TR("Off"), TR("Quality"), TR("Balanced"),
-            TR("Performance"), TR("Ultra Performance"),
-            TR("150% (experimental)"),
-            TR("200% (experimental)")};
+            TR("Performance"), TR("Ultra Performance")};
         const auto preset_name = [](int p) {
-            p = std::clamp(p, 0, S::PresetCount - 1);
-            return S::IsSupersampling(p) ? std::string(TR("Supersampling")) + ' ' + quality_labels[p]
-                                         : std::string(quality_labels[p]);
+            return std::string(quality_labels[std::clamp(p, 0, int(S::UltraPerformance))]);
         };
         int ow = 0, oh = 0, rw = 0, rh = 0;
         S::OutputSize(ow, oh);
@@ -604,9 +595,6 @@ void ImageTab() {
         quality_help = preset_name(s.preset) + ": ";
         if (s.preset == S::NativeAA) {
             quality_help += Format(TR("renders at the output size, %dx"), ow) + Format("%d.", oh);
-        } else if (S::IsSupersampling(s.preset)) {
-            quality_help += Format(TR("renders at %dx"), rw) + Format("%d, ", rh) +
-                            Format(TR("shrunk to %dx"), ow) + Format("%d.", oh);
         } else {
             quality_help += Format(TR("renders at %dx"), rw) + Format("%d, ", rh) +
                             Format(TR("upscaled to %dx"), ow) + Format("%d.", oh);
@@ -618,14 +606,10 @@ void ImageTab() {
                             Format("%d (", ah) + preset_name(s.startup_preset) + ").";
         }
         quality_help += TR(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.");
-        quality_help += ' ';
-        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.");
-        Row(TR("Scaling quality (requires restart)"));
+        Row(TR("Upscale quality (requires restart)"));
         ImGui::BeginDisabled(method == MethodOff);
         if (ImGui::BeginCombo("##value", method == MethodOff ? "" : quality_labels[preset])) {
-            const int first = method == MethodSuper ? S::Super150 : S::Quality;
-            const int last = method == MethodSuper ? S::Super200 : S::UltraPerformance;
-            for (int i = first; i <= last; ++i) {
+            for (int i = S::Quality; i <= S::UltraPerformance; ++i) {
                 if (ImGui::Selectable(quality_labels[i], i == preset) && i != preset) {
                     s.preset = i;
                     dirty = true;
@@ -641,18 +625,17 @@ void ImageTab() {
                                         S::UpscalerTaa};
         constexpr int aa_count = int(std::size(aa_values));
         // An upscaler as the method: the row shows Off, greyed out (user, 2026-11-10).
-        const bool aa_free = method == MethodOff || method == MethodSuper;
+        const bool aa_free = method == MethodOff;
         int aa_index = 0;
         for (int i = 0; i < aa_count && aa_free; ++i) {
             if (aa_values[i] == upscaler) aa_index = i;
         }
         Row(TR("Anti-aliasing"));
-        ImGui::BeginDisabled(method != MethodOff && method != MethodSuper);
+        ImGui::BeginDisabled(method != MethodOff);
         if (ImGui::BeginCombo("##value", aa_labels[aa_index])) {
             for (int i = 0; i < aa_count; ++i) {
                 const bool supported = (aa_values[i] != S::UpscalerDlss || s.dlss_supported) &&
-                                       (aa_values[i] != S::UpscalerFsr4 || s.fsr4_supported) &&
-                                       (aa_values[i] != S::UpscalerTaa || method != MethodSuper);
+                                       (aa_values[i] != S::UpscalerFsr4 || s.fsr4_supported);
                 ImGui::BeginDisabled(!supported);
                 if (ImGui::Selectable(aa_labels[i], i == aa_index) && i != aa_index) {
                     S::SetUpscaler(aa_values[i]);
@@ -663,7 +646,7 @@ void ImageTab() {
             ImGui::EndCombo();
         }
         ImGui::EndDisabled();
-        Help(TR("Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own."),
+        Help(TR("Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own."),
              {s.dlss_supported ? "DLAA (NVIDIA)" : aa_labels[s.fsr4_supported ? 3 : 2], ""});
         ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,
@@ -1368,16 +1351,13 @@ void Menu() {
                                     std::min(680.0f * base_scale, viewport->WorkSize.y * 0.9f)),
                              ImGuiCond_Appearing);
     bool keep_open = true;
-    // tlg: the game's own title (param.sfo), not a fixed one, then this port's name and the
-    // Japanese title (as on the launcher's home screen; only with a font that has the characters).
+    // tlg: the game's own title (param.sfo), not a fixed one, then this port's name (Japanese
+    // title removed, user 2026-11-10).
     static const std::string heading = [] {
         const std::string_view title = Common::ElfInfo::Instance().Title();
         const char* app_name = std::getenv("TLG_APP_NAME");
         return std::string(!title.empty() ? title : app_name && *app_name ? app_name : "The Last Guardian") +
-               " - The Definitive Edition" +
-               (cjk_font_merged ? "  \xE4\xBA\xBA\xE5\x96\xB0\xE3\x81\x84\xE3\x81\xAE\xE5\xA4\xA7\xE9\xB7\xB2"
-                                  "\xE3\x83\x88\xE3\x83\xAA\xE3\x82\xB3" : "") +
-               "  (Insert / R3+L2)";
+               " - The Definitive Edition  (Insert / R3+L2)";
     }();
     if (!ImGui::Begin(heading.c_str(), &keep_open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
