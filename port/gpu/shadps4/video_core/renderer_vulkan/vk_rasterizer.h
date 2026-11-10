@@ -517,6 +517,8 @@ private:
     float sampler_lod_bias = 0.0f; ///< tlg: extra bias of this draw's samplers
     mutable float ui_cx = 0.f; ///< tlg: UI piece centre x (clip space if ui_clip, else layout px)
     mutable bool ui_clip = true;
+    bool hdr_ui_phase = false; ///< tlg: HDR, after the last image pass: draws are interface
+    mutable bool ui_menu = false; ///< tlg: piece placed by a menu model (constant-block offset)
     mutable bool ui_fill_quad = false; ///< tlg: this interface draw is one full-screen picture
     bool scene_debug_frame = false; ///< TLG_SCENE_DEBUG: this frame's passes are printed
     bool PendingWriteOverlaps(VAddr address, u64 size);

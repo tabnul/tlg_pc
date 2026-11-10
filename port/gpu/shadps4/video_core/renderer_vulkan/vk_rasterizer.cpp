@@ -1338,6 +1338,19 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     motion_geometry = 0;
 
     PrepareRenderState(pipeline);
+    // tlg: HDR draws the interface into the HDR frame after the game's last image pass
+    // (vs 0811cca2, as in vk_temporal_upscaler.cpp); the display pass ends that phase.
+    {
+        static const u64 hdr_post_vs = [] {
+            const char* env = std::getenv("TLG_HDR_POST_VS");
+            return env ? std::strtoull(env, nullptr, 16) : 0x0811cca2ull;
+        }();
+        if (regs.color_buffers[0] && FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
+            hdr_ui_phase = false;
+        } else if (pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash == hdr_post_vs) {
+            hdr_ui_phase = true;
+        }
+    }
     if (upscaler->Enabled() &&
         pipeline->FragmentHash() == upscaler->SkyMotionPs()) {
         upscaler->OnGameMotionPass(cb_descs[0].first, cb_descs[2].first, db_desc.first);
@@ -3853,8 +3866,9 @@ void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool
     // with it instead of boxing it into 16:9.
     ui_fill_quad = false;
     const auto& regs = Regs();
+    // HDR: the interface draws into the game's HDR frame (target_expand set), not the display buffer.
     if (regs.num_indices >= 6 && !regs.depth_control.depth_enable && regs.color_buffers[0] &&
-        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
+        (FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address()) || target_expand[0] || hdr_ui_phase)) {
         const auto& fetch = pipeline->GetFetchShader();
         if (fetch && !fetch->attributes.empty()) {
             const auto& vs = pipeline->GetStage(Shader::SwStage::Vertex);
@@ -3921,9 +3935,11 @@ void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool
                 if (ui_fill_quad) {
                     ui_cx = 0.f;
                     ui_clip = true;
+                    ui_menu = false;
                 } else if (x0 < x1) {
                     ui_clip = x0 >= -1.5f && x1 <= 1.5f && y0 >= -1.5f && y1 <= 1.5f;
                     ui_cx = (x0 + x1) * 0.5f + (ui_clip ? off_x : 0.f);
+                    ui_menu = ui_clip && off_x != 0.f;
                 } // unknown position: keep the last piece's
             }
         }
@@ -4078,7 +4094,9 @@ void Rasterizer::UpdateViewportScissorState() const {
     // enlarged and cropped at the long side, so they get no black bars.
     if (!regs.IsClipDisabled() && regs.primitive_type == AmdGpu::PrimitiveType::TriangleList &&
         !regs.depth_control.depth_enable && regs.color_buffers[0] && !viewports.empty() &&
-        FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
+        (FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address()) || target_expand[0] || hdr_ui_phase)) {
+        // HDR interface (drawn into the HDR frame at output size): only the 21:9 edge rule.
+        const bool hdr_ui = !FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address());
         // The game's own frame area (the target can be padded, e.g. 1088 lines for 1080).
         const float w = std::abs(viewports[0].width);
         const float h = std::abs(viewports[0].height);
@@ -4089,8 +4107,20 @@ void Rasterizer::UpdateViewportScissorState() const {
             // pieces (hint boxes) for a 1920 wide layout. Move those to the right edge.
             const float uiw = 1080.f * w / h;
             const float lx = ui_clip ? (ui_cx + 1.f) * 0.5f * uiw : ui_cx;
-            // Pieces centred on the wide canvas (title prompt, dialogs) stay in the middle.
-            if (lx > 1280.f && std::abs(lx - uiw * 0.5f) > 64.f) {
+            // Pieces centred on the wide canvas (title prompt, dialogs) stay in the middle, and
+            // so do menu-model pieces (pause / skip dialog "[ ]" cursor): the menus are laid out
+            // on the wide canvas, so moving them threw the cursor's "]" ~1000 px right.
+            const bool move = lx > 1280.f && std::abs(lx - uiw * 0.5f) > 64.f && !ui_menu;
+            static const bool log_ui = std::getenv("TLG_UI_LOG") != nullptr;
+            if (log_ui && lx > 1280.f) {
+                static int logged = 0;
+                if (logged < 300) {
+                    ++logged;
+                    std::printf("UI piece lx %.0f clip %d menu %d move %d\n", lx, int(ui_clip),
+                                int(ui_menu), int(move));
+                }
+            }
+            if (move) {
                 const float ax = w - 1920.f * h / 1080.f;
                 for (auto& v : viewports)
                     v.x += ax;
@@ -4099,7 +4129,7 @@ void Rasterizer::UpdateViewportScissorState() const {
                     s.offset.x = std::max(x0, 0);
                 }
             }
-        } else if (w > 0.f && h > 0.f && w * 9.f < h * 16.f - 16.f) {
+        } else if (!hdr_ui && w > 0.f && h > 0.f && w * 9.f < h * 16.f - 16.f) {
             const bool wide = w * 9.f > h * 16.f;
             const bool box_width = wide != ui_fill_quad;
             const float bw = box_width ? h * 16.f / 9.f : w;
