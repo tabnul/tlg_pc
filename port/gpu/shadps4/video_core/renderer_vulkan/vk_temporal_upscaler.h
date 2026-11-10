@@ -180,6 +180,7 @@ private:
 
     void Run();
     void RunGameMotion();
+    void RunFgInputs();
     /// tlg: engine upscale (TLG_RENDER_RESOLUTION below TLG_RESOLUTION_PATCH): the game renders
     /// at the smaller size and its PS_Upscale pass enlarges the finished frame. `OnEngineDraw`
     /// recognises that draw (the first output-size draw after the last render-size LDR target
@@ -380,6 +381,13 @@ private:
     bool fg_reset = false;
     std::array<float, 2> fg_jitter{};
     VideoCore::ImageId fg_depth{};
+    // tlg: frame generation without DLSS / FSR / TAA (Built-in upscaler): RunFgInputs makes the
+    // motion vectors in its own image, so the upscalers' images keep their sizes.
+    bool fg_own_motion = false; ///< the pending inputs use fg_motion_image
+    VideoCore::UniqueImage fg_motion_image;
+    vk::UniqueImageView fg_motion_view;
+    u32 fg_motion_width = 0, fg_motion_height = 0;
+    std::chrono::steady_clock::time_point last_fg_inputs{};
     VideoCore::UniqueImage motion_image;
     VideoCore::UniqueImage output_image;
     vk::UniqueImageView motion_view;

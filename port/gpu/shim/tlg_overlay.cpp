@@ -470,8 +470,36 @@ void ImageTab() {
                  TR("The game's own HDR10 output, used when HDR is on in Windows display settings. Applies after a restart."), d.hdr);
         static const char* const fg_labels[] = {TR("Off"), "DLSS", "FSR 3.1"};
         static const int fg_values[] = {0, 1, 2};
-        ChoiceRow(TR("Frame generation"), s.frame_generation, fg_labels, fg_values, 3,
-                  TR("Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand."), d.frame_generation);
+        // tlg: greyed out and shown as Off while the game runs at 30 FPS (launch mode or Frame
+        // rate limit): the game treats it as off then (TlgSettings::EffectiveFrameGeneration) and
+        // the stored choice comes back with a higher rate. DLSS alone is greyed on a card without
+        // DLSS frame generation.
+        {
+            const bool blocked = TlgSettings::FrameGenerationBlocked();
+            const bool dlss_fg = s.dlss_fg_supported != 0;
+            const int stored = s.frame_generation;
+            const int shown = blocked || (stored == 1 && !dlss_fg) ? 0 : stored;
+            static std::string fg_help;
+            fg_help = TR("Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.");
+            fg_help += ' ';
+            fg_help += blocked ? TR("Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.")
+                               : TR("With VSync on, the screen's refresh rate must be at least twice the game's frame rate.");
+            Row(TR("Frame generation"));
+            ImGui::BeginDisabled(blocked);
+            if (ImGui::BeginCombo("##value", fg_labels[shown])) {
+                for (int i = 0; i < 3; ++i) {
+                    ImGui::BeginDisabled(i == 1 && !dlss_fg);
+                    if (ImGui::Selectable(fg_labels[i], i == shown) && i != shown) {
+                        Store(s.frame_generation, fg_values[i], true);
+                    }
+                    ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+            Help(fg_help.c_str(), {ChoiceLabel(fg_labels, fg_values, 3, d.frame_generation), ""});
+            ImGui::PopID();
+        }
         ImGui::EndTable();
     }
     const int iw = s.image_width, ih = s.image_height, ww = s.window_width, wh = s.window_height;

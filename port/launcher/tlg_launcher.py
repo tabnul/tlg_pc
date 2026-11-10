@@ -225,7 +225,10 @@ TEXT = {
     'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
                       'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
-    'fg_hint': 'One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
+    'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; '
+                "FSR is not tied to one brand. Not at 30 FPS. With VSync on, the screen's refresh rate must be at least twice "
+                "the game's frame rate."),
+    'fg_blocked': 'Off: the game runs at 30 FPS (frame rate or frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.',
     'aa_no_dlss': 'No DLSS on this GPU: it runs as FSR 3.1',
     'aa_no_fsr4': 'This GPU cannot run FSR 4: it runs as FSR 3.1',
     'smaa_hint': 'Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
@@ -473,6 +476,27 @@ UPSCALERS = [('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_f
 def fg_mode_of(ini):
     value = ini.get('frame_generation', '0')
     return int(value) if value in ('1', '2') else 0
+
+
+FG_NAMES = {1: 'DLSS', 2: 'FSR 3.1'}
+
+
+def fg_blocked(settings, ini):
+    """Frame generation is off at a 30 FPS game rate: the frame rate mode or the frame rate limit
+    (the game's own rule, TlgSettings::FrameGenerationBlocked). tlg.ini keeps the choice."""
+    return settings.get('frame_rate') == '30' or ini.get('fps_limit') == '30'
+
+
+def fg_modes(ini):
+    """The choices of the Frame generation row: no DLSS once the game found the card cannot do
+    DLSS frame generation (dlss_fg_supported, written by the game)."""
+    return [0, 2] if ini.get('dlss_fg_supported') == '0' else [0, 1, 2]
+
+
+def fg_shown(settings, ini):
+    """The mode the row shows and the game runs: Off while blocked or without the card for it."""
+    stored = fg_mode_of(ini)
+    return 0 if fg_blocked(settings, ini) or stored not in fg_modes(ini) else stored
 
 
 def dlss_unsupported(ini):
@@ -1053,6 +1077,20 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
             self.refresh_preset()
 
+    def update_fg(self, ini=None):
+        """The Frame generation row: greyed out and Off at a 30 FPS game rate, with the reason
+        under it; the game treats it as off then and tlg.ini keeps the choice."""
+        if ini is None:
+            ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        modes = fg_modes(ini)
+        self.fg_box.configure(state='readonly', values=[FG_NAMES.get(mode, self.t('aa_off')) for mode in modes])
+        self.fg_box.current(modes.index(fg_shown(self.settings, ini)))
+        if fg_blocked(self.settings, ini):
+            self.fg_box.configure(state='disabled')
+            self.fg_note.grid()
+        else:
+            self.fg_note.grid_remove()
+
     def update_aa_note(self, ini):
         # DLSS or FSR 4 stays the choice in tlg.ini; the game runs FSR 3.1 while the card lacks it.
         mode = self.up_box.current()
@@ -1238,7 +1276,8 @@ class Launcher:
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
-        self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'))
+        self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'),
+                   on_change=lambda: (self.update_fg(), self.refresh_status()))
         self.hint(video, 5, 2, 'fps_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
@@ -1252,7 +1291,7 @@ class Launcher:
         self.up_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
         self.up_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 9, 2, 'upscaler_hint')
-        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=DIM, wraplength=320)
+        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=MUTED, wraplength=320)
         self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
         ttk.Label(video, text=self.t('quality')).grid(row=11, column=0, sticky='w', pady=(6, 0))
         self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.menu_preset_keys(tlg_run.quality_preset(ini))],
@@ -1263,11 +1302,13 @@ class Launcher:
         help_mark(video, self.quality_help, *video.grid_slaves(row=11, column=0)).grid(row=11, column=2, sticky='w', padx=(4, 0))
         self.update_aa_note(ini)
         ttk.Label(video, text=self.t('fg_mode')).grid(row=14, column=0, sticky='w', pady=(6, 0))
-        self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS', 'FSR 3.1'], state='readonly', width=20)
-        self.fg_box.current(fg_mode_of(ini))
+        self.fg_box = ttk.Combobox(video, state='readonly', width=20)
         self.fg_box.grid(row=14, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 14, 2, 'fg_hint')
+        self.fg_note = ttk.Label(video, text=self.t('fg_blocked'), foreground=MUTED, wraplength=320)
+        self.fg_note.grid(row=15, column=0, columnspan=2, sticky='w')
+        self.update_fg(ini)
         self.hdr_var = tk.BooleanVar(value=ini.get('hdr', '1') != '0')
 
         def hdr_toggled():
@@ -1927,7 +1968,7 @@ class Launcher:
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         self.up_box.current(upscaler_of(ini))
         self.quality_box.current(tlg_run.quality_preset(ini))
-        self.fg_box.current(fg_mode_of(ini))
+        self.update_fg(ini)
         self.update_aa_note(ini)
         self.hdr_var.set(ini.get('hdr', '1') != '0')
         # Its sliders show the old values; rebuilt after, not from inside one of its own events.
@@ -1989,8 +2030,13 @@ class Launcher:
     def filters_changed(self):
         values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'sharpen': int(self.sharpen_var.get())}
-        values['frame_generation'] = max(self.fg_box.current(), 0)
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        # Only a pick in the row itself: while it shows Off for another reason (30 FPS, no DLSS
+        # frame generation on this card) tlg.ini keeps the stored choice.
+        modes = fg_modes(current_ini)
+        picked = modes[self.fg_box.current()] if 0 <= self.fg_box.current() < len(modes) else 0
+        if not fg_blocked(self.settings, current_ini) and picked != fg_shown(self.settings, current_ini):
+            values['frame_generation'] = picked
         self.update_aa_note(current_ini)
         self.update_strength(current_ini)
         if self.up_box.current() >= 0:
