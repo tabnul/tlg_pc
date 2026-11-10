@@ -363,7 +363,15 @@
     "preset.ps_p_unknown_item": "已忽略，未知选项：{detail}",
     "preset.ps_p_unknown_setting": "已忽略，未知或特定于本机的设置：{detail}",
     "preset.ps_p_bad_item": "已拒绝，无效的值：{detail}",
-    "preset.ps_p_bad_setting": "已拒绝，无效的值：{detail}"
+    "preset.ps_p_bad_setting": "已拒绝，无效的值：{detail}",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "选择一个打包的游戏文件（.zar）而不是文件夹。游戏在运行时解压数据，会占用一些 CPU：加载可能稍慢，较慢的 CPU 上读取新区域时可能卡顿。普通文件夹仍是最快的。",
+    "launcher.pack_zar": "打包…",
+    "launcher.pack_zar_tip": "将游戏文件夹打包成一个压缩的 .zar 文件，移植版可直接读取（节省空间）。原文件夹会保留；测试启动成功后可自行删除。从 .zar 运行会多用一些 CPU（加载稍慢，较慢的 CPU 上可能卡顿）。",
+    "launcher.pack_zar_need_folder": "请先选择游戏文件夹（文件夹，而不是 .zar）。",
+    "launcher.pack_zar_running": "正在打包游戏：{line}",
+    "launcher.pack_zar_done": "已打包到 {path}。游戏设置现在指向该 .zar。",
+    "launcher.pack_zar_failed": "打包失败：{error}"
   },
   "items": {
     "menu:fsr1": {

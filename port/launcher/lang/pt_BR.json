@@ -361,7 +361,15 @@
     "preset.ps_p_unknown_item": "Ignorada, opção desconhecida: {detail}",
     "preset.ps_p_unknown_setting": "Ignorada, configuração desconhecida ou da máquina: {detail}",
     "preset.ps_p_bad_item": "Recusada, valor inválido: {detail}",
-    "preset.ps_p_bad_setting": "Recusada, valor inválido: {detail}"
+    "preset.ps_p_bad_setting": "Recusada, valor inválido: {detail}",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Escolha um arquivo de jogo compactado (.zar) em vez de uma pasta. O jogo descompacta dados enquanto você joga, o que custa um pouco de CPU: os carregamentos podem demorar um pouco mais e pode haver travadas em CPUs mais lentas. Uma pasta normal é o mais rápido.",
+    "launcher.pack_zar": "Compactar…",
+    "launcher.pack_zar_tip": "Compacta a pasta do jogo em um único arquivo .zar que o port lê diretamente (economiza espaço). A pasta é mantida; apague-a você mesmo após um início de teste. Jogar a partir de um .zar usa um pouco mais de CPU (carregamentos um pouco mais longos, possíveis travadas em CPUs mais lentas).",
+    "launcher.pack_zar_need_folder": "Escolha primeiro a pasta do jogo (uma pasta, não um .zar).",
+    "launcher.pack_zar_running": "Compactando o jogo: {line}",
+    "launcher.pack_zar_done": "Compactado em {path}. A configuração do jogo agora aponta para o .zar.",
+    "launcher.pack_zar_failed": "Falha ao compactar: {error}"
   },
   "items": {
     "menu:fsr1": {
