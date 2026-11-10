@@ -42,7 +42,7 @@ HOME_SIZE = (1100, 620)
 BACKGROUND_NAMES = ('launcher_background.png', 'launcher_background.jpg')
 
 # The port's name stays English in every language pack, like a brand name.
-EDITION = 'Definitive Edition'
+EDITION = 'The Definitive Edition'
 TITLE = f'The Last Guardian — {EDITION}'
 
 TEXT = {

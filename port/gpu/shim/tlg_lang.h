@@ -275,7 +275,8 @@ inline std::vector<ExtraFont> ExtraFontCandidates() {
     std::vector<ExtraFont> out;
     if (const char* own = std::getenv("TLG_LANG_FONT"); own && *own) out.push_back({own, 0});
     const std::string& code = Loaded().code;
-    const bool japanese = code.rfind("ja", 0) == 0;
+    // No pack in another script: Japanese first, for the Japanese title in the menu's heading.
+    const bool japanese = code.rfind("ja", 0) == 0 || !NeedsExtraFont();
     const bool korean = code.rfind("ko", 0) == 0;
 #ifdef _WIN32
     const char* windir = std::getenv("WINDIR");

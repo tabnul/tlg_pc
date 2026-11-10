@@ -65,6 +65,7 @@ namespace {
 
 std::mutex imgui_mutex; // the ImGui context: window thread (input) and present thread
 bool initialized = false;
+bool cjk_font_merged = false; // a system font with Japanese characters is in the menu font
 std::atomic<bool> menu_open{false};
 // tlg: the Fun move bar (F12): Trico's working moves as icons; the mouse goes to it while it is up.
 std::atomic<bool> move_bar_open{false};
@@ -1306,12 +1307,16 @@ void Menu() {
                                     std::min(680.0f * base_scale, viewport->WorkSize.y * 0.9f)),
                              ImGuiCond_Appearing);
     bool keep_open = true;
-    // tlg: the game's own title (param.sfo), not a fixed one.
+    // tlg: the game's own title (param.sfo), not a fixed one, then this port's name and the
+    // Japanese title (as on the launcher's home screen; only with a font that has the characters).
     static const std::string heading = [] {
         const std::string_view title = Common::ElfInfo::Instance().Title();
         const char* app_name = std::getenv("TLG_APP_NAME");
         return std::string(!title.empty() ? title : app_name && *app_name ? app_name : "The Last Guardian") +
-               " - Definitive Edition  (Insert / R3+L2)";
+               " - The Definitive Edition" +
+               (cjk_font_merged ? "  \xE4\xBA\xBA\xE5\x96\xB0\xE3\x81\x84\xE3\x81\xAE\xE5\xA4\xA7\xE9\xB7\xB2"
+                                  "\xE3\x83\x88\xE3\x83\xAA\xE3\x82\xB3" : "") +
+               "  (Insert / R3+L2)";
     }();
     if (!ImGui::Begin(heading.c_str(), &keep_open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
@@ -1990,8 +1995,9 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
     io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(tlg_font_ttf),
                                    int(tlg_font_ttf_end - tlg_font_ttf), 18.0f, &font_config);
     // A language pack in Japanese, Chinese, Korean, ...: DejaVu Sans lacks those characters, so a
-    // system font is merged in (ImGui 1.92 loads the characters it draws on demand).
-    if (TlgLang::NeedsExtraFont()) {
+    // system font is merged in (ImGui 1.92 loads the characters it draws on demand). Without
+    // such a pack too, for the Japanese title in the menu's heading (a Japanese font first).
+    {
         bool merged = false;
         for (const auto& extra : TlgLang::ExtraFontCandidates()) {
             if (std::FILE* f = std::fopen(extra.path.c_str(), "rb")) {
@@ -2008,7 +2014,8 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
                 break;
             }
         }
-        if (!merged) {
+        cjk_font_merged = merged;
+        if (!merged && TlgLang::NeedsExtraFont()) {
             std::fprintf(stderr, "[tlg] language pack font: none found, set TLG_LANG_FONT=<font file>\n");
         }
     }
