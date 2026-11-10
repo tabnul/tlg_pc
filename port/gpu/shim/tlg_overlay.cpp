@@ -539,7 +539,7 @@ void ImageTab() {
         // method: Off, an upscaler (Built-in, DLSS, FSR 3.1, FSR 4) or Supersampling. Upscale
         // quality: the render size (the launcher patches it in at start, so it needs a restart).
         // Anti-aliasing: free to choose only with method Off or Supersampling; an upscaler is its
-        // own anti-aliasing, the row then shows it greyed out. Stored as before: preset (0 off,
+        // own anti-aliasing, the row then shows Off, greyed out. Stored as before: preset (0 off,
         // 1-4 upscaling, 5-6 supersampling) and upscaler (the upscaler, or the anti-aliasing at
         // method Off / Supersampling). DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a
         // card with its shader features; both grey out when the card lacks them.
@@ -640,8 +640,10 @@ void ImageTab() {
         static const int aa_values[] = {S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3, S::UpscalerFsr4,
                                         S::UpscalerTaa};
         constexpr int aa_count = int(std::size(aa_values));
+        // An upscaler as the method: the row shows Off, greyed out (user, 2026-11-10).
+        const bool aa_free = method == MethodOff || method == MethodSuper;
         int aa_index = 0;
-        for (int i = 0; i < aa_count; ++i) {
+        for (int i = 0; i < aa_count && aa_free; ++i) {
             if (aa_values[i] == upscaler) aa_index = i;
         }
         Row(TR("Anti-aliasing"));

@@ -1143,7 +1143,7 @@ class Launcher:
 
     def show_video_rows(self, preset, upscaler):
         """The three rows for a tlg.ini preset and upscaler: the quality choices of the method,
-        the anti-aliasing greyed out (showing the upscaler's own) while an upscaler is the method."""
+        the anti-aliasing greyed out (showing Off) while an upscaler is the method."""
         method = method_of(preset, upscaler)
         self.video_state = (preset, upscaler)
         self.method_box.current(method)
@@ -1158,8 +1158,10 @@ class Launcher:
         choices = AA_CHOICES[:-1] if method == METHOD_SUPER else AA_CHOICES
         values = [value for _, value in choices]
         self.aa_box.configure(state='readonly', values=[self.t(label) for label, _ in choices])
-        self.aa_box.current(values.index(upscaler) if upscaler in values else 0)
-        if method not in (METHOD_OFF, METHOD_SUPER):
+        # An upscaler as the method: the row shows Off, greyed out (user, 2026-11-10).
+        free = method in (METHOD_OFF, METHOD_SUPER)
+        self.aa_box.current(values.index(upscaler) if free and upscaler in values else 0)
+        if not free:
             self.aa_box.configure(state='disabled')
 
     def quality_help(self):
