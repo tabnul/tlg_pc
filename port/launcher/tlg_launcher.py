@@ -204,25 +204,30 @@ TEXT = {
     'filters': 'Image filters (live in the in-game menu too, Insert → Image)',
     'smaa': 'SMAA anti-aliasing (smooths edges; the HUD too)',
     'aa_off': 'Off',
-    'upscaler': 'Upscaler / anti-aliasing',
+    'upscaler': 'Upscale method',
+    'method_super': 'Supersampling',
     'up_off': 'Built-in (game)',
     'up_dlss': 'DLSS (NVIDIA RTX)',
     'up_fsr3': 'FSR 3.1 (any card)',
     'up_fsr4': 'FSR 4 (any recent card)',
-    'up_taa': 'TAA (any card, native only)',
-    'upscaler_hint': 'Which upscaler draws the image at the chosen quality. It is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA. TAA: a lighter, softer anti-aliasing, at native size only. Built-in: only the game\'s own upscale pass and anti-aliasing. With supersampling it only does the anti-aliasing, at the larger size. F8 in game switches between Built-in and your choice.',
-    'quality': 'Quality',
-    'preset_native': 'Native AA',
+    'up_taa': 'TAA (any card)',
+    'aa': 'Anti-aliasing',
+    'aa_game': "Off (game's own)",
+    'aa_dlaa': 'DLAA (NVIDIA RTX)',
+    'aa_hint': "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.",
+    'upscaler_hint': "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.",
+    'quality': 'Upscale quality',
+    'preset_native': 'Off',
     'preset_quality': 'Quality',
     'preset_balanced': 'Balanced',
     'preset_performance': 'Performance',
     'preset_ultra': 'Ultra Performance',
-    'preset_super150': 'Supersampling 150% (experimental)',
-    'preset_super200': 'Supersampling 200% (experimental)',
+    'preset_super150': '150% (experimental)',
+    'preset_super200': '200% (experimental)',
     'quality_native': '{preset}: renders at the output size, {output}.',
     'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
     'quality_super': '{preset}: renders at {render}, shrunk to {output}.',
-    'quality_super_tip': 'Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.',
+    'quality_super_tip': 'Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.',
     'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
                       'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
@@ -472,6 +477,14 @@ INI_DEFAULTS = {'smaa': '0', 'sharpen': '1', 'sharpness': '1.75', 'color_adjust'
 # anti-aliasing, below it the upscaler is too (no separate AA checkbox; dlaa = not Built-in).
 # TAA (2026-11-07): our own light temporal AA at native size, between SMAA and DLAA in cost.
 UPSCALERS = [('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
+# The Video page's three rows (as the in-game menu). Upscale method: Off, an upscaler or
+# Supersampling; Upscale quality: the render size; Anti-aliasing: free to choose only with method
+# Off or Supersampling (an upscaler is its own). Stored as before: tlg.ini preset (0 off, 1-4
+# upscaling, 5-6 supersampling) and upscaler (the upscaler, or the anti-aliasing).
+METHODS = [('preset_native', None), ('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'),
+           ('method_super', None)]
+METHOD_OFF, METHOD_SUPER = 0, 5
+AA_CHOICES = [('aa_game', 'off'), ('aa_dlaa', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
 
 
 def fg_mode_of(ini):
@@ -520,11 +533,38 @@ def upscaler_of(ini):
     return {'off': 0, 'fsr3': 2, 'fsr4': 3, 'taa': 4}.get(ini.get('upscaler'), 1)
 
 
+def method_of(preset, upscaler):
+    """The METHODS index of a tlg.ini preset and upscaler (TAA runs at native size only)."""
+    if preset <= 0 or upscaler == 'taa':
+        return METHOD_OFF
+    if tlg_run.supersampling(preset):
+        return METHOD_SUPER
+    return [value for _, value in METHODS].index(upscaler)
+
+
+def video_choice(old, method, quality, aa):
+    """(preset, upscaler) for a pick in the three rows. old: the (preset, upscaler) before it;
+    quality and aa: the indexes shown in those rows (they count only while their row was usable)."""
+    old_preset, old_upscaler = old
+    old_method = method_of(old_preset, old_upscaler)
+    aa_free = old_method in (METHOD_OFF, METHOD_SUPER)
+    upscaler = AA_CHOICES[aa][1] if aa_free and 0 <= aa < len(AA_CHOICES) else old_upscaler
+    if method == METHOD_OFF:
+        return 0, upscaler
+    if method == METHOD_SUPER:
+        preset = 5 + quality if old_method == METHOD_SUPER and 0 <= quality < 2 else 5
+        return preset, 'off' if upscaler == 'taa' else upscaler
+    preset = 1 + quality if old_method not in (METHOD_OFF, METHOD_SUPER) and 0 <= quality < 4 else 1
+    return preset, METHODS[method][1]
+
+
 def quality_text(t, size, preset):
     """The Quality row's help: the render size for the output size, then the rules."""
     render = tlg_run.render_resolution(size, preset)
     key = 'quality_native' if not render else 'quality_super' if tlg_run.supersampling(preset) else 'quality_up'
-    line = t(key).format(preset=t(tlg_run.PRESET_KEYS[preset]), render=render, output=size)
+    name = t(tlg_run.PRESET_KEYS[preset])
+    line = t(key).format(preset=t('method_super') + ' ' + name if tlg_run.supersampling(preset) else name,
+                         render=render, output=size)
     return line + '\n' + t('quality_rules') + ' ' + t('quality_super_tip')
 
 
@@ -1094,15 +1134,36 @@ class Launcher:
 
     def update_aa_note(self, ini):
         # DLSS or FSR 4 stays the choice in tlg.ini; the game runs FSR 3.1 while the card lacks it.
-        mode = self.up_box.current()
-        if (mode == 1 and dlss_unsupported(ini)) or (mode == 3 and fsr4_unsupported(ini)):
-            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 1 else 'aa_no_fsr4'))
+        mode = self.video_state[1]
+        if (mode == 'dlss' and dlss_unsupported(ini)) or (mode == 'fsr4' and fsr4_unsupported(ini)):
+            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 'dlss' else 'aa_no_fsr4'))
             self.aa_note.grid()
         else:
             self.aa_note.grid_remove()
 
+    def show_video_rows(self, preset, upscaler):
+        """The three rows for a tlg.ini preset and upscaler: the quality choices of the method,
+        the anti-aliasing greyed out (showing the upscaler's own) while an upscaler is the method."""
+        method = method_of(preset, upscaler)
+        self.video_state = (preset, upscaler)
+        self.method_box.current(method)
+        keys = tlg_run.PRESET_KEYS[5:7] if method == METHOD_SUPER else tlg_run.PRESET_KEYS[1:5]
+        first = 5 if method == METHOD_SUPER else 1
+        self.quality_box.configure(state='readonly', values=[self.t(key) for key in keys])
+        if method == METHOD_OFF:
+            self.quality_box.set('')
+            self.quality_box.configure(state='disabled')
+        else:
+            self.quality_box.current(preset - first)
+        choices = AA_CHOICES[:-1] if method == METHOD_SUPER else AA_CHOICES
+        values = [value for _, value in choices]
+        self.aa_box.configure(state='readonly', values=[self.t(label) for label, _ in choices])
+        self.aa_box.current(values.index(upscaler) if upscaler in values else 0)
+        if method not in (METHOD_OFF, METHOD_SUPER):
+            self.aa_box.configure(state='disabled')
+
     def quality_help(self):
-        return quality_text(self.t, str(self.settings.get('resolution', '1920x1080')), max(self.quality_box.current(), 0))
+        return quality_text(self.t, str(self.settings.get('resolution', '1920x1080')), self.video_state[0])
 
     # -- window -----------------------------------------------------------------------------
     def build(self):
@@ -1283,24 +1344,27 @@ class Launcher:
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        # Upscaler (also the anti-aliasing) and Quality (render size, applied at start): tlg.ini
-        # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for Quality).
+        # Upscale method, Upscale quality (render size, applied at start) and Anti-aliasing: tlg.ini
+        # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for the render size).
         ttk.Label(video, text=self.t('upscaler')).grid(row=9, column=0, sticky='w', pady=(6, 0))
-        self.up_box = ttk.Combobox(video, values=[self.t(label) for label, _ in UPSCALERS],
-                                   state='readonly', width=24)
-        self.up_box.current(upscaler_of(ini))
-        self.up_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
-        self.up_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.method_box = ttk.Combobox(video, values=[self.t(label) for label, _ in METHODS],
+                                       state='readonly', width=24)
+        self.method_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.method_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 9, 2, 'upscaler_hint')
-        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=MUTED, wraplength=320)
-        self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
-        ttk.Label(video, text=self.t('quality')).grid(row=11, column=0, sticky='w', pady=(6, 0))
-        self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.PRESET_KEYS],
-                                        state='readonly', width=30)
-        self.quality_box.current(tlg_run.quality_preset(ini))
-        self.quality_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        ttk.Label(video, text=self.t('quality')).grid(row=10, column=0, sticky='w', pady=(6, 0))
+        self.quality_box = ttk.Combobox(video, state='readonly', width=24)
+        self.quality_box.grid(row=10, column=1, sticky='w', padx=6, pady=(6, 2))
         self.quality_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        help_mark(video, self.quality_help, *video.grid_slaves(row=11, column=0)).grid(row=11, column=2, sticky='w', padx=(4, 0))
+        help_mark(video, self.quality_help, *video.grid_slaves(row=10, column=0)).grid(row=10, column=2, sticky='w', padx=(4, 0))
+        ttk.Label(video, text=self.t('aa')).grid(row=11, column=0, sticky='w', pady=(6, 0))
+        self.aa_box = ttk.Combobox(video, state='readonly', width=24)
+        self.aa_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.hint(video, 11, 2, 'aa_hint')
+        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=MUTED, wraplength=320)
+        self.aa_note.grid(row=12, column=0, columnspan=2, sticky='w')
+        self.show_video_rows(tlg_run.quality_preset(ini), UPSCALERS[upscaler_of(ini)][1])
         self.update_aa_note(ini)
         ttk.Label(video, text=self.t('fg_mode')).grid(row=14, column=0, sticky='w', pady=(6, 0))
         self.fg_box = ttk.Combobox(video, state='readonly', width=20)
@@ -1969,8 +2033,7 @@ class Launcher:
     def reload_ini(self):
         """The rows that show tlg.ini values read it again."""
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        self.up_box.current(upscaler_of(ini))
-        self.quality_box.current(tlg_run.quality_preset(ini))
+        self.show_video_rows(tlg_run.quality_preset(ini), UPSCALERS[upscaler_of(ini)][1])
         self.update_fg(ini)
         self.update_aa_note(ini)
         self.hdr_var.set(ini.get('hdr', '1') != '0')
@@ -2040,14 +2103,13 @@ class Launcher:
         picked = modes[self.fg_box.current()] if 0 <= self.fg_box.current() < len(modes) else 0
         if not fg_blocked(self.settings, current_ini) and picked != fg_shown(self.settings, current_ini):
             values['frame_generation'] = picked
+        preset, upscaler = video_choice(self.video_state, self.method_box.current(), self.quality_box.current(),
+                                        self.aa_box.current())
+        self.show_video_rows(preset, upscaler)
         self.update_aa_note(current_ini)
         self.update_strength(current_ini)
-        if self.up_box.current() >= 0:
-            values.update(upscaler=UPSCALERS[self.up_box.current()][1], aa_row=1)
-        if self.quality_box.current() >= 0:
-            values['preset'] = self.quality_box.current()
-        # No AA checkbox (2026-11-07): the upscaler choice is the anti-aliasing; Built-in = the game's own.
-        values['dlaa'] = int(self.up_box.current() > 0)
+        # tlg.ini dlaa: anti-aliasing or upscaling by something else than the game's own.
+        values.update(upscaler=upscaler, aa_row=1, preset=preset, dlaa=int(upscaler != 'off'))
         for key, (low, high) in COLOR_RANGES.items():
             try:
                 value = min(max(float(self.ini_vars[key].get().replace(',', '.')), low), high)

@@ -538,31 +538,47 @@ void ImageTab() {
     ImGui::SeparatorText(TR("Upscaling and anti-aliasing"));
     if (BeginRows("##antialiasing")) {
         namespace S = TlgSettings;
-        // tlg: Upscaler (Built-in, DLSS, FSR 3.1, FSR 4), Quality (the render size; the launcher
-        // patches it in at start, so it needs a restart) and the AA checkbox (DLAA / FSR native
-        // AA at native size). Below native size the upscaler is the anti-aliasing: the AA row
-        // does not apply. DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a card with its
-        // shader features; both grey out when the card lacks them.
-        // TAA (test 2026-11-07): our own light temporal AA, native size only, between the
-        // game's SMAA and DLAA / FSR native AA in cost.
-        static const char* const up_labels[] = {TR("Built-in (game)"), "DLSS (NVIDIA)", "FSR 3.1",
-                                                "FSR 4", TR("TAA (native only)")};
-        static const int up_values[] = {S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3, S::UpscalerFsr4,
-                                        S::UpscalerTaa};
-        constexpr int up_count = int(std::size(up_values));
-        Row(TR("Upscaler / anti-aliasing"));
-        const int upscaler = S::SelectedUpscaler();
-        int up_index = 2;
-        for (int i = 0; i < up_count; ++i) {
-            if (up_values[i] == upscaler) up_index = i;
+        // tlg: three rows (user, 2026-11-10, laid out as Ratchet & Clank: Rift Apart). Upscale
+        // method: Off, an upscaler (Built-in, DLSS, FSR 3.1, FSR 4) or Supersampling. Upscale
+        // quality: the render size (the launcher patches it in at start, so it needs a restart).
+        // Anti-aliasing: free to choose only with method Off or Supersampling; an upscaler is its
+        // own anti-aliasing, the row then shows it greyed out. Stored as before: preset (0 off,
+        // 1-4 upscaling, 5-6 supersampling) and upscaler (the upscaler, or the anti-aliasing at
+        // method Off / Supersampling). DLSS needs tlg_dlss.dll and an NVIDIA RTX card, FSR 4 a
+        // card with its shader features; both grey out when the card lacks them.
+        // TAA (test 2026-11-07): our own light temporal AA, native size only (not with supersampling).
+        enum Method { MethodOff, MethodBuiltIn, MethodDlss, MethodFsr3, MethodFsr4, MethodSuper, MethodCount };
+        static const char* const method_labels[MethodCount] = {TR("Off"), TR("Built-in (game)"), "DLSS (NVIDIA)",
+                                                               "FSR 3.1", "FSR 4", TR("Supersampling")};
+        static const int method_upscalers[MethodCount] = {-1, S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3,
+                                                          S::UpscalerFsr4, -1};
+        const int upscaler = S::SelectedUpscaler() == S::UpscalerFsr411 ? int(S::UpscalerFsr4) : S::SelectedUpscaler();
+        const int preset = std::clamp(s.preset.load(), 0, S::PresetCount - 1);
+        int method = MethodOff;
+        if (preset == S::NativeAA || upscaler == S::UpscalerTaa) {
+            method = MethodOff;  // TAA always runs at native size (RenderPreset)
+        } else if (S::IsSupersampling(preset)) {
+            method = MethodSuper;
+        } else {
+            for (int i = MethodBuiltIn; i <= MethodFsr4; ++i) {
+                if (method_upscalers[i] == upscaler) method = i;
+            }
         }
-        if (ImGui::BeginCombo("##value", up_labels[up_index])) {
-            for (int i = 0; i < up_count; ++i) {
-                const bool supported = (up_values[i] != S::UpscalerDlss || s.dlss_supported) &&
-                                       (up_values[i] != S::UpscalerFsr4 || s.fsr4_supported);
+        Row(TR("Upscale method"));
+        if (ImGui::BeginCombo("##value", method_labels[method])) {
+            for (int i = 0; i < MethodCount; ++i) {
+                const bool supported = (i != MethodDlss || s.dlss_supported) && (i != MethodFsr4 || s.fsr4_supported);
                 ImGui::BeginDisabled(!supported);
-                if (ImGui::Selectable(up_labels[i], i == up_index) && i != up_index) {
-                    S::SetUpscaler(up_values[i]);
+                if (ImGui::Selectable(method_labels[i], i == method) && i != method) {
+                    if (i == MethodOff) {
+                        s.preset = S::NativeAA;
+                    } else if (i == MethodSuper) {
+                        s.preset = S::Super150;
+                        if (upscaler == S::UpscalerTaa) S::SetUpscaler(S::UpscalerOff);
+                    } else {
+                        if (method == MethodOff || method == MethodSuper) s.preset = S::Quality;
+                        S::SetUpscaler(method_upscalers[i]);
+                    }
                     dirty = true;
                 }
                 ImGui::EndDisabled();
@@ -571,19 +587,24 @@ void ImageTab() {
         }
         Help(!s.dlss_supported && s.dlss_problem.load()
                  ? s.dlss_problem.load()
-                 : TR("Which upscaler draws the image at the chosen quality: DLSS (NVIDIA RTX cards), FSR 4 (any recent card, not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 (any card) or the game's own upscale pass (Built-in). TAA is a lighter, softer anti-aliasing at native size only (no upscaling). The choice is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA; Built-in keeps only the game's own. With supersampling it only does the anti-aliasing, at the larger size. F8 switches between Built-in and your choice in game."),
-             {s.dlss_supported ? "DLSS (NVIDIA)" : up_labels[s.fsr4_supported ? 3 : 2], ""});
+                 : TR("How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game."),
+             {method_labels[MethodOff], ""});
         ImGui::PopID();
         static const char* const quality_labels[S::PresetCount] = {
-            TR("Native AA"), TR("Quality"), TR("Balanced"),
+            TR("Off"), TR("Quality"), TR("Balanced"),
             TR("Performance"), TR("Ultra Performance"),
-            TR("Supersampling 150% (experimental)"),
-            TR("Supersampling 200% (experimental)")};
+            TR("150% (experimental)"),
+            TR("200% (experimental)")};
+        const auto preset_name = [](int p) {
+            p = std::clamp(p, 0, S::PresetCount - 1);
+            return S::IsSupersampling(p) ? std::string(TR("Supersampling")) + ' ' + quality_labels[p]
+                                         : std::string(quality_labels[p]);
+        };
         int ow = 0, oh = 0, rw = 0, rh = 0;
         S::OutputSize(ow, oh);
         S::PresetRenderSize(s.preset, ow, oh, rw, rh);
         static std::string quality_help;
-        quality_help = Format("%s: ", quality_labels[std::clamp(s.preset.load(), 0, S::PresetCount - 1)]);
+        quality_help = preset_name(s.preset) + ": ";
         if (s.preset == S::NativeAA) {
             quality_help += Format(TR("renders at the output size, %dx"), ow) + Format("%d.", oh);
         } else if (S::IsSupersampling(s.preset)) {
@@ -597,13 +618,55 @@ void ImageTab() {
             int aw = 0, ah = 0;
             S::PresetRenderSize(s.startup_preset, ow, oh, aw, ah);
             quality_help += Format(TR(" Until the restart the game keeps rendering at %dx"), aw) +
-                            Format("%d (", ah) + quality_labels[std::clamp(s.startup_preset, 0, S::PresetCount - 1)] + ").";
+                            Format("%d (", ah) + preset_name(s.startup_preset) + ").";
         }
         quality_help += TR(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.");
         quality_help += ' ';
-        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. The Upscaler choice only smooths edges then; it does not enlarge the image.");
-        ChoiceRow(TR("Quality (requires restart)"), s.preset, quality_labels, nullptr, S::PresetCount,
-                  quality_help.c_str(), S::NativeAA);
+        quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.");
+        Row(TR("Upscale quality (requires restart)"));
+        ImGui::BeginDisabled(method == MethodOff);
+        if (ImGui::BeginCombo("##value", method == MethodOff ? "" : quality_labels[preset])) {
+            const int first = method == MethodSuper ? S::Super150 : S::Quality;
+            const int last = method == MethodSuper ? S::Super200 : S::UltraPerformance;
+            for (int i = first; i <= last; ++i) {
+                if (ImGui::Selectable(quality_labels[i], i == preset) && i != preset) {
+                    s.preset = i;
+                    dirty = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
+        Help(quality_help.c_str());
+        ImGui::PopID();
+        static const char* const aa_labels[] = {TR("Off (game's own)"), "DLAA (NVIDIA)", "FSR 3.1", "FSR 4", "TAA"};
+        static const int aa_values[] = {S::UpscalerOff, S::UpscalerDlss, S::UpscalerFsr3, S::UpscalerFsr4,
+                                        S::UpscalerTaa};
+        constexpr int aa_count = int(std::size(aa_values));
+        int aa_index = 0;
+        for (int i = 0; i < aa_count; ++i) {
+            if (aa_values[i] == upscaler) aa_index = i;
+        }
+        Row(TR("Anti-aliasing"));
+        ImGui::BeginDisabled(method != MethodOff && method != MethodSuper);
+        if (ImGui::BeginCombo("##value", aa_labels[aa_index])) {
+            for (int i = 0; i < aa_count; ++i) {
+                const bool supported = (aa_values[i] != S::UpscalerDlss || s.dlss_supported) &&
+                                       (aa_values[i] != S::UpscalerFsr4 || s.fsr4_supported) &&
+                                       (aa_values[i] != S::UpscalerTaa || method != MethodSuper);
+                ImGui::BeginDisabled(!supported);
+                if (ImGui::Selectable(aa_labels[i], i == aa_index) && i != aa_index) {
+                    S::SetUpscaler(aa_values[i]);
+                    dirty = true;
+                }
+                ImGui::EndDisabled();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
+        Help(TR("Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own."),
+             {s.dlss_supported ? "DLAA (NVIDIA)" : aa_labels[s.fsr4_supported ? 3 : 2], ""});
+        ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,
                  TR("Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060)."), d.smaa, false);
         ImGui::EndTable();
