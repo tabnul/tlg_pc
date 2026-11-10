@@ -723,7 +723,7 @@
     "Upscaling and anti-aliasing": "Mise à l'échelle et anticrénelage",
     "Built-in (game)": "Intégré (jeu)",
     "Off (game's own)": "Désactivé (celui du jeu seul)",
-    "Upscale method": "Méthode de mise à l'échelle",
+    "Scaling method": "Méthode de mise à l'échelle",
     "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.": "Comment l'image obtient sa taille. Désactivé : dessinée à la taille de l'écran. Intégré, DLSS, FSR 3.1 et FSR 4 : dessinée plus petite puis agrandie, pour plus de vitesse ; DLSS demande une carte NVIDIA RTX, FSR 4 une carte récente (pas seulement AMD ; plus net et plus stable que FSR 3.1), FSR 3.1 fonctionne sur toute carte, Intégré est la mise à l'échelle du jeu. Un upscaler lisse aussi lui-même les contours. Suréchantillonnage : dessinée plus grande puis réduite, pour des contours plus fins ; lourd. F8 bascule en jeu entre Intégré et votre choix.",
     "Supersampling": "Suréchantillonnage",
     "Quality": "Qualité",
@@ -738,7 +738,7 @@
     "upscaled to %dx": "agrandi en %dx",
     " Until the restart the game keeps rendering at %dx": " Jusqu'au redémarrage, le jeu continue le rendu en %dx",
     " Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.": " Sortie / 1.5 (Qualité), 1.7 (Équilibré), 2 (Performance) ou 3 (Ultra Performance) par côté ; la mise à l'échelle complète le reste. Défini au démarrage : le changer nécessite Appliquer et redémarrer.",
-    "Upscale quality (requires restart)": "Qualité de mise à l'échelle (redémarrage requis)",
+    "Scaling quality (requires restart)": "Qualité de mise à l'échelle (redémarrage requis)",
     "Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).": "Lisse les bords crénelés (plumes, herbe, rambardes) de l'image finale. Le jeu dessine son HUD et ses sous-titres dans la même image, donc les bords du texte sont lissés aussi. Environ 0.2 à 0.4 ms par image en 1080p (RTX 2060).",
     "Enhancements": "Améliorations",
     "Game (2048)": "Jeu (2048)",
@@ -975,6 +975,6 @@
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Avec la VSync, la fréquence de rafraîchissement de l'écran doit être au moins le double de la fréquence d'images du jeu.",
     "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.": "Le suréchantillonnage calcule une image plus grande que l'écran puis la réduit : contours plus fins, mais lourd pour la carte graphique et plus gourmand en mémoire. Réservé aux cartes puissantes. Un anticrénelage peut s'y ajouter.",
     "Anti-aliasing": "Anticrénelage",
-    "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Lisse les contours en escalier. Au choix avec la méthode de mise à l'échelle Désactivé ou Suréchantillonnage ; un upscaler fait le sien. DLAA (cartes NVIDIA RTX) et FSR 4 (toute carte récente) sont les plus nets, FSR 3.1 fonctionne sur toute carte, TAA est plus léger et plus doux (pas avec le suréchantillonnage). Désactivé ne garde que celui du jeu."
+    "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Lisse les contours en escalier. Au choix avec la méthode de mise à l'échelle Désactivé ou Suréchantillonnage ; un upscaler fait le sien. DLAA (cartes NVIDIA RTX) et FSR 4 (toute carte récente) sont les plus nets, FSR 3.1 fonctionne sur toute carte, TAA est plus léger et plus doux (pas avec le suréchantillonnage). Désactivé ne garde que celui du jeu."
   }
 }

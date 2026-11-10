@@ -204,7 +204,7 @@ TEXT = {
     'filters': 'Image filters (live in the in-game menu too, Insert → Image)',
     'smaa': 'SMAA anti-aliasing (smooths edges; the HUD too)',
     'aa_off': 'Off',
-    'upscaler': 'Upscale method',
+    'upscaler': 'Scaling method',
     'method_super': 'Supersampling',
     'up_off': 'Built-in (game)',
     'up_dlss': 'DLSS (NVIDIA RTX)',
@@ -214,9 +214,9 @@ TEXT = {
     'aa': 'Anti-aliasing',
     'aa_game': "Off (game's own)",
     'aa_dlaa': 'DLAA (NVIDIA RTX)',
-    'aa_hint': "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.",
+    'aa_hint': "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.",
     'upscaler_hint': "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.",
-    'quality': 'Upscale quality',
+    'quality': 'Scaling quality',
     'preset_native': 'Off',
     'preset_quality': 'Quality',
     'preset_balanced': 'Balanced',
@@ -477,8 +477,8 @@ INI_DEFAULTS = {'smaa': '0', 'sharpen': '1', 'sharpness': '1.75', 'color_adjust'
 # anti-aliasing, below it the upscaler is too (no separate AA checkbox; dlaa = not Built-in).
 # TAA (2026-11-07): our own light temporal AA at native size, between SMAA and DLAA in cost.
 UPSCALERS = [('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
-# The Video page's three rows (as the in-game menu). Upscale method: Off, an upscaler or
-# Supersampling; Upscale quality: the render size; Anti-aliasing: free to choose only with method
+# The Video page's three rows (as the in-game menu). Scaling method: Off, an upscaler or
+# Supersampling; Scaling quality: the render size; Anti-aliasing: free to choose only with method
 # Off or Supersampling (an upscaler is its own). Stored as before: tlg.ini preset (0 off, 1-4
 # upscaling, 5-6 supersampling) and upscaler (the upscaler, or the anti-aliasing).
 METHODS = [('preset_native', None), ('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'),
@@ -1344,7 +1344,7 @@ class Launcher:
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        # Upscale method, Upscale quality (render size, applied at start) and Anti-aliasing: tlg.ini
+        # Scaling method, Scaling quality (render size, applied at start) and Anti-aliasing: tlg.ini
         # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for the render size).
         ttk.Label(video, text=self.t('upscaler')).grid(row=9, column=0, sticky='w', pady=(6, 0))
         self.method_box = ttk.Combobox(video, values=[self.t(label) for label, _ in METHODS],

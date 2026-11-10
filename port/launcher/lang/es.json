@@ -723,7 +723,7 @@
     "Upscaling and anti-aliasing": "Escalado y antialiasing",
     "Built-in (game)": "Integrado (juego)",
     "Off (game's own)": "Desactivado (solo el del juego)",
-    "Upscale method": "Método de escalado",
+    "Scaling method": "Método de escalado",
     "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.": "Cómo obtiene la imagen su tamaño. Desactivado: se dibuja al tamaño de la pantalla. Integrado, DLSS, FSR 3.1 y FSR 4: se dibuja más pequeña y se amplía, para ganar velocidad; DLSS necesita una tarjeta NVIDIA RTX, FSR 4 una tarjeta reciente (no solo AMD; más nítido y estable que FSR 3.1), FSR 3.1 funciona en cualquier tarjeta, Integrado es el escalado propio del juego. Un escalador también suaviza los bordes por sí mismo. Supermuestreo: se dibuja más grande y se reduce, para bordes más finos; exigente. F8 alterna en el juego entre Integrado y tu elección.",
     "Supersampling": "Supermuestreo",
     "Quality": "Calidad",
@@ -738,7 +738,7 @@
     "upscaled to %dx": "escalado a %dx",
     " Until the restart the game keeps rendering at %dx": " Hasta el reinicio, el juego sigue renderizando a %dx",
     " Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.": " Salida / 1.5 (Calidad), 1.7 (Equilibrado), 2 (Rendimiento) o 3 (Ultra rendimiento) por lado; el escalador completa el resto. Se fija al iniciar, así que cambiarlo requiere Aplicar y reiniciar.",
-    "Upscale quality (requires restart)": "Calidad de escalado (requiere reinicio)",
+    "Scaling quality (requires restart)": "Calidad de escalado (requiere reinicio)",
     "Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).": "Suaviza los bordes dentados (plumas, hierba, barandillas) de la imagen final. El juego dibuja su HUD y los subtítulos en la misma imagen, así que también se suavizan los bordes del texto. Unos 0.2 a 0.4 ms por fotograma a 1080p (RTX 2060).",
     "Enhancements": "Mejoras",
     "Game (2048)": "Juego (2048)",
@@ -975,6 +975,6 @@
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Con VSync activado, la frecuencia de actualización de la pantalla debe ser al menos el doble de la velocidad de fotogramas del juego.",
     "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.": "El supermuestreo renderiza a un tamaño mayor que la pantalla y reduce la imagen: bordes más finos, pero exige mucho a la tarjeta gráfica y necesita más memoria. Solo para tarjetas potentes. Se puede añadir antialiasing encima.",
     "Anti-aliasing": "Antialiasing",
-    "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado o Supermuestreo; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave (no con supermuestreo). Desactivado deja solo el del juego."
+    "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado o Supermuestreo; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave (no con supermuestreo). Desactivado deja solo el del juego."
   }
 }

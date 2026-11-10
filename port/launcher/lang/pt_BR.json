@@ -131,14 +131,14 @@
     "launcher.filters": "Filtros de imagem (também no menu do jogo, Insert → Imagem)",
     "launcher.smaa": "Anti-aliasing SMAA (suaviza bordas; o HUD também)",
     "launcher.aa_off": "Desligado",
-    "launcher.upscaler": "Método de upscaling",
+    "launcher.upscaler": "Método de escala",
     "launcher.up_off": "Do jogo",
     "launcher.up_dlss": "DLSS (NVIDIA RTX)",
     "launcher.up_fsr3": "FSR 3.1 (qualquer placa)",
     "launcher.up_fsr4": "FSR 4 (qualquer placa recente)",
     "launcher.up_taa": "TAA (qualquer placa)",
     "launcher.upscaler_hint": "Como a imagem ganha seu tamanho. Desligado: desenhada no tamanho da tela. Do jogo, DLSS, FSR 3.1 e FSR 4: desenhada menor e ampliada, para mais velocidade; DLSS precisa de uma placa NVIDIA RTX, FSR 4 de uma placa recente (não só AMD; mais nítido e estável que o FSR 3.1), FSR 3.1 roda em qualquer placa, Do jogo é o upscaling próprio do jogo. Um upscaler também suaviza as bordas por conta própria. Superamostragem: desenhada maior e reduzida, para bordas mais finas; pesada. F8 alterna no jogo entre Do jogo e a sua escolha.",
-    "launcher.quality": "Qualidade do upscaling",
+    "launcher.quality": "Qualidade da escala",
     "launcher.preset_native": "Desligado",
     "launcher.preset_quality": "Qualidade",
     "launcher.preset_balanced": "Equilibrado",
@@ -368,7 +368,7 @@
     "launcher.aa": "Anti-aliasing",
     "launcher.aa_game": "Desligado (só o do jogo)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado ou Superamostragem; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave (não com superamostragem). Desligado mantém só o do jogo."
+    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de escala Desligado ou Superamostragem; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave (não com superamostragem). Desligado mantém só o do jogo."
   },
   "items": {
     "menu:fsr1": {
@@ -721,7 +721,7 @@
     "Upscaling and anti-aliasing": "Ampliação e anti-aliasing",
     "Built-in (game)": "Do jogo",
     "Off (game's own)": "Desligado (só o do jogo)",
-    "Upscale method": "Método de upscaling",
+    "Scaling method": "Método de escala",
     "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.": "Como a imagem ganha seu tamanho. Desligado: desenhada no tamanho da tela. Do jogo, DLSS, FSR 3.1 e FSR 4: desenhada menor e ampliada, para mais velocidade; DLSS precisa de uma placa NVIDIA RTX, FSR 4 de uma placa recente (não só AMD; mais nítido e estável que o FSR 3.1), FSR 3.1 roda em qualquer placa, Do jogo é o upscaling próprio do jogo. Um upscaler também suaviza as bordas por conta própria. Superamostragem: desenhada maior e reduzida, para bordas mais finas; pesada. F8 alterna no jogo entre Do jogo e a sua escolha.",
     "Supersampling": "Superamostragem",
     "Quality": "Qualidade",
@@ -734,7 +734,7 @@
     "upscaled to %dx": "ampliado para %dx",
     " Until the restart the game keeps rendering at %dx": " Até reiniciar o jogo continua a desenhar em %dx",
     " Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.": " Saída / 1,5 (Qualidade), 1,7 (Equilibrado), 2 (Desempenho) ou 3 (Ultra desempenho) por lado; o ampliador completa o resto. Definido no início: mudar exige Aplicar e reiniciar.",
-    "Upscale quality (requires restart)": "Qualidade do upscaling (exige reiniciar)",
+    "Scaling quality (requires restart)": "Qualidade da escala (exige reiniciar)",
     "Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).": "Suaviza o serrilhado (penas, grama, grades) na imagem final. O jogo desenha o HUD e as legendas na mesma imagem, então as bordas do texto também são suavizadas. Cerca de 0,2 a 0,4 ms por quadro em 1080p (RTX 2060).",
     "Enhancements": "Melhorias",
     "Game (2048)": "Jogo (2048)",
@@ -969,6 +969,6 @@
     "150% (experimental)": "150% (experimental)",
     "200% (experimental)": "200% (experimental)",
     "Anti-aliasing": "Anti-aliasing",
-    "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado ou Superamostragem; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave (não com superamostragem). Desligado mantém só o do jogo."
+    "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de escala Desligado ou Superamostragem; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave (não com superamostragem). Desligado mantém só o do jogo."
   }
 }

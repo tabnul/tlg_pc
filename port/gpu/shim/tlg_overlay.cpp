@@ -564,7 +564,7 @@ void ImageTab() {
                 if (method_upscalers[i] == upscaler) method = i;
             }
         }
-        Row(TR("Upscale method"));
+        Row(TR("Scaling method"));
         if (ImGui::BeginCombo("##value", method_labels[method])) {
             for (int i = 0; i < MethodCount; ++i) {
                 const bool supported = (i != MethodDlss || s.dlss_supported) && (i != MethodFsr4 || s.fsr4_supported);
@@ -623,7 +623,7 @@ void ImageTab() {
         quality_help += TR(" Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.");
         quality_help += ' ';
         quality_help += TR("Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.");
-        Row(TR("Upscale quality (requires restart)"));
+        Row(TR("Scaling quality (requires restart)"));
         ImGui::BeginDisabled(method == MethodOff);
         if (ImGui::BeginCombo("##value", method == MethodOff ? "" : quality_labels[preset])) {
             const int first = method == MethodSuper ? S::Super150 : S::Quality;
@@ -664,7 +664,7 @@ void ImageTab() {
             ImGui::EndCombo();
         }
         ImGui::EndDisabled();
-        Help(TR("Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own."),
+        Help(TR("Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own."),
              {s.dlss_supported ? "DLAA (NVIDIA)" : aa_labels[s.fsr4_supported ? 3 : 2], ""});
         ImGui::PopID();
         CheckRow("SMAA 1x", s.smaa,

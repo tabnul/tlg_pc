@@ -133,14 +133,14 @@
     "launcher.filters": "Bildfilter (auch live im Spielmenü, Insert → Bild)",
     "launcher.smaa": "SMAA-Kantenglättung (glättet Kanten; auch das HUD)",
     "launcher.aa_off": "Aus",
-    "launcher.upscaler": "Upscaling-Methode",
+    "launcher.upscaler": "Skalierungsmethode",
     "launcher.up_off": "Eingebaut (Spiel)",
     "launcher.up_dlss": "DLSS (NVIDIA RTX)",
     "launcher.up_fsr3": "FSR 3.1 (jede Karte)",
     "launcher.up_fsr4": "FSR 4 (jede neuere Karte)",
     "launcher.up_taa": "TAA (jede Karte)",
     "launcher.upscaler_hint": "Wie das Bild seine Größe erhält. Aus: in Bildschirmgröße gezeichnet. Eingebaut, DLSS, FSR 3.1 und FSR 4: kleiner gezeichnet und vergrößert, für mehr Tempo; DLSS braucht eine NVIDIA-RTX-Karte, FSR 4 eine neuere Karte (nicht nur AMD; schärfer und ruhiger als FSR 3.1), FSR 3.1 läuft auf jeder Karte, Eingebaut ist der eigene Upscale-Durchgang des Spiels. Ein Upscaler glättet auch selbst die Kanten. Supersampling: größer gezeichnet und verkleinert, für feinere Kanten; anspruchsvoll. F8 schaltet im Spiel zwischen Eingebaut und deiner Wahl um.",
-    "launcher.quality": "Upscaling-Qualität",
+    "launcher.quality": "Skalierungsqualität",
     "launcher.preset_native": "Aus",
     "launcher.preset_quality": "Qualität",
     "launcher.preset_balanced": "Ausgewogen",
@@ -370,7 +370,7 @@
     "launcher.aa": "Kantenglättung",
     "launcher.aa_game": "Aus (nur die des Spiels)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus oder Supersampling; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher (nicht mit Supersampling). Aus behält nur die Kantenglättung des Spiels."
+    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Skalierungsmethode Aus oder Supersampling; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher (nicht mit Supersampling). Aus behält nur die Kantenglättung des Spiels."
   },
   "items": {
     "menu:fsr1": {
@@ -723,7 +723,7 @@
     "Upscaling and anti-aliasing": "Upscaling und Kantenglättung",
     "Built-in (game)": "Eingebaut (Spiel)",
     "Off (game's own)": "Aus (nur die des Spiels)",
-    "Upscale method": "Upscaling-Methode",
+    "Scaling method": "Skalierungsmethode",
     "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.": "Wie das Bild seine Größe erhält. Aus: in Bildschirmgröße gezeichnet. Eingebaut, DLSS, FSR 3.1 und FSR 4: kleiner gezeichnet und vergrößert, für mehr Tempo; DLSS braucht eine NVIDIA-RTX-Karte, FSR 4 eine neuere Karte (nicht nur AMD; schärfer und ruhiger als FSR 3.1), FSR 3.1 läuft auf jeder Karte, Eingebaut ist der eigene Upscale-Durchgang des Spiels. Ein Upscaler glättet auch selbst die Kanten. Supersampling: größer gezeichnet und verkleinert, für feinere Kanten; anspruchsvoll. F8 schaltet im Spiel zwischen Eingebaut und deiner Wahl um.",
     "Supersampling": "Supersampling",
     "Quality": "Qualität",
@@ -738,7 +738,7 @@
     "upscaled to %dx": "hochskaliert auf %dx",
     " Until the restart the game keeps rendering at %dx": " Bis zum Neustart rendert das Spiel weiter in %dx",
     " Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.": " Ausgabe / 1,5 (Qualität), 1,7 (Ausgewogen), 2 (Leistung) oder 3 (Ultra-Leistung) pro Seite; der Upscaler füllt den Rest auf. Wird beim Start gesetzt, eine Änderung braucht also Anwenden und neu starten.",
-    "Upscale quality (requires restart)": "Upscaling-Qualität (Neustart nötig)",
+    "Scaling quality (requires restart)": "Skalierungsqualität (Neustart nötig)",
     "Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).": "Glättet gezackte Kanten (Federn, Gras, Geländer) im fertigen Bild. Das Spiel zeichnet HUD und Untertitel in dasselbe Bild, also werden auch Textkanten geglättet. Etwa 0,2 bis 0,4 ms pro Bild bei 1080p (RTX 2060).",
     "Enhancements": "Verbesserungen",
     "Game (2048)": "Spiel (2048)",
@@ -975,6 +975,6 @@
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Mit VSync muss die Bildwiederholrate des Bildschirms mindestens doppelt so hoch sein wie die Bildrate des Spiels.",
     "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.": "Supersampling rendert größer als der Bildschirm und verkleinert das Bild: feinere Kanten, aber anspruchsvoll für die Grafikkarte und mit höherem Speicherbedarf. Nur für starke Grafikkarten. Kantenglättung kann zusätzlich aktiviert werden.",
     "Anti-aliasing": "Kantenglättung",
-    "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus oder Supersampling; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher (nicht mit Supersampling). Aus behält nur die Kantenglättung des Spiels."
+    "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "Glättet gezackte Kanten. Frei wählbar bei Skalierungsmethode Aus oder Supersampling; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher (nicht mit Supersampling). Aus behält nur die Kantenglättung des Spiels."
   }
 }

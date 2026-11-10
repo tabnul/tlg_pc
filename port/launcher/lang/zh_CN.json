@@ -133,14 +133,14 @@
     "launcher.filters": "图像滤镜（也可在游戏内菜单实时调整，Insert → 画面）",
     "launcher.smaa": "SMAA 抗锯齿（平滑边缘；HUD 也会受影响）",
     "launcher.aa_off": "关闭",
-    "launcher.upscaler": "放大方式",
+    "launcher.upscaler": "缩放方式",
     "launcher.up_off": "内置（游戏）",
     "launcher.up_dlss": "DLSS（NVIDIA RTX）",
     "launcher.up_fsr3": "FSR 3.1（任意显卡）",
     "launcher.up_fsr4": "FSR 4（较新的显卡）",
     "launcher.up_taa": "TAA（任意显卡）",
     "launcher.upscaler_hint": "决定画面尺寸的方式。关闭：按屏幕尺寸绘制。内置、DLSS、FSR 3.1 和 FSR 4：以较小尺寸绘制再放大，速度更快；DLSS 需要 NVIDIA RTX 显卡，FSR 4 需要较新的显卡（不限 AMD；比 FSR 3.1 更清晰稳定），FSR 3.1 可在任意显卡上运行，内置是游戏自带的放大处理。放大器自身也会平滑边缘。超采样：以较大尺寸绘制再缩小，边缘更细腻；负担很重。游戏中按 F8 可在内置与你的选择之间切换。",
-    "launcher.quality": "放大质量",
+    "launcher.quality": "缩放质量",
     "launcher.preset_native": "关闭",
     "launcher.preset_quality": "质量",
     "launcher.preset_balanced": "平衡",
@@ -370,7 +370,7 @@
     "launcher.aa": "抗锯齿",
     "launcher.aa_game": "关闭（仅游戏自带）",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "平滑锯齿边缘。放大方式为关闭或超采样时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和（不能与超采样同用）。关闭则只保留游戏自带的。"
+    "launcher.aa_hint": "平滑锯齿边缘。缩放方式为关闭或超采样时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和（不能与超采样同用）。关闭则只保留游戏自带的。"
   },
   "items": {
     "menu:fsr1": {
@@ -723,7 +723,7 @@
     "Upscaling and anti-aliasing": "超分辨率与抗锯齿",
     "Built-in (game)": "内置（游戏）",
     "Off (game's own)": "关闭（仅游戏自带）",
-    "Upscale method": "放大方式",
+    "Scaling method": "缩放方式",
     "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. Supersampling: drawn larger and shrunk, for finer edges; heavy. F8 switches between Built-in and your choice in game.": "决定画面尺寸的方式。关闭：按屏幕尺寸绘制。内置、DLSS、FSR 3.1 和 FSR 4：以较小尺寸绘制再放大，速度更快；DLSS 需要 NVIDIA RTX 显卡，FSR 4 需要较新的显卡（不限 AMD；比 FSR 3.1 更清晰稳定），FSR 3.1 可在任意显卡上运行，内置是游戏自带的放大处理。放大器自身也会平滑边缘。超采样：以较大尺寸绘制再缩小，边缘更细腻；负担很重。游戏中按 F8 可在内置与你的选择之间切换。",
     "Supersampling": "超采样",
     "Quality": "质量",
@@ -738,7 +738,7 @@
     "upscaled to %dx": "放大至 %dx",
     " Until the restart the game keeps rendering at %dx": " 重启前游戏仍以此分辨率渲染：%dx",
     " Output / 1.5 (Quality), 1.7 (Balanced), 2 (Performance) or 3 (Ultra Performance) per side; the upscaler fills in the rest. Set at start, so changing it needs Apply and restart.": " 输出每边除以 1.5（质量）、1.7（平衡）、2（性能）或 3（极致性能）；其余由超分辨率补全。启动时设定，因此更改需要“应用并重启”。",
-    "Upscale quality (requires restart)": "放大质量（需重启）",
+    "Scaling quality (requires restart)": "缩放质量（需重启）",
     "Smooths jagged edges (feathers, grass, railings) on the final image. The game draws its HUD and subtitles into the same image, so text edges are smoothed too. About 0.2 to 0.4 ms per frame at 1080p (RTX 2060).": "平滑最终画面上的锯齿边缘（羽毛、草地、栏杆）。游戏将 HUD 和字幕绘制在同一画面中，因此文字边缘也会被平滑。在 1080p 下每帧约 0.2 到 0.4 ms（RTX 2060）。",
     "Enhancements": "增强",
     "Game (2048)": "游戏（2048）",
@@ -975,6 +975,6 @@
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "开启垂直同步时，屏幕刷新率必须至少是游戏帧率的两倍。",
     "Supersampling renders larger than the screen and shrinks the image: finer edges, but heavy on the graphics card and it needs more memory. For strong cards only. Anti-aliasing can be added on top.": "超级采样以大于屏幕的尺寸渲染再缩小画面：边缘更细腻，但对显卡负担很重，并且需要更多内存。仅适合高性能显卡。还可以叠加抗锯齿。",
     "Anti-aliasing": "抗锯齿",
-    "Smooths jagged edges. Yours to choose with Upscale method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "平滑锯齿边缘。放大方式为关闭或超采样时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和（不能与超采样同用）。关闭则只保留游戏自带的。"
+    "Smooths jagged edges. Yours to choose with Scaling method Off or Supersampling; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer (not with supersampling). Off keeps only the game's own.": "平滑锯齿边缘。缩放方式为关闭或超采样时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和（不能与超采样同用）。关闭则只保留游戏自带的。"
   }
 }
