@@ -504,13 +504,10 @@ void ImageTab() {
         ImGui::EndTable();
     }
     const int iw = s.image_width, ih = s.image_height, ww = s.window_width, wh = s.window_height;
-    const bool upscaling = iw < ww && ih < wh;
     // tlg: only spatial filters on the final image. The temporal upscalers (FSR 3/4, DLSS) work on
     // the scene color (vk_temporal_upscaler), so they are not offered here.
-    ImGui::SeparatorText(TR("Scaling and sharpening"));
+    ImGui::SeparatorText(TR("Sharpening"));
     if (BeginRows("##scaling")) {
-        CheckRow(TR("Upscale with FSR 1"), s.fsr1,
-                 TR("Enlarges the game image when it is smaller than the window (spatial filter, no shimmer)."), d.fsr1, false);
         // tlg: one Sharpening setting (2026-11-07): with DLSS / FSR / TAA it is their own RCAS in
         // the AA step (scene only, the UI stays crisp), with Built-in AMD CAS on the final picture.
         const bool aa_sharpens = TlgSettings::AaSharpenedRecently();
@@ -774,7 +771,6 @@ void ImageTab() {
         InfoRow(TR("Game image"), text);
         std::snprintf(text, sizeof(text), "%d x %d", ww, wh);
         InfoRow(TR("Windowed"), text);
-        InfoRow("FSR 1", !s.fsr1 ? TR("off") : upscaling ? TR("active") : TR("no effect (image not smaller than window)"));
         InfoRow(TR("Sharpening"), !s.sharpen ? TR("off") : s.rcas_applied ? TR("applied (CAS)") : TlgSettings::AaSharpenedRecently() ? TR("applied (RCAS, in the AA step)") : TR("not applied"));
         ImGui::EndTable();
     }

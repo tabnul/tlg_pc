@@ -371,10 +371,6 @@
     "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de escala Desligado ou Superamostragem; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave (não com superamostragem). Desligado mantém só o do jogo."
   },
   "items": {
-    "menu:fsr1": {
-      "name": "Ampliar com FSR 1",
-      "what": "Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor)."
-    },
     "menu:sharpen": {
       "name": "Nitidez",
       "what": "Deixa a imagem mais nítida: com DLSS, FSR ou TAA a nitidez deles (só a cena), com Do jogo o AMD CAS."
@@ -709,9 +705,6 @@
     "Off": "Desligado",
     "Frame generation": "Geração de quadros",
     "Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.": "Mostra uma imagem gerada entre dois quadros do jogo: movimento mais suave, um pouco mais de atraso de entrada. DLSS precisa de NVIDIA RTX 40 ou mais nova; FSR não depende de marca.",
-    "Scaling and sharpening": "Escala e nitidez",
-    "Upscale with FSR 1": "Ampliar com FSR 1",
-    "Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).": "Amplia a imagem do jogo quando ela é menor que a janela (filtro espacial, sem tremor).",
     "Sharpening": "Nitidez",
     "Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.": "Deixa a imagem mais nítida. Agora feito pela própria etapa de anti-aliasing (o RCAS dela), só na cena.",
     "Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.": "Deixa a imagem mais nítida. Com Do jogo é o AMD CAS na imagem final; com DLSS, FSR ou TAA a nitidez deles.",
@@ -791,8 +784,6 @@
     "Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.": "Acima de 1 clareia os tons médios, abaixo de 1 escurece; pretos e brancos ficam. Padrão 1, a do jogo; 0,75 suaviza a imagem SDR clara demais ao ar livre.",
     "Information": "Informações",
     "Game image": "Imagem do jogo",
-    "active": "ativo",
-    "no effect (image not smaller than window)": "sem efeito (imagem não é menor que a janela)",
     "applied (CAS)": "aplicada (CAS)",
     "applied (RCAS, in the AA step)": "aplicada (RCAS, na etapa de AA)",
     "not applied": "não aplicada",

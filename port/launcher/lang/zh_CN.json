@@ -373,10 +373,6 @@
     "launcher.aa_hint": "平滑锯齿边缘。缩放方式为关闭或超采样时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和（不能与超采样同用）。关闭则只保留游戏自带的。"
   },
   "items": {
-    "menu:fsr1": {
-      "name": "使用 FSR 1 放大",
-      "what": "当游戏画面小于窗口时将其放大（空间滤镜，无闪烁）。"
-    },
     "menu:sharpen": {
       "name": "锐化",
       "what": "锐化画面：使用 DLSS、FSR 或 TAA 时为它们自带的锐化（仅场景），使用内置时为 AMD CAS。"
@@ -711,9 +707,6 @@
     "Off": "关闭",
     "Frame generation": "帧生成",
     "Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.": "在两帧游戏画面之间显示一帧生成的画面：动作更流畅，输入延迟略增。DLSS 需要 NVIDIA RTX 40 或更新的显卡；FSR 不限品牌。",
-    "Scaling and sharpening": "缩放与锐化",
-    "Upscale with FSR 1": "使用 FSR 1 放大",
-    "Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).": "当游戏画面小于窗口时将其放大（空间滤镜，无闪烁）。",
     "Sharpening": "锐化",
     "Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.": "锐化画面。现由抗锯齿步骤本身（其 RCAS）完成，仅作用于场景。",
     "Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.": "锐化画面。使用内置时为作用于最终画面的 AMD CAS；使用 DLSS、FSR 或 TAA 时为它们自带的锐化。",
@@ -796,8 +789,6 @@
     "Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.": "高于 1 提亮中间调，低于 1 压暗中间调；黑色和白色保持不变。默认 1，即游戏原值；0.75 可缓解户外 SDR 画面过亮的问题。",
     "Information": "信息",
     "Game image": "游戏画面",
-    "active": "已启用",
-    "no effect (image not smaller than window)": "无效果（画面不小于窗口）",
     "applied (CAS)": "已应用（CAS）",
     "applied (RCAS, in the AA step)": "已应用（RCAS，在 AA 步骤中）",
     "not applied": "未应用",

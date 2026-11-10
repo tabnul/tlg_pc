@@ -373,10 +373,6 @@
     "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Skalierungsmethode Aus oder Supersampling; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher (nicht mit Supersampling). Aus behält nur die Kantenglättung des Spiels."
   },
   "items": {
-    "menu:fsr1": {
-      "name": "Mit FSR 1 hochskalieren",
-      "what": "Vergrößert das Spielbild, wenn es kleiner als das Fenster ist (räumlicher Filter, kein Flimmern)."
-    },
     "menu:sharpen": {
       "name": "Schärfen",
       "what": "Schärft das Bild: mit DLSS, FSR oder TAA deren eigene Schärfung (nur die Szene), mit Eingebaut AMD CAS."
@@ -711,9 +707,6 @@
     "Off": "Aus",
     "Frame generation": "Frame Generation",
     "Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.": "Zeigt ein erzeugtes Bild zwischen zwei Spielbildern: flüssigere Bewegung, etwas mehr Eingabeverzögerung. DLSS braucht NVIDIA RTX 40 oder neuer; FSR ist an keine Marke gebunden.",
-    "Scaling and sharpening": "Skalierung und Schärfe",
-    "Upscale with FSR 1": "Mit FSR 1 hochskalieren",
-    "Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).": "Vergrößert das Spielbild, wenn es kleiner als das Fenster ist (räumlicher Filter, kein Flimmern).",
     "Sharpening": "Schärfen",
     "Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.": "Schärft das Bild. Jetzt vom Kantenglättungsschritt selbst erledigt (sein RCAS), nur auf der Szene.",
     "Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.": "Schärft das Bild. Mit Eingebaut ist es AMD CAS auf dem fertigen Bild; mit DLSS, FSR oder TAA deren eigene Schärfung.",
@@ -796,8 +789,6 @@
     "Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.": "Über 1 hellt die Mitteltöne auf, unter 1 dunkelt sie ab; Schwarz und Weiß bleiben. Standard 1, der Wert des Spiels; 0.75 zähmt das überbelichtete SDR-Bild im Freien.",
     "Information": "Information",
     "Game image": "Spielbild",
-    "active": "aktiv",
-    "no effect (image not smaller than window)": "keine Wirkung (Bild nicht kleiner als Fenster)",
     "applied (CAS)": "angewendet (CAS)",
     "applied (RCAS, in the AA step)": "angewendet (RCAS, im AA-Schritt)",
     "not applied": "nicht angewendet",

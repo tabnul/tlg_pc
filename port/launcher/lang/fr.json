@@ -373,10 +373,6 @@
     "launcher.aa_hint": "Lisse les contours en escalier. Au choix avec la méthode de mise à l'échelle Désactivé ou Suréchantillonnage ; un upscaler fait le sien. DLAA (cartes NVIDIA RTX) et FSR 4 (toute carte récente) sont les plus nets, FSR 3.1 fonctionne sur toute carte, TAA est plus léger et plus doux (pas avec le suréchantillonnage). Désactivé ne garde que celui du jeu."
   },
   "items": {
-    "menu:fsr1": {
-      "name": "Mise à l'échelle FSR 1",
-      "what": "Agrandit l'image du jeu quand elle est plus petite que la fenêtre (filtre spatial, sans scintillement)."
-    },
     "menu:sharpen": {
       "name": "Netteté",
       "what": "Accentue la netteté de l'image : avec DLSS, FSR ou TAA leur propre netteté (scène uniquement), avec Intégré AMD CAS."
@@ -711,9 +707,6 @@
     "Off": "Désactivé",
     "Frame generation": "Génération d'images",
     "Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.": "Affiche une image inventée entre deux images du jeu : mouvement plus fluide, un peu plus de latence. DLSS nécessite une NVIDIA RTX 40 ou plus récente ; FSR n'est lié à aucune marque.",
-    "Scaling and sharpening": "Mise à l'échelle et netteté",
-    "Upscale with FSR 1": "Mise à l'échelle FSR 1",
-    "Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).": "Agrandit l'image du jeu quand elle est plus petite que la fenêtre (filtre spatial, sans scintillement).",
     "Sharpening": "Netteté",
     "Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.": "Accentue la netteté de l'image. Désormais réalisée par l'étape d'anticrénelage elle-même (son RCAS), sur la scène uniquement.",
     "Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.": "Accentue la netteté de l'image. Avec Intégré, c'est AMD CAS sur l'image finale ; avec DLSS, FSR ou TAA, leur propre netteté.",
@@ -796,8 +789,6 @@
     "Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.": "Au-dessus de 1 éclaircit les tons moyens, en dessous de 1 les assombrit ; les noirs et les blancs restent. Par défaut 1, la valeur du jeu ; 0.75 atténue l'image SDR surexposée en extérieur.",
     "Information": "Informations",
     "Game image": "Image du jeu",
-    "active": "actif",
-    "no effect (image not smaller than window)": "sans effet (image pas plus petite que la fenêtre)",
     "applied (CAS)": "appliqué (CAS)",
     "applied (RCAS, in the AA step)": "appliqué (RCAS, dans l'étape AA)",
     "not applied": "non appliqué",

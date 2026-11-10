@@ -373,10 +373,6 @@
     "launcher.aa_hint": "ギザギザの輪郭を滑らかにします。スケーリング方式がオフまたはスーパーサンプリングのときに選べます。アップスケーラー使用時はそれ自身が行います。DLAA（NVIDIA RTX カード）と FSR 4（最近のカード）が最も鮮明で、FSR 3.1 はどのカードでも動作し、TAA は軽くてやわらかめです（スーパーサンプリングとは併用不可）。オフはゲーム標準のみです。"
   },
   "items": {
-    "menu:fsr1": {
-      "name": "FSR 1でアップスケール",
-      "what": "ゲーム画像がウィンドウより小さいときに拡大します（空間フィルター、ちらつきなし）。"
-    },
     "menu:sharpen": {
       "name": "シャープネス",
       "what": "画像をシャープにします。DLSS、FSR、TAAではそれぞれ自身のシャープ化（シーンのみ）、内蔵ではAMD CASです。"
@@ -711,9 +707,6 @@
     "Off": "オフ",
     "Frame generation": "フレーム生成",
     "Shows one made-up image between two game frames: smoother motion, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.": "ゲームの2フレームの間に生成画像を1枚表示します。動きがより滑らかになりますが、入力遅延が少し増えます。DLSSにはNVIDIA RTX 40以降が必要です。FSRは特定のメーカーに依存しません。",
-    "Scaling and sharpening": "スケーリングとシャープ化",
-    "Upscale with FSR 1": "FSR 1でアップスケール",
-    "Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).": "ゲーム画像がウィンドウより小さいときに拡大します（空間フィルター、ちらつきなし）。",
     "Sharpening": "シャープネス",
     "Sharpens the image. Now done by the anti-aliasing step itself (its RCAS), on the scene only.": "画像をシャープにします。現在はアンチエイリアス処理自体（そのRCAS）が、シーンのみに対して行います。",
     "Sharpens the image. With Built-in it is AMD CAS on the final picture; with DLSS, FSR or TAA their own sharpening.": "画像をシャープにします。内蔵では最終画像へのAMD CAS、DLSS、FSR、TAAではそれぞれ自身のシャープ化です。",
@@ -796,8 +789,6 @@
     "Above 1 lightens the midtones, below 1 darkens them; blacks and whites stay. Default 1, the game's own; 0.75 tames the over-lit SDR image outdoors.": "1より上で中間調が明るく、1より下で暗くなります。黒と白は変わりません。デフォルトは1でゲーム本来の値。0.75で屋外の明るすぎるSDR画像を抑えられます。",
     "Information": "情報",
     "Game image": "ゲーム画像",
-    "active": "有効",
-    "no effect (image not smaller than window)": "効果なし（画像がウィンドウより小さくない）",
     "applied (CAS)": "適用中（CAS）",
     "applied (RCAS, in the AA step)": "適用中（RCAS、AA処理内）",
     "not applied": "未適用",

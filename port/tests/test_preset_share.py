@@ -28,7 +28,7 @@ def t(key, **fmt):
 def custom_states():
     """A player's choices: a few menu values of each type, a start-up switch off and one on."""
     states = {i.id: None for i in backports_table.ITEMS}
-    states.update({'menu:fsr1': '1', 'menu:ssao': '80', 'menu:color_contrast': '1.2', 'menu:fps_limit': '60',
+    states.update({'menu:smaa': '1', 'menu:ssao': '80', 'menu:color_contrast': '1.2', 'menu:fps_limit': '60',
                    'menu:overlay_corner': '3', 'TLG_BACKGROUND_WARMUP': '0', 'TLG_DEFERRED_READBACK': '1'})
     return states
 
@@ -52,7 +52,7 @@ class Base(unittest.TestCase):
     def valid(self, **over):
         data = {'format': 'tlg-preset', 'version': 1, 'game': 'CUSA03627', 'name': 'n', 'what': 'w',
                 'exported': '2026-10-16', 'port_version': 'v1', 'settings': {'vsync': False},
-                'items': {'menu:fsr1': '1'}}
+                'items': {'menu:smaa': '1'}}
         data.update(over)
         return data
 
@@ -129,11 +129,11 @@ class RoundTripTests(Base):
         self.assertEqual(gfxlogic.matching_preset(other_settings, other_states), 'quality')
 
     def test_diff_lists_only_what_changes_and_texts_render(self):
-        preset, _ = preset_share.parse_preset(self.valid(items={'menu:fsr1': '1', 'menu:color_contrast': '1.3'},
+        preset, _ = preset_share.parse_preset(self.valid(items={'menu:smaa': '1', 'menu:color_contrast': '1.3'},
                                                          settings={'vsync': False, 'gpu_readbacks': '0'}))
         changes = preset_share.diff(preset, dict(DEFAULTS), {i.id: None for i in backports_table.ITEMS})
         self.assertEqual(sorted((k, i) for k, i, _, _ in changes),
-                         [('item', 'menu:color_contrast'), ('item', 'menu:fsr1'), ('setting', 'vsync')])
+                         [('item', 'menu:color_contrast'), ('item', 'menu:smaa'), ('setting', 'vsync')])
         body, lines = preset_share.summary_lines(preset, [], changes, t)
         self.assertIn('3', body)
         self.assertEqual(len(lines), 3)
@@ -180,10 +180,10 @@ class ValidationTests(Base):
         self.assertIn('CUSA99999', preset_share.problem_text(problems[0], t))
 
     def test_unknown_ids_are_ignored_and_listed(self):
-        preset, problems = self.read(self.valid(items={'menu:fsr1': '1', 'BP99': '1', 'menu:nope': '3'},
+        preset, problems = self.read(self.valid(items={'menu:smaa': '1', 'BP99': '1', 'menu:nope': '3'},
                                                 settings={'vsync': True, 'vram_budget_mb': 9999, 'display_mode': 'Fullscreen',
                                                           'game_dir': '/x'}))
-        self.assertEqual(preset['items'], {'menu:fsr1': '1'})
+        self.assertEqual(preset['items'], {'menu:smaa': '1'})
         self.assertEqual(preset['settings'], {'vsync': True})
         self.assertEqual(sorted((p.code, p.detail) for p in problems),
                          [('unknown_item', 'BP99'), ('unknown_item', 'menu:nope'), ('unknown_setting', 'display_mode'),
@@ -194,7 +194,7 @@ class ValidationTests(Base):
         bad = {'menu:sharpness': '4.5',            # float, hi 4
                'menu:color_contrast': 9,            # float, hi 1.5
                'menu:color_gamma': 'abc',
-               'menu:fsr1': '2',                    # bool
+               'menu:smaa': '2',                    # bool
                'menu:fps_limit': '45',              # choice
                'menu:ssao': 80.5,                   # int, not whole
                'TLG_BLOCK1D': None, 'TLG_BACKGROUND_WARMUP': [1],

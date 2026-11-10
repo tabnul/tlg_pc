@@ -166,7 +166,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "fps_limit") {
         v.fps_limit = TlgGraphics::ParseFpsLimit(i);
     } else if (key == "fsr1") {
-        v.fsr1 = i != 0;
+        v.fsr1 = false;  // FSR 1 removed (user 2026-11-10): old files and presets load it off
     } else if (key == "rcas") {
         v.rcas = i != 0;
     } else if (key == "rcas_strength") {
