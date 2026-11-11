@@ -38,8 +38,17 @@ jobs:
           submodules: recursive
       - name: System packages
         # 2026-10-23 this step hung in apt-get for hours: fail fast instead, a re-run gets a mirror.
-        timeout-minutes: 15
+        # 2026-11-11 the runner could not resolve azure.archive.ubuntu.com for hours: use the main
+        # Ubuntu archive (the runner image lists only the Azure mirror) and retry downloads.
+        timeout-minutes: 25
         run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'http://archive.ubuntu.com/ubuntu/	priority:1
+http://azure.archive.ubuntu.com/ubuntu/	priority:2
+' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          sudo sed -i 's#http://azure.archive.ubuntu.com#http://archive.ubuntu.com#g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
             curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \
