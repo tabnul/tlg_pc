@@ -1726,10 +1726,14 @@ class Launcher:
                       font=(SERIF, 14 if home else 11), tags='title')
         c.create_text(left, top + (44 if home else 30), text='G U A R D I A N', anchor='w', fill=TEXT_COLOR,
                       font=(SERIF, 34 if home else 22), tags='title')
-        line_y = top + (84 if home else 56)
+        # The Japanese title right under the game's title, as it means the same (user 2026-11-11).
+        c.create_text(left, top + (76 if home else 50), text='人喰いの大鷲トリコ',
+                      anchor='w', fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11 if home else 9),
+                      tags='title')
+        line_y = top + (100 if home else 66)
         c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
-        # This port's name under the game's title on every page (Japanese title removed, user 2026-11-10).
-        c.create_text(left, 198 if home else 130, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
+        # This port's name under the titles on every page (English only).
+        c.create_text(left, 214 if home else 140, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
                       anchor='w', fill=ACCENT, font=(SERIF, 10 if home else 7), tags='title')
         if home:
             c.create_line(left, 244, left + 46, 244, fill=ACCENT)
