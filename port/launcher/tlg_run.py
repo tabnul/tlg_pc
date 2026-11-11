@@ -940,6 +940,22 @@ def build_env(settings, extra=None):
     return env
 
 
+def build_ico_horns(data, force=False):
+    """Mods > ICO horns: builds the horn models (ico_horns.py) into <user>/mods-builtin, where the game
+    mounts them. Only called when the player turns the horns on. Returns None or the error text."""
+    horns = Path(data) / 'mods-builtin' / 'trico_other.psarc'
+    if horns.is_file() and not force:
+        return None
+    try:
+        import ico_horns
+        horns.parent.mkdir(parents=True, exist_ok=True)
+        ico_horns.write(str(horns))
+        return None
+    except Exception as error:  # never blocks the game: only the ICO horns stay away
+        print(f'ICO horns: could not build the models: {error}')
+        return str(error)
+
+
 def new_log():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log = LOG_DIR / f'run-{datetime.datetime.now():%Y%m%d-%H%M%S}.log'
@@ -1044,14 +1060,8 @@ def launch(settings, seconds=0, extra_env=None, detached=False, header=()):
         'menu_confirm': settings.get('menu_confirm', 'cross'),
         'key_map': key_map_spec(key_map) if isinstance(key_map, dict) else str(key_map),
     })
-    try:   # Mods > Horns > ICO horns: the horn models, built here (the game mounts this file)
-        import ico_horns
-        horns = data / 'mods-builtin' / 'trico_other.psarc'
-        if not horns.is_file():
-            horns.parent.mkdir(parents=True, exist_ok=True)
-            ico_horns.write(str(horns))
-    except Exception as error:  # never blocks the game: only the ICO horns stay away
-        print(f'ICO horns: could not build the models: {error}')
+    if read_ini(data / 'tlg.ini').get('mod_horns', '0') not in ('0', ''):
+        build_ico_horns(data)   # only for players who turned the horns on; built once
     log = new_log()
     try:   # saves copied aside before every start; never blocks the game
         import savemanager

@@ -150,6 +150,8 @@ TEXT = {
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
                  '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60'),
     'skip_logos': 'Skip the boot logos',
+    'horns_built': 'The horn models are built on this PC.',
+    'horns_failed': 'Could not build the horn models: {error}',
     'update_check': 'Check for new releases at start',
     'update_available': 'New release {tag} is out: click to open the download page',
     'old_version': 'Game version {version}: install update 01.03 (the port is made for it)',
@@ -1341,9 +1343,16 @@ class Launcher:
                 pick.grid(row=0, column=0, sticky='w')
             else:
                 var = tk.BooleanVar(value=ini.get(key, item.default) not in ('0', ''))
-                ttk.Checkbutton(mod, text=item.name, variable=var,
-                                command=lambda v=var, w=write: w('1' if v.get() else '0')
-                                ).grid(row=0, column=0, sticky='w')
+                note = ttk.Label(mod, text='', foreground=ACCENT)
+
+                def ticked(v=var, w=write, k=key, n=note):
+                    w('1' if v.get() else '0')
+                    if k == 'mod_horns' and v.get():   # built only for players who want them (user 2026-11-11)
+                        error = tlg_run.build_ico_horns(tlg_run.USER_DIR)
+                        n.configure(text=self.t('horns_failed', error=error) if error else self.t('horns_built'))
+                        n.grid(row=2, column=0, sticky='w', pady=(4, 0))
+
+                ttk.Checkbutton(mod, text=item.name, variable=var, command=ticked).grid(row=0, column=0, sticky='w')
             ttk.Label(mod, text=item.what, foreground=DIM, wraplength=900, justify='left').grid(
                 row=1, column=0, sticky='w', pady=(6, 0))
 

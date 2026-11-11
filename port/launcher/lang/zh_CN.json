@@ -370,7 +370,9 @@
     "launcher.pack_zar_need_folder": "请先选择游戏文件夹（文件夹，而不是 .zar）。",
     "launcher.pack_zar_running": "正在打包游戏：{line}",
     "launcher.pack_zar_done": "已打包到 {path}。游戏设置现在指向该 .zar。",
-    "launcher.pack_zar_failed": "打包失败：{error}"
+    "launcher.pack_zar_failed": "打包失败：{error}",
+    "launcher.horns_built": "角的模型已在这台电脑上生成。",
+    "launcher.horns_failed": "无法生成角的模型：{error}"
   },
   "items": {
     "menu:sharpen": {
@@ -973,7 +975,7 @@
     "Mods": "模组",
     "All treasures": "全部宝物",
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "使用开发者自己的解锁功能，解锁所有宝物（服装、Trico 的羽毛）以及选项菜单中的“宝物”项。保存在存档中：关闭后不会收回。首次解锁前会备份你的存档（启动器的存档管理可以恢复）。可在游戏暂停菜单的“物品”中选择。",
-    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures).": "少年戴上角，向《ICO》致敬：骨白色、尖端为黑色。可与游戏自带的 Ico 服装（宝物之一）搭配。",
+    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年戴上角，向《ICO》致敬：骨白色、尖端为黑色。可与游戏自带的 Ico 服装（宝物之一）搭配。请先在启动器中开启一次：启动器会在你的电脑上生成角的模型。",
     "ICO horns": "ICO 的角"
   }
 }

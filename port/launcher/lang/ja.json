@@ -370,7 +370,9 @@
     "launcher.pack_zar_need_folder": "まずゲームフォルダーを選んでください（.zar ではなくフォルダー）。",
     "launcher.pack_zar_running": "ゲームをパック中: {line}",
     "launcher.pack_zar_done": "{path} にパックしました。ゲームの設定は .zar を指すようになりました。",
-    "launcher.pack_zar_failed": "パックに失敗しました: {error}"
+    "launcher.pack_zar_failed": "パックに失敗しました: {error}",
+    "launcher.horns_built": "角のモデルをこの PC で作成しました。",
+    "launcher.horns_failed": "角のモデルを作成できませんでした: {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -973,7 +975,7 @@
     "Mods": "Mod",
     "All treasures": "すべての宝物",
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。",
-    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures).": "少年が角を身に着けます。ICOへのオマージュで、先端が黒い骨白色の角です。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。",
+    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年が角を身に着けます。ICOへのオマージュで、先端が黒い骨白色の角です。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。まずランチャーで一度オンにしてください。ランチャーがお使いの PC で角のモデルを作成します。",
     "ICO horns": "ICOの角"
   }
 }

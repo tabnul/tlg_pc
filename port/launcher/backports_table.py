@@ -154,7 +154,8 @@ MENU = [
           'Select them in the game\'s pause menu, under Items.'),
     _menu('Fun', 'mod_horns', 'bool', '0', 'ICO horns',
           'The boy wears horns, a nod to Ico: bone white with a black tip. '
-          'Can be combined with the game\'s own Ico outfit (one of the treasures).'),
+          'Can be combined with the game\'s own Ico outfit (one of the treasures). '
+          'Turn it on in the launcher once first: the launcher builds the horn models on your PC.'),
     _menu('Performance', 'frames_queued', 'choice', '1', 'Frames queued',
           'More frames queued: steadier FPS, slower response to input.',
           choices=(('1', '1 (lowest latency)'), ('2', '2'),
