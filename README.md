@@ -156,7 +156,7 @@ that is still in `condorcommonslaver.lua`:
 
 The Horned Apparel finally gets its horns. One of the boy's
 treasure outfits is the Ico one, and the game's own script calls it "the horned garment", but the
-boy never had any. Now he does: bone white with a black tip, just like Ico. Tick **ICO horns** on
+boy never had any. Now he does, just like Ico. Tick **ICO horns** on
 the launcher's Mods page. They go with every outfit,
 [more on the fun page](docs/fun.md#made-for-ico-fans-ico-horns).
 

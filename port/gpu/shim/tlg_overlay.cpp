@@ -1343,7 +1343,7 @@ void FunTab() {
                     "Select them in the game's pause menu, under Items."),
                  false);
         CheckRow(TR("ICO horns"), TlgSettings::Get().mod_horns,
-                 TR("The boy wears horns, a nod to Ico: bone white with a black tip. "
+                 TR("The boy wears horns, a nod to Ico. "
                     "Can be combined with the game's own Ico outfit (one of the treasures). "
                     "Turn it on in the launcher once first: the launcher builds the horn models on your PC."),
                  false);
