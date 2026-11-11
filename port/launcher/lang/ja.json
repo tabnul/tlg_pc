@@ -370,7 +370,9 @@
     "launcher.pack_zar_need_folder": "まずゲームフォルダーを選んでください（.zar ではなくフォルダー）。",
     "launcher.pack_zar_running": "ゲームをパック中: {line}",
     "launcher.pack_zar_done": "{path} にパックしました。ゲームの設定は .zar を指すようになりました。",
-    "launcher.pack_zar_failed": "パックに失敗しました: {error}"
+    "launcher.pack_zar_failed": "パックに失敗しました: {error}",
+    "launcher.horns_built": "角のモデルをこの PC で作成しました。",
+    "launcher.horns_failed": "角のモデルを作成できませんでした: {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -675,6 +677,14 @@
       "name": "非同期フェンス",
       "what": "ゲームのフェンスを待つ代わりに、その前のメモリコピーが終わった時点でシグナルします。",
       "why": "測定では遅くなりました（83 FPSに対し79）。ゲームがこれらのフェンスを待つためです。"
+    },
+    "menu:mod_treasures": {
+      "name": "すべての宝物",
+      "what": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。"
+    },
+    "menu:mod_horns": {
+      "name": "ICOの角",
+      "what": "少年が角を身に着けます。ICOへのオマージュで、先端が黒い骨白色の角です。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。"
     }
   },
   "menu": {
@@ -961,6 +971,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "現在オフ：ゲームが30 FPSで動作しており（フレームレートモードまたはフレームレート上限）、フレーム生成には低すぎます。フレームレートを上げると選択が戻ります。",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "VSyncがオンの場合、画面のリフレッシュレートはゲームのフレームレートの2倍以上が必要です。",
     "Anti-aliasing": "アンチエイリアス",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "ギザギザの輪郭を滑らかにします。アップスケール方式がオフのときに選べます。アップスケーラー使用時はそれ自身が行います。DLAA（NVIDIA RTX カード）と FSR 4（最近のカード）が最も鮮明で、FSR 3.1 はどのカードでも動作し、TAA は軽くてやわらかめです。オフはゲーム標準のみです。"
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "ギザギザの輪郭を滑らかにします。アップスケール方式がオフのときに選べます。アップスケーラー使用時はそれ自身が行います。DLAA（NVIDIA RTX カード）と FSR 4（最近のカード）が最も鮮明で、FSR 3.1 はどのカードでも動作し、TAA は軽くてやわらかめです。オフはゲーム標準のみです。",
+    "Mods": "Mod",
+    "All treasures": "すべての宝物",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。",
+    "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年が角を身に着けます。ICOへのオマージュです。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。まずランチャーで一度オンにしてください。ランチャーがお使いの PC で角のモデルを作成します。",
+    "ICO horns": "ICOの角"
   }
 }

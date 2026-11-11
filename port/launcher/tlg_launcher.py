@@ -150,6 +150,8 @@ TEXT = {
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
                  '10 FPS against 60 at the same spot; pick 60 unless your PC runs well above 60'),
     'skip_logos': 'Skip the boot logos',
+    'horns_built': 'The horn models are built on this PC.',
+    'horns_failed': 'Could not build the horn models: {error}',
     'update_check': 'Check for new releases at start',
     'update_available': 'New release {tag} is out: click to open the download page',
     'old_version': 'Game version {version}: install update 01.03 (the port is made for it)',
@@ -1250,7 +1252,6 @@ class Launcher:
         audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
         self.build_sound_output(audio)
-        self.build_drool(left)
 
         lang = section(right, self.t('language'))
         lang.grid(sticky='ew', pady=(0, 8))
@@ -1303,12 +1304,12 @@ class Launcher:
             row=4, column=0, sticky='w')
 
     def build_drool(self, parent):
-        """Trico's drool on the Settings page, with its story in plain sight: the developers built it
+        """Built-in mods on the Mods page: Trico's drool, with its story in plain sight: the developers built it
         and switched it off just before release (tlg.ini trico_drool; the game reads it live, also from
         the in-game Fun tab)."""
         drool = next(item for item in backports_table.MENU if item.key == 'trico_drool')
         box = section(parent, drool.name)
-        box.grid(sticky='ew', pady=(8, 0))
+        box.pack(fill='x', anchor='w', pady=(0, 8))
         values = [choice[0] for choice in drool.choices]
         combo = ttk.Combobox(box, values=[choice[1] for choice in drool.choices], state='readonly', width=28)
         chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('trico_drool', drool.default)
@@ -1323,6 +1324,37 @@ class Launcher:
         combo.bind('<<ComboboxSelected>>', lambda _: picked())
         ttk.Label(box, text=drool.what, foreground=DIM, wraplength=420, justify='left').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key in ('mod_treasures', 'mod_horns'):
+            item = next(i for i in backports_table.MENU if i.key == key)
+            mod = section(parent, item.name)
+            mod.pack(fill='x', anchor='w', pady=(0, 8))
+            def write(value, k=key):
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {k: value})
+                self.ini_stamp = self.ini_files_stamp()
+
+            if item.choices:  # a list setting
+                keys = [choice[0] for choice in item.choices]
+                pick = ttk.Combobox(mod, values=[choice[1] for choice in item.choices], state='readonly', width=28)
+                now = ini.get(key, item.default)
+                pick.current(keys.index(now) if now in keys else 0)
+                pick.bind('<<ComboboxSelected>>', lambda _, p=pick, ks=keys, w=write: w(ks[p.current()]))
+                pick.grid(row=0, column=0, sticky='w')
+            else:
+                var = tk.BooleanVar(value=ini.get(key, item.default) not in ('0', ''))
+                note = ttk.Label(mod, text='', foreground=ACCENT)
+
+                def ticked(v=var, w=write, k=key, n=note):
+                    w('1' if v.get() else '0')
+                    if k == 'mod_horns' and v.get():   # built only for players who want them (user 2026-11-11)
+                        error = tlg_run.build_ico_horns(tlg_run.USER_DIR)
+                        n.configure(text=self.t('horns_failed', error=error) if error else self.t('horns_built'))
+                        n.grid(row=2, column=0, sticky='w', pady=(4, 0))
+
+                ttk.Checkbutton(mod, text=item.name, variable=var, command=ticked).grid(row=0, column=0, sticky='w')
+            ttk.Label(mod, text=item.what, foreground=DIM, wraplength=900, justify='left').grid(
+                row=1, column=0, sticky='w', pady=(6, 0))
 
     def build_video(self):
         """Video: display, frame rate, resolution, anti-aliasing, frame generation | video memory."""
@@ -1767,6 +1799,7 @@ class Launcher:
                  ('home_graphics', 'graphics', self.graphics_dialog),
                  ('home_controls', 'controls', self.controller_dialog),
                  ('home_advanced', 'advanced', self.advanced_dialog),
+                 ('home_mods', 'mods', self.mods_dialog),
                  ('home_start', 'start', self.start_dialog),
                  ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
@@ -2268,6 +2301,7 @@ class Launcher:
         frame = ttk.Frame(win, padding=12)
         frame.pack(fill='both', expand=True)
         self.show_page('mods')
+        self.build_drool(frame)  # built-in mods (tlg.ini, live in game) above the cheat files
         ttk.Label(frame, text=self.t('mods_warning'), foreground='#d07060', wraplength=900, justify='left').pack(
             anchor='w', pady=(4, 8))
 

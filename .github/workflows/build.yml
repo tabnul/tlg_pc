@@ -1,4 +1,4 @@
-# (Releases ship Linux and Windows; the Linux package is untested so far: tabnul/the-last-guardian-definitive#1.)
+# (Releases ship Linux and Windows; Linux reports: tabnul/the-last-guardian-definitive#1.)
 # Pull requests to master (from integration) build the Windows package, kept as a run artifact for 3
 # days. Only a pushed tag v* (e.g. v0.2) publishes a release, named after that tag and marked latest.
 # Every release is kept as version history. No game or console file is ever built in or uploaded.
@@ -20,7 +20,7 @@ permissions:
   contents: write
 
 jobs:
-  # Linux: released next to Windows, marked untested until it is tested (tabnul/the-last-guardian-definitive#1).
+  # Linux: released next to Windows (reports: tabnul/the-last-guardian-definitive#1).
   linux:
     runs-on: ubuntu-24.04
     defaults:
@@ -38,8 +38,15 @@ jobs:
           submodules: recursive
       - name: System packages
         # 2026-10-23 this step hung in apt-get for hours: fail fast instead, a re-run gets a mirror.
-        timeout-minutes: 15
+        # 2026-11-11 the runner could not resolve azure.archive.ubuntu.com for hours: use the main
+        # Ubuntu archive (the runner image lists only the Azure mirror) and retry downloads.
+        timeout-minutes: 25
         run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://azure.archive.ubuntu.com/ubuntu/\tpriority:2\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          sudo sed -i 's#http://azure.archive.ubuntu.com#http://archive.ubuntu.com#g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends gcc-14 g++-14 cmake ninja-build pkg-config nasm \
             curl git python3-venv python3-tk libvulkan-dev glslang-tools libboost-dev \

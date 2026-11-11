@@ -40,7 +40,7 @@ delete it. The trade-off: unpacking while playing costs some CPU time, so loads 
 longer and slower CPUs may see short hitches when the game streams new areas. If you have the
 space, a plain folder is still the fastest choice.
 
-You need a Vulkan 1.3 graphics card with at least 6 GB of video memory. DLSS needs an NVIDIA RTX
+You need a Vulkan 1.3 graphics card with at least 8 GB of video memory. DLSS needs an NVIDIA RTX
 card and FSR 4 a recent card; FSR 3.1 runs on any card.
 
 **Error 4551 on Windows 11:** Smart App Control blocks programs without a digital signature, and
@@ -151,6 +151,16 @@ that is still in `condorcommonslaver.lua`:
 **As the developers planned** or **Always**, in the launcher's Settings page or the Fun tab.
 
 <p align="center"><a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool.jpg" width="49%" alt="Trico drooling"></a> <a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool2.jpg" width="49%" alt="Trico drooling, close up"></a></p>
+
+### ICO horns, only in this port
+
+The Horned Apparel finally gets its horns. One of the boy's
+treasure outfits is the Ico one, and the game's own script calls it "the horned garment", but the
+boy never had any. Now he does, just like Ico. Tick **ICO horns** on
+the launcher's Mods page. They go with every outfit,
+[more on the fun page](docs/fun.md#made-for-ico-fans-ico-horns).
+
+<p align="center"><a href="docs/fun.md#made-for-ico-fans-ico-horns"><img src="docs/screenshots/fun/outfits.jpg" width="100%" alt="The boy in Enduring Attire, Homecoming, Warrior, Horned Apparel, and Horned Apparel with ICO horns, and from behind with the Featherpainter idol"></a></p>
 
 **Trico's toilet.** Trico does need to go, but the game's scripts make sure you almost never see
 it. He has to have eaten enough barrels, then 30 minutes of play must pass, then he waits until

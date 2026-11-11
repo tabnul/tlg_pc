@@ -137,6 +137,12 @@ struct Values {
     /// tlg.ini trico_drool, env TLG_TRICO_DROOL wins): 0 = off as shipped, 1 = always,
     /// 2 = as the developers planned (only while he wants a smell pot or the boy's smell bottle).
     std::atomic<int> trico_drool{0};
+    /// Mods > All treasures (tlg.ini mod_treasures, env TLG_MOD_TREASURES wins): owns every treasure
+    /// and opens the Treasures menu. Written to the save: turning it off takes nothing back.
+    std::atomic<bool> mod_treasures{false};
+    /// Mods > ICO horns (tlg.ini mod_horns, env TLG_MOD_HORNS wins): the boy wears ICO-style horns
+    /// (own models, tlg_lua.cpp Horns).
+    std::atomic<bool> mod_horns{false};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: tlg_run.py turns them into patches and environment variables; "Apply and restart".

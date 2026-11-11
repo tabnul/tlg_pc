@@ -370,7 +370,9 @@
     "launcher.pack_zar_need_folder": "Choisis d'abord le dossier du jeu (un dossier, pas un .zar).",
     "launcher.pack_zar_running": "Compression du jeu : {line}",
     "launcher.pack_zar_done": "Compressé dans {path}. Le réglage du jeu pointe maintenant vers le .zar.",
-    "launcher.pack_zar_failed": "Échec de la compression : {error}"
+    "launcher.pack_zar_failed": "Échec de la compression : {error}",
+    "launcher.horns_built": "Les modèles des cornes sont créés sur ce PC.",
+    "launcher.horns_failed": "Impossible de créer les modèles des cornes : {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -675,6 +677,14 @@
       "name": "Fences asynchrones",
       "what": "Signale les fences du jeu dès que les copies mémoire qui les précèdent sont terminées, au lieu de les attendre.",
       "why": "Mesuré plus lent (79 contre 83 FPS) : le jeu attend ces fences."
+    },
+    "menu:mod_treasures": {
+      "name": "Tous les trésors",
+      "what": "Débloque tous les trésors (tenues, plumes de Trico) et l'entrée Trésors du menu des options, avec le déblocage des développeurs eux-mêmes. Enregistré dans ta sauvegarde : le désactiver ne les retire pas. Tes sauvegardes sont copiées avant le premier déblocage (le gestionnaire de sauvegardes du launcher peut les restaurer). Choisissez-les dans le menu pause du jeu, sous Objets."
+    },
+    "menu:mod_horns": {
+      "name": "Cornes d'ICO",
+      "what": "Le garçon porte des cornes, un clin d'œil à Ico : blanc os avec la pointe noire. Elles peuvent se combiner avec la tenue d'Ico du jeu (l'un des trésors)."
     }
   },
   "menu": {
@@ -961,6 +971,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Désactivée pour l'instant : le jeu tourne à 30 FPS (mode de fréquence d'images ou limite de fréquence d'images), trop peu pour la génération d'images. Votre choix revient avec une fréquence plus élevée.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Avec la VSync, la fréquence de rafraîchissement de l'écran doit être au moins le double de la fréquence d'images du jeu.",
     "Anti-aliasing": "Anticrénelage",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Lisse les contours en escalier. Au choix avec la méthode de mise à l'échelle Désactivé ; un upscaler fait le sien. DLAA (cartes NVIDIA RTX) et FSR 4 (toute carte récente) sont les plus nets, FSR 3.1 fonctionne sur toute carte, TAA est plus léger et plus doux. Désactivé ne garde que celui du jeu."
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Lisse les contours en escalier. Au choix avec la méthode de mise à l'échelle Désactivé ; un upscaler fait le sien. DLAA (cartes NVIDIA RTX) et FSR 4 (toute carte récente) sont les plus nets, FSR 3.1 fonctionne sur toute carte, TAA est plus léger et plus doux. Désactivé ne garde que celui du jeu.",
+    "Mods": "Mods",
+    "All treasures": "Tous les trésors",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Débloque tous les trésors (tenues, plumes de Trico) et l'entrée Trésors du menu des options, avec le déblocage des développeurs eux-mêmes. Enregistré dans ta sauvegarde : le désactiver ne les retire pas. Tes sauvegardes sont copiées avant le premier déblocage (le gestionnaire de sauvegardes du launcher peut les restaurer). Choisissez-les dans le menu pause du jeu, sous Objets.",
+    "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "Le garçon porte des cornes, un clin d'œil à Ico. Elles peuvent se combiner avec la tenue d'Ico du jeu (l'un des trésors). Activez-les d'abord une fois dans le launcher : le launcher crée les modèles des cornes sur votre PC.",
+    "ICO horns": "Cornes d'ICO"
   }
 }

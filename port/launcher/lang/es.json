@@ -370,7 +370,9 @@
     "launcher.pack_zar_need_folder": "Elige primero la carpeta del juego (una carpeta, no un .zar).",
     "launcher.pack_zar_running": "Empaquetando el juego: {line}",
     "launcher.pack_zar_done": "Empaquetado en {path}. El ajuste del juego ahora apunta al .zar.",
-    "launcher.pack_zar_failed": "Error al empaquetar: {error}"
+    "launcher.pack_zar_failed": "Error al empaquetar: {error}",
+    "launcher.horns_built": "Los modelos de los cuernos se han creado en este PC.",
+    "launcher.horns_failed": "No se pudieron crear los modelos de los cuernos: {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -675,6 +677,14 @@
       "name": "Fences asíncronos",
       "what": "Señala los fences del juego en cuanto terminan las copias de memoria previas, en vez de esperarlas.",
       "why": "Medido más lento (79 frente a 83 FPS): el juego espera en estos fences."
+    },
+    "menu:mod_treasures": {
+      "name": "Todos los tesoros",
+      "what": "Desbloquea todos los tesoros (atuendos, plumas de Trico) y la entrada Tesoros del menú de opciones, con el desbloqueo de los propios desarrolladores. Se guarda en tu partida: desactivarlo no los retira. Tus partidas se copian antes del primer desbloqueo (el gestor de partidas del launcher puede restaurarlas). Elígelos en el menú de pausa del juego, en Objetos."
+    },
+    "menu:mod_horns": {
+      "name": "Cuernos de ICO",
+      "what": "El niño lleva cuernos, un guiño a Ico: blanco hueso con la punta negra. Se pueden combinar con el atuendo de Ico del propio juego (uno de los tesoros)."
     }
   },
   "menu": {
@@ -961,6 +971,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Desactivada ahora: el juego funciona a 30 FPS (modo de velocidad de fotogramas o límite de fotogramas), demasiado poco para la generación de fotogramas. Tu elección vuelve con una velocidad mayor.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Con VSync activado, la frecuencia de actualización de la pantalla debe ser al menos el doble de la velocidad de fotogramas del juego.",
     "Anti-aliasing": "Antialiasing",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave. Desactivado deja solo el del juego."
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave. Desactivado deja solo el del juego.",
+    "Mods": "Mods",
+    "All treasures": "Todos los tesoros",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Desbloquea todos los tesoros (atuendos, plumas de Trico) y la entrada Tesoros del menú de opciones, con el desbloqueo de los propios desarrolladores. Se guarda en tu partida: desactivarlo no los retira. Tus partidas se copian antes del primer desbloqueo (el gestor de partidas del launcher puede restaurarlas). Elígelos en el menú de pausa del juego, en Objetos.",
+    "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "El niño lleva cuernos, un guiño a Ico. Se pueden combinar con el atuendo de Ico del propio juego (uno de los tesoros). Actívalo primero una vez en el launcher: el launcher crea los modelos de los cuernos en tu PC.",
+    "ICO horns": "Cuernos de ICO"
   }
 }

@@ -174,6 +174,51 @@ local function Drool(m)
     end
   end
 end
+-- Mods > All treasures (tlg.ini mod_treasures): the developers' Treasure.DbgFullOpen() owns every
+-- treasure; the Treasures entry of the options menu only shows after a finished run (lap 2). Both
+-- are written to the save (SavePerpetual), so they stay after the setting is turned off.
+local function Treasures(on)
+  if not on or _TLGTRS or type(Treasure)~='table' or type(Treasure.DbgFullOpen)~='function' then return end
+  local sd=FindObject('_savedata') local pd=sd and sd.perpetualData
+  if not pd then return end
+  _TLGTRS=true
+  Treasure.DbgFullOpen()
+  if (pd.lap or 1)<2 then pd.lap=2 end
+  if (pd.treasurePoint or 0)<999 then pd.treasurePoint=999 end
+  if SavePerpetual then SavePerpetual() end
+end
+-- Mods > ICO horns (tlg.ini mod_horns 1): the boy wears horns on his head bone, a nod to Ico. Own
+-- models (bone white, black tip) from the horn archive the launcher builds; without that archive
+-- the load fails and nothing shows (tried again after the next stage load). A stage load removes
+-- them and the next run puts them back.
+local ICOHORN='game/assets/props/level/icohorn_%sx/icohorn_%sx'
+local function Has(n) local ok,v=pcall(function() return Exists(FindObject(n)) end) return ok and v end
+local function Horns(on)
+  local H=_TLGHORN
+  if H and (not on or not Has(H[1]) or not Has(H[2])) then
+    for _,n in ipairs(H) do
+      if Has(n) then local o=FindObject(n) pcall(Disconnect,o) o.entityFlags='|Hide' end
+    end
+    H=nil _TLGHORN=nil
+  end
+  if not Has('Player') then _TLGHORNX=nil return end
+  if not on or H or _TLGHORNX then return end
+  local ok,head=pcall(GameCharacter.FindBone,'Player','jt_Head')
+  if not ok or not head then return end
+  H={}
+  for _,side in ipairs({'r','l'}) do
+    local got,o=pcall(Load,ICOHORN:format(side,side))
+    local c=got and o and (FindObject(o) or o)
+    if not c then _TLGHORNX=true return end
+    Connect(head,c)
+    c.entityFlags='~Hide'
+    c.rotation='90 90 0'
+    c.scale='1 1 1 1'
+    c.position='0.09 -0.03 0 1'
+    H[#H+1]=c:GetName()
+  end
+  _TLGHORN=H
+end
 -- Field of view: every camera mode has its own GameCameraParam (Base_FovDeg 70 as shipped).
 local function Fov(deg)
   if deg==70 and not B.fovd then return end
@@ -504,9 +549,49 @@ int SubtitleShift() {
     return (ui_width - 1920) / 2;
 }
 
+// Copies the saves to savedata_backups/<time>-<tag> (the game runs in the user folder), where the
+// launcher's save manager lists them and can restore one. A failed copy only logs.
+void BackupSaves(const char* tag) {
+    namespace fs = std::filesystem;
+    std::error_code error;
+    if (!fs::is_directory("savedata", error)) return;
+    char name[64];
+    const std::time_t now = std::time(nullptr);
+    std::strftime(name, sizeof(name), "%Y%m%d-%H%M%S-", std::localtime(&now));
+    const std::string folder = std::string(name) + tag;
+    const fs::path target = fs::path("savedata_backups") / folder;
+    const fs::path temp = fs::path("savedata_backups") / (folder + ".copying");
+    fs::create_directories("savedata_backups", error);
+    fs::remove_all(temp, error);
+    fs::copy("savedata", temp, fs::copy_options::recursive, error);
+    if (!error) fs::rename(temp, target, error);
+    if (error) {
+        std::printf("Saves: backup (%s) failed: %s\n", tag, error.message().c_str());
+        fs::remove_all(temp, error);
+    } else {
+        std::printf("Saves: backed up to %s\n", target.string().c_str());
+    }
+}
+
+// Mods > All treasures writes to the save: before its first unlock ever (no *-treasures backup yet),
+// the saves are copied, so the old state can come back through the launcher's save manager.
+void BackupBeforeTreasures() {
+    namespace fs = std::filesystem;
+    static bool done = false;
+    if (done) return;
+    done = true;
+    std::error_code error;
+    for (fs::directory_iterator it("savedata_backups", error), end; !error && it != end; it.increment(error)) {
+        const std::string name = it->path().filename().string();
+        if (name.size() > 10 && name.compare(name.size() - 10, 10, "-treasures") == 0) return;
+    }
+    BackupSaves("treasures");
+}
+
 std::string SetChunk() {
     static const int subtitle_shift = SubtitleShift();
     const auto& s = TlgSettings::Get();
+    if (s.mod_treasures.load()) BackupBeforeTreasures(); // before the Lua below unlocks anything
     std::string code(Prelude);
     code += TlgLab::Lua(s.wind_skip.load());
     code += DevChunk();
@@ -530,6 +615,8 @@ std::string SetChunk() {
                   s.grass_smooth.load() ? "true" : "false", s.boy_wind.load(), s.tree_wind.load());
     code += line;
     code += "Drool(" + std::to_string(std::clamp(s.trico_drool.load(), 0, 2)) + ")\n";
+    code += std::string("Treasures(") + (s.mod_treasures.load() ? "true" : "false") + ") Horns(" +
+            (s.mod_horns.load() ? "true" : "false") +")\n";
     if (subtitle_shift) {
         // Re-applied every tick: SubtitleSystem:Initialize resets it to (0, -OFFSET_Y).
         std::snprintf(line, sizeof(line),
@@ -911,35 +998,10 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
                    : original(L, options, buffer, size, name);
 }
 
-namespace {
-// A jump moves the story, and the game saves at its next checkpoint: the saves are copied first to
-// savedata_backups/<time>-jump (the game runs in the user folder), where the launcher's save
-// manager lists them and can restore one. A failed copy only logs: the jump still happens.
-void BackupBeforeJump() {
-    namespace fs = std::filesystem;
-    std::error_code error;
-    if (!fs::is_directory("savedata", error)) return;
-    char name[64];
-    const std::time_t now = std::time(nullptr);
-    std::strftime(name, sizeof(name), "%Y%m%d-%H%M%S-jump", std::localtime(&now));
-    const fs::path target = fs::path("savedata_backups") / name;
-    const fs::path temp = fs::path("savedata_backups") / (std::string(name) + ".copying");
-    fs::create_directories("savedata_backups", error);
-    fs::remove_all(temp, error);
-    fs::copy("savedata", temp, fs::copy_options::recursive, error);
-    if (!error) fs::rename(temp, target, error);
-    if (error) {
-        std::printf("Fun: save backup before the jump failed: %s\n", error.message().c_str());
-        fs::remove_all(temp, error);
-    } else {
-        std::printf("Fun: saves backed up to %s\n", target.string().c_str());
-    }
-}
-} // namespace
 
 namespace TlgFun {
 void Jump(const char* stage, const char* area) {
-    BackupBeforeJump();
+    BackupSaves("jump"); // a jump moves the story; the game saves at its next checkpoint
     trico_size = 1.0f; // the new stage's Trico has his normal size
     free_cam = false;  // and the game's own camera
     // As the QA menu does: _TLGQA_UNLOAD makes StartStage unload the current stage first

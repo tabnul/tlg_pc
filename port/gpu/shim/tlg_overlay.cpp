@@ -1332,6 +1332,23 @@ void FunTab() {
         ChoiceRow("Drool", TlgSettings::Get().trico_drool, drool_labels, drool_values, 3, TlgFun::DroolHelp, 0);
         ImGui::EndTable();
     }
+
+    // Mods (also on the launcher's Mods page; tlg_lua.cpp Treasures / Horns).
+    ImGui::SeparatorText(TR("Mods"));
+    if (BeginRows("##mods")) {
+        CheckRow(TR("All treasures"), TlgSettings::Get().mod_treasures,
+                 TR("Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, "
+                    "with the developers' own unlock. Stored in your save: turning it off does not take them back. "
+                    "Your saves are backed up before the first unlock (the launcher's save manager can restore them). "
+                    "Select them in the game's pause menu, under Items."),
+                 false);
+        CheckRow(TR("ICO horns"), TlgSettings::Get().mod_horns,
+                 TR("The boy wears horns, a nod to Ico. "
+                    "Can be combined with the game's own Ico outfit (one of the treasures). "
+                    "Turn it on in the launcher once first: the launcher builds the horn models on your PC."),
+                 false);
+        ImGui::EndTable();
+    }
 }
 
 int RestartChanges() {
