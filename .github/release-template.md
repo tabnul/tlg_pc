@@ -14,7 +14,7 @@ press **Play**.
 - Your own dump of The Last Guardian, CUSA03627 (US) or CUSA03745 (EU), with update 01.03, plus
   `libSceNgs2.sprx` from your PS4 for audio. The full list:
   [game files](https://github.com/{{REPO}}/blob/{{TAG}}/docs/game-files.md).
-- A Vulkan 1.3 graphics card with 6 GB of video memory or more. DLSS (DLAA and upscaling) needs an NVIDIA RTX card; FSR 4 a recent card; FSR 3.1 runs on any card.
+- A Vulkan 1.3 graphics card with 8 GB of video memory or more. DLSS (DLAA and upscaling) needs an NVIDIA RTX card; FSR 4 a recent card; FSR 3.1 runs on any card.
 
 No game files are included.
 

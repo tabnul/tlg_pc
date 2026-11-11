@@ -40,7 +40,7 @@ delete it. The trade-off: unpacking while playing costs some CPU time, so loads 
 longer and slower CPUs may see short hitches when the game streams new areas. If you have the
 space, a plain folder is still the fastest choice.
 
-You need a Vulkan 1.3 graphics card with at least 6 GB of video memory. DLSS needs an NVIDIA RTX
+You need a Vulkan 1.3 graphics card with at least 8 GB of video memory. DLSS needs an NVIDIA RTX
 card and FSR 4 a recent card; FSR 3.1 runs on any card.
 
 **Error 4551 on Windows 11:** Smart App Control blocks programs without a digital signature, and
