@@ -362,7 +362,15 @@
     "launcher.aa": "Kantenglättung",
     "launcher.aa_game": "Aus (nur die des Spiels)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels."
+    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels.",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Experimentell: Eine gepackte Spieldatei (.zar) statt eines Ordners wählen. Das Spiel entpackt Daten während des Spielens, was etwas CPU kostet: Ladezeiten können etwas länger sein und auf langsameren CPUs kann das Nachladen ruckeln. Ein normaler Ordner ist am schnellsten.",
+    "launcher.pack_zar": "Packen…",
+    "launcher.pack_zar_tip": "Experimentell: Packt den Spielordner in eine komprimierte .zar-Datei, die der Port direkt liest (spart Speicherplatz). Der Ordner bleibt erhalten; lösche ihn selbst nach einem Teststart. Spielen aus einer .zar braucht etwas mehr CPU (etwas längere Ladezeiten, mögliche Ruckler auf langsameren CPUs).",
+    "launcher.pack_zar_need_folder": "Wähle zuerst den Spielordner (einen Ordner, keine .zar).",
+    "launcher.pack_zar_running": "Spiel wird gepackt: {line}",
+    "launcher.pack_zar_done": "Gepackt nach {path}. Die Spieleinstellung zeigt jetzt auf die .zar.",
+    "launcher.pack_zar_failed": "Packen fehlgeschlagen: {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -667,6 +675,14 @@
       "name": "Asynchrone Fences",
       "what": "Signalisiert die Fences des Spiels, sobald die Speicherkopien davor fertig sind, statt auf sie zu warten.",
       "why": "Langsamer gemessen (79 gegenüber 83 FPS): Das Spiel wartet auf diese Fences."
+    },
+    "menu:mod_treasures": {
+      "name": "Alle Schätze",
+      "what": "Schaltet jeden Schatz (Kostüme, Tricos Federn) und den Eintrag Schätze im Optionsmenü frei, mit der eigenen Freischaltung der Entwickler. Im Spielstand gespeichert: Ausschalten nimmt sie nicht zurück. Deine Spielstände werden vor der ersten Freischaltung gesichert (die Spielstandverwaltung des Launchers kann sie wiederherstellen). Wähle sie im Pausenmenü des Spiels unter Gegenstände aus."
+    },
+    "menu:mod_horns": {
+      "name": "ICO-Hörner",
+      "what": "Der Junge trägt Hörner, eine Anspielung auf Ico: knochenweiß mit schwarzer Spitze. Lässt sich mit dem Ico-Kostüm des Spiels kombinieren (einer der Schätze)."
     }
   },
   "menu": {
@@ -953,6 +969,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Jetzt aus: Das Spiel läuft mit 30 FPS (Bildratenmodus oder Bildratenlimit), zu wenig für die Zwischenbildberechnung. Deine Auswahl kehrt bei einer höheren Bildrate zurück.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Mit VSync muss die Bildwiederholrate des Bildschirms mindestens doppelt so hoch sein wie die Bildrate des Spiels.",
     "Anti-aliasing": "Kantenglättung",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels."
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels.",
+    "Mods": "Mods",
+    "All treasures": "Alle Schätze",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Schaltet jeden Schatz (Kostüme, Tricos Federn) und den Eintrag Schätze im Optionsmenü frei, mit der eigenen Freischaltung der Entwickler. Im Spielstand gespeichert: Ausschalten nimmt sie nicht zurück. Deine Spielstände werden vor der ersten Freischaltung gesichert (die Spielstandverwaltung des Launchers kann sie wiederherstellen). Wähle sie im Pausenmenü des Spiels unter Gegenstände aus.",
+    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures).": "Der Junge trägt Hörner, eine Anspielung auf Ico: knochenweiß mit schwarzer Spitze. Lässt sich mit dem Ico-Kostüm des Spiels kombinieren (einer der Schätze).",
+    "ICO horns": "ICO-Hörner"
   }
 }

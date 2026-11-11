@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # would load a second copy, and the language pack would change that copy's TEXT, not the one shown.
 sys.modules.setdefault('tlg_launcher', sys.modules[__name__])
 import backports_table  # noqa: E402
+import game_image  # noqa: E402
 import langpack  # noqa: E402
 import logtail  # noqa: E402
 import pad_page  # noqa: E402
@@ -107,6 +108,19 @@ TEXT = {
     'game_dir': 'Game folder',
     'system_lib_dir': 'Console system modules',
     'browse': 'Browse…',
+    'browse_zar': '.zar…',
+    'browse_zar_tip': ('Experimental: pick a packed game file (.zar) instead of a folder. The game unpacks data while '
+                       'it plays, which costs some CPU: loads can take a bit longer and streaming '
+                       'may hitch on slower CPUs. A plain folder is fastest.'),
+    'pack_zar': 'Pack…',
+    'pack_zar_tip': ('Experimental: packs the game folder into one compressed .zar file that the port reads directly '
+                     '(saves disk space). The folder is kept; delete it yourself after a test start. '
+                     'Playing from a .zar uses some extra CPU (slightly longer loads, possible '
+                     'hitches on slower CPUs).'),
+    'pack_zar_need_folder': 'Pick the game folder first (a folder, not a .zar).',
+    'pack_zar_running': 'Packing the game: {line}',
+    'pack_zar_done': 'Packed into {path}. The game setting now points at the .zar.',
+    'pack_zar_failed': 'Packing failed: {error}',
     'texpack_dir': 'Texture packs folder (empty = default)',
     'texture_pack': 'Texture pack',
     'texture_pack_off': 'Off (original textures)',
@@ -884,7 +898,7 @@ def scroll_area(parent, padding=12):
 
 def art_path(settings, name):
     """Official art from the user's own dump (sce_sys); never shipped with the port."""
-    for folder in (Path(settings['game_dir']) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
+    for folder in (Path(game_image.safe_files_dir(settings['game_dir'])) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
         if (folder / name).is_file():
             return folder / name
     return None
@@ -1224,12 +1238,18 @@ class Launcher:
             ttk.Entry(game, textvariable=var).grid(row=row * 2 + 1, column=0, sticky='ew', pady=(0, 6))
             ttk.Button(game, text=self.t('browse'), command=lambda k=key: self.browse(k)).grid(
                 row=row * 2 + 1, column=1, padx=(6, 0), pady=(0, 6))
+            if key == 'game_dir':  # a packed game (.zar, issue #72): pick one, or make one
+                zar = ttk.Button(game, text=self.t('browse_zar'), command=self.browse_zar)
+                zar.grid(row=1, column=2, padx=(6, 0), pady=(0, 6))
+                add_tooltip(zar, self.t('browse_zar_tip'))
+                pack = ttk.Button(game, text=self.t('pack_zar'), command=self.pack_zar)
+                pack.grid(row=1, column=3, padx=(6, 0), pady=(0, 6))
+                add_tooltip(pack, self.t('pack_zar_tip'))
         self.vars['texpack_dir'].trace_add('write', lambda *_: self.refresh_texture_pack())
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
         self.check(audio, 0, 'native_audio')
         self.build_sound_output(audio)
-        self.build_drool(left)
 
         lang = section(right, self.t('language'))
         lang.grid(sticky='ew', pady=(0, 8))
@@ -1282,12 +1302,12 @@ class Launcher:
             row=4, column=0, sticky='w')
 
     def build_drool(self, parent):
-        """Trico's drool on the Settings page, with its story in plain sight: the developers built it
+        """Built-in mods on the Mods page: Trico's drool, with its story in plain sight: the developers built it
         and switched it off just before release (tlg.ini trico_drool; the game reads it live, also from
         the in-game Fun tab)."""
         drool = next(item for item in backports_table.MENU if item.key == 'trico_drool')
         box = section(parent, drool.name)
-        box.grid(sticky='ew', pady=(8, 0))
+        box.pack(fill='x', anchor='w', pady=(0, 8))
         values = [choice[0] for choice in drool.choices]
         combo = ttk.Combobox(box, values=[choice[1] for choice in drool.choices], state='readonly', width=28)
         chosen = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').get('trico_drool', drool.default)
@@ -1302,6 +1322,30 @@ class Launcher:
         combo.bind('<<ComboboxSelected>>', lambda _: picked())
         ttk.Label(box, text=drool.what, foreground=DIM, wraplength=420, justify='left').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
+        ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key in ('mod_treasures', 'mod_horns'):
+            item = next(i for i in backports_table.MENU if i.key == key)
+            mod = section(parent, item.name)
+            mod.pack(fill='x', anchor='w', pady=(0, 8))
+            def write(value, k=key):
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {k: value})
+                self.ini_stamp = self.ini_files_stamp()
+
+            if item.choices:  # a list setting
+                keys = [choice[0] for choice in item.choices]
+                pick = ttk.Combobox(mod, values=[choice[1] for choice in item.choices], state='readonly', width=28)
+                now = ini.get(key, item.default)
+                pick.current(keys.index(now) if now in keys else 0)
+                pick.bind('<<ComboboxSelected>>', lambda _, p=pick, ks=keys, w=write: w(ks[p.current()]))
+                pick.grid(row=0, column=0, sticky='w')
+            else:
+                var = tk.BooleanVar(value=ini.get(key, item.default) not in ('0', ''))
+                ttk.Checkbutton(mod, text=item.name, variable=var,
+                                command=lambda v=var, w=write: w('1' if v.get() else '0')
+                                ).grid(row=0, column=0, sticky='w')
+            ttk.Label(mod, text=item.what, foreground=DIM, wraplength=900, justify='left').grid(
+                row=1, column=0, sticky='w', pady=(6, 0))
 
     def build_video(self):
         """Video: display, frame rate, resolution, anti-aliasing, frame generation | video memory."""
@@ -1726,10 +1770,14 @@ class Launcher:
                       font=(SERIF, 14 if home else 11), tags='title')
         c.create_text(left, top + (44 if home else 30), text='G U A R D I A N', anchor='w', fill=TEXT_COLOR,
                       font=(SERIF, 34 if home else 22), tags='title')
-        line_y = top + (84 if home else 56)
+        # The Japanese title right under the game's title, as it means the same (user 2026-11-11).
+        c.create_text(left, top + (76 if home else 50), text='人喰いの大鷲トリコ',
+                      anchor='w', fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11 if home else 9),
+                      tags='title')
+        line_y = top + (100 if home else 66)
         c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
-        # This port's name under the game's title on every page (Japanese title removed, user 2026-11-10).
-        c.create_text(left, 198 if home else 130, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
+        # This port's name under the titles on every page (English only).
+        c.create_text(left, 214 if home else 140, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
                       anchor='w', fill=ACCENT, font=(SERIF, 10 if home else 7), tags='title')
         if home:
             c.create_line(left, 244, left + 46, 244, fill=ACCENT)
@@ -1742,6 +1790,7 @@ class Launcher:
                  ('home_graphics', 'graphics', self.graphics_dialog),
                  ('home_controls', 'controls', self.controller_dialog),
                  ('home_advanced', 'advanced', self.advanced_dialog),
+                 ('home_mods', 'mods', self.mods_dialog),
                  ('home_start', 'start', self.start_dialog),
                  ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
@@ -2243,6 +2292,7 @@ class Launcher:
         frame = ttk.Frame(win, padding=12)
         frame.pack(fill='both', expand=True)
         self.show_page('mods')
+        self.build_drool(frame)  # built-in mods (tlg.ini, live in game) above the cheat files
         ttk.Label(frame, text=self.t('mods_warning'), foreground='#d07060', wraplength=900, justify='left').pack(
             anchor='w', pady=(4, 8))
 
@@ -2587,6 +2637,36 @@ class Launcher:
         path = filedialog.askdirectory(initialdir=self.vars[key].get() or str(Path.home()))
         if path:
             self.vars[key].set(path)
+
+    def browse_zar(self):
+        current = self.vars['game_dir'].get()
+        path = filedialog.askopenfilename(initialdir=str(Path(current).parent) if current else str(Path.home()),
+                                          filetypes=[('ZArchive', '*.zar'), ('*', '*')])
+        if path:
+            self.vars['game_dir'].set(path)
+
+    def pack_zar(self):
+        folder = self.vars['game_dir'].get()
+        if not folder or not Path(folder).is_dir():
+            messagebox.showinfo(TITLE, self.t('pack_zar_need_folder'))
+            return
+        path = filedialog.asksaveasfilename(initialdir=str(Path(folder).parent), initialfile=Path(folder).name + '.zar',
+                                            defaultextension='.zar', filetypes=[('ZArchive', '*.zar')])
+        if not path:
+            return
+
+        def show(text):
+            self.root.after(0, lambda: self.status.configure(text=text))
+
+        def work():
+            try:
+                game_image.pack(folder, path, lambda line: show(self.t('pack_zar_running').format(line=line)))
+            except Exception as error:
+                self.root.after(0, lambda: messagebox.showerror(TITLE, self.t('pack_zar_failed').format(error=error)))
+                return
+            self.root.after(0, lambda: (self.vars['game_dir'].set(path),
+                                        messagebox.showinfo(TITLE, self.t('pack_zar_done').format(path=path))))
+        threading.Thread(target=work, daemon=True).start()
 
     def open(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)

@@ -78,7 +78,7 @@ static std::span<const u32> NextPacket(std::span<const u32> span, size_t offset)
 
 Liverpool::Liverpool() : guest_markers_enabled{EmulatorSettings.IsVkGuestMarkersEnabled()} {
     num_counter_pairs = Libraries::Kernel::sceKernelIsNeoMode() ? 16 : 8;
-    process_thread = std::jthread{std::bind_front(&Liverpool::Process, this)};
+    process_thread = std::jthread{[this](std::stop_token st) { Process(st); }};
 }
 
 Liverpool::~Liverpool() {

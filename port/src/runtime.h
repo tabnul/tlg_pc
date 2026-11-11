@@ -74,6 +74,7 @@ uintptr_t runtime_tlg_resolve(const char *name);
 void runtime_file_report(void);
 void runtime_file_configure(const char *app0, const char *user);
 int runtime_file_mount(const char *guest, const char *host);
+int runtime_file_is_archive_name(const char *path); /* game image chosen by a .zar name */
 void runtime_file_unmount(const char *guest);
 int runtime_file_translate(const char *guest, char *out, size_t size);
 int64_t runtime_file_open(const char *path, int flags, int mode);

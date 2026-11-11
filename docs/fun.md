@@ -14,6 +14,7 @@ Open the in-game menu with **Insert** (or **R3 + L2** on a controller) and go to
 ## Contents
 
 - [Trico's drool](#tricos-drool), a feature cut just before release
+- [Outfits and ICO horns](#outfits-and-ico-horns)
 - [Trico's size](#tricos-size)
 - [Extra Tricos](#extra-tricos)
 - [Trico's eyes](#tricos-eyes)
@@ -49,6 +50,27 @@ also while you play, and the choice is kept for the next start. Off by default.
 
 ![Trico drooling](screenshots/fun/drool.jpg)
 ![Trico drooling, close up](screenshots/fun/drool2.jpg)
+
+## Outfits and ICO horns
+
+Find the treasures and the boy gets new clothes. Horned Apparel is the Ico one. The script even
+calls it "the horned garment", yet there are no horns. So we added them. Tick **ICO horns** in
+the launcher's Mods page or in the in-game menu. They go with every outfit. 
+
+We don't ship the horns as a file. The launcher builds them on your PC when you start the game:
+a small script draws the shape, the colour and the hair tuft from scratch. Not a single byte comes
+from the game disc, and there's no model file to pass around.
+
+<p align="center"><img src="screenshots/fun/treasures.jpg" width="100%" alt="The Items menu with all the treasures"></p>
+
+<p align="center"><img src="screenshots/fun/outfits.jpg" width="100%" alt="The boy in Enduring Attire, Homecoming, Warrior, Horned Apparel, and Horned Apparel with ICO horns, and from behind with the Featherpainter idol"></p>
+
+<p align="center"><sub>Enduring Attire · Homecoming Costume · Warrior's Clothes · Horned Apparel · Horned Apparel + ICO horns · the Fine Featherpainter on his back</sub></p>
+
+Trico gets one too: the **Badge of Honour**, around his neck. He may not have earned it yet, but he
+sure can wear it in our port.
+
+<p align="center"><img src="screenshots/fun/badge-of-honor.jpg" width="70%" alt="Trico wearing the Badge of Honour"></p>
 
 ## Trico's size
 

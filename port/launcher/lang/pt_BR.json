@@ -360,7 +360,15 @@
     "launcher.aa": "Anti-aliasing",
     "launcher.aa_game": "Desligado (só o do jogo)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo."
+    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo.",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Experimental: Escolha um arquivo de jogo compactado (.zar) em vez de uma pasta. O jogo descompacta dados enquanto você joga, o que custa um pouco de CPU: os carregamentos podem demorar um pouco mais e pode haver travadas em CPUs mais lentas. Uma pasta normal é o mais rápido.",
+    "launcher.pack_zar": "Compactar…",
+    "launcher.pack_zar_tip": "Experimental: Compacta a pasta do jogo em um único arquivo .zar que o port lê diretamente (economiza espaço). A pasta é mantida; apague-a você mesmo após um início de teste. Jogar a partir de um .zar usa um pouco mais de CPU (carregamentos um pouco mais longos, possíveis travadas em CPUs mais lentas).",
+    "launcher.pack_zar_need_folder": "Escolha primeiro a pasta do jogo (uma pasta, não um .zar).",
+    "launcher.pack_zar_running": "Compactando o jogo: {line}",
+    "launcher.pack_zar_done": "Compactado em {path}. A configuração do jogo agora aponta para o .zar.",
+    "launcher.pack_zar_failed": "Falha ao compactar: {error}"
   },
   "items": {
     "menu:sharpen": {
@@ -665,6 +673,14 @@
       "name": "Fences assíncronas",
       "what": "Sinaliza as fences do jogo quando as cópias de memória antes delas terminam, em vez de esperar por elas.",
       "why": "Medido mais lento (79 contra 83 FPS): o jogo espera por essas fences."
+    },
+    "menu:mod_treasures": {
+      "name": "Todos os tesouros",
+      "what": "Desbloqueia todos os tesouros (roupas, penas do Trico) e a entrada Tesouros no menu de opções, com o desbloqueio dos próprios desenvolvedores. Fica salvo no seu save: desligar não os remove. Seus saves são copiados antes do primeiro desbloqueio (o gerenciador de saves do launcher pode restaurá-los). Escolha-os no menu de pausa do jogo, em Itens."
+    },
+    "menu:mod_horns": {
+      "name": "Chifres do ICO",
+      "what": "O menino usa chifres, uma homenagem a Ico: branco-osso com a ponta preta. Podem ser combinados com a roupa do Ico do próprio jogo (um dos tesouros)."
     }
   },
   "menu": {
@@ -947,6 +963,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "Desligada agora: o jogo roda a 30 FPS (modo de taxa de quadros ou limite de taxa de quadros), baixo demais para a geração de quadros. Sua escolha volta com uma taxa maior.",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "Com o VSync ligado, a taxa de atualização da tela deve ser pelo menos o dobro da taxa de quadros do jogo.",
     "Anti-aliasing": "Anti-aliasing",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo."
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo.",
+    "Mods": "Mods",
+    "All treasures": "Todos os tesouros",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Desbloqueia todos os tesouros (roupas, penas do Trico) e a entrada Tesouros no menu de opções, com o desbloqueio dos próprios desenvolvedores. Fica salvo no seu save: desligar não os remove. Seus saves são copiados antes do primeiro desbloqueio (o gerenciador de saves do launcher pode restaurá-los). Escolha-os no menu de pausa do jogo, em Itens.",
+    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures).": "O menino usa chifres, uma homenagem a Ico: branco-osso com a ponta preta. Podem ser combinados com a roupa do Ico do próprio jogo (um dos tesouros).",
+    "ICO horns": "Chifres do ICO"
   }
 }

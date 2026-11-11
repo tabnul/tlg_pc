@@ -146,6 +146,15 @@ MENU = [
           "A feature the developers built and then switched off just before release: Trico drools. Always: a string of drool hangs from his beak the whole time. As the developers planned: it slowly grows while Trico smells something he wants, a smell-pot cart (s04_FirstAntenna and s10_Pit), and fades away when he loses interest (the boy's smell bottle was cut, so the carts are the only trigger). Stays on through jumps, new stages and extra Tricos, and is kept for the next start.",
           choices=(('0', 'Off (as released)'), ('1', 'Always'),
                    ('2', 'As the developers planned'))),
+    # Mods (launcher Mods page, in-game Fun tab; tlg_lua.cpp Treasures / Horns). Same text as tlg_overlay.cpp.
+    _menu('Fun', 'mod_treasures', 'bool', '0', 'All treasures',
+          'Unlocks every treasure (outfits, Trico\'s feathers) and the Treasures entry in the options menu, '
+          'with the developers\' own unlock. Stored in your save: turning it off does not take them back. '
+          'Your saves are backed up before the first unlock (the launcher\'s save manager can restore them). '
+          'Select them in the game\'s pause menu, under Items.'),
+    _menu('Fun', 'mod_horns', 'bool', '0', 'ICO horns',
+          'The boy wears horns, a nod to Ico: bone white with a black tip. '
+          'Can be combined with the game\'s own Ico outfit (one of the treasures).'),
     _menu('Performance', 'frames_queued', 'choice', '1', 'Frames queued',
           'More frames queued: steadier FPS, slower response to input.',
           choices=(('1', '1 (lowest latency)'), ('2', '2'),
