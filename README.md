@@ -68,8 +68,8 @@ Each setting shows what the game originally used and what we recommend.
   included. It needs a game frame rate above 30, so it is off at 30 FPS. Off by default.
 - **Frame rate:** 30 (as on PS4), 60 or unlocked. On an RTX 5090, unlocked runs at about 90-120 FPS.
 - **Steam Deck (experimental):** one button in the launcher's Video page sets the game up for a
-  Steam Deck: 1280x800, 30 FPS, no upscaling, frame generation off and shadows at 1x. Your other
-  graphics settings stay as they are. It is new and still being tuned: tell us how it runs.
+  Steam Deck: 1280x800, 30 FPS, no upscaling, frame generation off, and every graphics setting
+  back to Stock (as on PS4). It is new and still being tuned: tell us how it runs.
 - **Shader stutter:** shaders are prepared at start from shader recipes (from
   [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by @deadinside28), so new
   drivers and updates don't bring the stutter back.

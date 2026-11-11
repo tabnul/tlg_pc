@@ -54,14 +54,14 @@ GAME_RECOMMENDED = {'dlaa': '1', 'smaa': '0', 'fsr1': '0', 'sharpen': '1', 'shar
                     'texture_pack': 'off'}
 GAME_STOCK = {**GAME_RECOMMENDED, 'dlaa': '0', 'sharpen': '0', 'lod_bias': '0', 'aniso': '0', 'grass_smooth': '0',
               'haze_fringe': '100', 'color_adjust': '0', 'color_gamma': '1.00'}
-
-# Steam Deck (experimental): the machine settings for the Deck's own screen, not a look preset
-# (Stock, Recommended and the player's own stay as they are). Native 1280x800 at the game's own
-# 30 FPS, no upscaler (they cost more than they give on that chip), frame generation off (too low
-# a base frame rate) and shadows at the game's own size (2x and 4x halve the frame rate there).
+# Steam Deck (experimental): the machine settings for the Deck's own screen plus the Stock look
+# (the game as shipped on PS4, the lightest one), so the button always ends in one known state.
+# Native 1280x800 at the game's own 30 FPS, no upscaler (they cost more than they give on that
+# chip), frame generation off (too low a base frame rate), shadows at the game's own size (2x
+# and 4x halve the frame rate there) and no texture pack.
 DECK_SETTINGS = {'resolution': '1280x800', 'frame_rate': '30'}
-DECK_INI = {'upscaler': 'off', 'aa_row': '1', 'preset': '0', 'dlaa': '0', 'frame_generation': '0',
-            'shadow_scale': '1'}
+DECK_INI = {**GAME_STOCK, 'upscaler': 'off', 'aa_row': '1', 'preset': '0', 'dlaa': '0',
+            'frame_generation': '0'}
 
 
 def game_presets(folder):

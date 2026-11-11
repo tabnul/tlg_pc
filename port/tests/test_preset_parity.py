@@ -79,12 +79,9 @@ class DeckPreset(unittest.TestCase):
         self.assertIn(preset_share.DECK_SETTINGS['resolution'], tlg_run.RESOLUTIONS)
         self.assertIn(preset_share.DECK_SETTINGS['frame_rate'], tlg_run.FRAME_RATES)
 
-    def test_keeps_the_look_presets(self):
-        # Only shadow_scale is also a look setting; it must be the Recommended (and Stock) value,
-        # so picking the Deck preset never turns Stock or Recommended into Custom by itself.
-        for key, value in preset_share.DECK_INI.items():
-            if key in preset_share.GAME_RECOMMENDED and key != 'dlaa':
-                self.assertEqual(value, preset_share.GAME_RECOMMENDED[key], key)
+    def test_look_is_stock(self):
+        # The button ends in the Stock look: the preset list shows Stock after it, not Custom.
+        self.assertTrue(preset_share.game_preset_matches(preset_share.DECK_INI, preset_share.GAME_STOCK))
 
 
 if __name__ == '__main__':

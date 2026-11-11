@@ -131,9 +131,9 @@ TEXT = {
     'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
     'fps_30': '30 FPS (as on PS4)',
     'deck_preset': 'Steam Deck (experimental)',
-    'deck_preset_hint': ('Sets this page for a Steam Deck: 1280x800, 30 FPS, no upscaling (built-in '
-                         'anti-aliasing), frame generation off and shadows at 1x. Your other graphics settings stay '
-                         'as they are. Experimental: tell us how it runs.'),
+    'deck_preset_hint': ('Sets the game up for a Steam Deck: 1280x800, 30 FPS, no upscaling (built-in '
+                         'anti-aliasing), frame generation off, and every graphics setting back to Stock '
+                         '(as on PS4), without a texture pack. Experimental: tell us how it runs.'),
     'fps_60': '60 FPS',
     'fps_unlocked': 'Unlocked (up to the display)',
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '

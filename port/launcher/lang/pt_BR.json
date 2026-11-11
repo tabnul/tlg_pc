@@ -83,7 +83,7 @@
     "launcher.resolution_hint": "Renderizado nativamente; mais largo que 16:9 mostra mais da cena e leva o HUD às bordas",
     "launcher.fps_30": "30 FPS (como no PS4)",
     "launcher.deck_preset": "Steam Deck (experimental)",
-    "launcher.deck_preset_hint": "Ajusta esta página para um Steam Deck: 1280x800, 30 FPS, sem upscaling e com o anti-aliasing do próprio jogo, geração de quadros desligada e sombras em 1x. Suas outras configurações gráficas ficam como estão. Experimental: conte para nós como roda.",
+    "launcher.deck_preset_hint": "Prepara o jogo para um Steam Deck: 1280x800, 30 FPS, sem upscaling (anti-aliasing do próprio jogo), geração de quadros desligada e todas as configurações gráficas de volta ao Original (como no PS4), sem pacote de texturas. Experimental: conte para nós como roda.",
     "launcher.fps_60": "60 FPS",
     "launcher.fps_unlocked": "Livre (até a taxa do monitor)",
     "launcher.fps_hint": "60/livre alteram o eboot 1.03 na memória. Livre reduz a taxa base em cerca de 10 FPS em relação a 60 no mesmo lugar; escolha 60, a não ser que seu PC rode bem acima de 60",
