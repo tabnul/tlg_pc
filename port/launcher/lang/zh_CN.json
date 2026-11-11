@@ -976,6 +976,7 @@
     "All treasures": "全部宝物",
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "使用开发者自己的解锁功能，解锁所有宝物（服装、Trico 的羽毛）以及选项菜单中的“宝物”项。保存在存档中：关闭后不会收回。首次解锁前会备份你的存档（启动器的存档管理可以恢复）。可在游戏暂停菜单的“物品”中选择。",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年戴上角，向《ICO》致敬。可与游戏自带的 Ico 服装（宝物之一）搭配。请先在启动器中开启一次：启动器会在你的电脑上生成角的模型。",
-    "ICO horns": "ICO 的角"
+    "ICO horns": "ICO 的角",
+    "Turn on ICO horns in the launcher (Mods page) once first.": "请先在启动器（Mods 页面）中开启一次 ICO 角。"
   }
 }

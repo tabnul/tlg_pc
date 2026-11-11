@@ -1342,11 +1342,29 @@ void FunTab() {
                     "Your saves are backed up before the first unlock (the launcher's save manager can restore them). "
                     "Select them in the game's pause menu, under Items."),
                  false);
+        // The horn models only exist after the launcher built them (Mods page); the game mounts
+        // them at start (runtime_file.c), so check once: without them the checkmark does nothing.
+        static const bool horns_built = [] {
+            const char* ini = std::getenv("TLG_CONFIG");
+            std::string dir = ini && ini[0] ? ini : "tlg.ini";
+            const size_t slash = dir.find_last_of("/\\");
+            dir = slash == std::string::npos ? std::string(".") : dir.substr(0, slash);
+            FILE* file = std::fopen((dir + "/mods-builtin/trico_other.psarc").c_str(), "rb");
+            if (file) std::fclose(file);
+            return file != nullptr;
+        }();
+        ImGui::BeginDisabled(!horns_built);
         CheckRow(TR("ICO horns"), TlgSettings::Get().mod_horns,
                  TR("The boy wears horns, a nod to Ico. "
                     "Can be combined with the game's own Ico outfit (one of the treasures). "
                     "Turn it on in the launcher once first: the launcher builds the horn models on your PC."),
                  false);
+        ImGui::EndDisabled();
+        if (!horns_built) {
+            Row("");
+            ImGui::TextDisabled("%s", TR("Turn on ICO horns in the launcher (Mods page) once first."));
+            ImGui::PopID();
+        }
         ImGui::EndTable();
     }
 }

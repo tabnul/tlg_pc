@@ -976,6 +976,7 @@
     "All treasures": "すべての宝物",
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年が角を身に着けます。ICOへのオマージュです。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。まずランチャーで一度オンにしてください。ランチャーがお使いの PC で角のモデルを作成します。",
-    "ICO horns": "ICOの角"
+    "ICO horns": "ICOの角",
+    "Turn on ICO horns in the launcher (Mods page) once first.": "まずランチャー（Mods ページ）で ICO の角を一度オンにしてください。"
   }
 }

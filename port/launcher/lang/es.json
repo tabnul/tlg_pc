@@ -976,6 +976,7 @@
     "All treasures": "Todos los tesoros",
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Desbloquea todos los tesoros (atuendos, plumas de Trico) y la entrada Tesoros del menú de opciones, con el desbloqueo de los propios desarrolladores. Se guarda en tu partida: desactivarlo no los retira. Tus partidas se copian antes del primer desbloqueo (el gestor de partidas del launcher puede restaurarlas). Elígelos en el menú de pausa del juego, en Objetos.",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "El niño lleva cuernos, un guiño a Ico. Se pueden combinar con el atuendo de Ico del propio juego (uno de los tesoros). Actívalo primero una vez en el launcher: el launcher crea los modelos de los cuernos en tu PC.",
-    "ICO horns": "Cuernos de ICO"
+    "ICO horns": "Cuernos de ICO",
+    "Turn on ICO horns in the launcher (Mods page) once first.": "Activa primero una vez los cuernos de ICO en el launcher (página Mods)."
   }
 }
