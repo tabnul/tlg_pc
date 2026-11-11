@@ -152,12 +152,15 @@ that is still in `condorcommonslaver.lua`:
 
 <p align="center"><a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool.jpg" width="49%" alt="Trico drooling"></a> <a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool2.jpg" width="49%" alt="Trico drooling, close up"></a></p>
 
-**ICO horns.** One of the boy's treasure outfits, Horned Apparel, is the Ico one. The script
-calls it "the horned garment", yet there are no horns. So we added them: tick **ICO horns** in
-the launcher's Mods page or in the in-game menu. They go with every outfit,
-[more on the fun page](docs/fun.md#outfits-and-ico-horns).
+### ICO horns, only in this port
 
-<p align="center"><a href="docs/fun.md#outfits-and-ico-horns"><img src="docs/screenshots/fun/outfits.jpg" width="100%" alt="The boy in Enduring Attire, Homecoming, Warrior, Horned Apparel, and Horned Apparel with ICO horns, and from behind with the Featherpainter idol"></a></p>
+The Horned Apparel finally gets its horns. One of the boy's
+treasure outfits is the Ico one, and the game's own script calls it "the horned garment", but the
+boy never had any. Now he does: bone white with a black tip, just like Ico. Tick **ICO horns** on
+the launcher's Mods page. They go with every outfit,
+[more on the fun page](docs/fun.md#made-for-ico-fans-ico-horns).
+
+<p align="center"><a href="docs/fun.md#made-for-ico-fans-ico-horns"><img src="docs/screenshots/fun/outfits.jpg" width="100%" alt="The boy in Enduring Attire, Homecoming, Warrior, Horned Apparel, and Horned Apparel with ICO horns, and from behind with the Featherpainter idol"></a></p>
 
 **Trico's toilet.** Trico does need to go, but the game's scripts make sure you almost never see
 it. He has to have eaten enough barrels, then 30 minutes of play must pass, then he waits until
