@@ -131,9 +131,6 @@ TEXT = {
     'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
     'fps_30': '30 FPS (as on PS4)',
     'deck_preset': 'Steam Deck (experimental)',
-    'deck_preset_hint': ('Sets the game up for a Steam Deck: 1280x800, 30 FPS, no upscaling (built-in '
-                         'anti-aliasing), frame generation off, and every graphics setting back to Stock '
-                         '(as on PS4), without a texture pack. Experimental: tell us how it runs.'),
     'fps_60': '60 FPS',
     'fps_unlocked': 'Unlocked (up to the display)',
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
@@ -355,10 +352,12 @@ TEXT = {
     'shadow_game': 'Game (2048)',
     'graphics_preset': 'Graphics preset',
     'graphics_preset_hint': ('All look settings and the texture pack at once. Stock is the game as shipped; '
-                             'save your own here or in the in-game menu (Insert, Image tab).'),
+                             'save your own here or in the in-game menu (Insert, Image tab). Steam Deck '
+                             '(experimental) is Stock plus 1280x800, 30 FPS, no upscaling and frame '
+                             'generation off: tell us how it runs.'),
     'preset_save': 'Save as preset',
     'preset_save_button': 'Save',
-    'preset_save_bad': 'Type a name (letters, digits, space, - or _; not Stock or Recommended).',
+    'preset_save_bad': 'Type a name (letters, digits, space, - or _; not Stock, Recommended or Steam Deck).',
     'preset_stock': 'Stock (as shipped)',
     'preset_recommended': 'Recommended (default)',
     'preset_custom': 'Custom',
@@ -1329,9 +1328,6 @@ class Launcher:
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
-        ttk.Button(video, text=self.t('deck_preset'), command=self.deck_preset_picked).grid(
-            row=3, column=0, columnspan=2, sticky='w', pady=(6, 4))
-        self.hint(video, 3, 2, 'deck_preset_hint')
         self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'),
                    on_change=lambda: (self.update_fg(), self.refresh_status()))
         self.hint(video, 5, 2, 'fps_hint')
@@ -2051,16 +2047,16 @@ class Launcher:
         self.refresh_preset()
 
     def preset_label(self, index, name):
-        return self.t('preset_stock') if index == 0 else self.t('preset_recommended') if index == 1 else name
+        builtin = ('preset_stock', 'preset_recommended', 'deck_preset')
+        return self.t(builtin[index]) if index < len(builtin) else name
 
     def refresh_preset(self):
         """Lists the presets (the folder may have new ones) and shows the one tlg.ini equals."""
-        self.presets = preset_share.game_presets(tlg_run.USER_DIR / 'presets')
+        self.presets = preset_share.launcher_presets(tlg_run.USER_DIR / 'presets')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         names = [self.preset_label(i, name) for i, (name, _) in enumerate(self.presets)]
         self.preset_box.configure(values=names, postcommand=self.refresh_preset)
-        current = next((i for i, (_, values) in enumerate(self.presets)
-                        if preset_share.game_preset_matches(ini, values)), -1)
+        current = preset_share.current_preset(self.presets, ini, self.settings)
         self.preset_box.set(names[current] if current >= 0 else self.t('preset_custom'))
 
     def preset_picked(self):
@@ -2070,21 +2066,15 @@ class Launcher:
         tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
         tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', self.presets[index][1])
         self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
-        self.reload_ini()
-
-    def deck_preset_picked(self):
-        """Steam Deck (experimental): preset_share.DECK_SETTINGS and DECK_INI, then the rows again."""
-        self.settings.update(preset_share.DECK_SETTINGS)
-        tlg_run.save_settings(self.settings)
-        for key, value in preset_share.DECK_SETTINGS.items():
-            box, values = self.combo_boxes[key]
-            box.current(values.index(value))
-        tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
-        tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', preset_share.DECK_INI)
-        self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        if index == preset_share.DECK_INDEX:  # the Steam Deck entry: its resolution and frame rate too
+            self.settings.update(preset_share.DECK_SETTINGS)
+            tlg_run.save_settings(self.settings)
+            for key, value in preset_share.DECK_SETTINGS.items():
+                box, values = self.combo_boxes[key]
+                box.current(values.index(value))
+            self.refresh_status()
         self.reload_ini()
         self.refresh_preset()
-        self.refresh_status()
 
     def filters_changed(self):
         values = {'color_adjust': int(self.ini_vars['color_adjust'].get()),

@@ -80,8 +80,19 @@ class DeckPreset(unittest.TestCase):
         self.assertIn(preset_share.DECK_SETTINGS['frame_rate'], tlg_run.FRAME_RATES)
 
     def test_look_is_stock(self):
-        # The button ends in the Stock look: the preset list shows Stock after it, not Custom.
         self.assertTrue(preset_share.game_preset_matches(preset_share.DECK_INI, preset_share.GAME_STOCK))
+
+    def test_shown_in_the_list(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            presets = preset_share.launcher_presets(folder)
+            self.assertIsNone(preset_share.save_game_preset(folder, preset_share.DECK_NAME, {}))
+        self.assertEqual(presets[preset_share.DECK_INDEX][0], preset_share.DECK_NAME)
+        deck, other = preset_share.DECK_SETTINGS, {'resolution': '1920x1080', 'frame_rate': '60'}
+        # With the Deck's screen settings the list shows the Deck entry, without them Stock.
+        self.assertEqual(preset_share.current_preset(presets, preset_share.DECK_INI, deck), preset_share.DECK_INDEX)
+        self.assertEqual(preset_share.current_preset(presets, preset_share.DECK_INI, other), 0)
+        self.assertEqual(preset_share.current_preset(presets, preset_share.GAME_RECOMMENDED, deck), 1)
 
 
 if __name__ == '__main__':
