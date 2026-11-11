@@ -259,12 +259,15 @@ void Presenter::RecordFrameGeneration(Frame* frame) {
         Dlss* dlss = Dlss::Get();
         fg_state = dlss && dlss->FgAvailable() ? 1 : 0;
         std::printf("Frame generation: %s\n", fg_state ? "available" : "not available");
+        TlgSettings::ConfigureDlssFgSupport(fg_state != 0);
     }
     TemporalUpscaler::FgInputs inputs{};
     const bool have_inputs = rasterizer->GetUpscaler().TakeFgInputs(inputs);
     // Live switch. A change frees the old data; on starts without the old frames. A failed mode
     // stays off until the setting changes.
-    const int setting = TlgSettings::Get().frame_generation;
+    // tlg: the setting as it may run now: off at a 30 FPS game rate (launch mode, limit, end
+    // credits, slow motion scenes), see TlgSettings::EffectiveFrameGeneration.
+    const int setting = TlgSettings::EffectiveFrameGeneration();
     if (setting != fg_failed) {
         fg_failed = 0;
     }

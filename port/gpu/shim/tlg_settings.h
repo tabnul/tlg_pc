@@ -26,9 +26,6 @@ inline bool IsFsr4(int upscaler) {
 /// is a startup patch: a change takes a restart.
 enum Preset : int { NativeAA = 0, Quality, Balanced, Performance, UltraPerformance, Super150, Super200,
                     PresetCount };
-/// The menus offer Native AA .. Ultra Performance; supersampling is experimental (tlg.ini
-/// preset=5/6 or TLG_UPSCALE_PRESET) and only listed while selected.
-constexpr int MenuPresetCount = Super150;
 enum DebugView : int { DebugNone = 0, DebugReactive = 1, DebugMotion = 2, DebugViewCount };
 
 /// Live output resolutions: the upscaler's output and the UI host targets.
@@ -171,6 +168,9 @@ struct Values {
     /// DLSS (tlg_dlss.dll, NVIDIA RTX) is ready, or why not (null before the device exists).
     std::atomic<bool> dlss_supported{false};
     std::atomic<const char*> dlss_problem{nullptr};
+    /// DLSS frame generation (NVIDIA RTX 40 or newer) can run: -1 not checked yet, 0 no, 1 yes.
+    /// Set by the presenter on its first frame.
+    std::atomic<int> dlss_fg_supported{-1};
 
     // Mouse and keyboard (src/runtime_pad.c through tlggpu_input_settings, src/mouse_stick.h):
     // the mouse turns the camera (right stick). Live from the menu.
@@ -217,6 +217,14 @@ void Load();
 void ConfigureUpscalerSupport(bool fsr4, bool fsr411);
 /// After device creation: DLSS availability; a DLSS setting falls back to FSR 3.1 without it.
 void ConfigureDlssSupport(bool available, const char* problem);
+/// The presenter's DLSS frame generation check; kept in tlg.ini (dlss_fg_supported) for the launcher.
+void ConfigureDlssFgSupport(bool available);
+/// The frame rate settings rule frame generation out: the game runs at 30 FPS (launch mode or
+/// Frame rate limit), where the made-up images stay on screen too long. The menus grey the row out.
+bool FrameGenerationBlocked();
+/// frame_generation as it really runs: 0 while blocked, while the end credits or a slow motion
+/// scene hold the game at 30 FPS, and for DLSS on a card without it. The stored choice stays.
+int EffectiveFrameGeneration();
 /// The selected upscaler does not work here: runs FSR 3.1, while Save keeps the selection.
 void FallBackToFsr3();
 /// Startup-patched scene dimensions cannot change until the launcher prepares a new image.

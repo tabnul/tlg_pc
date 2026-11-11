@@ -2,9 +2,14 @@
  *   /app0, /hostapp  -> game package root (read-only by convention)
  *   /temp0, /download0, /data, and mounts added by SaveData -> user directory
  * Guest descriptors are small integers in our own table; stdio 0-2 pass through.
- * Paths containing ".." components are rejected rather than normalized. */
+ * Paths containing ".." components are rejected rather than normalized.
+ * /app0 can also be a packed ZArchive (.zar) game image (issue #72): the same guest paths resolve
+ * inside the archive and reads decompress only the 64 KiB blocks they touch. A host mount over
+ * part of /app0 (mod overlays) still wins for its path: the longest mount matches first. */
 #define _GNU_SOURCE
 #include "runtime.h"
+#include "runtime_zarchive.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,8 +59,9 @@ typedef struct { char *names; size_t count, *offsets; unsigned char *types; } Li
  * inFAMOUS say "the disc or hard disk is corrupted" at the graffiti. Reads at the position go
  * through compat_pread like pread. */
 typedef struct { int used, host; Listing *dir; size_t position; char path[512];
-                 int64_t offset; int append; pthread_mutex_t io; } File;
-typedef struct { char guest[64]; char host[512]; } Mount;
+                 int64_t offset; int append; pthread_mutex_t io;
+                 ZArchive *archive; int64_t node; uint64_t size; } File; /* archive: host is -1 */
+typedef struct { char guest[64]; char host[512]; ZArchive *archive; } Mount;
 static File files[MAX_FILES];
 static Mount mounts[MAX_MOUNTS];
 static size_t mount_count, opens, reads, writes, missing;
@@ -63,19 +69,23 @@ static size_t bounce_reads, direct_reads; /* TLG_FILE_DIRECT: which path each ch
 static uint64_t bytes_read;
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 
-int runtime_file_mount(const char *guest,const char *host) {
+/* guest=host, or guest=archive (host empty). */
+static int mount_point(const char *guest,const char *host,ZArchive *archive) {
     pthread_mutex_lock(&lock);
     for (size_t i=0;i<mount_count;++i) if (!strcmp(mounts[i].guest,guest)) {
         snprintf(mounts[i].host,sizeof(mounts[i].host),"%s",host);
+        mounts[i].archive=archive;
         pthread_mutex_unlock(&lock); return 0;
     }
     if (mount_count==MAX_MOUNTS || strlen(guest)>=64 || strlen(host)>=512) { pthread_mutex_unlock(&lock); return -1; }
     snprintf(mounts[mount_count].guest,64,"%s",guest);
     snprintf(mounts[mount_count].host,512,"%s",host);
+    mounts[mount_count].archive=archive;
     ++mount_count;
     pthread_mutex_unlock(&lock);
     return 0;
 }
+int runtime_file_mount(const char *guest,const char *host) { return mount_point(guest,host,NULL); }
 void runtime_file_unmount(const char *guest) {
     pthread_mutex_lock(&lock);
     for (size_t i=0;i<mount_count;++i) if (!strcmp(mounts[i].guest,guest)) {
@@ -85,11 +95,26 @@ void runtime_file_unmount(const char *guest) {
 }
 static char user_root[512]="user";
 const char *runtime_file_user_dir(void) { return user_root; }
+/* A game image is chosen by its name (.zar), not by probing the file. */
+int runtime_file_is_archive_name(const char *path) {
+    size_t n=path ? strlen(path) : 0;
+    return n>4 && path[n-4]=='.' && tolower((unsigned char)path[n-3])=='z' &&
+           tolower((unsigned char)path[n-2])=='a' && tolower((unsigned char)path[n-1])=='r';
+}
+static ZArchive *app0_archive;
 void runtime_file_configure(const char *app0,const char *user) {
     char path[600];
     snprintf(user_root,sizeof(user_root),"%s",user);
-    runtime_file_mount("/app0",app0);
-    runtime_file_mount("/hostapp",app0);
+    if (runtime_file_is_archive_name(app0) && (app0_archive=zarchive_open(app0))) {
+        mount_point("/app0","",app0_archive);
+        mount_point("/hostapp","",app0_archive);
+        printf("Runtime: /app0 is the ZArchive %s (%.2f GiB)\n",app0,zarchive_size(app0_archive)/1073741824.0);
+    } else {
+        if (runtime_file_is_archive_name(app0))
+            printf("Runtime: %s cannot be opened as a ZArchive (%s)\n",app0,zarchive_error());
+        runtime_file_mount("/app0",app0);
+        runtime_file_mount("/hostapp",app0);
+    }
     const char *japanese=getenv("TLG_JAPANESE_FALLBACK");
     if (japanese && !strcmp(japanese,"1"))
         puts("Runtime: Japanese text fallback: French root archives hidden from guest; host files unchanged");
@@ -130,8 +155,12 @@ static int japanese_hidden_archive(const char *guest) {
            language_archive_name(p,"trico_frfp.psarc");
 }
 
-/* Resolve a guest path to a host path; returns 0 or a host errno. */
-static int translate(const char *guest,char *out,size_t size) {
+/* What a guest path resolves to inside the mounted archive (archive NULL: a host path). */
+typedef struct { ZArchive *archive; int64_t node; } ArchiveTarget;
+/* Resolve a guest path to a host path or an archive node; returns 0 or a host errno. */
+static int resolve(const char *guest,char *out,size_t size,ArchiveTarget *archive) {
+    archive->archive=NULL; archive->node=ZARCHIVE_NONE;
+    if (size) out[0]=0;
     if (!guest || !*guest) return ENOENT;
     char buffer[1024];
     if (guest[0]!='/') snprintf(buffer,sizeof(buffer),"/app0/%s",guest);
@@ -147,10 +176,21 @@ static int translate(const char *guest,char *out,size_t size) {
     }
     int result=0;
     if (!m) result=ENOENT;
+    else if (m->archive) {
+        archive->archive=m->archive;
+        archive->node=zarchive_find(m->archive,buffer+best);
+        if (archive->node==ZARCHIVE_NONE) result=ENOENT;
+    }
     else if ((size_t)snprintf(out,size,"%s%s",m->host,buffer+best)>=size) result=ENAMETOOLONG;
     pthread_mutex_unlock(&lock);
-    if (result==ENOENT) fprintf(stderr,"Runtime: no mount for guest path %s\n",guest);
+    if (result==ENOENT && !m) fprintf(stderr,"Runtime: no mount for guest path %s\n",guest);
     return result;
+}
+/* Host path only: an archive entry has none (writes there were refused as EROFS before). */
+static int translate(const char *guest,char *out,size_t size) {
+    ArchiveTarget a;
+    int e=resolve(guest,out,size,&a);
+    return e ? e : a.archive ? ENOENT : 0;
 }
 static int host_flags(int flags) {
     int r;
@@ -207,6 +247,41 @@ static Listing *list_directory(const char *path,const char *guest) {
     closedir(d);
     return l;
 }
+/* Directory listing from the archive: files 8 (DT_REG), directories 4 (DT_DIR). */
+static Listing *list_archive(ZArchive *archive,int64_t node,const char *guest) {
+    Listing *l=calloc(1,sizeof(*l));
+    if (!l) return NULL;
+    size_t capacity=0,bytes=0,cap_names=0;
+    char name[512];
+    int is_file=0;
+    for (uint32_t i=0;zarchive_child(archive,node,i,name,sizeof(name),&is_file);++i) {
+        char child_guest[1100];
+        if ((size_t)snprintf(child_guest,sizeof(child_guest),"%s/%s",guest,name)<sizeof(child_guest) &&
+            japanese_hidden_archive(child_guest)) continue;
+        size_t n=strlen(name)+1;
+        if (l->count==capacity) {
+            capacity=capacity ? capacity*2 : 64;
+            l->offsets=realloc(l->offsets,capacity*sizeof(size_t));
+            l->types=realloc(l->types,capacity);
+        }
+        if (bytes+n>cap_names) { cap_names=(bytes+n)*2; l->names=realloc(l->names,cap_names); }
+        if (!l->offsets || !l->types || !l->names) { fputs("Out of memory listing directory\n",stderr); exit(1); }
+        memcpy(l->names+bytes,name,n);
+        l->offsets[l->count]=bytes;
+        l->types[l->count]=is_file ? 8 : 4;
+        ++l->count; bytes+=n;
+    }
+    return l;
+}
+/* stat of an archive node: read-only like the folder it replaces, times 0. */
+static void archive_stat(ZArchive *archive,int64_t node,GuestStat *g) {
+    memset(g,0,sizeof(*g));
+    const int file=zarchive_is_file(archive,node);
+    g->ino=(uint32_t)node+1; g->nlink=1;
+    g->mode=(uint16_t)(file ? 0100444 : 0040555);
+    g->size=file ? (int64_t)zarchive_entry_size(archive,node) : 0;
+    g->blocks=(g->size+511)/512; g->blksize=65536;
+}
 static void convert_stat(const HostStat *s,GuestStat *g) {
     memset(g,0,sizeof(*g));
     g->dev=(uint32_t)s->st_dev; g->ino=(uint32_t)s->st_ino;
@@ -249,10 +324,32 @@ static int64_t do_open(const char *guest,int flags,int mode) {
         return -EROFS;
     }
     char path[1024];
-    int e=translate(guest,path,sizeof(path));
+    ArchiveTarget target;
+    int e=resolve(guest,path,sizeof(path),&target);
     if (e) {
-        if (runtime_verbose()) log_io_problem("open (path not translated)",guest,-e,e);
+        if (e==ENOENT && target.archive) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
+        else if (runtime_verbose()) log_io_problem("open (path not translated)",guest,-e,e);
         return -e;
+    }
+    if (target.archive) {
+        Listing *dir=NULL;
+        const int is_file=zarchive_is_file(target.archive,target.node);
+        if (!is_file) {
+            if (flags&3) return -EISDIR;
+            if (!(dir=list_archive(target.archive,target.node,guest))) return -ENOMEM;
+        } else if (flags&0x20000) return -ENOTDIR;
+        const uint64_t size=is_file ? zarchive_entry_size(target.archive,target.node) : 0;
+        pthread_mutex_lock(&lock);
+        int fd=-1;
+        for (int i=3;i<MAX_FILES;++i) if (!files[i].used) { fd=i; break; }
+        if (fd<0) { pthread_mutex_unlock(&lock); free_listing(dir); return -EMFILE; }
+        files[fd]=(File){.used=1,.host=-1,.dir=dir,.archive=target.archive,.node=target.node,.size=size};
+        pthread_mutex_init(&files[fd].io,NULL);
+        snprintf(files[fd].path,sizeof(files[fd].path),"%s",guest);
+        ++opens;
+        pthread_mutex_unlock(&lock);
+        if (audio_trace() && strstr(guest,"sound/")) printf("Audio trace: open(%s) -> fd %d, %llu bytes (archive)\n",guest,fd,(unsigned long long)size);
+        return fd;
     }
 #ifdef _WIN32
     /* Windows cannot open a directory as a CRT descriptor: directories are listings only. */
@@ -444,7 +541,25 @@ static ssize_t full_io(int h,void *buffer,uint64_t size,int64_t offset) {
     if (stalls>=64) log_read_problem("io (gave up after 64 retries)",h,size,offset,(ssize_t)done,EFAULT);
     return (ssize_t)done;
 }
+/* Archive read at offset: decompression writes the guest buffer in user mode, so GPU-protected
+ * pages fault through our handler, as with the bounce buffer's memcpy. */
+static int64_t archive_read(File *f,void *buffer,uint64_t size,int64_t offset) {
+    if (f->dir) return -EISDIR;
+    if (offset<0) return -EINVAL;
+    if ((uint64_t)offset>=f->size || !size) return 0;
+    const uint64_t n=zarchive_read(f->archive,f->node,(uint64_t)offset,buffer,size);
+    __atomic_add_fetch(&reads,1,__ATOMIC_RELAXED); __atomic_add_fetch(&bytes_read,n,__ATOMIC_RELAXED);
+    return (int64_t)n;
+}
 static int64_t do_read(int fd,void *buffer,uint64_t size) {
+    File *af=fd>=3 ? get(fd) : NULL;
+    if (af && af->archive) {
+        pthread_mutex_lock(&af->io);
+        const int64_t n=archive_read(af,buffer,size,af->offset);
+        if (n>0) af->offset+=n;
+        pthread_mutex_unlock(&af->io);
+        return n;
+    }
     int h=host_fd(fd);
     if (h<0) return -EBADF;
 #ifdef _WIN32
@@ -464,6 +579,8 @@ static int64_t do_read(int fd,void *buffer,uint64_t size) {
     return n;
 }
 static int64_t do_pread(int fd,void *buffer,uint64_t size,int64_t offset) {
+    File *af=fd>=3 ? get(fd) : NULL;
+    if (af && af->archive) return archive_read(af,buffer,size,offset);
     int h=host_fd(fd);
     if (h<0) return -EBADF;
     ssize_t n=full_io(h,buffer,size,offset);
@@ -543,6 +660,13 @@ static int64_t do_lseek(int fd,int64_t offset,int whence) {
         if (whence==0 && offset>=0) { f->position=(size_t)offset; return offset; }
         return -EINVAL;
     }
+    if (f->archive) {
+        pthread_mutex_lock(&f->io);
+        const int64_t base=whence==1 ? f->offset : whence==2 ? (int64_t)f->size : 0, r=base+offset;
+        if (r>=0) f->offset=r;
+        pthread_mutex_unlock(&f->io);
+        return r<0 ? -EINVAL : r;
+    }
 #ifdef _WIN32
     pthread_mutex_lock(&f->io);
     int64_t base=0;
@@ -564,6 +688,11 @@ static int64_t do_lseek(int fd,int64_t offset,int whence) {
 #endif
 }
 static int64_t do_fstat(int fd,GuestStat *out) {
+    File *af=fd>=3 ? get(fd) : NULL;
+    if (af && af->archive) {
+        if (!out) return -EFAULT;
+        archive_stat(af->archive,af->node,out); return 0;
+    }
     int h=host_fd(fd);
     HostStat s;
 #ifdef _WIN32
@@ -582,10 +711,11 @@ static int64_t do_fstat(int fd,GuestStat *out) {
     convert_stat(&s,out); return 0;
 }
 static int64_t do_stat(const char *guest,GuestStat *out) {
-    char path[1024]; HostStat s;
-    int e=translate(guest,path,sizeof(path));
+    char path[1024]; HostStat s; ArchiveTarget target;
+    int e=resolve(guest,path,sizeof(path),&target);
     if (e) return -e;
     if (!out) return -EFAULT;
+    if (target.archive) { archive_stat(target.archive,target.node,out); return 0; }
     if (host_stat(path,&s)) return -errno;
     convert_stat(&s,out); return 0;
 }
@@ -679,9 +809,10 @@ static int64_t do_truncate(const char *guest,int64_t length) {
 }
 static int64_t do_fsync(int fd) { int h=host_fd(fd); if (h<0) return -EBADF; return fsync(h) ? -errno : 0; }
 static int64_t do_access(const char *guest,int mode) {
-    char path[1024];
-    int e=translate(guest,path,sizeof(path));
+    char path[1024]; ArchiveTarget target;
+    int e=resolve(guest,path,sizeof(path),&target);
     if (e) return -e;
+    if (target.archive) return (mode&2) ? -EROFS : 0;
 #ifdef _WIN32
     return access(path,mode&6) ? -errno : 0; /* X_OK is invalid for the CRT */
 #else

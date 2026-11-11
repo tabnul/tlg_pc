@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # would load a second copy, and the language pack would change that copy's TEXT, not the one shown.
 sys.modules.setdefault('tlg_launcher', sys.modules[__name__])
 import backports_table  # noqa: E402
+import game_image  # noqa: E402
 import langpack  # noqa: E402
 import logtail  # noqa: E402
 import pad_page  # noqa: E402
@@ -42,7 +43,7 @@ HOME_SIZE = (1100, 620)
 BACKGROUND_NAMES = ('launcher_background.png', 'launcher_background.jpg')
 
 # The port's name stays English in every language pack, like a brand name.
-EDITION = 'Definitive Edition'
+EDITION = 'The Definitive Edition'
 TITLE = f'The Last Guardian — {EDITION}'
 
 TEXT = {
@@ -107,6 +108,19 @@ TEXT = {
     'game_dir': 'Game folder',
     'system_lib_dir': 'Console system modules',
     'browse': 'Browse…',
+    'browse_zar': '.zar…',
+    'browse_zar_tip': ('Experimental: pick a packed game file (.zar) instead of a folder. The game unpacks data while '
+                       'it plays, which costs some CPU: loads can take a bit longer and streaming '
+                       'may hitch on slower CPUs. A plain folder is fastest.'),
+    'pack_zar': 'Pack…',
+    'pack_zar_tip': ('Experimental: packs the game folder into one compressed .zar file that the port reads directly '
+                     '(saves disk space). The folder is kept; delete it yourself after a test start. '
+                     'Playing from a .zar uses some extra CPU (slightly longer loads, possible '
+                     'hitches on slower CPUs).'),
+    'pack_zar_need_folder': 'Pick the game folder first (a folder, not a .zar).',
+    'pack_zar_running': 'Packing the game: {line}',
+    'pack_zar_done': 'Packed into {path}. The game setting now points at the .zar.',
+    'pack_zar_failed': 'Packing failed: {error}',
     'texpack_dir': 'Texture packs folder (empty = default)',
     'texture_pack': 'Texture pack',
     'texture_pack_off': 'Off (original textures)',
@@ -130,6 +144,7 @@ TEXT = {
     'resolution': 'Resolution',
     'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
     'fps_30': '30 FPS (as on PS4)',
+    'deck_preset': 'Steam Deck (experimental)',
     'fps_60': '60 FPS',
     'fps_unlocked': 'Unlocked (up to the display)',
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
@@ -202,33 +217,34 @@ TEXT = {
                              'cleanup was fixed (issue #104), old textures no longer pile up. It can cause a short stutter after a load, '
                              'so it is off by default. Also in the in-game menu (Insert → Performance).'),
     'filters': 'Image filters (live in the in-game menu too, Insert → Image)',
-    'smaa': 'SMAA anti-aliasing (smooths edges; the HUD too)',
     'aa_off': 'Off',
-    'upscaler': 'Upscaler',
+    'upscaler': 'Upscale method',
     'up_off': 'Built-in (game)',
     'up_dlss': 'DLSS (NVIDIA RTX)',
     'up_fsr3': 'FSR 3.1 (any card)',
     'up_fsr4': 'FSR 4 (any recent card)',
-    'up_taa': 'TAA (any card, native only)',
-    'upscaler_hint': 'Which upscaler draws the image at the chosen quality. It is also the anti-aliasing: at Native AA quality DLSS is DLAA and FSR is FSR native AA. TAA: a lighter, softer anti-aliasing, at native size only. Built-in: only the game\'s own upscale pass and anti-aliasing. F8 in game switches between Built-in and your choice.',
-    'quality': 'Quality',
-    'preset_native': 'Native AA',
+    'up_taa': 'TAA (any card)',
+    'aa': 'Anti-aliasing',
+    'aa_game': "Off (game's own)",
+    'aa_dlaa': 'DLAA (NVIDIA RTX)',
+    'aa_hint': "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.",
+    'upscaler_hint': "How the image gets its size. Off: drawn at the screen's size. Built-in, DLSS, FSR 3.1 and FSR 4: drawn smaller and enlarged, for more speed; DLSS needs an NVIDIA RTX card, FSR 4 any recent card (not only AMD; sharper and steadier than FSR 3.1), FSR 3.1 runs on any card, Built-in is the game's own upscale pass. An upscaler also smooths the edges itself. F8 switches between Built-in and your choice in game.",
+    'quality': 'Upscale quality',
+    'preset_native': 'Off',
     'preset_quality': 'Quality',
     'preset_balanced': 'Balanced',
     'preset_performance': 'Performance',
     'preset_ultra': 'Ultra Performance',
-    'preset_super150': 'Supersampling 150% (experimental)',
-    'preset_super200': 'Supersampling 200% (experimental)',
-    'quality_native': '{preset}: renders at the output size, {output}.',
-    'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
-    'quality_super': '{preset}: renders at {render}, shrunk to {output}.',
-    'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
-                      'Applied at start: the game restarts for a change.'),
+    'quality_hint': ('How large the game draws each frame before the upscaler brings it to your resolution, per side: '
+                     'Quality 67%, Balanced 59%, Performance 50%, Ultra Performance 33%. Lower is faster but less sharp. '
+                     'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
-    'fg_hint': 'One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; FSR is not tied to one brand.',
+    'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; '
+                "FSR is not tied to one brand. Not at 30 FPS. With VSync on, the screen's refresh rate must be at least twice "
+                "the game's frame rate."),
+    'fg_blocked': 'Off: the game runs at 30 FPS (frame rate or frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.',
     'aa_no_dlss': 'No DLSS on this GPU: it runs as FSR 3.1',
     'aa_no_fsr4': 'This GPU cannot run FSR 4: it runs as FSR 3.1',
-    'smaa_hint': 'Not recommended: DLAA and FSR already smooth the edges; SMAA on top blurs the image and the HUD.',
     'sharpening': 'Sharpening',
     'sharpening_hint': ('Sharpens the image. With DLSS, FSR or TAA it is their own sharpening (scene only); with '
                         "Built-in it is AMD CAS on the final picture. Up to 100% the upscaler's own sharpening; "
@@ -342,17 +358,19 @@ TEXT = {
     'graphics_keys': ('Insert          open / close the graphics menu (Esc closes)\n'
                       'L2 + R3         controller: hold L2, press R3\n'
                       'Q / E, L1 / R1  previous / next tab\n'
-                      'F8              switch anti-aliasing (DLAA, FSR) / SMAA\n'
+                      'F8              switch your upscaler / Built-in\n'
                       'F10             show / hide the FPS counter'),
     'hdr_hint': "The game's own HDR10 output, used when HDR is on in Windows display settings. Recommended: on.",
     'shadow_scale': 'Shadow resolution',
     'shadow_game': 'Game (2048)',
     'graphics_preset': 'Graphics preset',
     'graphics_preset_hint': ('All look settings and the texture pack at once. Stock is the game as shipped; '
-                             'save your own here or in the in-game menu (Insert, Image tab).'),
+                             'save your own here or in the in-game menu (Insert, Image tab). Steam Deck '
+                             '(experimental) is Stock plus 1280x800, 30 FPS, no upscaling and frame '
+                             'generation off: tell us how it runs.'),
     'preset_save': 'Save as preset',
     'preset_save_button': 'Save',
-    'preset_save_bad': 'Type a name (letters, digits, space, - or _; not Stock or Recommended).',
+    'preset_save_bad': 'Type a name (letters, digits, space, - or _; not Stock, Recommended or Steam Deck).',
     'preset_stock': 'Stock (as shipped)',
     'preset_recommended': 'Recommended (default)',
     'preset_custom': 'Custom',
@@ -468,11 +486,39 @@ INI_DEFAULTS = {'smaa': '0', 'sharpen': '1', 'sharpness': '1.75', 'color_adjust'
 # anti-aliasing, below it the upscaler is too (no separate AA checkbox; dlaa = not Built-in).
 # TAA (2026-11-07): our own light temporal AA at native size, between SMAA and DLAA in cost.
 UPSCALERS = [('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
+# The Video page's three rows (as the in-game menu). Upscale method: Off or an upscaler
+# (supersampling removed, user 2026-11-10); Upscale quality: the render size; Anti-aliasing: free
+# to choose only with method Off (an upscaler is its own). Stored as before: tlg.ini preset (0 off,
+# 1-4 upscaling) and upscaler (the upscaler, or the anti-aliasing).
+METHODS = [('preset_native', None), ('up_off', 'off'), ('up_dlss', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4')]
+METHOD_OFF = 0
+AA_CHOICES = [('aa_game', 'off'), ('aa_dlaa', 'dlss'), ('up_fsr3', 'fsr3'), ('up_fsr4', 'fsr4'), ('up_taa', 'taa')]
 
 
 def fg_mode_of(ini):
     value = ini.get('frame_generation', '0')
     return int(value) if value in ('1', '2') else 0
+
+
+FG_NAMES = {1: 'DLSS', 2: 'FSR 3.1'}
+
+
+def fg_blocked(settings, ini):
+    """Frame generation is off at a 30 FPS game rate: the frame rate mode or the frame rate limit
+    (the game's own rule, TlgSettings::FrameGenerationBlocked). tlg.ini keeps the choice."""
+    return settings.get('frame_rate') == '30' or ini.get('fps_limit') == '30'
+
+
+def fg_modes(ini):
+    """The choices of the Frame generation row: no DLSS once the game found the card cannot do
+    DLSS frame generation (dlss_fg_supported, written by the game)."""
+    return [0, 2] if ini.get('dlss_fg_supported') == '0' else [0, 1, 2]
+
+
+def fg_shown(settings, ini):
+    """The mode the row shows and the game runs: Off while blocked or without the card for it."""
+    stored = fg_mode_of(ini)
+    return 0 if fg_blocked(settings, ini) or stored not in fg_modes(ini) else stored
 
 
 def dlss_unsupported(ini):
@@ -495,12 +541,24 @@ def upscaler_of(ini):
     return {'off': 0, 'fsr3': 2, 'fsr4': 3, 'taa': 4}.get(ini.get('upscaler'), 1)
 
 
-def quality_text(t, size, preset):
-    """The Quality row's help: the render size for the output size, then the rules."""
-    render = tlg_run.render_resolution(size, preset)
-    key = 'quality_native' if not render else 'quality_super' if tlg_run.supersampling(preset) else 'quality_up'
-    line = t(key).format(preset=t(tlg_run.PRESET_KEYS[preset]), render=render, output=size)
-    return line + '\n' + t('quality_rules')
+def method_of(preset, upscaler):
+    """The METHODS index of a tlg.ini preset and upscaler (TAA runs at native size only)."""
+    if preset <= 0 or upscaler == 'taa':
+        return METHOD_OFF
+    return [value for _, value in METHODS].index(upscaler)
+
+
+def video_choice(old, method, quality, aa):
+    """(preset, upscaler) for a pick in the three rows. old: the (preset, upscaler) before it;
+    quality and aa: the indexes shown in those rows (they count only while their row was usable)."""
+    old_preset, old_upscaler = old
+    old_method = method_of(old_preset, old_upscaler)
+    aa_free = old_method == METHOD_OFF
+    upscaler = AA_CHOICES[aa][1] if aa_free and 0 <= aa < len(AA_CHOICES) else old_upscaler
+    if method == METHOD_OFF:
+        return 0, upscaler
+    preset = 1 + quality if old_method != METHOD_OFF and 0 <= quality < 4 else 1
+    return preset, METHODS[method][1]
 
 
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
@@ -840,7 +898,7 @@ def scroll_area(parent, padding=12):
 
 def art_path(settings, name):
     """Official art from the user's own dump (sce_sys); never shipped with the port."""
-    for folder in (Path(settings['game_dir']) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
+    for folder in (Path(game_image.safe_files_dir(settings['game_dir'])) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
         if (folder / name).is_file():
             return folder / name
     return None
@@ -1053,17 +1111,51 @@ class Launcher:
             self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
             self.refresh_preset()
 
+    def update_fg(self, ini=None):
+        """The Frame generation row: greyed out and Off at a 30 FPS game rate, with the reason
+        under it; the game treats it as off then and tlg.ini keeps the choice."""
+        if ini is None:
+            ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        modes = fg_modes(ini)
+        self.fg_box.configure(state='readonly', values=[FG_NAMES.get(mode, self.t('aa_off')) for mode in modes])
+        self.fg_box.current(modes.index(fg_shown(self.settings, ini)))
+        if fg_blocked(self.settings, ini):
+            self.fg_box.configure(state='disabled')
+            self.fg_note.grid()
+        else:
+            self.fg_note.grid_remove()
+
     def update_aa_note(self, ini):
         # DLSS or FSR 4 stays the choice in tlg.ini; the game runs FSR 3.1 while the card lacks it.
-        mode = self.up_box.current()
-        if (mode == 1 and dlss_unsupported(ini)) or (mode == 3 and fsr4_unsupported(ini)):
-            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 1 else 'aa_no_fsr4'))
+        mode = self.video_state[1]
+        if (mode == 'dlss' and dlss_unsupported(ini)) or (mode == 'fsr4' and fsr4_unsupported(ini)):
+            self.aa_note.configure(text=self.t('aa_no_dlss' if mode == 'dlss' else 'aa_no_fsr4'))
             self.aa_note.grid()
         else:
             self.aa_note.grid_remove()
 
-    def quality_help(self):
-        return quality_text(self.t, str(self.settings.get('resolution', '1920x1080')), max(self.quality_box.current(), 0))
+    def show_video_rows(self, preset, upscaler):
+        """The three rows for a tlg.ini preset and upscaler: the quality choices of the method,
+        the anti-aliasing greyed out (showing Off) while an upscaler is the method."""
+        method = method_of(preset, upscaler)
+        self.video_state = (preset, upscaler)
+        self.method_box.current(method)
+        keys = tlg_run.PRESET_KEYS[1:5]
+        first = 1
+        self.quality_box.configure(state='readonly', values=[self.t(key) for key in keys])
+        if method == METHOD_OFF:
+            self.quality_box.set('')
+            self.quality_box.configure(state='disabled')
+        else:
+            self.quality_box.current(preset - first)
+        choices = AA_CHOICES
+        values = [value for _, value in choices]
+        self.aa_box.configure(state='readonly', values=[self.t(label) for label, _ in choices])
+        # An upscaler as the method: the row shows Off, greyed out (user, 2026-11-10).
+        free = method == METHOD_OFF
+        self.aa_box.current(values.index(upscaler) if free and upscaler in values else 0)
+        if not free:
+            self.aa_box.configure(state='disabled')
 
     # -- window -----------------------------------------------------------------------------
     def build(self):
@@ -1146,6 +1238,13 @@ class Launcher:
             ttk.Entry(game, textvariable=var).grid(row=row * 2 + 1, column=0, sticky='ew', pady=(0, 6))
             ttk.Button(game, text=self.t('browse'), command=lambda k=key: self.browse(k)).grid(
                 row=row * 2 + 1, column=1, padx=(6, 0), pady=(0, 6))
+            if key == 'game_dir':  # a packed game (.zar, issue #72): pick one, or make one
+                zar = ttk.Button(game, text=self.t('browse_zar'), command=self.browse_zar)
+                zar.grid(row=1, column=2, padx=(6, 0), pady=(0, 6))
+                add_tooltip(zar, self.t('browse_zar_tip'))
+                pack = ttk.Button(game, text=self.t('pack_zar'), command=self.pack_zar)
+                pack.grid(row=1, column=3, padx=(6, 0), pady=(0, 6))
+                add_tooltip(pack, self.t('pack_zar_tip'))
         self.vars['texpack_dir'].trace_add('write', lambda *_: self.refresh_texture_pack())
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
@@ -1238,36 +1337,42 @@ class Launcher:
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
-        self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'))
+        self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'),
+                   on_change=lambda: (self.update_fg(), self.refresh_status()))
         self.hint(video, 5, 2, 'fps_hint')
         self.combo(video, 7, 'resolution', tlg_run.RESOLUTIONS, tlg_run.resolution_label)
         self.hint(video, 7, 2, 'resolution_hint')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        # Upscaler (also the anti-aliasing) and Quality (render size, applied at start): tlg.ini
-        # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for Quality).
+        # Upscale method, Upscale quality (render size, applied at start) and Anti-aliasing: tlg.ini
+        # keys upscaler, dlaa and preset, the in-game menu's Image tab (restart for the render size).
         ttk.Label(video, text=self.t('upscaler')).grid(row=9, column=0, sticky='w', pady=(6, 0))
-        self.up_box = ttk.Combobox(video, values=[self.t(label) for label, _ in UPSCALERS],
-                                   state='readonly', width=24)
-        self.up_box.current(upscaler_of(ini))
-        self.up_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
-        self.up_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.method_box = ttk.Combobox(video, values=[self.t(label) for label, _ in METHODS],
+                                       state='readonly', width=24)
+        self.method_box.grid(row=9, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.method_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 9, 2, 'upscaler_hint')
-        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=DIM, wraplength=320)
-        self.aa_note.grid(row=10, column=0, columnspan=2, sticky='w')
-        ttk.Label(video, text=self.t('quality')).grid(row=11, column=0, sticky='w', pady=(6, 0))
-        self.quality_box = ttk.Combobox(video, values=[self.t(key) for key in tlg_run.menu_preset_keys(tlg_run.quality_preset(ini))],
-                                        state='readonly', width=30)
-        self.quality_box.current(tlg_run.quality_preset(ini))
-        self.quality_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        ttk.Label(video, text=self.t('quality')).grid(row=10, column=0, sticky='w', pady=(6, 0))
+        self.quality_box = ttk.Combobox(video, state='readonly', width=24)
+        self.quality_box.grid(row=10, column=1, sticky='w', padx=6, pady=(6, 2))
         self.quality_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        help_mark(video, self.quality_help, *video.grid_slaves(row=11, column=0)).grid(row=11, column=2, sticky='w', padx=(4, 0))
+        help_mark(video, self.t('quality_hint'), *video.grid_slaves(row=10, column=0)).grid(row=10, column=2, sticky='w', padx=(4, 0))
+        ttk.Label(video, text=self.t('aa')).grid(row=11, column=0, sticky='w', pady=(6, 0))
+        self.aa_box = ttk.Combobox(video, state='readonly', width=24)
+        self.aa_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
+        self.aa_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
+        self.hint(video, 11, 2, 'aa_hint')
+        self.aa_note = ttk.Label(video, text=self.t('aa_no_dlss'), foreground=MUTED, wraplength=320)
+        self.aa_note.grid(row=12, column=0, columnspan=2, sticky='w')
+        self.show_video_rows(tlg_run.quality_preset(ini), UPSCALERS[upscaler_of(ini)][1])
         self.update_aa_note(ini)
         ttk.Label(video, text=self.t('fg_mode')).grid(row=14, column=0, sticky='w', pady=(6, 0))
-        self.fg_box = ttk.Combobox(video, values=[self.t('aa_off'), 'DLSS', 'FSR 3.1'], state='readonly', width=20)
-        self.fg_box.current(fg_mode_of(ini))
+        self.fg_box = ttk.Combobox(video, state='readonly', width=20)
         self.fg_box.grid(row=14, column=1, sticky='w', padx=6, pady=(6, 2))
         self.fg_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
         self.hint(video, 14, 2, 'fg_hint')
+        self.fg_note = ttk.Label(video, text=self.t('fg_blocked'), foreground=MUTED, wraplength=320)
+        self.fg_note.grid(row=15, column=0, columnspan=2, sticky='w')
+        self.update_fg(ini)
         self.hdr_var = tk.BooleanVar(value=ini.get('hdr', '1') != '0')
 
         def hdr_toggled():
@@ -1305,9 +1410,6 @@ class Launcher:
             self.hint(memory, row, 2, hint_key)
 
         ini_check(1, 'texture_cleanup', '0', 'texture_cleanup_hint')
-        ini_check(2, 'keep_gpu_textures', '1', 'keep_gpu_textures_hint')
-        ini_check(3, 'arena_release', '1', 'arena_release_hint')
-        ini_check(4, 'gc_live_budget', '1', 'gc_live_budget_hint')
 
     def build_logs(self):
         """Logs: the game log as it runs, and the logs folder."""
@@ -1645,13 +1747,16 @@ class Launcher:
                       font=(SERIF, 14 if home else 11), tags='title')
         c.create_text(left, top + (44 if home else 30), text='G U A R D I A N', anchor='w', fill=TEXT_COLOR,
                       font=(SERIF, 34 if home else 22), tags='title')
-        line_y = top + (84 if home else 56)
+        # The Japanese title right under the game's title, as it means the same (user 2026-11-11).
+        c.create_text(left, top + (76 if home else 50), text='人喰いの大鷲トリコ',
+                      anchor='w', fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11 if home else 9),
+                      tags='title')
+        line_y = top + (100 if home else 66)
         c.create_line(left, line_y, left + 46, line_y, fill=ACCENT)
+        # This port's name under the titles on every page (English only).
+        c.create_text(left, 214 if home else 140, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
+                      anchor='w', fill=ACCENT, font=(SERIF, 10 if home else 7), tags='title')
         if home:
-            c.create_text(left, 198, text='   '.join(' '.join(word) for word in EDITION.upper().split()),
-                          anchor='w', fill=ACCENT, font=(SERIF, 10))
-            c.create_text(left, 222, text='\u4eba\u55b0\u3044\u306e\u5927\u9df2\u30c8\u30ea\u30b3', anchor='w',
-                          fill=MUTED, font=('Yu Mincho' if sys.platform == 'win32' else 'serif', 11))
             c.create_line(left, 244, left + 46, 244, fill=ACCENT)
         else:
             c.tag_bind('title', '<Button-1>', lambda _: self.show_page('home'))
@@ -1666,7 +1771,7 @@ class Launcher:
                  ('home_soundtrack', 'soundtrack', lambda: self.show_page('soundtrack')),
                  ('home_logs', 'logs', lambda: self.show_page('logs')),
                  ('home_quit', None, self.quit)]
-        first = 274 if home else 170
+        first = 274 if home else 204
         step = min(38 if home else 36, max(28, (height - first - 120) // len(items)))
         for index, (key, page, action) in enumerate(items):
             y = first + index * step
@@ -1822,19 +1927,10 @@ class Launcher:
             self.banner = None
 
     def build_aa_filters(self, parent, row):
-        """SMAA and Sharpening on the Video page next to the upscaler (user, 2026-11-07); tlg.ini at once."""
+        """Sharpening on the Video page next to the upscaler (user, 2026-11-07); tlg.ini at once."""
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
         self.ini_vars = getattr(self, 'ini_vars', {})
-        for offset, key in ((0, 'smaa'),):
-            var = tk.BooleanVar(value=ini[key] not in ('0', ''))
-            self.ini_vars[key] = var
-            cell = ttk.Frame(parent)
-            cell.grid(row=row + offset, column=0, columnspan=2, sticky='w', pady=2)
-            box = ttk.Checkbutton(cell, text=self.t(key), variable=var, command=self.filters_changed)
-            box.pack(side='left')
-            if key == 'smaa':
-                self.hint_mark(cell, 'smaa_hint', box).pack(side='left', padx=(4, 0))
         ttk.Label(parent, text=self.t('sharpening')).grid(row=row + 1, column=0, sticky='w')
         cell = ttk.Frame(parent)
         cell.grid(row=row + 1, column=1, sticky='w', padx=6, pady=2)
@@ -1850,11 +1946,11 @@ class Launcher:
         self.update_strength(ini)
 
     def build_filters(self, parent, row):
-        """Color adjustments, read from and written to tlg.ini right away (SMAA and Sharpening: build_aa_filters)."""
+        """Color adjustments, read from and written to tlg.ini right away (Sharpening: build_aa_filters)."""
         ttk.Separator(parent).grid(row=row + 1, column=0, columnspan=3, sticky='ew', pady=(8, 4))
         ini = dict(INI_DEFAULTS)
         ini.update({k: v for k, v in tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini').items() if k in ini})
-        self.ini_vars = getattr(self, 'ini_vars', {})  # SMAA lives on the Video page (build_aa_filters)
+        self.ini_vars = getattr(self, 'ini_vars', {})
         var = tk.BooleanVar(value=ini['color_adjust'] not in ('0', ''))
         self.ini_vars['color_adjust'] = var
         ttk.Checkbutton(parent, text=self.t('color_adjust'), variable=var, command=self.filters_changed).grid(
@@ -1925,9 +2021,8 @@ class Launcher:
     def reload_ini(self):
         """The rows that show tlg.ini values read it again."""
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        self.up_box.current(upscaler_of(ini))
-        self.quality_box.current(tlg_run.quality_preset(ini))
-        self.fg_box.current(fg_mode_of(ini))
+        self.show_video_rows(tlg_run.quality_preset(ini), UPSCALERS[upscaler_of(ini)][1])
+        self.update_fg(ini)
         self.update_aa_note(ini)
         self.hdr_var.set(ini.get('hdr', '1') != '0')
         # Its sliders show the old values; rebuilt after, not from inside one of its own events.
@@ -1965,16 +2060,16 @@ class Launcher:
         self.refresh_preset()
 
     def preset_label(self, index, name):
-        return self.t('preset_stock') if index == 0 else self.t('preset_recommended') if index == 1 else name
+        builtin = ('preset_stock', 'preset_recommended', 'deck_preset')
+        return self.t(builtin[index]) if index < len(builtin) else name
 
     def refresh_preset(self):
         """Lists the presets (the folder may have new ones) and shows the one tlg.ini equals."""
-        self.presets = preset_share.game_presets(tlg_run.USER_DIR / 'presets')
+        self.presets = preset_share.launcher_presets(tlg_run.USER_DIR / 'presets')
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
         names = [self.preset_label(i, name) for i, (name, _) in enumerate(self.presets)]
         self.preset_box.configure(values=names, postcommand=self.refresh_preset)
-        current = next((i for i, (_, values) in enumerate(self.presets)
-                        if preset_share.game_preset_matches(ini, values)), -1)
+        current = preset_share.current_preset(self.presets, ini, self.settings)
         self.preset_box.set(names[current] if current >= 0 else self.t('preset_custom'))
 
     def preset_picked(self):
@@ -1984,21 +2079,33 @@ class Launcher:
         tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
         tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', self.presets[index][1])
         self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        if index == preset_share.DECK_INDEX:  # the Steam Deck entry: its resolution and frame rate too
+            self.settings.update(preset_share.DECK_SETTINGS)
+            tlg_run.save_settings(self.settings)
+            for key, value in preset_share.DECK_SETTINGS.items():
+                box, values = self.combo_boxes[key]
+                box.current(values.index(value))
+            self.refresh_status()
         self.reload_ini()
+        self.refresh_preset()
 
     def filters_changed(self):
-        values = {'smaa': int(self.ini_vars['smaa'].get()), 'color_adjust': int(self.ini_vars['color_adjust'].get()),
+        values = {'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'sharpen': int(self.sharpen_var.get())}
-        values['frame_generation'] = max(self.fg_box.current(), 0)
         current_ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        # Only a pick in the row itself: while it shows Off for another reason (30 FPS, no DLSS
+        # frame generation on this card) tlg.ini keeps the stored choice.
+        modes = fg_modes(current_ini)
+        picked = modes[self.fg_box.current()] if 0 <= self.fg_box.current() < len(modes) else 0
+        if not fg_blocked(self.settings, current_ini) and picked != fg_shown(self.settings, current_ini):
+            values['frame_generation'] = picked
+        preset, upscaler = video_choice(self.video_state, self.method_box.current(), self.quality_box.current(),
+                                        self.aa_box.current())
+        self.show_video_rows(preset, upscaler)
         self.update_aa_note(current_ini)
         self.update_strength(current_ini)
-        if self.up_box.current() >= 0:
-            values.update(upscaler=UPSCALERS[self.up_box.current()][1], aa_row=1)
-        if self.quality_box.current() >= 0:
-            values['preset'] = self.quality_box.current()
-        # No AA checkbox (2026-11-07): the upscaler choice is the anti-aliasing; Built-in = the game's own.
-        values['dlaa'] = int(self.up_box.current() > 0)
+        # tlg.ini dlaa: anti-aliasing or upscaling by something else than the game's own.
+        values.update(upscaler=upscaler, aa_row=1, preset=preset, dlaa=int(upscaler != 'off'))
         for key, (low, high) in COLOR_RANGES.items():
             try:
                 value = min(max(float(self.ini_vars[key].get().replace(',', '.')), low), high)
@@ -2017,6 +2124,7 @@ class Launcher:
         current = self.settings.get(key, values[0])
         box.current(values.index(current) if current in values else 0)
         box.grid(row=row, column=1, sticky='w', padx=6, pady=2)
+        self.__dict__.setdefault('combo_boxes', {})[key] = (box, values)
 
         def picked(_):
             self.settings[key] = values[box.current()]
@@ -2442,6 +2550,21 @@ class Launcher:
         slow_box.bind('<<ComboboxSelected>>', lambda _: slow_picked())
         help_mark(parent, slow.what).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
         resets.append(lambda: (slow_box.current(slow_values.index(slow.default)), slow_picked()))
+        # Memory test switches (issue #38; tlg.ini, apply at once), moved from Video (2026-11-10).
+        ini_now = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key in ('keep_gpu_textures', 'arena_release', 'gc_live_budget'):
+            parent, row = place(0)
+            var = tk.BooleanVar(value=ini_now.get(key, '1') != '0')
+
+            def ini_toggled(key=key, var=var):
+                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
+                self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+
+            ttk.Checkbutton(parent, text=self.t(key), variable=var, command=ini_toggled).grid(
+                row=row, column=0, columnspan=2, sticky='w')
+            help_mark(parent, self.t(key + '_hint')).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
+            resets.append(lambda var=var, ini_toggled=ini_toggled: (var.set(True), ini_toggled()))
 
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
@@ -2489,6 +2612,36 @@ class Launcher:
         path = filedialog.askdirectory(initialdir=self.vars[key].get() or str(Path.home()))
         if path:
             self.vars[key].set(path)
+
+    def browse_zar(self):
+        current = self.vars['game_dir'].get()
+        path = filedialog.askopenfilename(initialdir=str(Path(current).parent) if current else str(Path.home()),
+                                          filetypes=[('ZArchive', '*.zar'), ('*', '*')])
+        if path:
+            self.vars['game_dir'].set(path)
+
+    def pack_zar(self):
+        folder = self.vars['game_dir'].get()
+        if not folder or not Path(folder).is_dir():
+            messagebox.showinfo(TITLE, self.t('pack_zar_need_folder'))
+            return
+        path = filedialog.asksaveasfilename(initialdir=str(Path(folder).parent), initialfile=Path(folder).name + '.zar',
+                                            defaultextension='.zar', filetypes=[('ZArchive', '*.zar')])
+        if not path:
+            return
+
+        def show(text):
+            self.root.after(0, lambda: self.status.configure(text=text))
+
+        def work():
+            try:
+                game_image.pack(folder, path, lambda line: show(self.t('pack_zar_running').format(line=line)))
+            except Exception as error:
+                self.root.after(0, lambda: messagebox.showerror(TITLE, self.t('pack_zar_failed').format(error=error)))
+                return
+            self.root.after(0, lambda: (self.vars['game_dir'].set(path),
+                                        messagebox.showinfo(TITLE, self.t('pack_zar_done').format(path=path))))
+        threading.Thread(target=work, daemon=True).start()
 
     def open(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)

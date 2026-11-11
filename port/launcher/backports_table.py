@@ -44,8 +44,6 @@ def _menu(tab, key, vtype, default, name, what, **kw):
 _CORNERS = (('0', 'Top left'), ('1', 'Top right'),
             ('2', 'Bottom left'), ('3', 'Bottom right'))
 MENU = [
-    _menu('Image', 'fsr1', 'bool', '0', 'Upscale with FSR 1',
-          'Enlarges the game image when it is smaller than the window (spatial filter, no shimmer).'),
     # One Sharpening setting (2026-11-07): the AA step's own RCAS with DLSS / FSR / TAA, AMD CAS on
     # the final picture with Built-in. The old rcas / cas keys are still read but no longer used.
     _menu('Image', 'sharpen', 'bool', '1', 'Sharpening',

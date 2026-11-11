@@ -33,7 +33,7 @@ Scheduler::Scheduler(const Instance& instance, bool threaded_recording)
     const char* env = std::getenv("TLG_VK_RECORD_THREAD");
     if (threaded_recording && !(env && env[0] == '0')) {
         record_chunk = AcquireChunk();
-        recorder_thread = std::jthread(std::bind_front(&Scheduler::RecorderThread, this));
+        recorder_thread = std::jthread([this](std::stop_token st) { RecorderThread(st); });
         recording_threaded = true;
     }
 #if TRACY_GPU_ENABLED
@@ -41,7 +41,7 @@ Scheduler::Scheduler(const Instance& instance, bool threaded_recording)
 #endif
     AllocateWorkerCommandBuffers();
     priority_pending_ops_thread =
-        std::jthread(std::bind_front(&Scheduler::PriorityPendingOpsThread, this));
+        std::jthread([this](std::stop_token st) { PriorityPendingOpsThread(st); });
 }
 
 Scheduler::~Scheduler() {

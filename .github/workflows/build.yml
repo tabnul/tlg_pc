@@ -46,7 +46,15 @@ jobs:
             libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
             libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
-            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
+            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev libzstd-dev
+      - name: Clang 23 (reads the PGO profile recorded with Windows Clang 23)
+        timeout-minutes: 15
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          sudo bash /tmp/llvm.sh 23
+          sudo ln -sf /usr/bin/clang-23 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-23 /usr/local/bin/clang++
+          clang++ --version
       - name: Cache built libraries
         id: deps
         uses: actions/cache@v4
@@ -67,7 +75,10 @@ jobs:
           done) &
           progress_pid=$!
           trap 'kill "$progress_pid" 2>/dev/null || true' EXIT
-          TLG_LTO=OFF TLG_PGO=off bash build.sh
+          # PGO on when pgo/tlggpu.profdata is readable (GPU library built with Clang); build.sh says why if not.
+          set -o pipefail
+          TLG_LTO=OFF bash build.sh 2>&1 | tee /tmp/build-out.txt
+          grep -q "PGO off" /tmp/build-out.txt && { echo "::error::PGO did not turn on"; exit 1; } || true
       # DLAA: the same pinned DLSS SDK as Windows; gpu/dlss_bridge built with GCC (libtlg_dlss.so).
       - name: DLSS SDK
         uses: actions/checkout@v4
@@ -120,6 +131,7 @@ jobs:
             mingw-w64-clang-x86_64-robin-map mingw-w64-clang-x86_64-xxhash mingw-w64-clang-x86_64-ffmpeg
             mingw-w64-clang-x86_64-zydis mingw-w64-clang-x86_64-spirv-tools
             mingw-w64-clang-x86_64-spirv-headers mingw-w64-clang-x86_64-spirv-cross
+            mingw-w64-clang-x86_64-zstd
       - name: Build
         env:
           MSYS2_ROOT: ${{ runner.temp }}/msys64

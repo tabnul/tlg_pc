@@ -474,6 +474,11 @@ void TemporalUpscaler::OnDispatch(u64 cs_hash) {
         } else {
             reset = true;
             game_reset = true;
+            // tlg: Built-in upscaler: no DLSS / FSR / TAA step runs, frame generation still gets
+            // its depth and motion.
+            if (!Active() && TlgSettings::EffectiveFrameGeneration() != 0) {
+                RunFgInputs();
+            }
         }
         game_frame.valid = false;
         return;
@@ -1153,8 +1158,8 @@ bool TemporalUpscaler::TakeFgInputs(FgInputs& inputs) {
     inputs = {depth.GetImage(),
               CachedView(depth, depth.info.pixel_format, vk::ImageAspectFlagBits::eDepth),
               depth.info.pixel_format,
-              vk::Image(motion_image),
-              *motion_view,
+              fg_own_motion ? vk::Image(fg_motion_image) : vk::Image(motion_image),
+              fg_own_motion ? *fg_motion_view : *motion_view,
               vk::Format::eR16G16Sfloat,
               depth.info.size.width,
               depth.info.size.height,
@@ -1215,6 +1220,93 @@ struct AaCpuTimer {
     }
 };
 } // namespace
+
+// tlg: frame generation with the Built-in upscaler (the game's own anti-aliasing and upscale pass):
+// only the depth and the game's motion vectors of the finished game frame, as RunGameMotion hands
+// them over, without touching the scene. No jitter: the game draws this frame without one.
+void TemporalUpscaler::RunFgInputs() {
+    auto& motion = texture_cache.GetImage(game_frame.motion);
+    auto& depth = texture_cache.GetImage(game_frame.depth);
+    const u32 w = depth.info.size.width, h = depth.info.size.height;
+    if (motion.info.pixel_format != vk::Format::eR16G16Sfloat || motion.info.size.width != w ||
+        motion.info.size.height != h) {
+        static bool logged = false;
+        if (!std::exchange(logged, true)) {
+            std::printf("Frame generation: no inputs with the Built-in upscaler (motion %d %ux%u, "
+                        "depth %ux%u)\n",
+                        int(motion.info.pixel_format), motion.info.size.width,
+                        motion.info.size.height, w, h);
+        }
+        return;
+    }
+    if (fg_motion_width != w || fg_motion_height != h) {
+        // The old image can still be in recorded commands.
+        scheduler.Finish();
+        const auto device = instance.GetDevice();
+        fg_motion_view.reset();
+        fg_motion_image = VideoCore::UniqueImage(device, instance.GetAllocator());
+        fg_motion_image.Create(vk::ImageCreateInfo{
+            .imageType = vk::ImageType::e2D,
+            .format = vk::Format::eR16G16Sfloat,
+            .extent = {w, h, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = vk::SampleCountFlagBits::e1,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+            .initialLayout = vk::ImageLayout::eUndefined,
+        });
+        fg_motion_view = Check(device.createImageViewUnique({
+            .image = vk::Image(fg_motion_image),
+            .viewType = vk::ImageViewType::e2D,
+            .format = vk::Format::eR16G16Sfloat,
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        }));
+        fg_motion_width = w;
+        fg_motion_height = h;
+        std::printf("Frame generation: Built-in upscaler, game motion vectors %ux%u\n", w, h);
+    }
+    const auto motion_src_view =
+        CachedView(motion, vk::Format::eR16G16Sfloat, vk::ImageAspectFlagBits::eColor);
+    const auto depth_view = CachedView(depth, depth.info.pixel_format, vk::ImageAspectFlagBits::eDepth);
+
+    scheduler.EndRendering();
+    const auto read = vk::PipelineStageFlagBits2::eComputeShader;
+    runtime.Transit(&depth, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+    runtime.Transit(&motion, vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderRead);
+    runtime.FlushBarriers();
+    const auto cmdbuf = scheduler.CommandBuffer();
+    const auto all = vk::PipelineStageFlagBits2::eAllCommands;
+    const auto own_barrier = [&](vk::ImageLayout old_layout, vk::PipelineStageFlags2 src_stage,
+                                 vk::AccessFlags2 src_access, vk::PipelineStageFlags2 dst_stage,
+                                 vk::AccessFlags2 dst_access) {
+        const vk::ImageMemoryBarrier2 barrier{
+            .srcStageMask = src_stage,
+            .srcAccessMask = src_access,
+            .dstStageMask = dst_stage,
+            .dstAccessMask = dst_access,
+            .oldLayout = old_layout,
+            .newLayout = vk::ImageLayout::eGeneral,
+            .image = vk::Image(fg_motion_image),
+            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier});
+    };
+    own_barrier(vk::ImageLayout::eUndefined, all, vk::AccessFlagBits2::eNone, read,
+                vk::AccessFlagBits2::eShaderWrite);
+    camera_motion.RecordGameMotion(cmdbuf, depth_view, motion_src_view, *fg_motion_view, w, h);
+    own_barrier(vk::ImageLayout::eGeneral, read, vk::AccessFlagBits2::eShaderWrite, all,
+                vk::AccessFlagBits2::eShaderRead);
+
+    // Fresh history after a skipped frame, a menu or a loading screen.
+    const auto now = std::chrono::steady_clock::now();
+    fg_pending = true;
+    fg_own_motion = true;
+    fg_reset = now - last_fg_inputs > std::chrono::milliseconds(100);
+    fg_jitter = {};
+    fg_depth = game_frame.depth;
+    last_fg_inputs = now;
+}
 
 void TemporalUpscaler::RunGameMotion() {
     auto& color = texture_cache.GetImage(game_frame.scene);
@@ -1331,6 +1423,7 @@ void TemporalUpscaler::RunGameMotion() {
         ExtraSharpen(cmdbuf, vk::Image(output_image), false, w, h);
     }
     fg_pending = true;
+    fg_own_motion = false;
     fg_reset = reset;
     fg_jitter = game_frame.jitter;
     fg_depth = game_frame.depth;
@@ -2118,6 +2211,7 @@ bool TemporalUpscaler::RunGameUpscale(VideoCore::ImageId ldr, VideoCore::ImageId
     // Frame generation: render-size depth and motion (checked equal to w x h above) with the
     // output-size frame; DLSS and FSR frame generation both take the two sizes apart.
     fg_pending = true;
+    fg_own_motion = false;
     fg_reset = reset;
     fg_jitter = game_frame.jitter;
     fg_depth = game_frame.depth;

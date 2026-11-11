@@ -16,7 +16,7 @@ import backports_table
 # Keys a preset sets (anything a preset does not list goes back to the default of the table).
 # Only options this port's game really reads (backports_table.MENU, checked against gpu/shim).
 PRESET_SETTINGS = ('vsync',)
-PRESET_ITEMS = ('menu:fps_limit', 'menu:frames_queued', 'menu:fsr1', 'menu:sharpen', 'menu:sharpness',
+PRESET_ITEMS = ('menu:fps_limit', 'menu:frames_queued', 'menu:sharpen', 'menu:sharpness',
                 'menu:smaa')
 # Imported files (preset_share.py) are applied as "full" presets: they may also set these.
 FULL_PRESETS = {}
@@ -24,10 +24,10 @@ FULL_PRESETS = {}
 SETTING_DEFAULTS = {'vsync': True, 'show_fps': False, 'frame_rate': '30'}
 # id, settings overrides, item overrides (values as strings; unlisted = default)
 PRESETS = (
-    ('performance', {'vsync': False}, {'menu:frames_queued': '2', 'menu:fsr1': '1'}),
+    ('performance', {'vsync': False}, {'menu:frames_queued': '2'}),
     ('balanced', {}, {}),
-    ('quality', {}, {'menu:fsr1': '1', 'menu:smaa': '1'}),
-    ('ps4', {}, {'menu:fps_limit': '30', 'menu:fsr1': '0', 'menu:sharpen': '0'}),
+    ('quality', {}, {}),
+    ('ps4', {}, {'menu:fps_limit': '30', 'menu:sharpen': '0'}),
 )
 DEFAULT_PRESET = 'balanced'
 

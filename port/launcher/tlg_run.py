@@ -23,6 +23,7 @@ import sys
 import time
 
 import backports_table
+import game_image
 import logtail
 import shader_cache
 import userdata
@@ -70,13 +71,13 @@ DEFAULT_LANGUAGE_BY_TITLE = {'CUSA03627': 'es_LA', 'CUSA03745': 'es_ES',
 
 def game_languages(game_dir=''):
     """The language table (engine ids) the CUSA in game_dir ships; the US one when it is unknown."""
-    title = shader_cache.title_id(game_dir) if game_dir else None
+    title = shader_cache.title_id(game_image.safe_files_dir(game_dir)) if game_dir else None
     return LANGUAGES_BY_TITLE.get(title, LANGUAGES_US)
 
 
 def default_language(game_dir=''):
     """The game language the launcher starts with for the CUSA in game_dir (US by default)."""
-    title = shader_cache.title_id(game_dir) if game_dir else None
+    title = shader_cache.title_id(game_image.safe_files_dir(game_dir)) if game_dir else None
     return DEFAULT_LANGUAGE_BY_TITLE.get(title, 'es_LA')
 
 
@@ -85,11 +86,11 @@ JAPANESE_FALLBACK_LABEL = '日本語 (EU 1.03 text fallback)'
 
 def japanese_fallback_available(game_dir):
     """Only the verified EU 01.03 asset layout; not Japanese-region disc support."""
-    if not game_dir or shader_cache.title_id(game_dir) != 'CUSA03745':
+    if not game_dir or shader_cache.title_id(game_image.safe_files_dir(game_dir)) != 'CUSA03745':
         return False
     try:
-        return (mod_patches.game_app_version(game_dir) == '01.03' and
-                all((Path(game_dir) / name).is_file()
+        return (mod_patches.game_app_version(game_image.safe_files_dir(game_dir)) == '01.03' and
+                all(game_image.has_file(game_dir, name)
                     for name in ('trico_boot.psarc', 'trico_bootp.psarc')))
     except (OSError, ValueError, struct.error):
         return False
@@ -398,17 +399,13 @@ def save_experimental(settings, states):
 
 def check_game(game_dir):
     """Problems that keep the game from starting, as (key, detail) pairs; empty means ready."""
-    game = Path(game_dir)
+    # A packed game (.zar) is checked by its file list; its small files are extracted for the rest.
     problems = []
-    if not (game / 'eboot.bin').is_file():
-        problems.append(('missing', 'eboot.bin'))
-    for module in ('libc.prx', 'libSceFios2.prx'):
-        if not (game / 'sce_module' / module).is_file():
-            problems.append(('missing', f'sce_module/{module}'))
-    for archive in ('trico_boot.psarc', 'trico_001.psarc', 'trico_002.psarc', 'trico_003.psarc'):
-        if not (game / archive).is_file():
-            problems.append(('missing', archive))
-    version = game_version(game)
+    for name in ('eboot.bin', 'sce_module/libc.prx', 'sce_module/libSceFios2.prx',
+                 'trico_boot.psarc', 'trico_001.psarc', 'trico_002.psarc', 'trico_003.psarc'):
+        if not game_image.has_file(game_dir, name):
+            problems.append(('missing', name))
+    version = game_version(Path(game_image.safe_files_dir(game_dir)))
     if version is not None:
         problems.append(('old_version', version))
     if not PROBE.is_file():
@@ -487,7 +484,7 @@ SHADER_CACHE_SERIALS = ('CUSA03627',)
 
 
 def shader_cache_serials(settings):
-    serial = shader_cache.title_id(settings['game_dir']) if settings.get('game_dir') else None
+    serial = shader_cache.title_id(game_image.safe_files_dir(settings['game_dir'])) if settings.get('game_dir') else None
     return sorted({*SHADER_CACHE_SERIALS, *([serial] if serial else [])})
 
 
@@ -572,23 +569,17 @@ def resolution(settings):
 PRESET_SCALES = (1.0, 1.5, 1.7, 2.0, 3.0, 1 / 1.5, 0.5)
 PRESET_KEYS = ('preset_native', 'preset_quality', 'preset_balanced', 'preset_performance',
                'preset_ultra', 'preset_super150', 'preset_super200')
-# The launchers list Native AA .. Ultra Performance; supersampling (experimental) is tlg.ini
-# preset=5/6 or TLG_UPSCALE_PRESET only, and listed while selected.
-MENU_PRESETS = 5
-
-
-def menu_preset_keys(preset):
-    """The Quality choices to show: the menu ones, plus the supersampling ones while selected."""
-    return PRESET_KEYS if preset >= MENU_PRESETS else PRESET_KEYS[:MENU_PRESETS]
 
 
 def quality_preset(ini):
     """The tlg.ini Quality row (0 Native AA .. 6 Supersampling 200%); TLG_UPSCALE_PRESET wins."""
     value = os.environ.get('TLG_UPSCALE_PRESET') or ini.get('preset', '0')
     try:
-        return min(max(int(value), 0), len(PRESET_SCALES) - 1)
+        preset = min(max(int(value), 0), len(PRESET_SCALES) - 1)
     except ValueError:
         return 0
+    # Supersampling removed from the menus (user 2026-11-10): old files load it as Off.
+    return 0 if supersampling(preset) else preset
 
 
 def render_resolution(size, preset):
@@ -631,7 +622,7 @@ def list_mods(settings):
     the mods folder for this game's version, with its current enabled state (the file's own
     isEnabled, unless mods.json overrides it). An untouched mods folder lists nothing selected."""
     from tlg_patches import TITLE_IDS
-    app_version = mod_patches.game_app_version(settings['game_dir'])
+    app_version = mod_patches.game_app_version(game_image.safe_files_dir(settings['game_dir']))
     found = mod_patches.external_patches(mods_dir(), app_version, TITLE_IDS)
     selected = {key for key, _, _ in mod_patches.external_selection(found, mods_config())}
     return [(key, meta.get('Name'), meta.get('Note', ''), key in selected) for key, _, meta in found]
@@ -661,7 +652,7 @@ def prepare(settings, log=print):
     # derived again from the new options; an explicit TLG_RENDER_RESOLUTION still wins.
     for key in os.environ.pop('TLG_DERIVED', '').split(','):
         os.environ.pop(key, None)
-    game = settings['game_dir']
+    game = game_image.files_dir(settings['game_dir'])  # a .zar: its extracted small files
     # The Quality row (tlg.ini): the render size below (DLSS / FSR upscale) or above (supersampling,
     # experimental, with the GPU heap above 4 GiB) the output size.
     render = render_resolution(resolution(settings), quality_preset(read_ini(user_dir() / 'tlg.ini')))
@@ -750,7 +741,7 @@ def music_tool():
 def menu_music_file(settings):
     """The game's own menu tune, the one the PS4 home screen and shadPS4's game list play; None
     when the game folder is not set or has none (the launcher then stays silent)."""
-    game = settings.get('game_dir')
+    game = game_image.safe_files_dir(settings.get('game_dir'))
     path = Path(game) / 'sce_sys' / 'snd0.at9' if game else None
     return path if path and path.is_file() else None
 

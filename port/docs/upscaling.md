@@ -47,9 +47,11 @@ in-game menu show the exact size for your output in the Quality hint.
 
 ## Supersampling (experimental)
 
-Two extra presets are not in any menu: `preset=5` (150 %) and `preset=6` (200 %) in
-`tlg.ini`, or `TLG_UPSCALE_PRESET=5|6` for one run. The menus list the one in use only while
-it is selected. They render larger than the output (150 %: 2880x1620 at 1080p, 5760x2400 at
+The Quality row ends with two supersampling choices: 150 % and 200 % (`preset=5` / `preset=6`
+in `tlg.ini`, or `TLG_UPSCALE_PRESET=5|6` for one run). Quality is one choice, so supersampling
+and upscaling cannot be combined: with supersampling the chosen upscaler (DLSS, FSR) only does
+its anti-aliasing at the larger size and never enlarges the picture. They render larger than the
+output (150 %: 2880x1620 at 1080p, 5760x2400 at
 3840x1600; 200 %: double) and shrink the picture with the game's own pass. They need the GPU
 heap above 4 GiB (the launcher patches it to 5120 MB
 only for these presets), so count on 12 GB VRAM or more. Tested on Windows at 3840x1600

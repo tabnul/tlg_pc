@@ -74,16 +74,16 @@ class TableTest(unittest.TestCase):
         self.assertEqual(bt.ADVANCED, [])
 
     def test_states_round_trip_and_defaults_store_nothing(self):
-        ini = {'fsr1': '1', 'sharpness': '1.75', 'color_contrast': '1.20', 'overlay_corner': '9'}
+        ini = {'smaa': '1', 'sharpness': '1.75', 'color_contrast': '1.20', 'overlay_corner': '9'}
         states = bt.read_states(ini, {'deferred_readback': False, 'background_warmup': True})
-        self.assertEqual(states['menu:fsr1'], '1')
+        self.assertEqual(states['menu:smaa'], '1')
         self.assertIsNone(states['menu:sharpness'])          # equal to the default
         self.assertEqual(states['menu:color_contrast'], '1.2')
         self.assertIsNone(states['menu:overlay_corner'])         # invalid choice
         self.assertEqual(states['TLG_DEFERRED_READBACK'], '0')
         self.assertIsNone(states['TLG_BACKGROUND_WARMUP'])
         updates = bt.ini_updates(states)
-        self.assertEqual(updates['fsr1'], '1')
+        self.assertEqual(updates['smaa'], '1')
         self.assertIsNone(updates['sharpness'])
         self.assertNotIn('deferred_readback', updates)           # kept in settings.json
 
@@ -92,7 +92,7 @@ class TableTest(unittest.TestCase):
         self.assertEqual(bt.environment(states), {})
         states['TLG_DEFERRED_READBACK'] = '0'
         states['TLG_READBACK_LINEAR'] = '0'
-        states['menu:fsr1'] = '1'                                 # tlg.ini, never the environment
+        states['menu:smaa'] = '1'                                 # tlg.ini, never the environment
         self.assertEqual(bt.environment(states), {'TLG_DEFERRED_READBACK': '0', 'TLG_READBACK_LINEAR': '0'})
         self.assertEqual(bt.environment(states, {'TLG_READBACK_LINEAR': '1'}), {'TLG_DEFERRED_READBACK': '0'})
         self.assertEqual(bt.changes(states), 2)                   # menu preferences do not count

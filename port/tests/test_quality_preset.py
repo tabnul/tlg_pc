@@ -27,16 +27,14 @@ class QualityPresetTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop('TLG_UPSCALE_PRESET', None)
             self.assertEqual(tlg_run.quality_preset({'preset': '3'}), 3)
-            self.assertEqual(tlg_run.quality_preset({'preset': '9'}), 6)
+            self.assertEqual(tlg_run.quality_preset({'preset': '9'}), 0)  # supersampling removed: loads as Off
             self.assertEqual(tlg_run.quality_preset({'preset': 'x'}), 0)
             self.assertEqual(tlg_run.quality_preset({}), 0)
             os.environ['TLG_UPSCALE_PRESET'] = '2'
             self.assertEqual(tlg_run.quality_preset({'preset': '3'}), 2)
 
-    def test_menu_lists_supersampling_only_while_selected(self):
-        self.assertEqual(len(tlg_run.menu_preset_keys(0)), tlg_run.MENU_PRESETS)
-        self.assertEqual(len(tlg_run.menu_preset_keys(4)), tlg_run.MENU_PRESETS)
-        self.assertEqual(tlg_run.menu_preset_keys(5), tlg_run.PRESET_KEYS)
+    def test_supersampling_presets(self):
+        self.assertEqual(len(tlg_run.PRESET_KEYS), len(tlg_run.PRESET_SCALES))
         self.assertTrue(tlg_run.supersampling(5) and tlg_run.supersampling(6))
         self.assertFalse(tlg_run.supersampling(4))
 

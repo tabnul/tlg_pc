@@ -6,6 +6,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "runtime.h"
+#include "runtime_zarchive.h"
 #include "cpu_check.h"
 #include "isa_rewrite.h"
 #include "gpu/tlggpu.h"
@@ -541,12 +542,111 @@ static void dump_request(int sig, siginfo_t *info, void *context) {
     ssize_t written_=write(2,tail,sizeof(tail)-1); (void)written_;
 }
 #endif
-/* param.sfo lookup: string or integer value of key, 0 when absent. */
-static int sfo_value(const char *path, const char *key, char *text, size_t text_size, uint32_t *number) {
-    FILE *f=fopen(path,"rb");
+/* Reads up to size bytes of path inside app0 (a folder or a .zar game image); bytes read. */
+static size_t app0_read(const char *app0, const char *path, unsigned char *data, size_t size) {
+    size_t n=0;
+    if (runtime_file_is_archive_name(app0)) {
+        ZArchive *archive=zarchive_open(app0);
+        if (!archive) return 0;
+        const int64_t node=zarchive_find(archive,path);
+        if (zarchive_is_file(archive,node)) n=(size_t)zarchive_read(archive,node,0,data,size);
+        zarchive_close(archive);
+        return n;
+    }
+    char full[4096];
+    snprintf(full,sizeof(full),"%s/%s",app0,path);
+    FILE *f=fopen(full,"rb");
     if (!f) return 0;
-    unsigned char data[65536];
-    size_t n=fread(data,1,sizeof(data),f); fclose(f);
+    n=fread(data,1,size,f); fclose(f);
+    return n;
+}
+/* .zar tools for the launcher (issue #72): list, extract one entry, pack a folder. */
+/* Archive paths are short; a truncated name only fails its lookup. GCC cannot see that. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
+static int zar_list(const char *archive_path) {
+    ZArchive *a=zarchive_open(archive_path);
+    if (!a) { fprintf(stderr,"%s: %s\n",archive_path,zarchive_error()); return 1; }
+    struct { int64_t node; char path[1024]; } stack[64]; int depth=0;
+    stack[depth].node=zarchive_find(a,""); stack[depth++].path[0]=0;
+    while (depth) {
+        const int64_t node=stack[--depth].node; char base[1024];
+        snprintf(base,sizeof(base),"%s",stack[depth].path);
+        char name[512]; int is_file;
+        for (uint32_t i=0;zarchive_child(a,node,i,name,sizeof(name),&is_file);++i) {
+            char full[1024];
+            snprintf(full,sizeof(full),"%s%s%s",base,*base?"/":"",name);
+            const int64_t child=zarchive_find(a,full);
+            if (is_file) printf("F %llu %s\n",(unsigned long long)zarchive_entry_size(a,child),full);
+            else {
+                printf("D 0 %s\n",full);
+                if (depth<64) { stack[depth].node=child; snprintf(stack[depth].path,sizeof(stack[depth].path),"%s",full); ++depth; }
+            }
+        }
+    }
+    zarchive_close(a);
+    return 0;
+}
+static int zar_extract(const char *archive_path, const char *entry, const char *out_path) {
+    ZArchive *a=zarchive_open(archive_path);
+    if (!a) { fprintf(stderr,"%s: %s\n",archive_path,zarchive_error()); return 1; }
+    const int64_t node=zarchive_find(a,entry);
+    if (!zarchive_is_file(a,node)) { fprintf(stderr,"%s: no file %s\n",archive_path,entry); zarchive_close(a); return 1; }
+    FILE *out=fopen(out_path,"wb");
+    if (!out) { fprintf(stderr,"cannot create %s\n",out_path); zarchive_close(a); return 1; }
+    static unsigned char buffer[1<<20];
+    const uint64_t size=zarchive_entry_size(a,node);
+    int failed=0;
+    for (uint64_t at=0;at<size && !failed;) {
+        const uint64_t n=zarchive_read(a,node,at,buffer,sizeof(buffer));
+        if (!n || fwrite(buffer,1,(size_t)n,out)!=n) failed=1;
+        at+=n;
+    }
+    if (fclose(out)) failed=1;
+    zarchive_close(a);
+    if (failed) { remove(out_path); fprintf(stderr,"extract of %s failed\n",entry); return 1; }
+    return 0;
+}
+/* Byte ranges of archive entries for the launcher (the Soundtrack page reads the psarcs inside a
+ * .zar): each stdin line "offset length entry" answers an 8-byte little-endian count, then the
+ * bytes; a missing entry answers count 0. Ends at end of input. */
+#ifdef _WIN32
+#include <io.h>
+#endif
+static int zar_serve(const char *archive_path) {
+    ZArchive *a=zarchive_open(archive_path);
+    if (!a) { fprintf(stderr,"%s: %s\n",archive_path,zarchive_error()); return 1; }
+#ifdef _WIN32
+    _setmode(_fileno(stdout),_O_BINARY);
+#endif
+    static unsigned char buffer[1<<20];
+    char line[1200];
+    while (fgets(line,sizeof(line),stdin)) {
+        unsigned long long offset=0,length=0; int used=0;
+        line[strcspn(line,"\r\n")]=0;
+        if (sscanf(line,"%llu %llu %n",&offset,&length,&used)<2) break;
+        const int64_t node=zarchive_find(a,line+used);
+        const uint64_t size=zarchive_is_file(a,node) ? zarchive_entry_size(a,node) : 0;
+        uint64_t count=offset<size ? size-offset : 0;
+        if (count>length) count=length;
+        fwrite(&count,8,1,stdout);
+        for (uint64_t at=0;at<count;) {
+            uint64_t want=count-at; if (want>sizeof(buffer)) want=sizeof(buffer);
+            uint64_t n=zarchive_read(a,node,offset+at,buffer,want);
+            if (n<want) memset(buffer+n,0,(size_t)(want-n));
+            fwrite(buffer,1,(size_t)want,stdout);
+            at+=want;
+        }
+        fflush(stdout);
+    }
+    zarchive_close(a);
+    return 0;
+}
+/* param.sfo lookup in app0: string or integer value of key, 0 when absent. */
+static int sfo_value(const char *app0, const char *key, char *text, size_t text_size, uint32_t *number) {
+    static unsigned char data[65536];
+    size_t n=app0_read(app0,"sce_sys/param.sfo",data,sizeof(data));
     if (n<20 || memcmp(data,"\0PSF",4)) return 0;
     uint32_t keys, values, count;
     memcpy(&keys,data+8,4); memcpy(&values,data+12,4); memcpy(&count,data+16,4);
@@ -1082,6 +1182,10 @@ int main(int argc, char **argv) {
     mallopt(M_MMAP_THRESHOLD,32*1024*1024);
 #endif
     if (argc == 2 && !strcmp(argv[1], "--vulkan-only")) return vulkan_smoke();
+    if (argc == 3 && !strcmp(argv[1], "--zar-list")) return zar_list(argv[2]);
+    if (argc == 3 && !strcmp(argv[1], "--zar-serve")) return zar_serve(argv[2]);
+    if (argc == 5 && !strcmp(argv[1], "--zar-extract")) return zar_extract(argv[2], argv[3], argv[4]);
+    if (argc == 4 && !strcmp(argv[1], "--zar-pack")) return zarchive_pack(argv[2], argv[3]);
     if (argc == 4 && !strcmp(argv[1], "--import-shaders")) return tlg_import_shaders(argv[2], argv[3]);
     if (argc == 4 && !strcmp(argv[1], "--compare-meta")) return tlg_compare_meta(argv[2], argv[3]);
     char missing[128];
@@ -1160,9 +1264,8 @@ int main(int argc, char **argv) {
     }
     if (app0) {
         runtime_file_configure(app0, user_dir ? user_dir : "user");
-        char sfo[4096], id[16]="";
-        snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0);
-        if (sfo_value(sfo,"INSTALL_DIR_SAVEDATA",id,sizeof(id),NULL) || sfo_value(sfo,"TITLE_ID",id,sizeof(id),NULL))
+        char id[16]="";
+        if (sfo_value(app0,"INSTALL_DIR_SAVEDATA",id,sizeof(id),NULL) || sfo_value(app0,"TITLE_ID",id,sizeof(id),NULL))
             runtime_savedata_configure(id);
     }
     tlggpu_register_kernel();
@@ -1336,9 +1439,9 @@ int main(int argc, char **argv) {
         red_zone_on = 0;
     }
     if (!cpu_only) {
-        char title[128]="The Last Guardian", serial[16]="UNKNOWN", sfo[4096];
+        char title[128]="The Last Guardian", serial[16]="UNKNOWN";
+        const char *sfo=app0 ? app0 : ".";
         uint32_t attributes=0;
-        snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0 ? app0 : ".");
         sfo_value(sfo,"TITLE",title,sizeof(title),NULL);
         sfo_value(sfo,"TITLE_ID",serial,sizeof(serial),NULL);
         sfo_value(sfo,"ATTRIBUTE",NULL,0,&attributes);

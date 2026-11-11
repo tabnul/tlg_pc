@@ -54,6 +54,8 @@ bool aa_row_file = false;
 bool dlss_checked = false;
 // dlss_supported in tlg.ini: the game's last DLSS check, for the launcher (-1: none).
 int dlss_supported_file = -1;
+// dlss_fg_supported in tlg.ini: the game's last DLSS frame generation check, for the launcher (-1: none).
+int dlss_fg_supported_file = -1;
 // The upscaler tlg.ini selected before a fallback to FSR 3.1 (-1: none): Save writes it back.
 int selected_upscaler = -1;
 // fsr4_default in tlg.ini: the one-time switch from FSR 3.1 to FSR 4 native AA on a card that
@@ -103,6 +105,9 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "dlss_supported") {
         dlss_supported_file = i != 0;
         return;
+    } else if (key == "dlss_fg_supported") {
+        dlss_fg_supported_file = i != 0;
+        return;
     } else if (key == "fsr4_supported") {
         fsr4_supported_file = i != 0;
         return;
@@ -129,7 +134,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
             }
         }
     } else if (key == "preset") {
-        v.preset = std::clamp(i, 0, PresetCount - 1);
+        // Supersampling removed from the menus (user 2026-11-10): old files load it as Off.
+        v.preset = IsSupersampling(i) ? int(NativeAA) : std::clamp(i, 0, PresetCount - 1);
     } else if (key == "sharpen") {
         v.sharpen = i != 0;
     } else if (key == "sharpness") {
@@ -161,7 +167,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "fps_limit") {
         v.fps_limit = TlgGraphics::ParseFpsLimit(i);
     } else if (key == "fsr1") {
-        v.fsr1 = i != 0;
+        v.fsr1 = false;  // FSR 1 removed (user 2026-11-10): old files and presets load it off
     } else if (key == "rcas") {
         v.rcas = i != 0;
     } else if (key == "rcas_strength") {
@@ -502,6 +508,28 @@ void ConfigureUpscalerSupport(bool fsr4, bool fsr411) {
     }
 }
 
+void ConfigureDlssFgSupport(bool available) {
+    Get().dlss_fg_supported = int(available);
+    if (dlss_fg_supported_file != int(available)) {
+        // Only this line changes: the launcher leaves DLSS out of its Frame generation row from it.
+        if (WriteKeys({{"dlss_fg_supported", std::to_string(int(available))}}))
+            dlss_fg_supported_file = available;
+    }
+}
+
+bool FrameGenerationBlocked() {
+    const auto& v = Get();
+    return TlgGraphics::EffectiveFps(v.fps_limit, v.applied_engine_fps) <= 30;
+}
+
+int EffectiveFrameGeneration() {
+    const auto& v = Get();
+    const int mode = v.frame_generation;
+    const std::uint32_t lock = v.credits_fps_lock;
+    if (mode == 0 || FrameGenerationBlocked() || (lock != 0 && lock <= 30)) return 0;
+    return mode == 1 && v.dlss_fg_supported == 0 ? 0 : mode;
+}
+
 void ConfigureDlssSupport(bool available, const char* problem) {
     auto& v = Get();
     v.dlss_supported = available;
@@ -661,6 +689,8 @@ void Save() {
                  pack > 0 ? TexturePackNames()[pack - 1].c_str() : "off");
     if (dlss_checked || dlss_supported_file >= 0)
         std::fprintf(file, "dlss_supported=%d\n", dlss_checked ? int(v.dlss_supported.load()) : dlss_supported_file);
+    if (const int fg = v.dlss_fg_supported >= 0 ? v.dlss_fg_supported.load() : dlss_fg_supported_file; fg >= 0)
+        std::fprintf(file, "dlss_fg_supported=%d\n", fg);
     if (fsr4_supported_file >= 0) std::fprintf(file, "fsr4_supported=%d\n", fsr4_supported_file);
     if (fsr4_default_done) std::fprintf(file, "fsr4_default=1\n");
     // Read by the launcher at start.

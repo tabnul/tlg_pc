@@ -57,7 +57,7 @@ int main() {
     TlgSettings::Load();
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);  // a stored async_shaders=1 is ignored
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);
-    assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
+    assert(!v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
     assert(v.smaa && v.cas && v.cas_strength == 30 && v.color_adjust && v.color_gamma == 2.0f);
     assert(v.brightness == 0.10f && v.contrast == 1.20f && v.saturation == 0.80f);
     assert(!TlgSettings::GraphicsNeedRestart());
@@ -68,6 +68,30 @@ int main() {
     _putenv_s("TLG_ENGINE_FPS", "");
     v.engine_fps = 120;
     assert(TlgSettings::GraphicsNeedRestart());
+    // Frame generation: off at a 30 FPS game rate (limit, launch mode, end credits), the choice stays.
+    v.frame_generation = 2;
+    v.applied_engine_fps = 120;
+    v.fps_limit = 0;
+    assert(!TlgSettings::FrameGenerationBlocked() && TlgSettings::EffectiveFrameGeneration() == 2);
+    v.fps_limit = 30;
+    assert(TlgSettings::FrameGenerationBlocked() && TlgSettings::EffectiveFrameGeneration() == 0);
+    v.fps_limit = 60;
+    assert(!TlgSettings::FrameGenerationBlocked() && TlgSettings::EffectiveFrameGeneration() == 2);
+    v.applied_engine_fps = 30;
+    assert(TlgSettings::FrameGenerationBlocked() && TlgSettings::EffectiveFrameGeneration() == 0);
+    v.applied_engine_fps = 120;
+    v.credits_fps_lock = 30;  // not greyed in the menu, paused while it lasts
+    assert(!TlgSettings::FrameGenerationBlocked() && TlgSettings::EffectiveFrameGeneration() == 0);
+    v.credits_fps_lock = 60;
+    assert(TlgSettings::EffectiveFrameGeneration() == 2);
+    v.credits_fps_lock = 0;
+    v.frame_generation = 1;  // DLSS: off only once the card's check said no
+    assert(TlgSettings::EffectiveFrameGeneration() == 1);
+    v.dlss_fg_supported = 0;
+    assert(TlgSettings::EffectiveFrameGeneration() == 0 && v.frame_generation == 1);
+    v.dlss_fg_supported = -1;
+    v.frame_generation = 0;
+    v.applied_engine_fps = 60;
     v.fps_limit = 60;  // live: no restart because of it
     v.engine_fps = 240;
     assert(!TlgSettings::GraphicsNeedRestart());

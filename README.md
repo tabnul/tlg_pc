@@ -18,8 +18,6 @@ see [Cut and hidden content](#cut-and-hidden-content) and the [full guide](docs/
 
 No game files are included. You need your own copy, dumped from your own PS4.
 
-[![Stock vs modded (YouTube)](https://img.youtube.com/vi/16rYLJlGy6A/maxresdefault.jpg)](https://www.youtube.com/watch?v=16rYLJlGy6A)
-
 **Contents:** [Get started](#get-started) · [Graphics](#graphics) ·
 [Cut and hidden content](#cut-and-hidden-content) · [Sound](#sound) · [Soundtrack](#soundtrack) ·
 [Controllers and languages](#controllers-and-languages) · [For testers](#for-testers) ·
@@ -33,6 +31,14 @@ No game files are included. You need your own copy, dumped from your own PS4.
    [Dumping your own copy](port/packaging/README-player.md#dumping-your-own-copy).
 3. For audio, copy `libSceNgs2.sprx` from your PS4 firmware into `system_lib/` next to the executable.
 4. Start the launcher, pick the game folder and press **Play**.
+
+**Save half the disk space (experimental):** the port can play the game straight from one packed file. In the
+launcher, under Game folder, press **Pack…** to turn the folder into a `.zar` file (about 26 GB
+becomes about 12.5 GB, a few minutes), or **.zar…** to pick one you made before. Only the parts the
+game asks for are unpacked, while it plays. Keep the folder until a first start works, then you can
+delete it. The trade-off: unpacking while playing costs some CPU time, so loads can take a bit
+longer and slower CPUs may see short hitches when the game streams new areas. If you have the
+space, a plain folder is still the fastest choice.
 
 You need a Vulkan 1.3 graphics card with at least 6 GB of video memory. DLSS needs an NVIDIA RTX
 card and FSR 4 a recent card; FSR 3.1 runs on any card.
@@ -66,8 +72,12 @@ Each setting shows what the game originally used and what we recommend.
   while menus and subtitles stay sharp. **F8** switches back to the game's own AA to compare.
   See [port/docs/upscaling.md](port/docs/upscaling.md) and [docs/dlaa.md](docs/dlaa.md).
 - **Frame generation:** DLSS (RTX 40 or newer) or FSR 3.1 (any card). It shows one generated frame
-  between each pair of real ones, and works with any upscaler setting. Off by default.
+  between each pair of real ones, and works with any upscaler setting, the game's own (Built-in)
+  included. It needs a game frame rate above 30, so it is off at 30 FPS. Off by default.
 - **Frame rate:** 30 (as on PS4), 60 or unlocked. On an RTX 5090, unlocked runs at about 90-120 FPS.
+- **Steam Deck (experimental):** a graphics preset in the launcher, next to Stock and
+  Recommended, sets the game up for a Steam Deck: 1280x800, 30 FPS, no upscaling, frame
+  generation off, and every graphics setting at Stock (as on PS4). It is new and still being tuned: tell us how it runs.
 - **Shader stutter:** shaders are prepared at start from shader recipes (from
   [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by @deadinside28), so new
   drivers and updates don't bring the stutter back.
@@ -260,6 +270,9 @@ Thanks to everyone whose work this builds on.
 - [4x-UltraSharp](https://huggingface.co/Kim2091/UltraSharp) by Kim2091 (CC BY-NC-SA 4.0), the
   default texture upscale model, and Microsoft's [DirectXTex](https://github.com/microsoft/DirectXTex).
 - NVIDIA DLSS, under the NVIDIA DLSS license.
+- Packed games (.zar): [ZArchive](https://github.com/Exzap/ZArchive) by Exzap (MIT-0), and the
+  idea and design from [@R-V-L](https://github.com/R-V-L)'s ZArchive build of
+  [gow3_pc](https://github.com/R-V-L/gow3_pc). Thanks to @dwaynevn-git for asking for it (#72).
 - The controller drawing: the [RPCS3](https://github.com/RPCS3/rpcs3) DualShock 3 drawing by
   HerrHulaHoop (GPL-2.0), redrawn as a DualShock 4.
 
