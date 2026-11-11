@@ -76,13 +76,32 @@ fi
 read -r -a includes <<< "$(pkg-config --cflags vulkan sdl3 libavcodec libavutil libswscale)"
 read -r -a libraries <<< "$(pkg-config --libs vulkan sdl3 libavcodec libavutil libswscale)"
 # GPU library (shadPS4 video core + drivers), built by CMake into out/gpu/libtlggpu.so.
-# TLG_PGO: generate (instrumented build that writes pgo/ while the game runs), use, off.
-# Default: use the profile in pgo/ when there is one. TLG_LTO=OFF disables link-time optimization.
+# TLG_PGO (Clang, same profile as Windows): use = build with pgo/tlggpu.profdata, generate =
+# instrumented build writing pgo/*.profraw while the game runs, merge = profraw into profdata,
+# off. Default: use when pgo/tlggpu.profdata exists and clang++ can read it (the profile is
+# written by MSYS2 Clang on Windows; an older Clang cannot read a newer profile).
+# TLG_LTO=OFF disables link-time optimization.
 pgo=${TLG_PGO:-}
-if [[ -z $pgo ]]; then
-    if [[ -n $(find pgo -name '*.gcda' -print -quit 2>/dev/null) ]]; then pgo=use; else pgo=off; fi
-fi
 mkdir -p pgo
+if [[ $pgo == merge ]]; then
+    llvm-profdata merge -o pgo/tlggpu.profdata pgo/*.profraw
+    echo "Merged into $PWD/pgo/tlggpu.profdata"; exit 0
+fi
+if [[ -z $pgo ]]; then
+    pgo=off
+    if [[ -f pgo/tlggpu.profdata ]]; then
+        if ! command -v clang++ >/dev/null; then
+            echo 'PGO off: profile found but clang++ is not installed.' >&2
+        elif ! echo 'int main(){return 0;}' | clang++ -x c++ -fprofile-use="$PWD/pgo/tlggpu.profdata" \
+                -Wno-profile-instr-unprofiled -o /dev/null - 2>/dev/null; then
+            echo "PGO off: $(clang++ --version | head -1) cannot read pgo/tlggpu.profdata (needs a newer Clang)." >&2
+        else
+            pgo=use
+        fi
+    fi
+fi
+pgo_compiler=()
+if [[ $pgo != off ]]; then pgo_compiler=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++); fi
 # Submodules (git clone --recursive, or: git submodule update --init) and this port's changes
 # to UniversalScalers-Vulkan (gpu/patches/fsr-vulkan), applied to its working tree once.
 if [[ ! -f gpu/third_party/fsr-vulkan/CMakeLists.txt || ! -f gpu/third_party/imgui/imgui.h ]]; then
@@ -94,7 +113,7 @@ for patch in gpu/patches/fsr-vulkan/*.patch; do
     fi
 done
 cmake -S gpu -B out/gpu -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTLG_PGO="$pgo" \
-    -DTLG_LTO="${TLG_LTO:-ON}" -DTLG_PGO_DIR="$PWD/pgo" >/dev/null
+    -DTLG_LTO="${TLG_LTO:-ON}" -DTLG_PGO_DIR="$PWD/pgo" "${pgo_compiler[@]}" >/dev/null
 echo "GPU library: PGO $pgo, LTO ${TLG_LTO:-ON}"
 # A failed GPU build must stop here: an older libtlggpu.so would otherwise be used silently.
 if ! ninja -C out/gpu tlggpu > out/gpu-build.log 2>&1; then
