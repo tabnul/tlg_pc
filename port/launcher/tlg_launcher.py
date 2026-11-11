@@ -221,10 +221,9 @@ TEXT = {
     'preset_balanced': 'Balanced',
     'preset_performance': 'Performance',
     'preset_ultra': 'Ultra Performance',
-    'quality_native': '{preset}: renders at the output size, {output}.',
-    'quality_up': '{preset}: renders at {render}, upscaled to {output}.',
-    'quality_rules': ('Quality 1/1.5, Balanced 1/1.7, Performance 1/2, Ultra Performance 1/3 of the output on each side; the upscaler fills in the rest. '
-                      'Applied at start: the game restarts for a change.'),
+    'quality_hint': ('How large the game draws each frame before the upscaler brings it to your resolution, per side: '
+                     'Quality 67%, Balanced 59%, Performance 50%, Ultra Performance 33%. Lower is faster but less sharp. '
+                     'Applied at start: the game restarts for a change.'),
     'fg_mode': 'Frame generation',
     'fg_hint': ('One made-up image between two game frames: smoother, a little more input delay. DLSS needs NVIDIA RTX 40 or newer; '
                 "FSR is not tied to one brand. Not at 30 FPS. With VSync on, the screen's refresh rate must be at least twice "
@@ -546,14 +545,6 @@ def video_choice(old, method, quality, aa):
         return 0, upscaler
     preset = 1 + quality if old_method != METHOD_OFF and 0 <= quality < 4 else 1
     return preset, METHODS[method][1]
-
-
-def quality_text(t, size, preset):
-    """The Quality row's help: the render size for the output size, then the rules."""
-    render = tlg_run.render_resolution(size, preset)
-    key = 'quality_native' if not render else 'quality_up'
-    line = t(key, preset=t(tlg_run.PRESET_KEYS[preset]), render=render, output=size)
-    return line + '\n' + t('quality_rules')
 
 
 COLOR_RANGES = {'color_brightness': (-0.5, 0.5), 'color_contrast': (0.5, 1.5),
@@ -1152,9 +1143,6 @@ class Launcher:
         if not free:
             self.aa_box.configure(state='disabled')
 
-    def quality_help(self):
-        return quality_text(self.t, str(self.settings.get('resolution', '1920x1080')), self.video_state[0])
-
     # -- window -----------------------------------------------------------------------------
     def build(self):
         """The home screen (art, menu, Play) and the pages that open over it: Settings, Video,
@@ -1346,7 +1334,7 @@ class Launcher:
         self.quality_box = ttk.Combobox(video, state='readonly', width=24)
         self.quality_box.grid(row=10, column=1, sticky='w', padx=6, pady=(6, 2))
         self.quality_box.bind('<<ComboboxSelected>>', lambda _: self.filters_changed())
-        help_mark(video, self.quality_help, *video.grid_slaves(row=10, column=0)).grid(row=10, column=2, sticky='w', padx=(4, 0))
+        help_mark(video, self.t('quality_hint'), *video.grid_slaves(row=10, column=0)).grid(row=10, column=2, sticky='w', padx=(4, 0))
         ttk.Label(video, text=self.t('aa')).grid(row=11, column=0, sticky='w', pady=(6, 0))
         self.aa_box = ttk.Combobox(video, state='readonly', width=24)
         self.aa_box.grid(row=11, column=1, sticky='w', padx=6, pady=(6, 2))
