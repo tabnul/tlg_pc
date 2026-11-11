@@ -152,6 +152,13 @@ that is still in `condorcommonslaver.lua`:
 
 <p align="center"><a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool.jpg" width="49%" alt="Trico drooling"></a> <a href="docs/fun.md#tricos-drool"><img src="docs/screenshots/fun/drool2.jpg" width="49%" alt="Trico drooling, close up"></a></p>
 
+**ICO horns.** One of the boy's treasure outfits, Horned Apparel, is the Ico one. The script
+calls it "the horned garment", yet there are no horns. So we added them: tick **ICO horns** in
+the launcher's Mods page or in the in-game menu. They go with every outfit,
+[more on the fun page](docs/fun.md#outfits-and-ico-horns).
+
+<p align="center"><a href="docs/fun.md#outfits-and-ico-horns"><img src="docs/screenshots/fun/outfits.jpg" width="100%" alt="The boy in Enduring Attire, Homecoming, Warrior, Horned Apparel, and Horned Apparel with ICO horns, and from behind with the Featherpainter idol"></a></p>
+
 **Trico's toilet.** Trico does need to go, but the game's scripts make sure you almost never see
 it. He has to have eaten enough barrels, then 30 minutes of play must pass, then he waits until
 the boy is more than 10 metres away and Trico's head has been out of the camera's view for 3

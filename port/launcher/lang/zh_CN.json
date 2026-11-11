@@ -675,6 +675,14 @@
       "name": "异步 fence",
       "what": "在 fence 之前的内存复制完成后即发出游戏的 fence 信号，而不是等待它们。",
       "why": "实测更慢（79 对 83 FPS）：游戏会等待这些 fence。"
+    },
+    "menu:mod_treasures": {
+      "name": "全部宝物",
+      "what": "使用开发者自己的解锁功能，解锁所有宝物（服装、Trico 的羽毛）以及选项菜单中的“宝物”项。保存在存档中：关闭后不会收回。首次解锁前会备份你的存档（启动器的存档管理可以恢复）。可在游戏暂停菜单的“物品”中选择。"
+    },
+    "menu:mod_horns": {
+      "name": "ICO 的角",
+      "what": "少年戴上角，向《ICO》致敬：骨白色、尖端为黑色。可与游戏自带的 Ico 服装（宝物之一）搭配。"
     }
   },
   "menu": {
@@ -961,6 +969,11 @@
     "Off now: the game runs at 30 FPS (frame rate mode or Frame rate limit), too low for frame generation. Your choice comes back at a higher frame rate.": "当前已关闭：游戏以 30 FPS 运行（帧率模式或帧率上限），对帧生成来说太低。提高帧率后会恢复你的选择。",
     "With VSync on, the screen's refresh rate must be at least twice the game's frame rate.": "开启垂直同步时，屏幕刷新率必须至少是游戏帧率的两倍。",
     "Anti-aliasing": "抗锯齿",
-    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "平滑锯齿边缘。放大方式为关闭时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和。关闭则只保留游戏自带的。"
+    "Smooths jagged edges. Yours to choose with Upscale method Off; an upscaler does its own. DLAA (NVIDIA RTX cards) and FSR 4 (any recent card) are the sharpest, FSR 3.1 runs on any card, TAA is lighter and softer. Off keeps only the game's own.": "平滑锯齿边缘。放大方式为关闭时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和。关闭则只保留游戏自带的。",
+    "Mods": "模组",
+    "All treasures": "全部宝物",
+    "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "使用开发者自己的解锁功能，解锁所有宝物（服装、Trico 的羽毛）以及选项菜单中的“宝物”项。保存在存档中：关闭后不会收回。首次解锁前会备份你的存档（启动器的存档管理可以恢复）。可在游戏暂停菜单的“物品”中选择。",
+    "The boy wears horns, a nod to Ico: bone white with a black tip. Can be combined with the game's own Ico outfit (one of the treasures).": "少年戴上角，向《ICO》致敬：骨白色、尖端为黑色。可与游戏自带的 Ico 服装（宝物之一）搭配。",
+    "ICO horns": "ICO 的角"
   }
 }

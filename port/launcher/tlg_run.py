@@ -1044,6 +1044,14 @@ def launch(settings, seconds=0, extra_env=None, detached=False, header=()):
         'menu_confirm': settings.get('menu_confirm', 'cross'),
         'key_map': key_map_spec(key_map) if isinstance(key_map, dict) else str(key_map),
     })
+    try:   # Mods > Horns > ICO horns: the horn models, built here (the game mounts this file)
+        import ico_horns
+        horns = data / 'mods-builtin' / 'trico_other.psarc'
+        if not horns.is_file():
+            horns.parent.mkdir(parents=True, exist_ok=True)
+            ico_horns.write(str(horns))
+    except Exception as error:  # never blocks the game: only the ICO horns stay away
+        print(f'ICO horns: could not build the models: {error}')
     log = new_log()
     try:   # saves copied aside before every start; never blocks the game
         import savemanager
