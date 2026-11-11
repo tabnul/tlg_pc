@@ -362,7 +362,15 @@
     "launcher.aa": "Antialiasing",
     "launcher.aa_game": "Desactivado (solo el del juego)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave. Desactivado deja solo el del juego."
+    "launcher.aa_hint": "Suaviza los bordes dentados. Se puede elegir con el método de escalado Desactivado; un escalador hace el suyo. DLAA (tarjetas NVIDIA RTX) y FSR 4 (cualquier tarjeta reciente) son los más nítidos, FSR 3.1 funciona en cualquier tarjeta, TAA es más ligero y suave. Desactivado deja solo el del juego.",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Experimental: Elige un archivo de juego empaquetado (.zar) en lugar de una carpeta. El juego descomprime datos mientras juegas, lo que cuesta algo de CPU: las cargas pueden tardar un poco más y puede haber tirones en CPU más lentas. Una carpeta normal es lo más rápido.",
+    "launcher.pack_zar": "Empaquetar…",
+    "launcher.pack_zar_tip": "Experimental: Empaqueta la carpeta del juego en un único archivo .zar comprimido que el port lee directamente (ahorra espacio). La carpeta se conserva; bórrala tú tras un arranque de prueba. Jugar desde un .zar usa algo más de CPU (cargas algo más largas, posibles tirones en CPU más lentas).",
+    "launcher.pack_zar_need_folder": "Elige primero la carpeta del juego (una carpeta, no un .zar).",
+    "launcher.pack_zar_running": "Empaquetando el juego: {line}",
+    "launcher.pack_zar_done": "Empaquetado en {path}. El ajuste del juego ahora apunta al .zar.",
+    "launcher.pack_zar_failed": "Error al empaquetar: {error}"
   },
   "items": {
     "menu:sharpen": {

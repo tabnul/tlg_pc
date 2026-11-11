@@ -362,7 +362,15 @@
     "launcher.aa": "抗锯齿",
     "launcher.aa_game": "关闭（仅游戏自带）",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "平滑锯齿边缘。放大方式为关闭时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和。关闭则只保留游戏自带的。"
+    "launcher.aa_hint": "平滑锯齿边缘。放大方式为关闭时可自行选择；使用放大器时由它自己完成。DLAA（NVIDIA RTX 显卡）和 FSR 4（任意较新显卡）最清晰，FSR 3.1 可在任意显卡上运行，TAA 更轻、更柔和。关闭则只保留游戏自带的。",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "实验性功能：选择一个打包的游戏文件（.zar）而不是文件夹。游戏在运行时解压数据，会占用一些 CPU：加载可能稍慢，较慢的 CPU 上读取新区域时可能卡顿。普通文件夹仍是最快的。",
+    "launcher.pack_zar": "打包…",
+    "launcher.pack_zar_tip": "实验性功能：将游戏文件夹打包成一个压缩的 .zar 文件，移植版可直接读取（节省空间）。原文件夹会保留；测试启动成功后可自行删除。从 .zar 运行会多用一些 CPU（加载稍慢，较慢的 CPU 上可能卡顿）。",
+    "launcher.pack_zar_need_folder": "请先选择游戏文件夹（文件夹，而不是 .zar）。",
+    "launcher.pack_zar_running": "正在打包游戏：{line}",
+    "launcher.pack_zar_done": "已打包到 {path}。游戏设置现在指向该 .zar。",
+    "launcher.pack_zar_failed": "打包失败：{error}"
   },
   "items": {
     "menu:sharpen": {

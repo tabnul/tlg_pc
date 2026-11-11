@@ -33,10 +33,16 @@ import start_points
 import tlg_run
 
 FPS_LINE = re.compile(r"Frame stats: ([\d.]+) FPS, worst frame ([\d.]+) ms .*?; (\d+) shader/pipeline compiles")
+CPU_LINE = re.compile(r"CPU stats: process ([\d.]+)%")
+ZAR_LINE = re.compile(r"ZAR stats: game read [\d.]+ MB in [\d.]+ ms; disk ([\d.]+) MB in ([\d.]+) ms; "
+                      r"unpacked [\d.]+ MB in ([\d.]+) ms")
 START_LINE = re.compile(r"Fun: start at (\S+) (\S+) \((\S+)\)")
 # Same columns as tools/scene-check/scene_check.py, so its report.py reads our results.csv as-is.
 FIELDS = ["k", "stage", "area", "scene", "status", "warn", "entry", "launch_s", "load_s", "fps", "fps_min", "fps_max",
-          "worst_ms", "compiles", "stalls", "shot", "fade", "mb_s", "top_write", "changed_pct", "missions"]
+          "worst_ms", "compiles", "stalls", "shot", "fade", "mb_s", "top_write", "changed_pct", "missions",
+          # Issue #72: process CPU (% of all threads) while measuring and while loading; reads from a
+          # packed .zar during the load (MB from disk, ms in disk reads, ms unpacking).
+          "cpu_pct", "cpu_peak", "load_cpu_pct", "zar_disk_mb", "zar_disk_ms", "zar_unpack_ms"]
 # The curse spell (rune screen) of these points waits for a button at the scene start (scene check skips them too).
 SKIP = {("s04_FirstAntenna", "_050_SleepingTrico_001"),
         ("s13_FirstFlight", "_020_Care_Start"),
@@ -212,6 +218,7 @@ class Sweep:
         row = dict.fromkeys(FIELDS, '')
         row.update(k=index, stage=stage, area=area, scene='', status='ok', entry='warp')
         samples, missions, stalls = [], [], 0
+        cpu, load_cpu, zar = [], [], [0.0, 0.0, 0.0]
         try:
             import logtail
             # A load can write thousands of lines in one burst; a small tail drops the
@@ -241,6 +248,10 @@ class Sweep:
                         row['status'] = 'crash'
                     elif 'sceSystemServiceLoadExec' in line:
                         row['status'] = 'restart'
+                    elif (cpu_match := CPU_LINE.search(line)) and phase in ('load', 'measure'):
+                        (cpu if phase == 'measure' else load_cpu).append(float(cpu_match.group(1)))
+                    elif (zar_match := ZAR_LINE.search(line)) and phase == 'load':
+                        zar = [a + float(b) for a, b in zip(zar, zar_match.groups())]
                     elif phase == 'measure':
                         if line.startswith('Lua: mission '):
                             missions.append(line.split()[-1])
@@ -279,6 +290,13 @@ class Sweep:
         elif row['status'] == 'ok':
             row['status'] = 'no stats'
         row['stalls'] = stalls
+        if cpu:
+            row['cpu_pct'] = round(sum(cpu) / len(cpu), 1)
+            row['cpu_peak'] = round(max(cpu), 1)
+        if load_cpu:
+            row['load_cpu_pct'] = round(sum(load_cpu) / len(load_cpu), 1)
+        if zar[0]:
+            row['zar_disk_mb'], row['zar_disk_ms'], row['zar_unpack_ms'] = (round(v) for v in zar)
         row['missions'] = ' '.join(dict.fromkeys(missions))
         if row['status'] == 'ok' and row['scene'] and row['scene'] not in row['missions']:
             row['warn'] = 'mission not seen'

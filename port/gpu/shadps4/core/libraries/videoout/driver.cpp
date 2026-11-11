@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 #include <vector>
 #include <chrono>
 #include <cstdio>
@@ -15,6 +16,7 @@
 #include <sys/resource.h>
 #endif
 #include "common/assert.h"
+#include "../../src/runtime_zarchive.h" // tlg: .zar read counters (issue #72)
 #include "tlg_toggles.h"
 #include "tlg_freeze.h"
 #include "tlg_settings.h"
@@ -529,6 +531,43 @@ void VideoOutDriver::Flip(const Request& req) {
                         TlgStats::tick_wait_ns.exchange(0) / (window * 1e7),
                         frames ? double(TlgStats::reduced_draws.exchange(0)) / frames : 0.0,
                         frames ? double(TlgStats::scene_draws.exchange(0)) / frames : 0.0);
+            // tlg: whole-process CPU use per stats window, for the benchmark (issue #72: what a
+            // packed .zar costs on weak CPUs). "cores busy" = CPU time / wall time.
+            {
+                u64 cpu_us = 0;
+#ifdef _WIN32
+                FILETIME created, ended, kernel, user;
+                if (GetProcessTimes(GetCurrentProcess(), &created, &ended, &kernel, &user)) {
+                    const auto ticks = [](const FILETIME& t) {
+                        return (u64(t.dwHighDateTime) << 32) | t.dwLowDateTime;
+                    };
+                    cpu_us = (ticks(kernel) + ticks(user)) / 10;
+                }
+#else
+                rusage usage{};
+                if (getrusage(RUSAGE_SELF, &usage) == 0) {
+                    cpu_us = u64(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000000 +
+                             u64(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec);
+                }
+#endif
+                static u64 last_cpu_us = 0;
+                const unsigned threads = std::max(1u, std::thread::hardware_concurrency());
+                if (last_cpu_us && cpu_us >= last_cpu_us) {
+                    const double busy = (cpu_us - last_cpu_us) / (window * 1e6);
+                    std::printf("CPU stats: process %.1f%% of %u threads (%.2f cores busy)\n",
+                                std::min(100.0, busy * 100.0 / threads), threads, busy);
+                }
+                last_cpu_us = cpu_us;
+                // Game read from a packed .zar this window: how much, from disk, unpack time.
+                ZArchiveStats zar{};
+                zarchive_take_stats(&zar);
+                if (zar.served_bytes) {
+                    std::printf("ZAR stats: game read %.1f MB in %.0f ms; disk %.1f MB in %.0f ms; "
+                                "unpacked %.1f MB in %.0f ms\n",
+                                zar.served_bytes / 1e6, zar.read_ns / 1e6, zar.disk_bytes / 1e6,
+                                zar.disk_ns / 1e6, zar.unpack_bytes / 1e6, zar.unpack_ns / 1e6);
+                }
+            }
             // Readback cost per second, comparable between builds: faults on GPU-tracked pages and
             // their handler time, waits for image readbacks, protection changes and their time.
             {

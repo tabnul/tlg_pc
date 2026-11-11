@@ -360,7 +360,15 @@
     "launcher.aa": "Anti-aliasing",
     "launcher.aa_game": "Desligado (só o do jogo)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo."
+    "launcher.aa_hint": "Suaviza bordas serrilhadas. Pode ser escolhido com o método de upscaling Desligado; um upscaler faz o seu próprio. DLAA (placas NVIDIA RTX) e FSR 4 (qualquer placa recente) são os mais nítidos, FSR 3.1 roda em qualquer placa, TAA é mais leve e suave. Desligado mantém só o do jogo.",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Experimental: Escolha um arquivo de jogo compactado (.zar) em vez de uma pasta. O jogo descompacta dados enquanto você joga, o que custa um pouco de CPU: os carregamentos podem demorar um pouco mais e pode haver travadas em CPUs mais lentas. Uma pasta normal é o mais rápido.",
+    "launcher.pack_zar": "Compactar…",
+    "launcher.pack_zar_tip": "Experimental: Compacta a pasta do jogo em um único arquivo .zar que o port lê diretamente (economiza espaço). A pasta é mantida; apague-a você mesmo após um início de teste. Jogar a partir de um .zar usa um pouco mais de CPU (carregamentos um pouco mais longos, possíveis travadas em CPUs mais lentas).",
+    "launcher.pack_zar_need_folder": "Escolha primeiro a pasta do jogo (uma pasta, não um .zar).",
+    "launcher.pack_zar_running": "Compactando o jogo: {line}",
+    "launcher.pack_zar_done": "Compactado em {path}. A configuração do jogo agora aponta para o .zar.",
+    "launcher.pack_zar_failed": "Falha ao compactar: {error}"
   },
   "items": {
     "menu:sharpen": {

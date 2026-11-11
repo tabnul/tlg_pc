@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # would load a second copy, and the language pack would change that copy's TEXT, not the one shown.
 sys.modules.setdefault('tlg_launcher', sys.modules[__name__])
 import backports_table  # noqa: E402
+import game_image  # noqa: E402
 import langpack  # noqa: E402
 import logtail  # noqa: E402
 import pad_page  # noqa: E402
@@ -107,6 +108,19 @@ TEXT = {
     'game_dir': 'Game folder',
     'system_lib_dir': 'Console system modules',
     'browse': 'Browse…',
+    'browse_zar': '.zar…',
+    'browse_zar_tip': ('Experimental: pick a packed game file (.zar) instead of a folder. The game unpacks data while '
+                       'it plays, which costs some CPU: loads can take a bit longer and streaming '
+                       'may hitch on slower CPUs. A plain folder is fastest.'),
+    'pack_zar': 'Pack…',
+    'pack_zar_tip': ('Experimental: packs the game folder into one compressed .zar file that the port reads directly '
+                     '(saves disk space). The folder is kept; delete it yourself after a test start. '
+                     'Playing from a .zar uses some extra CPU (slightly longer loads, possible '
+                     'hitches on slower CPUs).'),
+    'pack_zar_need_folder': 'Pick the game folder first (a folder, not a .zar).',
+    'pack_zar_running': 'Packing the game: {line}',
+    'pack_zar_done': 'Packed into {path}. The game setting now points at the .zar.',
+    'pack_zar_failed': 'Packing failed: {error}',
     'texpack_dir': 'Texture packs folder (empty = default)',
     'texture_pack': 'Texture pack',
     'texture_pack_off': 'Off (original textures)',
@@ -884,7 +898,7 @@ def scroll_area(parent, padding=12):
 
 def art_path(settings, name):
     """Official art from the user's own dump (sce_sys); never shipped with the port."""
-    for folder in (Path(settings['game_dir']) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
+    for folder in (Path(game_image.safe_files_dir(settings['game_dir'])) / 'sce_sys', tlg_run.REPO_DIR / 'dump' / 'sce_sys'):
         if (folder / name).is_file():
             return folder / name
     return None
@@ -1224,6 +1238,13 @@ class Launcher:
             ttk.Entry(game, textvariable=var).grid(row=row * 2 + 1, column=0, sticky='ew', pady=(0, 6))
             ttk.Button(game, text=self.t('browse'), command=lambda k=key: self.browse(k)).grid(
                 row=row * 2 + 1, column=1, padx=(6, 0), pady=(0, 6))
+            if key == 'game_dir':  # a packed game (.zar, issue #72): pick one, or make one
+                zar = ttk.Button(game, text=self.t('browse_zar'), command=self.browse_zar)
+                zar.grid(row=1, column=2, padx=(6, 0), pady=(0, 6))
+                add_tooltip(zar, self.t('browse_zar_tip'))
+                pack = ttk.Button(game, text=self.t('pack_zar'), command=self.pack_zar)
+                pack.grid(row=1, column=3, padx=(6, 0), pady=(0, 6))
+                add_tooltip(pack, self.t('pack_zar_tip'))
         self.vars['texpack_dir'].trace_add('write', lambda *_: self.refresh_texture_pack())
         audio = section(left, self.t('audio'))
         audio.grid(sticky='ew')
@@ -2591,6 +2612,36 @@ class Launcher:
         path = filedialog.askdirectory(initialdir=self.vars[key].get() or str(Path.home()))
         if path:
             self.vars[key].set(path)
+
+    def browse_zar(self):
+        current = self.vars['game_dir'].get()
+        path = filedialog.askopenfilename(initialdir=str(Path(current).parent) if current else str(Path.home()),
+                                          filetypes=[('ZArchive', '*.zar'), ('*', '*')])
+        if path:
+            self.vars['game_dir'].set(path)
+
+    def pack_zar(self):
+        folder = self.vars['game_dir'].get()
+        if not folder or not Path(folder).is_dir():
+            messagebox.showinfo(TITLE, self.t('pack_zar_need_folder'))
+            return
+        path = filedialog.asksaveasfilename(initialdir=str(Path(folder).parent), initialfile=Path(folder).name + '.zar',
+                                            defaultextension='.zar', filetypes=[('ZArchive', '*.zar')])
+        if not path:
+            return
+
+        def show(text):
+            self.root.after(0, lambda: self.status.configure(text=text))
+
+        def work():
+            try:
+                game_image.pack(folder, path, lambda line: show(self.t('pack_zar_running').format(line=line)))
+            except Exception as error:
+                self.root.after(0, lambda: messagebox.showerror(TITLE, self.t('pack_zar_failed').format(error=error)))
+                return
+            self.root.after(0, lambda: (self.vars['game_dir'].set(path),
+                                        messagebox.showinfo(TITLE, self.t('pack_zar_done').format(path=path))))
+        threading.Thread(target=work, daemon=True).start()
 
     def open(self, path):
         Path(path).mkdir(parents=True, exist_ok=True)

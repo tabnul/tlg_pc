@@ -12,6 +12,7 @@ There are no track titles in the game; a few banks name their cues (bgm_fa_anten
 piece is called by its stage and number, with that name where the bank has one for it.
 """
 
+import game_image
 import hashlib
 import json
 import lzma
@@ -37,7 +38,7 @@ class Psarc:
     """One PSARC archive: its file names, and reads of a whole file or a byte range of one."""
 
     def __init__(self, path):
-        self.file = open(path, 'rb')
+        self.file = path.open('rb')  # a Path, or game_image.EntryPath inside a .zar
         magic, _, _, self.comp, toc_len, entry_size, count, self.block, _ = struct.unpack(
             '>4sHH4sIIIII', self.file.read(32))
         if magic != b'PSAR':
@@ -99,8 +100,8 @@ def _archive_paths(game_dir):
     """Every trico_*.psarc of the game folder. Sorted by name, an update archive (trico_001p) comes
     right after the one it updates ('.' sorts before 'p'), so its files win."""
     try:
-        return sorted(p for p in Path(game_dir).glob('trico_*.psarc') if p.is_file())
-    except OSError:
+        return game_image.root_files(game_dir, 'trico_*.psarc')
+    except (OSError, RuntimeError, ValueError):
         return []
 
 
@@ -248,7 +249,7 @@ def _scan_bank(found, bank, tracks, seen):
 
 def extract(game_dir, track, out_path):
     """Writes one piece as an ATRAC9 .at9 file (RIFF/WAVE, the layout the music tool reads)."""
-    archive = Psarc(Path(game_dir) / track['archive'])
+    archive = Psarc(game_image.game_path(game_dir, track['archive']))
     try:
         data = archive.read(track['file'], track['offset'], track['size'])
     finally:

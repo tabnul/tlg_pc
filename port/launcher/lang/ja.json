@@ -362,7 +362,15 @@
     "launcher.aa": "アンチエイリアス",
     "launcher.aa_game": "オフ（ゲーム標準のみ）",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "ギザギザの輪郭を滑らかにします。アップスケール方式がオフのときに選べます。アップスケーラー使用時はそれ自身が行います。DLAA（NVIDIA RTX カード）と FSR 4（最近のカード）が最も鮮明で、FSR 3.1 はどのカードでも動作し、TAA は軽くてやわらかめです。オフはゲーム標準のみです。"
+    "launcher.aa_hint": "ギザギザの輪郭を滑らかにします。アップスケール方式がオフのときに選べます。アップスケーラー使用時はそれ自身が行います。DLAA（NVIDIA RTX カード）と FSR 4（最近のカード）が最も鮮明で、FSR 3.1 はどのカードでも動作し、TAA は軽くてやわらかめです。オフはゲーム標準のみです。",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "実験的機能：フォルダーの代わりにパック済みのゲームファイル（.zar）を選択します。プレイ中にデータを展開するため CPU を少し使います。読み込みが少し長くなり、遅い CPU ではカクつくことがあります。通常のフォルダーが最も高速です。",
+    "launcher.pack_zar": "パック…",
+    "launcher.pack_zar_tip": "実験的機能：ゲームフォルダーを、移植版が直接読み込める圧縮 .zar ファイル 1 つにまとめます（容量を節約）。フォルダーは残ります。テスト起動の後でご自身で削除してください。.zar からのプレイは CPU を少し多く使います（読み込みが少し長く、遅い CPU ではカクつく可能性があります）。",
+    "launcher.pack_zar_need_folder": "まずゲームフォルダーを選んでください（.zar ではなくフォルダー）。",
+    "launcher.pack_zar_running": "ゲームをパック中: {line}",
+    "launcher.pack_zar_done": "{path} にパックしました。ゲームの設定は .zar を指すようになりました。",
+    "launcher.pack_zar_failed": "パックに失敗しました: {error}"
   },
   "items": {
     "menu:sharpen": {

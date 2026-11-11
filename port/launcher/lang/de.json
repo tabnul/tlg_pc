@@ -362,7 +362,15 @@
     "launcher.aa": "Kantenglättung",
     "launcher.aa_game": "Aus (nur die des Spiels)",
     "launcher.aa_dlaa": "DLAA (NVIDIA RTX)",
-    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels."
+    "launcher.aa_hint": "Glättet gezackte Kanten. Frei wählbar bei Upscaling-Methode Aus; ein Upscaler glättet selbst. DLAA (NVIDIA-RTX-Karten) und FSR 4 (jede neuere Karte) sind am schärfsten, FSR 3.1 läuft auf jeder Karte, TAA ist leichter und weicher. Aus behält nur die Kantenglättung des Spiels.",
+    "launcher.browse_zar": ".zar…",
+    "launcher.browse_zar_tip": "Experimentell: Eine gepackte Spieldatei (.zar) statt eines Ordners wählen. Das Spiel entpackt Daten während des Spielens, was etwas CPU kostet: Ladezeiten können etwas länger sein und auf langsameren CPUs kann das Nachladen ruckeln. Ein normaler Ordner ist am schnellsten.",
+    "launcher.pack_zar": "Packen…",
+    "launcher.pack_zar_tip": "Experimentell: Packt den Spielordner in eine komprimierte .zar-Datei, die der Port direkt liest (spart Speicherplatz). Der Ordner bleibt erhalten; lösche ihn selbst nach einem Teststart. Spielen aus einer .zar braucht etwas mehr CPU (etwas längere Ladezeiten, mögliche Ruckler auf langsameren CPUs).",
+    "launcher.pack_zar_need_folder": "Wähle zuerst den Spielordner (einen Ordner, keine .zar).",
+    "launcher.pack_zar_running": "Spiel wird gepackt: {line}",
+    "launcher.pack_zar_done": "Gepackt nach {path}. Die Spieleinstellung zeigt jetzt auf die .zar.",
+    "launcher.pack_zar_failed": "Packen fehlgeschlagen: {error}"
   },
   "items": {
     "menu:sharpen": {

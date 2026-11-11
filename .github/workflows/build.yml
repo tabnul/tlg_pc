@@ -46,7 +46,7 @@ jobs:
             libxxhash-dev zlib1g-dev libx11-dev libxcb1-dev libxext-dev libxrandr-dev libxcursor-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols \
             libdecor-0-dev libegl-dev libgl-dev libdrm-dev libgbm-dev libpulse-dev libasound2-dev \
-            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev
+            libpipewire-0.3-dev libudev-dev libdbus-1-dev libusb-1.0-0-dev libzstd-dev
       - name: Clang 23 (reads the PGO profile recorded with Windows Clang 23)
         timeout-minutes: 15
         run: |
@@ -131,6 +131,7 @@ jobs:
             mingw-w64-clang-x86_64-robin-map mingw-w64-clang-x86_64-xxhash mingw-w64-clang-x86_64-ffmpeg
             mingw-w64-clang-x86_64-zydis mingw-w64-clang-x86_64-spirv-tools
             mingw-w64-clang-x86_64-spirv-headers mingw-w64-clang-x86_64-spirv-cross
+            mingw-w64-clang-x86_64-zstd
       - name: Build
         env:
           MSYS2_ROOT: ${{ runner.temp }}/msys64
