@@ -130,6 +130,10 @@ TEXT = {
     'resolution': 'Resolution',
     'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
     'fps_30': '30 FPS (as on PS4)',
+    'deck_preset': 'Steam Deck (experimental)',
+    'deck_preset_hint': ('Sets this page for a Steam Deck: 1280x800, 30 FPS, no upscaling (built-in '
+                         'anti-aliasing), frame generation off and shadows at 1x. Your other graphics settings stay '
+                         'as they are. Experimental: tell us how it runs.'),
     'fps_60': '60 FPS',
     'fps_unlocked': 'Unlocked (up to the display)',
     'fps_hint': ('60/unlocked patch eboot 1.03 in memory. Unlocked lowers the base frame rate by about '
@@ -1325,6 +1329,9 @@ class Launcher:
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
+        ttk.Button(video, text=self.t('deck_preset'), command=self.deck_preset_picked).grid(
+            row=3, column=0, columnspan=2, sticky='w', pady=(6, 4))
+        self.hint(video, 3, 2, 'deck_preset_hint')
         self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'),
                    on_change=lambda: (self.update_fg(), self.refresh_status()))
         self.hint(video, 5, 2, 'fps_hint')
@@ -2065,6 +2072,20 @@ class Launcher:
         self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
         self.reload_ini()
 
+    def deck_preset_picked(self):
+        """Steam Deck (experimental): preset_share.DECK_SETTINGS and DECK_INI, then the rows again."""
+        self.settings.update(preset_share.DECK_SETTINGS)
+        tlg_run.save_settings(self.settings)
+        for key, value in preset_share.DECK_SETTINGS.items():
+            box, values = self.combo_boxes[key]
+            box.current(values.index(value))
+        tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
+        tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', preset_share.DECK_INI)
+        self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+        self.reload_ini()
+        self.refresh_preset()
+        self.refresh_status()
+
     def filters_changed(self):
         values = {'color_adjust': int(self.ini_vars['color_adjust'].get()),
                   'sharpen': int(self.sharpen_var.get())}
@@ -2100,6 +2121,7 @@ class Launcher:
         current = self.settings.get(key, values[0])
         box.current(values.index(current) if current in values else 0)
         box.grid(row=row, column=1, sticky='w', padx=6, pady=2)
+        self.__dict__.setdefault('combo_boxes', {})[key] = (box, values)
 
         def picked(_):
             self.settings[key] = values[box.current()]

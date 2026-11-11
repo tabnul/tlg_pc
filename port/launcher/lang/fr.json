@@ -84,6 +84,8 @@
     "launcher.resolution": "Résolution",
     "launcher.resolution_hint": "Rendu natif ; plus large que 16:9 montre davantage de la scène et déplace le HUD vers les bords",
     "launcher.fps_30": "30 FPS (comme sur PS4)",
+    "launcher.deck_preset": "Steam Deck (expérimental)",
+    "launcher.deck_preset_hint": "Règle cette page pour un Steam Deck : 1280x800, 30 FPS, pas de mise à l'échelle avec l'anticrénelage du jeu, génération d'images désactivée et ombres à 1x. Vos autres réglages graphiques restent tels quels. Expérimental : dites-nous comment ça tourne.",
     "launcher.fps_60": "60 FPS",
     "launcher.fps_unlocked": "Illimité (jusqu'à l'écran)",
     "launcher.fps_hint": "Patch 60/illimité de l'eboot 1.03 en mémoire. Illimité réduit la fréquence de base d'environ 10 FPS par rapport à 60 au même endroit ; choisissez 60 sauf si votre PC tourne bien au-dessus de 60",

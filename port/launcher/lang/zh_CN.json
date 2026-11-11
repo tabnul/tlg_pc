@@ -84,6 +84,8 @@
     "launcher.resolution": "分辨率",
     "launcher.resolution_hint": "原生渲染；宽于 16:9 时可看到更多场景，HUD 会移到画面边缘",
     "launcher.fps_30": "30 FPS（同 PS4）",
+    "launcher.deck_preset": "Steam Deck（实验性）",
+    "launcher.deck_preset_hint": "将本页设置为适合 Steam Deck：1280x800、30 FPS、不使用超分辨率并采用游戏自带的抗锯齿、关闭帧生成、阴影 1x。其他图形设置保持不变。实验性功能：欢迎告诉我们运行效果。",
     "launcher.fps_60": "60 FPS",
     "launcher.fps_unlocked": "不锁帧（最高至显示器刷新率）",
     "launcher.fps_hint": "60/不锁帧会在内存中修补 eboot 1.03。在同一位置，不锁帧的基础帧率比 60 低约 10 FPS；除非你的电脑能稳定远超 60，否则请选择 60",

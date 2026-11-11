@@ -84,6 +84,8 @@
     "launcher.resolution": "Auflösung",
     "launcher.resolution_hint": "Nativ gerendert; breiter als 16:9 zeigt mehr von der Szene und rückt das HUD an die Ränder",
     "launcher.fps_30": "30 FPS (wie auf PS4)",
+    "launcher.deck_preset": "Steam Deck (experimentell)",
+    "launcher.deck_preset_hint": "Stellt diese Seite für ein Steam Deck ein: 1280x800, 30 FPS, kein Upscaling mit der spieleigenen Kantenglättung, Frame Generation aus und Schatten auf 1x. Deine übrigen Grafikeinstellungen bleiben, wie sie sind. Experimentell: Sag uns, wie es läuft.",
     "launcher.fps_60": "60 FPS",
     "launcher.fps_unlocked": "Unbegrenzt (bis zum Bildschirm)",
     "launcher.fps_hint": "60/Unbegrenzt-Patch für eboot 1.03 im Speicher. Unbegrenzt senkt die Grund-Bildrate an derselben Stelle um etwa 10 FPS gegenüber 60; wähle 60, außer dein PC schafft deutlich mehr als 60",

@@ -73,5 +73,19 @@ class PresetParityTests(unittest.TestCase):
                                 f'{key}: launcher {preset_share.GAME_RECOMMENDED[key]}, in-game default {value}')
 
 
+class DeckPreset(unittest.TestCase):
+    def test_values_exist(self):
+        import tlg_run
+        self.assertIn(preset_share.DECK_SETTINGS['resolution'], tlg_run.RESOLUTIONS)
+        self.assertIn(preset_share.DECK_SETTINGS['frame_rate'], tlg_run.FRAME_RATES)
+
+    def test_keeps_the_look_presets(self):
+        # Only shadow_scale is also a look setting; it must be the Recommended (and Stock) value,
+        # so picking the Deck preset never turns Stock or Recommended into Custom by itself.
+        for key, value in preset_share.DECK_INI.items():
+            if key in preset_share.GAME_RECOMMENDED and key != 'dlaa':
+                self.assertEqual(value, preset_share.GAME_RECOMMENDED[key], key)
+
+
 if __name__ == '__main__':
     unittest.main()
