@@ -29,8 +29,8 @@ Open the in-game menu with **Insert** (or **R3 + L2** on a controller) and go to
 ## Made for ICO fans: ICO horns
 
 Only in this port. One of the boy's treasure outfits, Horned Apparel, is the Ico one. The game's
-own script calls it "the horned garment", yet the boy never had any horns. So we gave him a pair:
-bone white with a black tip and a small tuft of hair at the base, just like Ico.
+own script calls it "the horned garment", yet the boy never had any horns. So we gave him a pair,
+just like Ico.
 
 <p align="center"><img src="screenshots/fun/ico-horns-before-after.jpg" width="60%" alt="Horned Apparel without and with the ICO horns"><br><sub>Horned Apparel, before and after</sub></p>
 
