@@ -41,6 +41,13 @@ int zarchive_child(ZArchive *archive, int64_t node, uint32_t index, char *name, 
 uint64_t zarchive_read(ZArchive *archive, int64_t node, uint64_t offset, void *buffer,
                        uint64_t length);
 
+/* Counters since the last call (then reset): bytes handed to the game and time in those reads
+ * (disk + unpack + cache), bytes read from disk and time, bytes unpacked and time. */
+typedef struct ZArchiveStats {
+    uint64_t served_bytes, read_ns, disk_bytes, disk_ns, unpack_bytes, unpack_ns;
+} ZArchiveStats;
+void zarchive_take_stats(ZArchiveStats *out);
+
 /* Packs folder (its contents at the archive root) into out_path. Progress lines go to stdout.
  * 0 on success; on failure the partial output is removed and the reason printed to stderr. */
 int zarchive_pack(const char *folder, const char *out_path);

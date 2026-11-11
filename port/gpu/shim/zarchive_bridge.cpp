@@ -24,6 +24,11 @@
 
 namespace fs = std::filesystem;
 
+// Counters in third_party/zarchive/src/zarchivereader.cpp (TLG addition).
+extern std::atomic<uint64_t> g_tlg_zar_disk_bytes, g_tlg_zar_disk_ns, g_tlg_zar_unpack_bytes,
+    g_tlg_zar_unpack_ns;
+static std::atomic<uint64_t> g_served_bytes{0}, g_read_ns{0};
+
 namespace {
 constexpr size_t kReaders = 4;
 
@@ -52,6 +57,9 @@ struct ZArchive {
     std::atomic<uint32_t> next{0};
     ZArchiveReader* tree() const { return slots[0].reader.get(); }
 };
+
+static uint64_t read_pooled(ZArchive* archive, int64_t node, uint64_t offset, void* buffer,
+                            uint64_t length);
 
 extern "C" {
 
@@ -135,6 +143,28 @@ uint64_t zarchive_read(ZArchive* archive, int64_t node, uint64_t offset, void* b
                        uint64_t length) {
     if (!archive || node < 0 || !buffer || !length)
         return 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    const uint64_t n = read_pooled(archive, node, offset, buffer, length);
+    g_served_bytes.fetch_add(n, std::memory_order_relaxed);
+    g_read_ns.fetch_add(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now() - t0).count(),
+                        std::memory_order_relaxed);
+    return n;
+}
+
+void zarchive_take_stats(ZArchiveStats* out) {
+    out->served_bytes = g_served_bytes.exchange(0);
+    out->read_ns = g_read_ns.exchange(0);
+    out->disk_bytes = g_tlg_zar_disk_bytes.exchange(0);
+    out->disk_ns = g_tlg_zar_disk_ns.exchange(0);
+    out->unpack_bytes = g_tlg_zar_unpack_bytes.exchange(0);
+    out->unpack_ns = g_tlg_zar_unpack_ns.exchange(0);
+}
+
+} // extern "C"
+
+static uint64_t read_pooled(ZArchive* archive, int64_t node, uint64_t offset, void* buffer,
+                            uint64_t length) {
     const uint32_t start = archive->next.fetch_add(1, std::memory_order_relaxed);
     for (size_t i = 0; i < kReaders; ++i) {
         Slot& slot = archive->slots[(start + i) % kReaders];
@@ -147,6 +177,8 @@ uint64_t zarchive_read(ZArchive* archive, int64_t node, uint64_t offset, void* b
     std::lock_guard lock(slot.mutex);
     return slot.reader->ReadFromFile(static_cast<ZArchiveNodeHandle>(node), offset, length, buffer);
 }
+
+extern "C" {
 
 namespace {
 struct PackOutput {

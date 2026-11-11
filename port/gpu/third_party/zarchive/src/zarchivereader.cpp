@@ -5,6 +5,15 @@
 
 #include <zstd.h>
 #include <cassert>
+#include <atomic>
+#include <chrono>
+
+// TLG: read and unpack counters for the log (issue #72); read by zarchive_bridge.cpp.
+std::atomic<uint64_t> g_tlg_zar_disk_bytes{0}, g_tlg_zar_disk_ns{0}, g_tlg_zar_unpack_bytes{0}, g_tlg_zar_unpack_ns{0};
+static uint64_t _tlg_now_ns()
+{
+	return (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 static uint64_t _istream_getFileSize(std::istream& stream)
 {
@@ -343,15 +352,23 @@ bool ZArchiveReader::LoadBlock(CacheBlock* block)
 	if ((offset + compressedSize) > m_compressedDataSize)
 		return false;
 	offset += m_compressedDataOffset;
+	const uint64_t readStart = _tlg_now_ns(); // TLG: counters
+	g_tlg_zar_disk_bytes.fetch_add(compressedSize, std::memory_order_relaxed);
 	if (compressedSize == _ZARCHIVE::COMPRESSED_BLOCK_SIZE)
 	{
 		// uncompressed block, read directly into cached block
-		return _istream_readBytes(*m_stream, offset, block->data, compressedSize);
+		const bool ok = _istream_readBytes(*m_stream, offset, block->data, compressedSize);
+		g_tlg_zar_disk_ns.fetch_add(_tlg_now_ns() - readStart, std::memory_order_relaxed);
+		return ok;
 	}
 	if (!_istream_readBytes(*m_stream, offset, m_blockDecompressionBuffer.data(), compressedSize))
 		return false;
+	const uint64_t unpackStart = _tlg_now_ns();
+	g_tlg_zar_disk_ns.fetch_add(unpackStart - readStart, std::memory_order_relaxed);
 	// decompress
 	size_t outputSize = ZSTD_decompress(block->data, _ZARCHIVE::COMPRESSED_BLOCK_SIZE, m_blockDecompressionBuffer.data(), compressedSize);
+	g_tlg_zar_unpack_ns.fetch_add(_tlg_now_ns() - unpackStart, std::memory_order_relaxed);
+	g_tlg_zar_unpack_bytes.fetch_add(_ZARCHIVE::COMPRESSED_BLOCK_SIZE, std::memory_order_relaxed);
 	return outputSize == _ZARCHIVE::COMPRESSED_BLOCK_SIZE;
 }
 
