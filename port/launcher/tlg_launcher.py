@@ -140,6 +140,10 @@ TEXT = {
     'Borderless': 'Borderless window',
     'Fullscreen': 'Fullscreen',
     'vsync': 'VSync',
+    'gpu': 'Graphics card',
+    'gpu_auto': 'Automatic (most video memory)',
+    'gpu_hint': ('Which graphics card runs the game. The list fills after the first start. On a PC with two cards, '
+                 'pick the integrated one to test a weak-GPU problem. Automatic takes the card with the most video memory.'),
     'frame_rate': 'Frame rate (experimental)',
     'resolution': 'Resolution',
     'resolution_hint': 'Rendered natively; wider than 16:9 shows more of the scene and moves the HUD out to the edges',
@@ -1356,6 +1360,30 @@ class Launcher:
             ttk.Label(mod, text=item.what, foreground=DIM, wraplength=900, justify='left').grid(
                 row=1, column=0, sticky='w', pady=(6, 0))
 
+    def build_gpu_choice(self, parent, row):
+        """Video > Graphics card: Automatic or one of <user>/gpus.txt, which the game writes at every
+        start (the GPU lines in the log). Setting gpu_id -> TLG_GPU_ID; a stale index falls back to
+        automatic in the game with a log line."""
+        try:
+            names = [n for n in (tlg_run.gpu_user_dir() / 'gpus.txt').read_text(encoding='utf-8').splitlines() if n]
+        except OSError:
+            names = []
+        values = [-1] + list(range(len(names)))
+        current = int(self.settings.get('gpu_id', -1))
+        if current not in values:
+            current = -1
+        ttk.Label(parent, text=self.t('gpu')).grid(row=row, column=0, sticky='w', pady=(6, 0))
+        box = ttk.Combobox(parent, values=[self.t('gpu_auto')] + [f'{i}: {n}' for i, n in enumerate(names)],
+                           state='readonly', width=28)
+        box.current(values.index(current))
+        box.grid(row=row, column=1, sticky='w', padx=6, pady=2)
+        self.hint(parent, row, 2, 'gpu_hint')
+
+        def picked(_):
+            self.settings['gpu_id'] = values[box.current()]
+            tlg_run.save_settings(self.settings)
+        box.bind('<<ComboboxSelected>>', picked)
+
     def build_video(self):
         """Video: display, frame rate, resolution, anti-aliasing, frame generation | video memory."""
         win = self.video_window = Page(self, 'video')
@@ -1369,6 +1397,7 @@ class Launcher:
         self.combo(video, 0, 'display_mode', DISPLAY_MODES, lambda k: self.t(k))
         self.check(video, 1, 'vsync')
         self.check(video, 2, 'show_fps')
+        self.build_gpu_choice(video, 3)
         self.combo(video, 5, 'frame_rate', tlg_run.FRAME_RATES, lambda k: self.t(f'fps_{k}'),
                    on_change=lambda: (self.update_fg(), self.refresh_status()))
         self.hint(video, 5, 2, 'fps_hint')
