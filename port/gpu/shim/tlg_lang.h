@@ -13,6 +13,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -278,14 +279,18 @@ inline std::vector<ExtraFont> ExtraFontCandidates() {
     // No pack in another script: Japanese first, for the Japanese title in the menu's heading.
     const bool japanese = code.rfind("ja", 0) == 0 || !NeedsExtraFont();
     const bool korean = code.rfind("ko", 0) == 0;
+    // Traditional Chinese (zh_TW, zh_HK): a Traditional font first, so the characters take the Taiwan forms.
+    const bool traditional = code == "zh_TW" || code == "zh_HK";
 #ifdef _WIN32
     const char* windir = std::getenv("WINDIR");
     const std::string fonts = std::string(windir && *windir ? windir : "C:\\Windows") + "\\Fonts\\";
     const std::vector<ExtraFont> ja = {{fonts + "YuGothM.ttc", 0}, {fonts + "meiryo.ttc", 0}, {fonts + "msgothic.ttc", 0}};
-    const std::vector<ExtraFont> zh = {{fonts + "msyh.ttc", 0}, {fonts + "simsun.ttc", 0}};
+    const std::vector<ExtraFont> zh = traditional
+        ? std::vector<ExtraFont>{{fonts + "msjh.ttc", 0}, {fonts + "mingliu.ttc", 0}, {fonts + "msyh.ttc", 0}, {fonts + "simsun.ttc", 0}}
+        : std::vector<ExtraFont>{{fonts + "msyh.ttc", 0}, {fonts + "simsun.ttc", 0}};
     const std::vector<ExtraFont> ko = {{fonts + "malgun.ttf", 0}};
 #else
-    // Noto Sans CJK collections: face 0 Japanese, 1 Korean, 2 Simplified Chinese.
+    // Noto Sans CJK collections: face 0 Japanese, 1 Korean, 2 Simplified, 3 Traditional Chinese.
     const char* noto[] = {"/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
                           "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
                           "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
@@ -293,7 +298,8 @@ inline std::vector<ExtraFont> ExtraFontCandidates() {
     std::vector<ExtraFont> ja, zh, ko;
     for (const char* path : noto) {
         ja.push_back({path, 0});
-        zh.push_back({path, 2});
+        const bool single = std::string_view(path).ends_with(".otf"); // one face only
+        zh.push_back({path, single ? 0 : traditional ? 3 : 2});
         ko.push_back({path, 1});
     }
     for (const char* path : {"/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc",

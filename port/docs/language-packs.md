@@ -25,19 +25,31 @@ Shipped packs:
 | `de` | Deutsch | Machine translation, needs a native check |
 | `es` | Español | Machine translation, needs a native check |
 | `fr` | Français | Machine translation, needs a native check |
+| `it` | Italiano | Machine translation, needs a native check |
 | `ja` | 日本語 | Machine translation, needs a native check |
+| `ko` | 한국어 | Machine translation, needs a native check |
+| `nl` | Nederlands | Machine translation, needs a native check |
+| `pl` | Polski | Machine translation, needs a native check |
 | `pt_BR` | Português (Brasil) | HayatoG's original translation from [HayatoG/tlg_pc](https://github.com/HayatoG/tlg_pc) |
+| `pt_PT` | Português (Portugal) | Machine translation, needs a native check |
+| `tr` | Türkçe | Machine translation, needs a native check |
+| `uk` | Українська | Machine translation, needs a native check |
 | `zh_CN` | 简体中文 | Machine translation, needs a native check |
+| `zh_TW` | 繁體中文 | Machine translation, needs a native check |
 
 **Your own packs** go in the `lang/` folder inside the port's `user/` folder (create it). A pack
 there with the same code as a shipped one replaces it, so you can fix a translation without
 waiting for a release.
 
+Latin and Cyrillic packs (Polish, Turkish, Ukrainian, ...) need nothing extra: the menu font has
+those letters.
+
 **Japanese, Chinese and Korean in the in-game menu** need a font with those characters. The menu
 font has none, so the game merges in a system font:
 
-- Windows: Yu Gothic, Meiryo or MS Gothic for Japanese; Microsoft YaHei or SimSun for Chinese;
-  Malgun Gothic for Korean. All of these come with Windows.
+- Windows: Yu Gothic, Meiryo or MS Gothic for Japanese; Microsoft YaHei or SimSun for Simplified
+  Chinese; Microsoft JhengHei or MingLiU for Traditional Chinese; Malgun Gothic for Korean. All of
+  these come with Windows.
 - Linux: Noto Sans CJK (`noto-fonts-cjk` on Arch/CachyOS, `fonts-noto-cjk` on Debian/Ubuntu,
   `google-noto-sans-cjk-fonts` on Fedora), or WenQuanYi Micro Hei.
 
