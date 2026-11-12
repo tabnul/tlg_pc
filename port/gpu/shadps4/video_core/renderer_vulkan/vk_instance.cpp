@@ -114,10 +114,24 @@ Instance::Instance(const Frontend::WindowSystemInfo& window_info, s32 physical_d
     ASSERT_MSG(num_physical_devices > 0, "No physical devices found");
     LOG_INFO(Render_Vulkan, "Found {} physical devices", num_physical_devices);
     // tlg: the device list in the game log tells a missing driver apart from a wrong choice.
-    for (std::size_t i = 0; i < num_physical_devices; ++i) {
-        const auto props = physical_devices[i].getProperties();
-        std::printf("GPU %zu: %s (%s)\n", i, props.deviceName.data(),
-                    vk::to_string(props.deviceType).c_str());
+    // The same list goes to <user>/gpus.txt for the launcher's Graphics card choice (Video page).
+    {
+        const char* user = std::getenv("TLG_GPU_USER_DIR");
+        std::FILE* list = user && user[0] ? std::fopen((std::string(user) + "/gpus.txt").c_str(), "w") : nullptr;
+        for (std::size_t i = 0; i < num_physical_devices; ++i) {
+            const auto props = physical_devices[i].getProperties();
+            std::printf("GPU %zu: %s (%s)
+", i, props.deviceName.data(),
+                        vk::to_string(props.deviceType).c_str());
+            if (list) {
+                std::fprintf(list, "%s (%s)
+", props.deviceName.data(),
+                             vk::to_string(props.deviceType).c_str());
+            }
+        }
+        if (list) {
+            std::fclose(list);
+        }
     }
     // tlg: a saved choice can outlive its GPU (removed card, new driver order).
     if (physical_device_index >= static_cast<s32>(num_physical_devices)) {

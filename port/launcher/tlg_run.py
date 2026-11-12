@@ -222,6 +222,7 @@ DEFAULT_SETTINGS = {
     'vsync': True,
     'level_select': False,         # tlg.ini; tlg_lua.cpp
     'debug_logging': False,        # DEBUG_LOG_ENV
+    'gpu_id': -1,                  # TLG_GPU_ID: index in <user>/gpus.txt; -1 = automatic (most video memory)
     'vram_budget_mb': 7000,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
@@ -936,6 +937,8 @@ def build_env(settings, extra=None):
     if settings.get('debug_logging'):
         for key, value in DEBUG_LOG_ENV.items():
             env.setdefault(key, value)
+    if int(settings.get('gpu_id', -1)) >= 0:
+        env.setdefault('TLG_GPU_ID', str(int(settings['gpu_id'])))
     if extra:
         env.update(extra)
     return env
