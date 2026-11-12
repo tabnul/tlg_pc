@@ -82,7 +82,7 @@
     "launcher.vsync": "垂直同步",
     "launcher.gpu": "显卡",
     "launcher.gpu_auto": "自动（显存最大）",
-    "launcher.gpu_hint": "由哪块显卡运行游戏。列表在首次启动后填充。在有两块显卡的电脑上，选择集成显卡可测试弱显卡问题。自动会选择显存最大的显卡。",
+    "launcher.gpu_hint": "由哪块显卡运行游戏。在有两块显卡的电脑上，选择集成显卡可测试弱显卡问题。自动会选择显存最大的显卡。",
     "launcher.frame_rate": "帧率（实验性）",
     "launcher.resolution": "分辨率",
     "launcher.resolution_hint": "原生渲染；宽于 16:9 时可看到更多场景，HUD 会移到画面边缘",

@@ -82,7 +82,7 @@
     "launcher.vsync": "VSync",
     "launcher.gpu": "Tarjeta gráfica",
     "launcher.gpu_auto": "Automático (más memoria de vídeo)",
-    "launcher.gpu_hint": "Qué tarjeta gráfica ejecuta el juego. La lista se llena tras el primer inicio. En un PC con dos tarjetas, elige la integrada para probar un problema de GPU débil. Automático toma la tarjeta con más memoria de vídeo.",
+    "launcher.gpu_hint": "Qué tarjeta gráfica ejecuta el juego. En un PC con dos tarjetas, elige la integrada para probar un problema de GPU débil. Automático toma la tarjeta con más memoria de vídeo.",
     "launcher.frame_rate": "Tasa de fotogramas (experimental)",
     "launcher.resolution": "Resolución",
     "launcher.resolution_hint": "Renderizado nativo; más ancho que 16:9 muestra más de la escena y lleva el HUD hacia los bordes",

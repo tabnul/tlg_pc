@@ -8,6 +8,7 @@ Settings live in ~/.config/tlg-launcher/settings.json (%APPDATA% on Windows).
 """
 import locale
 import os
+import re
 from pathlib import Path
 import queue
 import subprocess
@@ -142,7 +143,7 @@ TEXT = {
     'vsync': 'VSync',
     'gpu': 'Graphics card',
     'gpu_auto': 'Automatic (most video memory)',
-    'gpu_hint': ('Which graphics card runs the game. The list fills after the first start. On a PC with two cards, '
+    'gpu_hint': ('Which graphics card runs the game. On a PC with two cards, '
                  'pick the integrated one to test a weak-GPU problem. Automatic takes the card with the most video memory.'),
     'frame_rate': 'Frame rate (experimental)',
     'resolution': 'Resolution',
@@ -1361,13 +1362,10 @@ class Launcher:
                 row=1, column=0, sticky='w', pady=(6, 0))
 
     def build_gpu_choice(self, parent, row):
-        """Video > Graphics card: Automatic or one of <user>/gpus.txt, which the game writes at every
-        start (the GPU lines in the log). Setting gpu_id -> TLG_GPU_ID; a stale index falls back to
-        automatic in the game with a log line."""
-        try:
-            names = [n for n in (tlg_run.gpu_user_dir() / 'gpus.txt').read_text(encoding='utf-8').splitlines() if n]
-        except OSError:
-            names = []
+        """Video > Graphics card: Automatic or one of the cards Vulkan lists (tlg_run.gpu_list, the
+        same order as the game's own choice). Setting gpu_id -> TLG_GPU_ID; a stale index falls
+        back to automatic in the game with a log line."""
+        names = [f'{name} ({kind})' for name, kind in tlg_run.gpu_list()]
         values = [-1] + list(range(len(names)))
         current = int(self.settings.get('gpu_id', -1))
         if current not in values:

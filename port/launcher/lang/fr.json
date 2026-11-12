@@ -82,7 +82,7 @@
     "launcher.vsync": "VSync",
     "launcher.gpu": "Carte graphique",
     "launcher.gpu_auto": "Automatique (le plus de mémoire vidéo)",
-    "launcher.gpu_hint": "Quelle carte graphique fait tourner le jeu. La liste se remplit après le premier lancement. Sur un PC à deux cartes, choisissez la carte intégrée pour tester un problème de GPU faible. Automatique prend la carte avec le plus de mémoire vidéo.",
+    "launcher.gpu_hint": "Quelle carte graphique fait tourner le jeu. Sur un PC à deux cartes, choisissez la carte intégrée pour tester un problème de GPU faible. Automatique prend la carte avec le plus de mémoire vidéo.",
     "launcher.frame_rate": "Fréquence d'images (expérimental)",
     "launcher.resolution": "Résolution",
     "launcher.resolution_hint": "Rendu natif ; plus large que 16:9 montre davantage de la scène et déplace le HUD vers les bords",

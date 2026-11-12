@@ -222,7 +222,7 @@ DEFAULT_SETTINGS = {
     'vsync': True,
     'level_select': False,         # tlg.ini; tlg_lua.cpp
     'debug_logging': False,        # DEBUG_LOG_ENV
-    'gpu_id': -1,                  # TLG_GPU_ID: index in <user>/gpus.txt; -1 = automatic (most video memory)
+    'gpu_id': -1,                  # TLG_GPU_ID: index in gpu_list(); -1 = automatic (most video memory)
     'vram_budget_mb': 7000,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
@@ -719,6 +719,25 @@ def pad_tool():
     """out/tlg-pad-tool(.exe): the launcher's Controller page reads controllers through it; None if absent."""
     path = OUT_DIR / ('tlg-pad-tool.exe' if os.name == 'nt' else 'tlg-pad-tool')
     return path if path.is_file() else None
+
+
+def gpu_list():
+    """The graphics cards Vulkan finds, as (name, type) in the game's own order (TLG_GPU_ID index):
+    out/tlg-gpu-capabilities --list (tools/gpu_capabilities.c). Empty when the tool is missing or fails."""
+    tool = OUT_DIR / ('tlg-gpu-capabilities.exe' if os.name == 'nt' else 'tlg-gpu-capabilities')
+    if not tool.is_file():
+        return []
+    try:
+        out = subprocess.run([str(tool), '--list'], capture_output=True, text=True, timeout=10,
+                             **(detach_options() if os.name == 'nt' else {})).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    cards = []
+    for line in out.splitlines():
+        parts = line.split('	')
+        if len(parts) == 3 and parts[0].isdigit():
+            cards.append((parts[1], parts[2]))
+    return cards
 
 
 def play_command():
