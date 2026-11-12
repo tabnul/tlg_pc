@@ -12,6 +12,9 @@
 // everywhere. So let's just move the handling of the failed assert to a single cpp file.
 
 void assert_fail_impl();
+// tlg: the exit code a failed assertion stops with (23 = generic GPU check, 24 = out of
+// memory, 25 = GPU device lost). The launcher shows a matching sentence per code.
+void assert_set_stop_code(int code);
 [[noreturn]] void unreachable_impl();
 
 #ifdef _MSC_VER
@@ -31,6 +34,16 @@ void assert_fail_impl();
 #define ASSERT_MSG(_a_, ...)                                                                       \
     do {                                                                                           \
         if (!(_a_)) [[unlikely]] {                                                                 \
+            LOG_CRITICAL(Debug, "Assertion Failed!\n" __VA_ARGS__);                                \
+            assert_fail_impl();                                                                    \
+        }                                                                                          \
+    } while (false)
+
+// tlg: ASSERT_MSG that stops with its own exit code (see assert_set_stop_code).
+#define ASSERT_CODE_MSG(_a_, _code_, ...)                                                          \
+    do {                                                                                           \
+        if (!(_a_)) [[unlikely]] {                                                                 \
+            assert_set_stop_code(_code_);                                                          \
             LOG_CRITICAL(Debug, "Assertion Failed!\n" __VA_ARGS__);                                \
             assert_fail_impl();                                                                    \
         }                                                                                          \

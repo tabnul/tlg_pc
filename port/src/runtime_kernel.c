@@ -183,7 +183,7 @@ static ABI __attribute__((noreturn)) void raise_exception(uint32_t code,uint64_t
     fprintf(stderr,"STOP: guest raised debug exception code=0x%x argument=0x%llx\n",code,(unsigned long long)argument);
     runtime_report();
     fflush(NULL);
-    _exit(23); /* no destructors: GPU, audio and guest threads are still running (#189) */
+    _exit(26); /* game exception; no destructors: GPU, audio and guest threads are still running (#189) */
 }
 /* The process was started without arguments other than its own name. */
 static const char *guest_argv[]={"eboot.bin",NULL};
@@ -211,7 +211,7 @@ static ABI __attribute__((noreturn)) void unwind_resume(void) {
     fputs("STOP: guest C++ exception unwinding (sigreturn/__Ux86_64_setcontext) is not supported\n",stderr);
     runtime_report();
     fflush(NULL);
-    _exit(23); /* no destructors: GPU, audio and guest threads are still running */
+    _exit(26); /* game exception; no destructors: GPU, audio and guest threads are still running */
 }
 static ABI int32_t print_backtrace(void) {
     fputs("Runtime: guest requested a backtrace (not available)\n",stderr);

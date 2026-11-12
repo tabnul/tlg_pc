@@ -1587,7 +1587,13 @@ const Buffer* BufferCache::GetArena(u64 first_block, u64 last_block) {
     auto* new_arena = &arenas.emplace_back(instance, base_addr, total_size, MemoryType::Sparse);
     new_arena->PresizeWriteTicks();
     if (any_arena) {
-        LOG_WARNING(Render, "Migrating arena ({} pages of {} MiB)", num_pages, arena_page_size >> 20);
+        u64 arena_bytes = 0;
+        for (const Buffer& arena : arenas) {
+            arena_bytes += arena.SizeBytes();
+        }
+        // tlg: the arena total counts against the card's sparse address space (log start).
+        LOG_WARNING(Render, "Migrating arena ({} pages of {} MiB); {} arenas, {} MiB in total",
+                    num_pages, arena_page_size >> 20, arenas.size(), arena_bytes >> 20);
         const u64 base_block = base_addr >> block_shift;
         const u64 end_block = (base_addr + total_size) >> block_shift;
         auto* bind = BindsForArena(new_arena);
@@ -1642,7 +1648,8 @@ void BufferCache::EnsureResident(const Buffer* arena, u64 first_block, u64 last_
                      alloc_info.allocationSize >> 20,
                      TlgStats::arena_resident_bytes.load(std::memory_order_relaxed) >> 20);
     }
-    ASSERT_MSG(alloc_result == vk::Result::eSuccess, "Failed to allocate buffer arena memory: {}",
+    ASSERT_CODE_MSG(alloc_result == vk::Result::eSuccess, 24,
+                    "Failed to allocate buffer arena memory: {}",
                vk::to_string(alloc_result));
     TlgStats::arena_resident_bytes.fetch_add(alloc_info.allocationSize, std::memory_order_relaxed);
     backing_blocks[static_cast<VkDeviceMemory>(device_memory)] += resident_blocks;
@@ -2013,7 +2020,8 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
     if (submit_result == vk::Result::eErrorDeviceLost) {
         instance.ReportDeviceFault("arena bind submit");
     }
-    ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
+    ASSERT_CODE_MSG(submit_result != vk::Result::eErrorDeviceLost, 25,
+                    "Device lost during submit");
     // tlg: from the SotC port (@Madmer, thanks): out of video and system memory the driver may
     // refuse the bind; the semaphore the next submit waits for was then never signalled and the
     // game froze for good. Once more after the earlier binds are done, else the semaphore is
@@ -2025,7 +2033,8 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
         if (submit_result == vk::Result::eErrorDeviceLost) {
         instance.ReportDeviceFault("arena bind submit");
     }
-    ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
+    ASSERT_CODE_MSG(submit_result != vk::Result::eErrorDeviceLost, 25,
+                    "Device lost during submit");
     }
     if (submit_result != vk::Result::eSuccess) {
         const vk::SemaphoreSignalInfo signal_info = {.semaphore = signal_sema,

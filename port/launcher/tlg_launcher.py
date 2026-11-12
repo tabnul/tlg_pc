@@ -469,6 +469,9 @@ TEXT = {
     'running': 'Playing — log:',
     'ended': 'Game closed (exit code {code}).',
     'crashed': 'The game closed with an error (code {code}). The log has the details.',
+    'crashed_memory': 'The game ran out of memory (code {code}). The log has the details.',
+    'crashed_device': 'The graphics driver stopped responding (code {code}). The log has the details.',
+    'crashed_game': 'The game stopped on an internal error (code {code}). The log has the details.',
     'already': 'The game is already running.',
     'error': 'Error',
 }
@@ -2973,7 +2976,9 @@ class Launcher:
                     if kind == 'error':
                         messagebox.showerror(self.t('error'), value)
                     else:
-                        message = self.t('ended' if value in (0, -15) else 'crashed', code=value)
+                        message = self.t('ended' if value in (0, -15) else
+                                         {24: 'crashed_memory', 25: 'crashed_device',
+                                          26: 'crashed_game'}.get(value, 'crashed'), code=value)
                         self.append(message)
                         if value not in (0, -15):
                             messagebox.showwarning(TITLE, message)

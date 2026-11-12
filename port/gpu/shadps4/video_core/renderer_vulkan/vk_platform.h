@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <source_location>
 #include <fmt/format.h>
 
 #include "common/assert.h"
@@ -50,23 +51,37 @@ void SetObjectName(vk::Device device, const HandleType& handle, const char* form
     SetObjectName(device, handle, debug_name);
 }
 
+// tlg: a failed check names its caller and stops with a code per kind (assert_set_stop_code).
+inline void CheckFailed(vk::Result r, const char* what, const std::source_location& loc) {
+    if (r == vk::Result::eErrorOutOfHostMemory || r == vk::Result::eErrorOutOfDeviceMemory ||
+        r == vk::Result::eErrorOutOfPoolMemory) {
+        assert_set_stop_code(24);
+    } else if (r == vk::Result::eErrorDeviceLost) {
+        assert_set_stop_code(25);
+    }
+    const char* file = loc.file_name();
+    for (const char* p = file; *p; ++p) {
+        if (*p == '/' || *p == '\\') {
+            file = p + 1;
+        }
+    }
+    LOG_CRITICAL(Render, "Vulkan call failed at {}:{} ({}){}{}: vk::Result={}", file, loc.line(),
+                 loc.function_name(), *what ? ": failed to " : "", what, vk::to_string(r));
+    assert_fail_impl();
+}
+
 template <StringLiteral msg = "">
-static void Check(vk::Result r) {
-    if constexpr (msg.len <= 1) {
-        ASSERT_MSG(r == vk::Result::eSuccess, "vk::Result={}", vk::to_string(r));
-    } else {
-        ASSERT_MSG(r == vk::Result::eSuccess, "Failed to {}: vk::Result={}", msg.value,
-                   vk::to_string(r));
+static void Check(vk::Result r, const std::source_location loc = std::source_location::current()) {
+    if (r != vk::Result::eSuccess) [[unlikely]] {
+        CheckFailed(r, msg.value, loc);
     }
 }
 
 template <StringLiteral msg = "", typename T>
-static T Check(vk::ResultValue<T> r) {
-    if constexpr (msg.len <= 1) {
-        ASSERT_MSG(r.result == vk::Result::eSuccess, "vk::Result={}", vk::to_string(r.result));
-    } else {
-        ASSERT_MSG(r.result == vk::Result::eSuccess, "Failed to {}: vk::Result={}", msg.value,
-                   vk::to_string(r.result));
+static T Check(vk::ResultValue<T> r,
+               const std::source_location loc = std::source_location::current()) {
+    if (r.result != vk::Result::eSuccess) [[unlikely]] {
+        CheckFailed(r.result, msg.value, loc);
     }
     return std::move(r.value);
 }

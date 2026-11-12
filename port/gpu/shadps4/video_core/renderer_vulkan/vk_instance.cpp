@@ -862,6 +862,15 @@ void Instance::CollectDeviceParameters() {
                 IsIntegrated() ? " (integrated)" : "", properties.vendorID, properties.deviceID);
     std::printf("System: driver %s %s (%s), Vulkan %s\n", vendor_name.c_str(),
                 driver.driverInfo.data(), driver_version.c_str(), api_version.c_str());
+    std::printf("System: sparse address space %llu MiB, max buffer %llu MiB\n",
+                static_cast<unsigned long long>(properties.limits.sparseAddressSpaceSize >> 20),
+                static_cast<unsigned long long>(
+                    physical_device
+                        .getProperties2<vk::PhysicalDeviceProperties2,
+                                        vk::PhysicalDeviceVulkan13Properties>()
+                        .get<vk::PhysicalDeviceVulkan13Properties>()
+                        .maxBufferSize >>
+                    20));
 }
 
 void Instance::CollectPhysicalMemoryInfo() {

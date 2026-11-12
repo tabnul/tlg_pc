@@ -475,7 +475,8 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     if (submit_result == vk::Result::eErrorDeviceLost) {
         instance.ReportDeviceFault("graphics submit");
     }
-    ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
+    ASSERT_CODE_MSG(submit_result != vk::Result::eErrorDeviceLost, 25,
+                    "Device lost during submit");
 
     work_semaphore.Refresh();
     AllocateWorkerCommandBuffers();
