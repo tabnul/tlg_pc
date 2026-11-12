@@ -3876,8 +3876,19 @@ void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool
             const u32 stride = vb.GetStride();
             const auto* base = reinterpret_cast<const u8*>(vb.base_address);
             float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+            // #68 #78: these reads happen on the GPU command thread. Bytes the GPU still owns
+            // (written by a pass the CPU has not downloaded, or by a draw not yet recorded) would
+            // trip the read-fault handler from inside the recording and lose the device (AMD
+            // Linux at the first frame, once hdr_ui_phase let 3D draws reach this). Skip those:
+            // the piece keeps the last position.
+            const auto gpu_owned = [this](VAddr address, u64 size) {
+                auto* self = const_cast<Rasterizer*>(this);
+                return self->buffer_cache.IsRegionGpuModified(address, size) ||
+                       self->PendingWriteOverlaps(address, size);
+            };
             if (base && stride >= 8 && vb.num_records >= 3 &&
-                vb.GetNumberFmt() == AmdGpu::NumberFormat::Float) {
+                vb.GetNumberFmt() == AmdGpu::NumberFormat::Float &&
+                !gpu_owned(vb.base_address, u64(vb.num_records) * stride)) {
                 // The quad's own vertices: the buffer is a shared ring, so go through the
                 // draw's vertex offset and (when indexed) its index buffer.
                 const u32 first = GetDrawOffsets(regs, vs, fetch).first;
@@ -3889,6 +3900,10 @@ void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool
                                      u64(draw_inputs.index_offset) * index_size)
                                : nullptr;
                 const u32 count = std::min<u32>(regs.num_indices, 16384);
+                if (indices && gpu_owned(reinterpret_cast<VAddr>(indices), u64(count) * index_size)) {
+                    indices = nullptr;
+                    x0 = 1e9f; // unknown position: keep the last piece's
+                } else
                 for (u32 i = 0; i < count; ++i) {
                     u32 v = i;
                     if (indices) {
@@ -3922,7 +3937,8 @@ void Rasterizer::UpdateDynamicState(const GraphicsPipeline* pipeline, const bool
                 if (x0 < x1 && x0 > -0.5f && x1 < 0.5f && std::abs(x0 + x1) < 0.01f) {
                     for (const auto& res : vs.buffers) {
                         const auto cb = res.GetSharp(vs);
-                        if (cb.base_address && cb.GetSize() == 304) {
+                        if (cb.base_address && cb.GetSize() == 304 &&
+                            !gpu_owned(cb.base_address, 304)) {
                             float c[20];
                             std::memcpy(c, reinterpret_cast<const void*>(cb.base_address), sizeof(c));
                             if (c[19] == 1.f && std::abs(c[16]) <= 1.f && std::abs(c[17]) <= 1.f)
