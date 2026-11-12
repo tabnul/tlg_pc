@@ -191,6 +191,8 @@ private:
     void FinishCompilations();
     void SeedWorkerCaches();
     bool CheckCacheProfile();
+    void SaveCacheHeader();
+    void RebuildIfDamaged(u32 failed_builds);
     void OnColdCache();
     struct BackgroundWarmup;
     struct WarmStage;
@@ -228,6 +230,7 @@ private:
     /// tlg: this session started a new pipeline cache and compiles graphics pipelines
     /// synchronously (OnColdCache).
     std::atomic<bool> cold_cache_sync{};
+    std::atomic<u32> cache_damaged{}; ///< damaged cache entries seen by the warm-up
     Shader::Pools pools;
     CompilerPool<Shader::Pools> compiler_pools{8};
     std::unique_ptr<AsyncCompiler> compiler, capture_compiler;
