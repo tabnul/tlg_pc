@@ -170,7 +170,8 @@ class TkPathTests(unittest.TestCase):
                 _, log = tlg_run.launch(settings, header=['Frame rate: test'])
             self.assertEqual(str(log), popen.call_args.kwargs['stdout'].name)
             self.assertNotIn('start_new_session', popen.call_args.kwargs)
-            self.assertEqual('Frame rate: test\n', log.read_text(encoding='utf-8'))
+            # Every log starts with the build line (tlg_run.build_info), then the header.
+            self.assertRegex(log.read_text(encoding='utf-8'), r'\ABuild: \S+.*\nFrame rate: test\n\Z')
 
 
 class FileLimitTests(unittest.TestCase):

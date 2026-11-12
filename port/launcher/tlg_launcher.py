@@ -64,6 +64,38 @@ TEXT = {
     'home_logs': 'Debug',
     'tab_log': 'Log',
     'tab_bench': 'Benchmark',
+    'tab_flags': 'Flags',
+    'flags_warning': ('For bug reports only. Change these only when you are asked to in an issue on GitHub. '
+                      'A wrong setting can make the game slower or crash it. "Restore defaults" puts everything back. '
+                      'Changes apply the next time the game starts; the log lists every switch you changed.'),
+    'flags_restore': 'Restore defaults',
+    'flags_logging': 'Logging',
+    'flags_crash': 'Crash tests',
+    'flags_memory': 'Memory tests',
+    'log_gpu': 'GPU messages',
+    'log_gpu_hint': 'The graphics emulation also logs its info messages, not only warnings.',
+    'log_vk_fault': 'GPU crash report',
+    'log_vk_fault_hint': 'When the graphics card gives up (device lost), the log says which draw and which address faulted. Needs driver support.',
+    'log_writes': 'Game memory writes',
+    'log_writes_hint': 'Keeps the latest GPU writes to game memory, for a crash report.',
+    'log_page_history': 'Page history',
+    'log_page_history_hint': 'Keeps the latest memory page tracking changes, for a fault loop report.',
+    'log_perf_diag': 'GPU wait report',
+    'log_perf_diag_hint': 'Logs where the game waits for the graphics card.',
+    'log_stop_report': 'Slow frame report',
+    'log_stop_report_hint': 'When a frame takes longer than 250 ms, logs what every thread is doing.',
+    'flag_hdr_hint_rule': 'HDR hint box rule',
+    'flag_hdr_hint_rule_hint': 'Since v0.9.2: places the 21:9 HDR hint boxes. Test switch (issues #68, #78): turn it off to check whether a crash at start comes from it.',
+    'flag_bind_guard': 'Bind guard',
+    'flag_bind_guard_hint': 'Fix for a crash while loading. Test switch: off is the behaviour without the fix.',
+    'flag_reinit_lock': 'Re-init lock',
+    'flag_reinit_lock_hint': 'Fix for the load crash in issue #19. Test switch: off is the behaviour without the fix.',
+    'flag_fault_nodrain': 'Fault no-drain',
+    'flag_fault_nodrain_hint': 'Test switch from issue #38: handles some memory faults without waiting for the graphics card. Off by default.',
+    'flag_pipeline_binaries': 'Pipeline binaries',
+    'flag_pipeline_binaries_hint': 'Stores compiled shaders in the driver format. Off by default: it crashes on NVIDIA driver 595.',
+    'flag_vk_validation': 'Vulkan validation',
+    'flag_vk_validation_hint': 'Checks every graphics call. Very slow, and only works with the Vulkan SDK installed. For developers.',
     'home_soundtrack': 'Soundtrack',
     'soundtrack_hint': ("All the game's music, read from your own game folder. The game has no track titles: each piece is "
                         "named by the stage it plays in, with the game's own working name where it has one. The music is "
@@ -1455,20 +1487,84 @@ class Launcher:
         spin.bind('<FocusOut>', lambda _: self.changed())
         self.hint(memory, 0, 2, 'vram_hint')
 
-        def ini_check(row, key, default, hint_key):
-            # The in-game menu's switches (tlg.ini, apply at once).
-            var = tk.BooleanVar(value=ini.get(key, default) != '0')
+        # texture_cleanup moved to Debug > Flags (2026-11-12).
+
+    def build_debug_flags(self, frame):
+        """Debug > Flags: start-up switches for bug reports (tlg_run.DEBUG_FLAGS) and the memory test
+        switches (tlg.ini). Launcher only."""
+        ttk.Label(frame, text=self.t('flags_warning'), foreground=ACCENT, wraplength=640,
+                  justify='left').grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
+        resets = []
+        ttk.Button(frame, text=self.t('flags_restore'), command=lambda: [reset() for reset in resets]).grid(
+            row=1, column=0, sticky='w')
+        row = 2
+
+        def heading(key):
+            nonlocal row
+            ttk.Label(frame, text=self.t(key), font=('TkDefaultFont', 10, 'bold')).grid(
+                row=row, column=0, columnspan=3, sticky='w', pady=(10, 2))
+            row += 1
+
+        self.flag_boxes = {}
+
+        def flag_box(name, default):
+            nonlocal row
+            var = tk.BooleanVar(value=tlg_run.debug_flag_on(self.settings, name))
+            self.flag_boxes[name] = (box_holder := [None, var])
 
             def toggled():
+                flags = dict(self.settings.get('debug_flags') or {})
+                if var.get() == default:
+                    flags.pop(name, None)
+                else:
+                    flags[name] = var.get()
+                self.settings['debug_flags'] = flags
+                tlg_run.save_settings(self.settings)
+            box = ttk.Checkbutton(frame, text=self.t(name), variable=var, command=toggled)
+            box_holder[0] = box
+            box.grid(row=row, column=0, columnspan=2, sticky='w', pady=2)
+            help_mark(frame, self.t(name + '_hint'), box).grid(row=row, column=2, sticky='w', padx=(4, 0))
+            resets.append(lambda: (var.set(default), toggled()))
+            row += 1
+
+        box = ttk.Checkbutton(frame, text=self.t('debug_logging'), variable=self.debug_logging_var,
+                              command=self.debug_logging_toggled)
+        box.grid(row=row, column=0, columnspan=2, sticky='w', pady=2)
+        help_mark(frame, self.t('debug_logging_hint'), box).grid(row=row, column=2, sticky='w', padx=(4, 0))
+        resets.append(lambda: (self.debug_logging_var.set(False), self.debug_logging_toggled()))
+        row += 1
+        heading('flags_logging')
+        for name, _, _, _, default in tlg_run.DEBUG_FLAGS:
+            if name.startswith('log_'):
+                flag_box(name, default)
+        heading('flags_crash')
+        for name, _, _, _, default in tlg_run.DEBUG_FLAGS:
+            if name.startswith('flag_'):
+                flag_box(name, default)
+        # Memory test switches (issue #38; tlg.ini, apply at once), moved from Advanced (2026-11-12).
+        heading('flags_memory')
+        ini_now = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
+        for key, default in (('keep_gpu_textures', '1'), ('arena_release', '1'),
+                             ('gc_live_budget', '1'), ('texture_cleanup', '0')):
+            var = tk.BooleanVar(value=ini_now.get(key, default) != '0')
+
+            def ini_toggled(key=key, var=var):
                 tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
                 tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
                 self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
+            box = ttk.Checkbutton(frame, text=self.t(key), variable=var, command=ini_toggled)
+            box.grid(row=row, column=0, columnspan=2, sticky='w', pady=2)
+            help_mark(frame, self.t(key + '_hint'), box).grid(row=row, column=2, sticky='w', padx=(4, 0))
+            resets.append(lambda var=var, ini_toggled=ini_toggled, on=default == '1': (var.set(on), ini_toggled()))
+            row += 1
+        self.sync_log_flags()
 
-            ttk.Checkbutton(memory, text=self.t(key), variable=var, command=toggled).grid(
-                row=row, column=0, columnspan=2, sticky='w', pady=(4, 0))
-            self.hint(memory, row, 2, hint_key)
-
-        ini_check(1, 'texture_cleanup', '0', 'texture_cleanup_hint')
+    def sync_log_flags(self):
+        """Advanced logging on: the logging boxes show ticked and greyed (it turns them all on)."""
+        for name, (box, var) in getattr(self, 'flag_boxes', {}).items():
+            if name in tlg_run.DEBUG_LOG_FLAGS:
+                var.set(tlg_run.debug_flag_on(self.settings, name))
+                box.state(['disabled'] if self.settings.get('debug_logging') else ['!disabled'])
 
     def build_logs(self):
         """Logs: the game log as it runs, and the logs folder."""
@@ -1478,7 +1574,7 @@ class Launcher:
             side='right', pady=(6, 0))
         ttk.Button(header, text=self.t('report_issue'), command=self.report_issue).pack(
             side='right', padx=(0, 6), pady=(6, 0))
-        # The same Advanced logging switch as Settings > Debug, next to the log it feeds.
+        # The same Advanced logging switch as Settings > Debug; shown on Debug > Flags.
         self.debug_logging_var = tk.BooleanVar(value=bool(self.settings.get('debug_logging')))
 
         def logging_toggled():
@@ -1486,14 +1582,15 @@ class Launcher:
             if 'debug_logging' in self.vars:
                 self.vars['debug_logging'].set(self.debug_logging_var.get())
             tlg_run.save_settings(self.settings)
-        box = ttk.Checkbutton(header, text=self.t('debug_logging'), variable=self.debug_logging_var,
-                              command=logging_toggled)
-        box.pack(side='right', padx=(0, 12), pady=(6, 0))
-        help_mark(header, self.t('debug_logging_hint'), box).pack(side='right', padx=(0, 4), pady=(6, 0))
+            self.sync_log_flags()
+        self.debug_logging_toggled = logging_toggled   # the box itself is on the Flags tab
         tabs = ttk.Notebook(win)
         tabs.pack(fill='both', expand=True, padx=12, pady=(8, 12))
         frame = ttk.Frame(tabs, padding=12)
         tabs.add(frame, text=self.t('tab_log'))
+        flags_tab = ttk.Frame(tabs)
+        tabs.add(flags_tab, text=self.t('tab_flags'))
+        self.build_debug_flags(scroll_area(flags_tab, padding=12))
         bench_tab = ttk.Frame(tabs)
         tabs.add(bench_tab, text=self.t('tab_bench'))
         # Taller than the window at 1080p (70% of the screen): scroll bars when it does not fit.
@@ -2623,22 +2720,7 @@ class Launcher:
         slow_box.bind('<<ComboboxSelected>>', lambda _: slow_picked())
         help_mark(parent, slow.what).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
         resets.append(lambda: (slow_box.current(slow_values.index(slow.default)), slow_picked()))
-        # Memory test switches (issue #38; tlg.ini, apply at once), moved from Video (2026-11-10).
-        ini_now = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        for key in ('keep_gpu_textures', 'arena_release', 'gc_live_budget'):
-            parent, row = place(0)
-            var = tk.BooleanVar(value=ini_now.get(key, '1') != '0')
-
-            def ini_toggled(key=key, var=var):
-                tlg_run.USER_DIR.mkdir(parents=True, exist_ok=True)
-                tlg_run.update_ini(tlg_run.USER_DIR / 'tlg.ini', {key: '1' if var.get() else '0'})
-                self.ini_stamp = self.ini_files_stamp()  # our own write: nothing to reload
-
-            ttk.Checkbutton(parent, text=self.t(key), variable=var, command=ini_toggled).grid(
-                row=row, column=0, columnspan=2, sticky='w')
-            help_mark(parent, self.t(key + '_hint')).grid(row=row, column=2, sticky='w', padx=(4, 0), pady=3)
-            resets.append(lambda var=var, ini_toggled=ini_toggled: (var.set(True), ini_toggled()))
-
+        # The memory test switches moved to Debug > Flags (2026-11-12).
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=lambda: [reset() for reset in resets]).pack(side='left')
@@ -2666,6 +2748,7 @@ class Launcher:
         tlg_run.save_settings(self.settings)
         if hasattr(self, 'debug_logging_var'):
             self.debug_logging_var.set(bool(self.settings.get('debug_logging')))
+            self.sync_log_flags()
         self.refresh_language_choices()
         self.refresh_status()
 
