@@ -846,6 +846,22 @@ void Instance::CollectDeviceParameters() {
     LOG_INFO(Render_Vulkan, "GPU_Vulkan_Driver: {}", driver_name);
     LOG_INFO(Render_Vulkan, "GPU_Vulkan_Version: {}", api_version);
     LOG_INFO(Render_Vulkan, "GPU_Vulkan_Extensions: {}", extensions);
+
+    // tlg: system specs in every log, Advanced logging or not (#79: a report without them).
+    // VRAM = the largest device-local heap; driverInfo carries the vendor's own version string
+    // (AMD Adrenalin "24.9.1", NVIDIA "566.36", Mesa "Mesa 24.2.3").
+    u64 vram = 0;
+    for (u32 i = 0; i < memory_properties.memoryHeapCount; ++i) {
+        const vk::MemoryHeap& heap = memory_properties.memoryHeaps[i];
+        if ((heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) && heap.size > vram) {
+            vram = heap.size;
+        }
+    }
+    std::printf("System: GPU %s, %llu MiB VRAM%s, vendor 0x%04x device 0x%04x\n",
+                model_name.c_str(), static_cast<unsigned long long>(vram >> 20),
+                IsIntegrated() ? " (integrated)" : "", properties.vendorID, properties.deviceID);
+    std::printf("System: driver %s %s (%s), Vulkan %s\n", vendor_name.c_str(),
+                driver.driverInfo.data(), driver_version.c_str(), api_version.c_str());
 }
 
 void Instance::CollectPhysicalMemoryInfo() {

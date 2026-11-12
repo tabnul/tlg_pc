@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <cpuid.h>
 #include "runtime.h"
 #include "runtime_zarchive.h"
 #include "cpu_check.h"
@@ -1173,6 +1174,66 @@ static int cpu_supported(char *missing, size_t size) {
     return 1;
 }
 
+/* tlg: system specs at the top of every log, Advanced logging or not (#79): CPU model and
+ * threads, RAM, OS. The GPU, VRAM and driver line comes from the Vulkan instance. */
+static void log_system_specs(void) {
+    char brand[49] = {0};
+    unsigned regs[4];
+    if (__get_cpuid(0x80000000, &regs[0], &regs[1], &regs[2], &regs[3]) && regs[0] >= 0x80000004) {
+        for (unsigned leaf = 0; leaf < 3; ++leaf) {
+            __get_cpuid(0x80000002 + leaf, &regs[0], &regs[1], &regs[2], &regs[3]);
+            memcpy(brand + leaf * 16, regs, 16);
+        }
+    }
+    const char *cpu = brand;
+    while (*cpu == ' ') ++cpu;
+    for (size_t n = strlen(brand); n && brand[n - 1] == ' '; --n) brand[n - 1] = 0;
+    unsigned long long ram_mib = 0, ram_free_mib = 0;
+    unsigned threads = 0;
+    char os[96] = "unknown";
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    threads = si.dwNumberOfProcessors;
+    MEMORYSTATUSEX ms = {.dwLength = sizeof ms};
+    if (GlobalMemoryStatusEx(&ms)) {
+        ram_mib = ms.ullTotalPhys >> 20;
+        ram_free_mib = ms.ullAvailPhys >> 20;
+    }
+    /* GetVersionEx lies past Windows 8 without a manifest; RtlGetVersion does not. */
+    typedef LONG(WINAPI * RtlGetVersionFn)(OSVERSIONINFOW *);
+    RtlGetVersionFn rtl_get_version =
+        (RtlGetVersionFn)(void *)GetProcAddress(GetModuleHandleA("ntdll.dll"), "RtlGetVersion");
+    OSVERSIONINFOW ver = {.dwOSVersionInfoSize = sizeof ver};
+    if (rtl_get_version && rtl_get_version(&ver) == 0) {
+        snprintf(os, sizeof os, "Windows %lu.%lu build %lu", ver.dwMajorVersion, ver.dwMinorVersion,
+                 ver.dwBuildNumber);
+    }
+#else
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    threads = n > 0 ? (unsigned)n : 0;
+    long pages = sysconf(_SC_PHYS_PAGES), avail = sysconf(_SC_AVPHYS_PAGES), page = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page > 0) ram_mib = ((unsigned long long)pages * page) >> 20;
+    if (avail > 0 && page > 0) ram_free_mib = ((unsigned long long)avail * page) >> 20;
+    FILE *f = fopen("/etc/os-release", "r");
+    if (f) {
+        char line[160];
+        while (fgets(line, sizeof line, f)) {
+            if (!strncmp(line, "PRETTY_NAME=", 12)) {
+                char *v = line + 12;
+                if (*v == '"') ++v;
+                v[strcspn(v, "\"\n")] = 0;
+                snprintf(os, sizeof os, "%s", v);
+                break;
+            }
+        }
+        fclose(f);
+    }
+#endif
+    printf("System: CPU %s, %u threads; RAM %llu MiB (%llu MiB free); OS %s\n",
+           *cpu ? cpu : "unknown", threads, ram_mib, ram_free_mib, os);
+}
+
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
 #ifndef _WIN32
@@ -1220,6 +1281,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Usage: %s boot.bin [--cpu-only] [--strict-imports] [--check-imports] [--content-profile file] [--app0 dir] [--user dir] [--patches file] [--isa-rewrite file] [--timeout seconds] | --vulkan-only | --cpu-features\n", argv[0]);
         return 1;
     }
+    log_system_specs();
     if (!cpu_supported(missing, sizeof missing)) return 20;
     if (cpu_missing_sets) printf("CPU: missing %s\n", missing);
     /* TLG_ISA_REWRITE=0 never rewrites, =1 rewrites every emulated site (MOVBE,
