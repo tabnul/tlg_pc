@@ -1478,6 +1478,18 @@ class Launcher:
             side='right', pady=(6, 0))
         ttk.Button(header, text=self.t('report_issue'), command=self.report_issue).pack(
             side='right', padx=(0, 6), pady=(6, 0))
+        # The same Advanced logging switch as Settings > Debug, next to the log it feeds.
+        self.debug_logging_var = tk.BooleanVar(value=bool(self.settings.get('debug_logging')))
+
+        def logging_toggled():
+            self.settings['debug_logging'] = self.debug_logging_var.get()
+            if 'debug_logging' in self.vars:
+                self.vars['debug_logging'].set(self.debug_logging_var.get())
+            tlg_run.save_settings(self.settings)
+        box = ttk.Checkbutton(header, text=self.t('debug_logging'), variable=self.debug_logging_var,
+                              command=logging_toggled)
+        box.pack(side='right', padx=(0, 12), pady=(6, 0))
+        help_mark(header, self.t('debug_logging_hint'), box).pack(side='right', padx=(0, 4), pady=(6, 0))
         tabs = ttk.Notebook(win)
         tabs.pack(fill='both', expand=True, padx=12, pady=(8, 12))
         frame = ttk.Frame(tabs, padding=12)
@@ -2652,6 +2664,8 @@ class Launcher:
             except tk.TclError:
                 pass  # spinbox while typing
         tlg_run.save_settings(self.settings)
+        if hasattr(self, 'debug_logging_var'):
+            self.debug_logging_var.set(bool(self.settings.get('debug_logging')))
         self.refresh_language_choices()
         self.refresh_status()
 
