@@ -228,7 +228,8 @@ trigger points, check for stick drift, and remap keyboard and mouse. See
 <p align="center"><img src="docs/screenshots/fun/controller.png" width="80%" alt="The launcher's Controls page"></p>
 
 The launcher and in-game menu are in English, with language packs for German, French, Spanish,
-Brazilian Portuguese, Japanese and Simplified Chinese (**Settings > Language**). The Portuguese
+Italian, Dutch, Polish, Turkish, Ukrainian, Portuguese (Brazil and Portugal), Japanese, Korean and
+Chinese (Simplified and Traditional) (**Settings > Language**). The Portuguese
 pack is HayatoG's translation. The others are machine translations, and corrections from native
 speakers are welcome; see [port/docs/language-packs.md](port/docs/language-packs.md). The game's
 own text and voices are a separate setting.
