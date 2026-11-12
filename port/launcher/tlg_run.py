@@ -203,6 +203,7 @@ DEBUG_LOG_ENV = {
     'TLG_PAGE_HISTORY': '1',       # the latest page tracking changes, for a FAULT LOOP report
     'TLG_PERF_DIAG': '1',          # where the GPU waits go
     'TLG_WRITE_LOG': '2',          # the latest GPU writes to game memory, for a crash report
+    'TLG_VK_FAULT': '1',           # which GPU draw faulted on a device lost (VK_EXT_device_fault)
 }
 
 DEFAULT_SETTINGS = {
@@ -221,6 +222,7 @@ DEFAULT_SETTINGS = {
     'vsync': True,
     'level_select': False,         # tlg.ini; tlg_lua.cpp
     'debug_logging': False,        # DEBUG_LOG_ENV
+    'gpu_id': -1,                  # TLG_GPU_ID: index in gpu_list(); -1 = automatic (most video memory)
     'vram_budget_mb': 7000,
     'native_audio': True,
     # Mouse and keyboard (tlg.ini; the in-game menu's Controls tab changes the mouse ones too).
@@ -719,6 +721,25 @@ def pad_tool():
     return path if path.is_file() else None
 
 
+def gpu_list():
+    """The graphics cards Vulkan finds, as (name, type) in the game's own order (TLG_GPU_ID index):
+    out/tlg-gpu-capabilities --list (tools/gpu_capabilities.c). Empty when the tool is missing or fails."""
+    tool = OUT_DIR / ('tlg-gpu-capabilities.exe' if os.name == 'nt' else 'tlg-gpu-capabilities')
+    if not tool.is_file():
+        return []
+    try:
+        out = subprocess.run([str(tool), '--list'], capture_output=True, text=True, timeout=10,
+                             **(detach_options() if os.name == 'nt' else {})).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    cards = []
+    for line in out.splitlines():
+        parts = line.split('	')
+        if len(parts) == 3 and parts[0].isdigit():
+            cards.append((parts[1], parts[2]))
+    return cards
+
+
 def play_command():
     """The command that starts the game with the saved launcher settings and no launcher window, as
     one line to paste in Steam ("Add a Non-Steam Game", then Properties > Target / Launch options)."""
@@ -935,6 +956,8 @@ def build_env(settings, extra=None):
     if settings.get('debug_logging'):
         for key, value in DEBUG_LOG_ENV.items():
             env.setdefault(key, value)
+    if int(settings.get('gpu_id', -1)) >= 0:
+        env.setdefault('TLG_GPU_ID', str(int(settings['gpu_id'])))
     if extra:
         env.update(extra)
     return env
