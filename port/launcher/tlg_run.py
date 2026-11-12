@@ -203,6 +203,7 @@ DEBUG_LOG_ENV = {
     'TLG_PAGE_HISTORY': '1',       # the latest page tracking changes, for a FAULT LOOP report
     'TLG_PERF_DIAG': '1',          # where the GPU waits go
     'TLG_WRITE_LOG': '2',          # the latest GPU writes to game memory, for a crash report
+    'TLG_VK_FAULT': '1',           # which GPU draw faulted on a device lost (VK_EXT_device_fault)
 }
 
 DEFAULT_SETTINGS = {

@@ -1026,7 +1026,7 @@ vk::Format Instance::GetSupportedFormat(const vk::Format format,
 // "Device lost during submit", which says where we noticed, not what went wrong.
 void Instance::ReportDeviceFault(const char* where) const {
     if (!device_fault) {
-        std::printf("GPU fault report (%s): not available (run with TLG_VK_FAULT=1)\n", where);
+        std::printf("GPU fault report (%s): not available (turn on Advanced logging in the launcher, or TLG_VK_FAULT=1)\n", where);
         std::fflush(stdout);
         return;
     }
