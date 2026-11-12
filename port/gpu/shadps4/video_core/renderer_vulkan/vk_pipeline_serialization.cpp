@@ -40,6 +40,33 @@ static constexpr u32 PipelineKeyVersion = 5u; // tlg: Info layout (ImageResource
 
 namespace Vulkan {
 
+namespace {
+// bbport (skuza-oss/bloodborne_pc): the cache's header is a tag and the versions above; the device
+// profile follows. A cache with other versions, another profile or no header is rebuilt whole:
+// metadata and SPIR-V share permutation indices, so blobs of two builds side by side could pair a
+// valid metadata entry with the other build's binary.
+constexpr std::array<u32, 4> CacheVersions{0x544c4743u, Serialization::ShaderBinaryVersion,
+                                           Serialization::ShaderMetaVersion,
+                                           Serialization::PipelineKeyVersion};
+constexpr size_t CacheHeaderSize = sizeof(CacheVersions);
+
+// bbport: SPIR-V starts with its magic number and a 5-word header; anything else is a damaged
+// file (a crash or a power loss while it was written) the driver must not see. A module the
+// driver rejects is a damaged entry too. Both throw: the warm-up counts them and rebuilds the
+// cache instead of stopping the game at every start.
+vk::ShaderModule CreateCachedModule(const std::vector<u32>& spv, vk::Device device) {
+    if (spv.size() < 5 || spv[0] != 0x07230203u) {
+        throw Serialization::CorruptData{};
+    }
+    auto [result, module] = device.createShaderModule(
+        {.codeSize = spv.size() * sizeof(u32), .pCode = spv.data()});
+    if (result != vk::Result::eSuccess) {
+        throw Serialization::CorruptData{};
+    }
+    return module;
+}
+} // namespace
+
 namespace PipelineBinaryCache {
 bool ValidKey(const Key& key) {
     return !key.empty() && key.size() <= VK_MAX_PIPELINE_BINARY_KEY_SIZE_KHR;
@@ -858,7 +885,12 @@ bool PipelineCache::LoadPipelineStage(Serialization::Archive& ar, size_t stage) 
 
     auto [it_pgm, new_program] = program_cache.try_emplace(program->info.pgm_hash);
     if (new_program) {
-        module = CompileSPV(spv, instance.GetDevice());
+        try {
+            module = CreateCachedModule(spv, instance.GetDevice());
+        } catch (...) {
+            program_cache.erase(it_pgm); // no empty program left behind
+            throw;
+        }
         it_pgm.value() = std::move(program);
     } else {
         const auto& it = std::ranges::find(it_pgm.value()->modules, spec, &Program::Module::spec);
@@ -876,7 +908,7 @@ bool PipelineCache::LoadPipelineStage(Serialization::Archive& ar, size_t stage) 
             }
             module = it->module;
         } else {
-            module = CompileSPV(spv, instance.GetDevice());
+            module = CreateCachedModule(spv, instance.GetDevice());
         }
     }
     it_pgm.value()->InsertPermut(module, std::move(spec), perm_idx);
@@ -909,37 +941,53 @@ bool PipelineCache::CheckCacheProfile() {
     if (profile_data.empty()) {
         Storage::DataBase::Instance().FinishPreload();
 
-        profile_data.resize(sizeof(profile));
-        std::memcpy(profile_data.data(), &profile, sizeof(profile));
-        Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
-                                           std::move(profile_data));
+        SaveCacheHeader();
         OnColdCache();
         return ImportRecipes();
     }
-    if (profile_data.size() != sizeof(Shader::Profile)) {
-        LOG_WARNING(Render, "Pipeline cache profile has unexpected size ({} != {})",
-                    profile_data.size(), sizeof(Shader::Profile));
+    bool compatible = profile_data.size() == CacheHeaderSize + sizeof(Shader::Profile) &&
+                      std::memcmp(profile_data.data(), CacheVersions.data(), CacheHeaderSize) == 0;
+    if (compatible) {
+        Shader::Profile cached_profile{};
+        std::memcpy(&cached_profile, profile_data.data() + CacheHeaderSize, sizeof(cached_profile));
+        compatible = cached_profile == profile;
     }
-    Shader::Profile cached_profile{};
-    if (profile_data.size() == sizeof(Shader::Profile)) {
-        std::memcpy(&cached_profile, profile_data.data(), sizeof(cached_profile));
-    }
-    if (profile_data.size() != sizeof(Shader::Profile) || cached_profile != profile) {
+    if (!compatible) {
         // tlg: upstream closed the cache for the session here, so it was never rewritten
         // and every later session compiled every shader again (stutters on each new area).
         // Start a fresh cache for this build and GPU instead.
-        LOG_WARNING(Render, "Pipeline cache isn't compatible with current system: rebuilding it");
+        LOG_WARNING(Render,
+                    "Pipeline cache isn't compatible with current build/system: rebuilding it");
         Storage::DataBase::Instance().Clear();
         Storage::DataBase::Instance().FinishPreload();
-        profile_data.resize(sizeof(profile));
-        std::memcpy(profile_data.data(), &profile, sizeof(profile));
-        Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
-                                           std::move(profile_data));
+        SaveCacheHeader();
         OnColdCache();
         return ImportRecipes();
     }
     ImportRecipes();
     return true;
+}
+
+void PipelineCache::SaveCacheHeader() {
+    std::vector<u8> data(CacheHeaderSize + sizeof(profile));
+    std::memcpy(data.data(), CacheVersions.data(), CacheHeaderSize);
+    std::memcpy(data.data() + CacheHeaderSize, &profile, sizeof(profile));
+    Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
+                                       std::move(data));
+}
+
+// bbport: a damaged entry (cut short by a crash or a power loss, or rejected by the driver) used
+// to stop the game at every start until the cache was deleted by hand. The entries that loaded
+// stay in use this session; the store is cleared so the next start rebuilds it clean.
+void PipelineCache::RebuildIfDamaged(u32 failed_builds) {
+    const u32 damaged = cache_damaged.exchange(0, std::memory_order_relaxed) + failed_builds;
+    if (!damaged) {
+        return;
+    }
+    LOG_WARNING(Render, "Pipeline cache: {} damaged entries, rebuilding it", damaged);
+    std::printf("Pipeline cache: %u damaged entries, rebuilding it\n", damaged);
+    Storage::DataBase::Instance().Clear();
+    SaveCacheHeader();
 }
 
 // tlg: with background compilation, a draw whose pipeline is still compiling is skipped. On the
@@ -964,6 +1012,7 @@ void PipelineCache::WarmUp(const std::function<void(u32, u32)>& progress) {
 
     u32 num_pipelines{};
     u32 num_total_pipelines{};
+    u32 warmup_failed{};
     const u32 expected =
         u32(Storage::DataBase::Instance().CountBlobs(Storage::BlobType::PipelineKey));
     const auto started = std::chrono::steady_clock::now();
@@ -1011,6 +1060,7 @@ void PipelineCache::WarmUp(const std::function<void(u32, u32)>& progress) {
                     ++num_pipelines;
                 }
             } catch (const std::exception&) {
+                cache_damaged.fetch_add(1, std::memory_order_relaxed);
                 sel.infos.fill(nullptr);
                 sel.modules.fill(nullptr);
                 sel.fetch_shader.reset();
@@ -1028,6 +1078,7 @@ void PipelineCache::WarmUp(const std::function<void(u32, u32)>& progress) {
             compute_pipelines[key] = std::move(pipeline);
         }
         num_pipelines -= pool->failed;
+        warmup_failed = pool->failed;
         warmup_graphics.clear();
         warmup_compute.clear();
         pool.reset();
@@ -1049,6 +1100,7 @@ void PipelineCache::WarmUp(const std::function<void(u32, u32)>& progress) {
         LOG_WARNING(Render, "{} stale pipelines were found. Consider re-generating the cache",
                     num_total_pipelines - num_pipelines);
     }
+    RebuildIfDamaged(warmup_failed);
 
     Storage::DataBase::Instance().FinishPreload();
 }
@@ -1142,6 +1194,7 @@ bool PipelineCache::StartBackgroundWarmUp() {
                     ReadWarmEntry(warm, std::move(data));
                 } catch (const std::exception&) {
                     warm.done.fetch_add(1, std::memory_order_relaxed);
+                    cache_damaged.fetch_add(1, std::memory_order_relaxed);
                 }
             },
             [&] { return warm.stopping.load(std::memory_order_relaxed); });
@@ -1211,7 +1264,7 @@ void PipelineCache::ReadWarmEntry(BackgroundWarmup& warm, std::vector<u8>&& data
                             spv);
                     if (!spv.empty()) {
                         const auto module_started = std::chrono::steady_clock::now();
-                        stage->module = CompileSPV(spv, stage->device);
+                        stage->module = CreateCachedModule(spv, stage->device);
                         module_time = ElapsedNs(module_started);
                         warm.module_ns += module_time;
                         ++warm.modules;
@@ -1413,6 +1466,7 @@ void PipelineCache::PumpWarmUp() {
     // The idle threads stay parked (StopWarmUp).
     warm.finished = true;
     TlgOverlay::SetBackgroundLoading(0, 0);
+    RebuildIfDamaged(warm.pool->failed);
     Storage::DataBase::Instance().FinishPreload();
 }
 

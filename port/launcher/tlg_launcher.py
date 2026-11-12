@@ -1978,8 +1978,10 @@ class Launcher:
             c.create_window(300, 40, window=self.panel, anchor='nw', width=width - 340, height=height - 80)
         self.home_items['status'] = c.create_text(left, status_y, text='', anchor='w', fill=MUTED,
                                                   font=(SERIF, 11 if home else 10, 'italic'), width=status_width)
-        c.create_text(left, cache_y, text=self.t('home_cache'), anchor='w', fill=DIM, font=(SERIF, 9),
-                      tags='cache')
+        cache = c.create_text(left, cache_y, text=self.t('home_cache'), anchor='w', fill=MUTED,
+                              font=(SERIF, 9), tags='cache')
+        c.tag_bind('cache', '<Enter>', lambda _: (c.itemconfig(cache, fill=ACCENT), c.configure(cursor='hand2')))
+        c.tag_bind('cache', '<Leave>', lambda _: (c.itemconfig(cache, fill=MUTED), c.configure(cursor='')))
         c.tag_bind('cache', '<Button-1>', lambda _: self.clear_cache())
         # Menu music on/off, next to the cache link (saved at once).
         music = c.create_text(left + 150, cache_y, anchor='w', fill=DIM, font=(SERIF, 9), tags='music',
@@ -2729,6 +2731,8 @@ class Launcher:
         bottom = ttk.Frame(frame)
         bottom.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
         ttk.Button(bottom, text=self.t('reset'), command=lambda: [reset() for reset in resets]).pack(side='left')
+        # The home screen's cache link, also here where a stuck start is looked into.
+        ttk.Button(bottom, text=self.t('clear_cache'), command=self.clear_cache).pack(side='left', padx=(10, 0))
 
     def hint(self, parent, row, column, key):
         """A small question mark in that cell; the text shows on the mark and on the row's name."""
