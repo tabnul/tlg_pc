@@ -104,6 +104,9 @@ if [[ ${GITHUB_REF:-} == refs/tags/v* ]]; then echo "$GITHUB_REF_NAME" > "$dest/
 elif [[ -n ${GITHUB_SHA:-} ]]; then printf 'v%s-%s\n' "$(date -u +%Y.%m.%d)" "${GITHUB_SHA::7}" > "$dest/VERSION"; fi
 bash packaging/check_package.sh "$dest"
 if [[ ! -f "$dest/VERSION" ]]; then git rev-parse --short HEAD > "$dest/VERSION"; fi
+# Line 2: the full commit, printed at the top of every game log (tlg_run.build_info).
+commit=${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || true)}
+if [[ -n $commit ]]; then echo "commit $commit" >> "$dest/VERSION"; fi
 mkdir -p dist
 rm -f "dist/$name.zip"
 (cd out/stage && powershell -NoProfile -Command "Compress-Archive -Path '$name' -DestinationPath '../../dist/$name.zip'")
