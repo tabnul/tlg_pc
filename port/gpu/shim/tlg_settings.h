@@ -43,7 +43,7 @@ struct Values {
     /// Debug (TLG_JITTER_DEBUG=1): F6 asks the rasterizer for a marked draw map of one frame.
     std::atomic<bool> jitter_mark{false};
     std::atomic<bool> reactive{false};
-    std::atomic<bool> object_motion{true};
+    std::atomic<bool> object_motion{false};
     std::atomic<float> reactive_scale{1.0f};
     std::atomic<float> reactive_threshold{0.2f};
     std::atomic<float> reactive_max{0.9f};

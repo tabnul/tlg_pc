@@ -2581,8 +2581,12 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                                      reinterpret_cast<const void*>(ring->address), ring->size);
             }
             if (!desc.IsSpecial()) {
+                // Same rule as the direct path below: never look in a GPU-written buffer. This
+                // runs on the recording thread, where every earlier write is already recorded,
+                // so the pending-write list of the GPU command thread is not needed (nor safe).
                 if (ring->size == 864 && gbuffer_draw &&
-                    memory->IsValidGpuMapping(ring->address, 0)) {
+                    memory->IsValidGpuMapping(ring->address, 0) &&
+                    !buffer_cache.IsRegionGpuModified(ring->address, 864)) {
                     camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
                 }
                 push_data.AddOffset(binding.buffer, 0);

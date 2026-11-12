@@ -366,7 +366,7 @@ void Load() {
         {"TLG_FSR_SHARPNESS", "sharpness"},        {"TLG_JITTER", "jitter"},
         {"TLG_REACTIVE", "reactive"},              {"TLG_REACTIVE_SCALE", "reactive_scale"},
         {"TLG_REACTIVE_THRESHOLD", "reactive_threshold"}, {"TLG_REACTIVE_MAX", "reactive_max"},
-        {"TLG_UPSCALE_PRESET", "preset"},            {"TLG_OBJECT_MOTION", "object_motion"},
+        {"TLG_UPSCALE_PRESET", "preset"},
         {"TLG_DEFERRED_READBACK", "deferred_readback"},
         {"TLG_STALE_READBACK", "stale_readback"},     {"TLG_FSR1", "fsr1"},
         {"TLG_RCAS", "rcas"},                        {"TLG_FRAMES_AHEAD", "frames_queued"},
@@ -390,6 +390,11 @@ void Load() {
     // Async shader compilation: environment only (tests), a stored async_shaders=1 is ignored.
     if (const char* value = std::getenv("TLG_ASYNC_SHADERS"); value && value[0]) {
         v.async_shaders = std::atoi(value) != 0;
+    }
+    // Object motion: environment only (launcher Debug > Flags); a stored object_motion=1 is ignored.
+    v.object_motion = false;
+    if (const char* value = std::getenv("TLG_OBJECT_MOTION"); value && value[0]) {
+        v.object_motion = std::atoi(value) != 0;
     }
     v.startup_preset = v.preset;
     v.startup_upscaler = v.upscaler;

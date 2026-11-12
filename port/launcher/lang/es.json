@@ -51,6 +51,8 @@
     "launcher.flag_fault_nodrain_hint": "Interruptor de prueba del issue #38: gestiona algunos fallos de memoria sin esperar a la tarjeta gráfica. Desactivado por defecto.",
     "launcher.flag_pipeline_binaries": "Binarios de pipeline",
     "launcher.flag_pipeline_binaries_hint": "Guarda los shaders compilados en el formato del controlador. Desactivado por defecto: falla con el controlador NVIDIA 595.",
+    "launcher.flag_object_motion": "Movimiento de objetos",
+    "launcher.flag_object_motion_hint": "Experimental: movimiento por objeto para DLSS y FSR, menos estelas en el niño y en Trico. Cuesta alrededor de un 10 % de FPS y puede fallar con tarjetas AMD en Linux. Desactivado por defecto.",
     "launcher.flag_vk_validation": "Validación de Vulkan",
     "launcher.flag_vk_validation_hint": "Comprueba cada llamada gráfica. Muy lento y solo funciona con el Vulkan SDK instalado. Para desarrolladores.",
     "launcher.home_soundtrack": "Banda sonora",

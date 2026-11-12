@@ -51,6 +51,8 @@
     "launcher.flag_fault_nodrain_hint": "issue #38 的测试开关:处理部分内存故障时不等待显卡。默认关闭。",
     "launcher.flag_pipeline_binaries": "管线二进制",
     "launcher.flag_pipeline_binaries_hint": "以驱动格式保存编译后的着色器。默认关闭:在 NVIDIA 595 驱动上会崩溃。",
+    "launcher.flag_object_motion": "物体运动",
+    "launcher.flag_object_motion_hint": "实验性:为 DLSS 和 FSR 提供逐物体运动信息,减少男孩和特里科身上的拖影。约降低 10% 帧率,在 Linux 的 AMD 显卡上可能崩溃。默认关闭。",
     "launcher.flag_vk_validation": "Vulkan 验证",
     "launcher.flag_vk_validation_hint": "检查每个图形调用。非常慢,且仅在安装了 Vulkan SDK 时可用。供开发者使用。",
     "launcher.home_soundtrack": "原声音乐",

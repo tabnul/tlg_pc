@@ -55,7 +55,7 @@ ObjectMotion::ObjectMotion(const Instance& instance_, Scheduler& scheduler_)
     // animated draws. A setting or environment override can still disable the path.
     if (!TlgSettings::Get().object_motion ||
         TlgSettings::Get().upscaler == TlgSettings::UpscalerOff) {
-        std::puts("Object motion: off (enable in menu or TLG_OBJECT_MOTION=1)");
+        std::puts("Object motion: off (launcher Debug > Flags, or TLG_OBJECT_MOTION=1)");
         return;
     }
     const auto& features = instance.GetPhysicalDevice().getFeatures();

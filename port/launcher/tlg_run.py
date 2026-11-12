@@ -192,7 +192,6 @@ DEFAULT_ENV = {
     'TLG_GC_BUDGET_MB': '7000',    # texture cache budget; higher only piles up old textures (#104)
     # The anti-aliasing comes from tlg.ini (dlaa, upscaler: DLAA, FSR 3.1 or FSR 4 native AA).
     'TLG_JITTER': '1',             # jitter only while DLAA or FSR native AA runs
-    'TLG_OBJECT_MOTION': '0',
     'TLG_FRAME_STATS': '1',        # FPS in the log every 5 s (read by bench and scene-check tools)
 }
 # The launcher's "Advanced logging", for bug reports. Off the write path only: no TLG_WRITE_LOG=1,
@@ -222,6 +221,7 @@ DEBUG_FLAGS = (
     ('flag_reinit_lock', 'TLG_REINIT_LOCK', None, '0', True),          # #19
     ('flag_fault_nodrain', 'TLG_FAULT_NODRAIN', '1', None, False),     # #38
     ('flag_pipeline_binaries', 'TLG_PIPELINE_BINARIES', '1', '0', False),  # NVIDIA 595 crash
+    ('flag_object_motion', 'TLG_OBJECT_MOTION', '1', '0', False),      # ~10% FPS; unguarded reads
     ('flag_vk_validation', 'TLG_VK_VALIDATION', '1', None, False),     # needs the Vulkan SDK layer
 )
 DEBUG_LOG_FLAGS = tuple(flag[0] for flag in DEBUG_FLAGS if flag[0].startswith('log_'))

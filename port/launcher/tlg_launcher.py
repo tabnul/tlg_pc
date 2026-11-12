@@ -94,6 +94,8 @@ TEXT = {
     'flag_fault_nodrain_hint': 'Test switch from issue #38: handles some memory faults without waiting for the graphics card. Off by default.',
     'flag_pipeline_binaries': 'Pipeline binaries',
     'flag_pipeline_binaries_hint': 'Stores compiled shaders in the driver format. Off by default: it crashes on NVIDIA driver 595.',
+    'flag_object_motion': 'Object motion',
+    'flag_object_motion_hint': 'Experimental: per-object motion for DLSS and FSR, less smear on the boy and Trico. Costs about 10% FPS and may crash on AMD cards on Linux. Off by default.',
     'flag_vk_validation': 'Vulkan validation',
     'flag_vk_validation_hint': 'Checks every graphics call. Very slow, and only works with the Vulkan SDK installed. For developers.',
     'home_soundtrack': 'Soundtrack',
