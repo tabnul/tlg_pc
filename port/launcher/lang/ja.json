@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "コンパイル済みシェーダーをドライバー形式で保存します。初期値はオフ:NVIDIA ドライバー 595 でクラッシュします。",
     "launcher.flag_object_motion": "オブジェクトモーション",
     "launcher.flag_object_motion_hint": "実験的:DLSS と FSR 向けのオブジェクトごとの動き情報。少年とトリコの残像が減ります。FPS が約 10% 下がり、Linux の AMD カードではクラッシュする場合があります。初期値はオフ。",
+    "launcher.flag_arena_free": "置き換えられたバッファブロックを解放",
+    "launcher.flag_arena_free_hint": "Issue #79 のテスト用スイッチ：より大きなブロックに置き換えられたメモリブロックをグラフィックドライバーに返します。ロード直後の「out of memory」クラッシュ向け。既定ではオフ。",
     "launcher.flag_vk_validation": "Vulkan 検証",
     "launcher.flag_vk_validation_hint": "すべてのグラフィック呼び出しを検査します。非常に遅く、Vulkan SDK がインストールされている場合のみ動作します。開発者向けです。",
     "launcher.home_soundtrack": "サウンドトラック",

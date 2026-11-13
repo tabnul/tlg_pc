@@ -5,7 +5,10 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <atomic>
+#include "tlg_toggles.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
+#include <vk_mem_alloc.h>
 
 #ifndef _WIN32
 #include <cstring>
@@ -222,6 +225,94 @@ void Start(const Vulkan::Instance& instance) {
     // ponytail: never joined; a thread that ended while the game ran crashed in ntdll
     // (vk_pipeline_serialization.cpp, StopWarmUp). It sleeps between samples.
     std::call_once(started, [&] { std::thread(Run, &instance).detach(); });
+}
+
+namespace {
+std::atomic<const Vulkan::Instance*> report_instance{nullptr};
+}
+
+void SetMemoryReportInstance(const Vulkan::Instance* instance) {
+    report_instance.store(instance, std::memory_order_release);
+}
+
+void MemoryStopReport() {
+    static std::atomic<bool> reported{false};
+    if (reported.exchange(true)) {
+        return;
+    }
+    const auto mib = [](unsigned long long bytes) { return bytes >> 20; };
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS_EX process{};
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(),
+                                reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&process),
+                                sizeof(process))) {
+        std::printf("Memory at stop: process private %llu MiB (peak %llu), working set %llu MiB "
+                    "(peak %llu)\n",
+                    mib(process.PrivateUsage), mib(process.PeakPagefileUsage),
+                    mib(process.WorkingSetSize), mib(process.PeakWorkingSetSize));
+    }
+    MEMORYSTATUSEX system{.dwLength = sizeof(MEMORYSTATUSEX)};
+    if (GlobalMemoryStatusEx(&system)) {
+        std::printf("Memory at stop: system RAM free %llu of %llu MiB, commit free %llu of %llu "
+                    "MiB, process address space free %llu MiB\n",
+                    mib(system.ullAvailPhys), mib(system.ullTotalPhys),
+                    mib(system.ullAvailPageFile), mib(system.ullTotalPageFile),
+                    mib(system.ullAvailVirtual));
+    }
+#else
+    if (std::FILE* f = std::fopen("/proc/self/status", "r")) {
+        char line[256];
+        while (std::fgets(line, sizeof(line), f)) {
+            if (!std::strncmp(line, "VmRSS:", 6) || !std::strncmp(line, "VmSize:", 7) ||
+                !std::strncmp(line, "VmPeak:", 7) || !std::strncmp(line, "VmHWM:", 6)) {
+                std::printf("Memory at stop: process %s", line);
+            }
+        }
+        std::fclose(f);
+    }
+    struct sysinfo info {};
+    if (sysinfo(&info) == 0) {
+        const unsigned long long unit = info.mem_unit;
+        std::printf("Memory at stop: system RAM free %llu of %llu MiB, swap free %llu of %llu "
+                    "MiB\n",
+                    mib(info.freeram * unit), mib(info.totalram * unit),
+                    mib(info.freeswap * unit), mib(info.totalswap * unit));
+    }
+#endif
+    if (const Vulkan::Instance* instance = report_instance.load(std::memory_order_acquire)) {
+        const auto& props = instance->GetMemoryProperties();
+        VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+        vmaGetHeapBudgets(instance->GetAllocator(), budgets);
+        unsigned long long blocks = 0;
+        for (uint32_t i = 0; i < props.memoryHeapCount; ++i) {
+            const bool device_local = static_cast<bool>(props.memoryHeaps[i].flags &
+                                                        vk::MemoryHeapFlagBits::eDeviceLocal);
+            blocks += budgets[i].statistics.blockCount;
+            std::printf("Memory at stop: Vulkan heap %u (%s, %llu MiB): driver says %llu MiB "
+                        "used of %llu MiB allowed; allocator %llu MiB in %u blocks\n",
+                        i, device_local ? "video memory" : "system memory",
+                        mib(props.memoryHeaps[i].size), mib(budgets[i].usage),
+                        mib(budgets[i].budget), mib(budgets[i].statistics.blockBytes),
+                        budgets[i].statistics.blockCount);
+        }
+        const auto limits = instance->GetPhysicalDevice().getProperties().limits;
+        const unsigned long long backing =
+            TlgStats::arena_backing_allocs.load(std::memory_order_relaxed);
+        std::printf("Memory at stop: %llu memory allocations (%llu allocator blocks + %llu "
+                    "buffer arena pieces), driver allows %u\n",
+                    blocks + backing, blocks, backing, limits.maxMemoryAllocationCount);
+    }
+    std::printf("Memory at stop: buffer arenas %llu alive reserving %llu MiB, %llu freed after "
+                "a migration; %llu MiB filled; %llu sparse binds since the start\n",
+                static_cast<unsigned long long>(
+                    TlgStats::arena_live_count.load(std::memory_order_relaxed)),
+                mib(TlgStats::arena_live_bytes.load(std::memory_order_relaxed)),
+                static_cast<unsigned long long>(
+                    TlgStats::arena_freed_count.load(std::memory_order_relaxed)),
+                mib(TlgStats::arena_resident_bytes.load(std::memory_order_relaxed)),
+                static_cast<unsigned long long>(
+                    TlgStats::arena_binds_total.load(std::memory_order_relaxed)));
+    std::fflush(stdout);
 }
 
 Sample Latest() {

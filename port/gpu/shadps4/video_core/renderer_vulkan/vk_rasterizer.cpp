@@ -1939,6 +1939,7 @@ void Rasterizer::FlushForFence(TlgStats::FenceSite site) {
 
 void Rasterizer::OnSubmit() {
     DrainDrawPipe();
+    buffer_cache.FreeReplacedArenas();
     if (fault_process_pending) {
         fault_process_pending = false;
         buffer_cache.ProcessFaultBuffer();

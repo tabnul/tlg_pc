@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "Speichert kompilierte Shader im Treiberformat. Standardmäßig aus: stürzt mit NVIDIA-Treiber 595 ab.",
     "launcher.flag_object_motion": "Objektbewegung",
     "launcher.flag_object_motion_hint": "Experimentell: Bewegung pro Objekt für DLSS und FSR, weniger Schlieren am Jungen und an Trico. Kostet etwa 10 % FPS und kann auf AMD-Karten unter Linux abstürzen. Standardmäßig aus.",
+    "launcher.flag_arena_free": "Ersetzte Pufferblöcke freigeben",
+    "launcher.flag_arena_free_hint": "Testschalter aus Issue #79: gibt Speicherblöcke, die durch einen größeren ersetzt wurden, an den Grafiktreiber zurück. Für Abstürze mit „out of memory“ kurz nach dem Laden. Standardmäßig aus.",
     "launcher.flag_vk_validation": "Vulkan-Validierung",
     "launcher.flag_vk_validation_hint": "Prüft jeden Grafikaufruf. Sehr langsam und funktioniert nur mit installiertem Vulkan SDK. Für Entwickler.",
     "launcher.home_soundtrack": "Soundtrack",

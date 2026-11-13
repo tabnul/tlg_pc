@@ -222,6 +222,7 @@ DEBUG_FLAGS = (
     ('flag_fault_nodrain', 'TLG_FAULT_NODRAIN', '1', None, False),     # #38
     ('flag_pipeline_binaries', 'TLG_PIPELINE_BINARIES', '1', '0', False),  # NVIDIA 595 crash
     ('flag_object_motion', 'TLG_OBJECT_MOTION', '1', '0', False),      # ~10% FPS; unguarded reads
+    ('flag_arena_free', 'TLG_ARENA_FREE', '1', None, False),           # #79: out of memory, 8 GB AMD
     ('flag_vk_validation', 'TLG_VK_VALIDATION', '1', None, False),     # needs the Vulkan SDK layer
 )
 DEBUG_LOG_FLAGS = tuple(flag[0] for flag in DEBUG_FLAGS if flag[0].startswith('log_'))

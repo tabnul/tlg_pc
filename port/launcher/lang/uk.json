@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "Зберігає скомпільовані шейдери у форматі драйвера. Типово вимкнено: спричиняє збій на драйвері NVIDIA 595.",
     "launcher.flag_object_motion": "Рух об'єктів",
     "launcher.flag_object_motion_hint": "Експериментально: рух окремих об'єктів для DLSS і FSR, менше розмиття на хлопчикові й Trico. Коштує близько 10% FPS і може спричиняти збої на картах AMD у Linux. Типово вимкнено.",
+    "launcher.flag_arena_free": "Звільняти замінені блоки буфера",
+    "launcher.flag_arena_free_hint": "Тестовий перемикач із issue #79: повертає графічному драйверу блоки пам’яті, замінені більшим блоком. Для збоїв «out of memory» невдовзі після завантаження. Типово вимкнено.",
     "launcher.flag_vk_validation": "Перевірка Vulkan",
     "launcher.flag_vk_validation_hint": "Перевіряє кожен графічний виклик. Дуже повільно й працює лише зі встановленим Vulkan SDK. Для розробників.",
     "launcher.home_soundtrack": "Soundtrack",

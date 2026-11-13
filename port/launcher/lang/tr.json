@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "Derlenmiş gölgelendiricileri sürücü biçiminde saklar. Varsayılan olarak kapalı: NVIDIA 595 sürücüsünde çöker.",
     "launcher.flag_object_motion": "Nesne hareketi",
     "launcher.flag_object_motion_hint": "Deneysel: DLSS ve FSR için nesne başına hareket, çocukta ve Trico'da daha az bulaşma. Yaklaşık %10 FPS'ye mal olur ve Linux'ta AMD kartlarda çökebilir. Varsayılan olarak kapalı.",
+    "launcher.flag_arena_free": "Değiştirilen arabellek bloklarını serbest bırak",
+    "launcher.flag_arena_free_hint": "Sorun #79 için test anahtarı: daha büyüğüyle değiştirilen bellek bloklarını grafik sürücüsüne geri verir. Yüklemeden kısa süre sonraki \"out of memory\" çökmeleri için. Varsayılan olarak kapalı.",
     "launcher.flag_vk_validation": "Vulkan doğrulaması",
     "launcher.flag_vk_validation_hint": "Her grafik çağrısını denetler. Çok yavaştır ve yalnızca Vulkan SDK kuruluyken çalışır. Geliştiriciler için.",
     "launcher.home_soundtrack": "Film müziği",

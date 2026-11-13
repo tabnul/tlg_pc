@@ -10,6 +10,7 @@
 #include "common/logging/log.h"
 #include "common/string_literal.h"
 #include "common/types.h"
+#include "tlg_perf_stats.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Frontend {
@@ -67,6 +68,11 @@ inline void CheckFailed(vk::Result r, const char* what, const std::source_locati
     }
     LOG_CRITICAL(Render, "Vulkan call failed at {}:{} ({}){}{}: vk::Result={}", file, loc.line(),
                  loc.function_name(), *what ? ": failed to " : "", what, vk::to_string(r));
+    if (r == vk::Result::eErrorOutOfHostMemory || r == vk::Result::eErrorOutOfDeviceMemory ||
+        r == vk::Result::eErrorOutOfPoolMemory) {
+        // tlg (issue #79): what the process, the driver and the arenas held when it stopped.
+        TlgPerfStats::MemoryStopReport();
+    }
     assert_fail_impl();
 }
 

@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "Guarda os shaders compilados no formato do driver. Desligado por padrão: bloqueia o jogo com o driver NVIDIA 595.",
     "launcher.flag_object_motion": "Movimento de objetos",
     "launcher.flag_object_motion_hint": "Experimental: movimento por objeto para DLSS e FSR, menos rastos no rapaz e no Trico. Custa cerca de 10% de FPS e pode bloquear em placas AMD no Linux. Desligado por padrão.",
+    "launcher.flag_arena_free": "Libertar blocos de buffer substituídos",
+    "launcher.flag_arena_free_hint": "Opção de teste do problema #79: devolve ao controlador gráfico os blocos de memória substituídos por um maior. Para falhas «out of memory» pouco depois do carregamento. Desativado por predefinição.",
     "launcher.flag_vk_validation": "Validação Vulkan",
     "launcher.flag_vk_validation_hint": "Verifica cada chamada gráfica. Muito lento, e só funciona com o Vulkan SDK instalado. Para desenvolvedores.",
     "launcher.home_soundtrack": "Trilha sonora",

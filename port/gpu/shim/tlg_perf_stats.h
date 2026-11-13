@@ -16,6 +16,13 @@ class Instance;
 
 namespace TlgPerfStats {
 
+/// tlg (issue #79): the instance MemoryStopReport reads the video memory figures from.
+void SetMemoryReportInstance(const Vulkan::Instance* instance);
+/// tlg (issue #79): "Memory at stop" lines, printed when a Vulkan call or an arena allocation
+/// fails for lack of memory: the process and system memory (the driver's "host memory"), every
+/// Vulkan heap, and the sparse buffer arenas. Any thread; never throws.
+void MemoryStopReport();
+
 /// Overlay items (TlgSettings::Values::overlay_items).
 enum Item : unsigned {
     Fps = 1u << 0,

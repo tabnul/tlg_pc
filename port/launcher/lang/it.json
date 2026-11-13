@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "Salva gli shader compilati nel formato del driver. Disattivata di default: crasha con il driver NVIDIA 595.",
     "launcher.flag_object_motion": "Movimento oggetti",
     "launcher.flag_object_motion_hint": "Sperimentale: movimento per oggetto per DLSS e FSR, meno scie sul ragazzo e su Trico. Costa circa il 10% di FPS e può crashare su schede AMD sotto Linux. Disattivata di default.",
+    "launcher.flag_arena_free": "Libera i blocchi buffer sostituiti",
+    "launcher.flag_arena_free_hint": "Opzione di test della segnalazione #79: restituisce al driver grafico i blocchi di memoria sostituiti da uno più grande. Per i crash «out of memory» poco dopo il caricamento. Disattivata per impostazione predefinita.",
     "launcher.flag_vk_validation": "Validazione Vulkan",
     "launcher.flag_vk_validation_hint": "Controlla ogni chiamata grafica. Molto lenta, e funziona solo con il Vulkan SDK installato. Per sviluppatori.",
     "launcher.home_soundtrack": "Colonna sonora",

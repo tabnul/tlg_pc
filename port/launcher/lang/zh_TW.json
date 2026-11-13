@@ -53,6 +53,8 @@
     "launcher.flag_pipeline_binaries_hint": "以驅動格式儲存編譯後的著色器。預設關閉:在 NVIDIA 595 驅動上會崩潰。",
     "launcher.flag_object_motion": "物體運動",
     "launcher.flag_object_motion_hint": "實驗性:為 DLSS 和 FSR 提供逐物體運動資訊,減少男孩和特里科身上的拖影。約降低 10% 幀率,在 Linux 的 AMD 顯示卡上可能崩潰。預設關閉。",
+    "launcher.flag_arena_free": "釋放被取代的緩衝區塊",
+    "launcher.flag_arena_free_hint": "來自問題 #79 的測試開關：將被更大區塊取代的記憶體區塊歸還給顯示卡驅動程式。用於載入後不久出現的「out of memory」當機。預設關閉。",
     "launcher.flag_vk_validation": "Vulkan 驗證",
     "launcher.flag_vk_validation_hint": "檢查每個圖形呼叫。非常慢,且僅在安裝了 Vulkan SDK 時可用。供開發者使用。",
     "launcher.home_soundtrack": "原聲音樂",

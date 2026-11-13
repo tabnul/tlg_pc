@@ -209,6 +209,11 @@ inline std::atomic<std::int64_t> image_bytes[ImageOwners]{}, image_count[ImageOw
 inline std::atomic<std::uint64_t> arena_resident_bytes{0};
 /// tlg (issue #38): arena memory given back on unmap.
 inline std::atomic<std::uint64_t> arena_released{0};
+/// tlg (issue #79): sparse arena bookkeeping for the memory lines at an out-of-memory stop:
+/// arenas alive and the address space they reserve, arenas freed after a migration, device
+/// memory allocations backing them, sparse binds handed to the driver since the start.
+inline std::atomic<std::uint64_t> arena_live_count{0}, arena_live_bytes{0}, arena_freed_count{0},
+    arena_backing_allocs{0}, arena_binds_total{0};
 /// Texture cache region lookups (ForEachImageInRegion) and the images they looked at, for the
 /// memory report: stale images in the page table make every lookup slower.
 inline std::atomic<std::uint64_t> region_lookups{0}, region_candidates{0};
