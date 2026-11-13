@@ -60,8 +60,12 @@ OVERHEAD_S = 35        # per-scene launch + load, for the time estimate
 # meta.json. Only what would break the measurement is forced: boot logos skipped, the per-second
 # frame stats on, frame generation off (generated frames would inflate the numbers) and the end
 # credits' own 30 FPS cap lifted (a capped reading says nothing).
+# TLG_RESTART_COMMAND empty: a scene that restarts the game (the end of s18_Ending
+# _070_Ending_Owari) exits instead. A restart starts a second game the benchmark does not know
+# and never closes (Windows and Linux): it stayed open at the opening cutscene after the run.
 BENCH_ENV = {"TLG_SKIP_LOGOS": "1", "TLG_FG": "0",
-             "TLG_FRAME_STATS": "1", "TLG_FRAME_STATS_MS": "1000"}
+             "TLG_FRAME_STATS": "1", "TLG_FRAME_STATS_MS": "1000",
+             "TLG_RESTART_COMMAND": ""}
 BENCH_INI = {"credits_fps": "unlocked"}
 
 
@@ -243,7 +247,8 @@ class Sweep:
                         row['load_s'] = round(now - started - (row['launch_s'] or 0), 1)
                         measure_end = now + self.seconds
                     elif 'blocking overlay started.' in line and phase == 'measure':
-                        row['status'] = 'reload'
+                        if row['status'] == 'ok':  # never over a crash or a restart
+                            row['status'] = 'reload'
                     elif 'Fault: exception' in line:
                         row['status'] = 'crash'
                     elif 'sceSystemServiceLoadExec' in line:
