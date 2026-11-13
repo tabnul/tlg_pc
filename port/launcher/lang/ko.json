@@ -1063,6 +1063,15 @@
     "Quitting...": "종료하는 중...",
     "Quitting... (release to cancel)": "종료하는 중... (떼면 취소)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "게임 종료: %s 2초 길게 누르기 또는 Alt+Q",
-    "Quit game: press Alt+Q": "게임 종료: Alt+Q"
+    "Quit game: press Alt+Q": "게임 종료: Alt+Q",
+    "Photo mode": "사진 모드",
+    "Photo mode##photo": "사진 모드##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "세상이 멈추고 카메라를 움직여 사진을 찍습니다. 개발자들이 직접 쓰던 자유 카메라를 쓰고 게임을 멈추므로 소년은 그 자리에 머뭅니다. 계속 플레이하려면 이 메뉴를 다시 열고 체크를 해제하세요. 점프하면 꺼집니다.",
+    "Pause the game": "게임 일시정지",
+    "Stop time": "시간 멈추기",
+    "Freeze##photofreeze": "정지 방식##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "세상을 멈추는 방법. 게임 일시정지: 게임 자체의 일시정지로 모든 것이 멈춥니다. 시간 멈추기: 게임 자체의 슬로 모션을 아무것도 움직이지 않을 때까지 낮춥니다. 첫 번째 방법으로 카메라가 움직이지 않으면 시도해 보세요.",
+    "Camera keeps the boy as its target##phototarget": "카메라가 소년을 대상으로 유지##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "켜기는 개발자들의 카메라 버튼이 설정하는 방식입니다. 카메라가 소년에게 묶여 있으면 끄세요."
   }
 }

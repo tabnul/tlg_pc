@@ -1063,6 +1063,15 @@
     "Quitting...": "Вихід...",
     "Quitting... (release to cancel)": "Вихід... (відпустіть, щоб скасувати)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Вийти з гри: утримуйте %s 2 секунди або натисніть Alt+Q",
-    "Quit game: press Alt+Q": "Вийти з гри: натисніть Alt+Q"
+    "Quit game: press Alt+Q": "Вийти з гри: натисніть Alt+Q",
+    "Photo mode": "Фоторежим",
+    "Photo mode##photo": "Фоторежим##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "Світ завмирає, а ви керуєте камерою, щоб зробити знімок: власна вільна камера розробників, з замороженою грою, тож хлопець лишається на місці. Відкрийте це меню ще раз і зніміть позначку, щоб грати далі. Стрибок вимикає його.",
+    "Pause the game": "Поставити гру на паузу",
+    "Stop time": "Зупинити час",
+    "Freeze##photofreeze": "Заморожування##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Як заморожується світ. Поставити гру на паузу: власна пауза гри, усе зупиняється. Зупинити час: власне сповільнення гри, зменшене так, що ніщо не рухається; спробуйте, якщо з першим варіантом камера не рухається.",
+    "Camera keeps the boy as its target##phototarget": "Камера тримає хлопця як ціль##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "Увімкнено — так це налаштовує власна кнопка камери розробників. Вимкніть, якщо камера лишається прив'язаною до хлопця."
   }
 }

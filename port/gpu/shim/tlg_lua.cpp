@@ -317,6 +317,9 @@ std::string size_pending; // the latest Trico size, under fun_mutex: a slider dr
 std::atomic<float> trico_size{1.0f};
 std::string cam_pending; // the latest free camera wish, under fun_mutex
 std::atomic<bool> free_cam{false};
+std::atomic<bool> photo{false};
+std::atomic<TlgFun::PhotoFreeze> photo_freeze{TlgFun::PhotoFreeze::Pause};
+std::atomic<bool> photo_target{true};
 std::atomic<bool> pilot{false}; // Tricopilot (TlgFun::Tricopilot)
 // Which camera watches him (TlgFun::PilotCam). Middle is what autoTrico() picks itself, so that
 // stays our default; the launcher and the Fun tab can pick another one, also while he drives.
@@ -1036,6 +1039,7 @@ void Jump(const char* stage, const char* area) {
     BackupSaves("jump"); // a jump moves the story; the game saves at its next checkpoint
     trico_size = 1.0f; // the new stage's Trico has his normal size
     free_cam = false;  // and the game's own camera
+    if (photo) PhotoMode(false); // unfreeze first, or the new stage would start paused
     // As the QA menu does: _TLGQA_UNLOAD makes StartStage unload the current stage first
     // (GameEdits, GameSetupTbl.lua).
     std::printf("Fun: jump to %s %s\n", stage, area);
@@ -1257,6 +1261,65 @@ void FreeCamera(bool on) {
 
 bool FreeCameraOn() {
     return free_cam;
+}
+
+// Photo mode (tlg_fun.h). The fly camera is the engine's FixCamera, which reads the pad itself;
+// the boy reads the same pad, which is why the plain Free camera walks him around. Freezing the
+// world stops him. Our settings tick keeps running during the game's pause (the developers' QA
+// menu relies on the same: it pauses and its tick still reads the pad), so leaving always works.
+// _TLG_PHOTO remembers what we changed, so leaving undoes only that: a pause we did not make
+// (the pause menu) stays, and the scene's own slow motion comes back at its own speed.
+constexpr std::string_view PhotoOnLua =
+    "if not _TLG_PHOTO then _TLG_PHOTO={}\n"
+    " local fc=FixCamera:GetCamera() if fc then fc.flags=%TARGET% end\n"
+    " if not FixCamera:IsActive() then FixCamera:ToActive() end\n"
+    " if %STOPTIME% then _TLG_PHOTO.speed=MS.GetGameSpeed() MS.SetGameSpeed(0.001,0)\n"
+    " elseif not TricoGame_IsGamePause() then luaCommand('trico pause') _TLG_PHOTO.paused=true end\n"
+    " L('fun photo on cam='..tostring(FixCamera:IsActive())..' paused='..tostring(TricoGame_IsGamePause())"
+    "..' speed='..tostring(MS.GetGameSpeed()))\n"
+    "end\n";
+constexpr std::string_view PhotoOffLua =
+    "if _TLG_PHOTO then local p=_TLG_PHOTO _TLG_PHOTO=nil\n"
+    " if p.paused then luaCommand('trico resume') end\n"
+    " if p.speed then MS.SetGameSpeed(p.speed,0) end\n"
+    " if FixCamera:IsActive() then GameCamera:ToActive() end\n"
+    " L('fun photo off')\n"
+    "end\n";
+
+void PhotoMode(bool on) {
+    photo = on;
+    std::printf("Fun: photo mode %s\n", on ? "on" : "off");
+    std::string code(on ? PhotoOnLua : PhotoOffLua);
+    if (on) {
+        auto put = [&](const std::string& mark, const std::string& with) {
+            code.replace(code.find(mark), mark.size(), with);
+        };
+        put("%TARGET%", photo_target ? "'|WithTarget'" : "'~WithTarget'");
+        put("%STOPTIME%", photo_freeze == TlgFun::PhotoFreeze::StopTime ? "true" : "false");
+    }
+    if (!on) free_cam = false; // leaving gives the normal camera back, whatever was on before
+    FunQueue("\ndo local ok,e=pcall(function()\n" + code +
+             "end) if not ok then L('fun error: '..tostring(e)) end end\n");
+}
+
+bool PhotoModeOn() {
+    return photo;
+}
+
+void PhotoModeFreeze(TlgFun::PhotoFreeze how) {
+    photo_freeze = how;
+}
+
+TlgFun::PhotoFreeze PhotoModeFreeze() {
+    return photo_freeze.load();
+}
+
+void PhotoModeTarget(bool on) {
+    photo_target = on;
+}
+
+bool PhotoModeTarget() {
+    return photo_target;
 }
 
 // Tricopilot: the developers' own self-driving Trico (game/scripts/ai2/condor/

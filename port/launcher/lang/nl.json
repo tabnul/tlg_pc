@@ -1063,6 +1063,15 @@
     "Quitting...": "Afsluiten...",
     "Quitting... (release to cancel)": "Afsluiten... (loslaten om te annuleren)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Spel afsluiten: houd %s 2 seconden vast, of druk op Alt+Q",
-    "Quit game: press Alt+Q": "Spel afsluiten: druk op Alt+Q"
+    "Quit game: press Alt+Q": "Spel afsluiten: druk op Alt+Q",
+    "Photo mode": "Fotomodus",
+    "Photo mode##photo": "Fotomodus##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "De wereld staat stil en jij vliegt met de camera om een foto te maken: de eigen vrije camera van de ontwikkelaars, met de game bevroren zodat de jongen blijft staan waar hij staat. Open dit menu opnieuw en vink het uit om verder te spelen. Een sprong zet het uit.",
+    "Pause the game": "Pauzeer de game",
+    "Stop time": "Tijd stilzetten",
+    "Freeze##photofreeze": "Bevriezen##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Hoe de wereld wordt bevroren. Pauzeer de game: de eigen pauze van de game, alles stopt. Tijd stilzetten: de eigen slow motion van de game, zo ver teruggedraaid dat niets meer beweegt; probeer dit als de camera met de eerste niet beweegt.",
+    "Camera keeps the boy as its target##phototarget": "Camera houdt de jongen als doel##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "Aan is hoe de eigen cameraknop van de ontwikkelaars het instelt. Zet het uit als de camera aan de jongen vast blijft zitten."
   }
 }

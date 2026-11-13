@@ -1063,6 +1063,15 @@
     "Quitting...": "Çıkılıyor...",
     "Quitting... (release to cancel)": "Çıkılıyor... (iptal için bırakın)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Oyundan çık: %s tuşlarını 2 saniye basılı tut veya Alt+Q'ya bas",
-    "Quit game: press Alt+Q": "Oyundan çık: Alt+Q'ya bas"
+    "Quit game: press Alt+Q": "Oyundan çık: Alt+Q'ya bas",
+    "Photo mode": "Fotoğraf modu",
+    "Photo mode##photo": "Fotoğraf modu##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "Dünya durur ve fotoğraf çekmek için kamerayı sen uçurursun: geliştiricilerin kendi serbest kamerası, oyun dondurulmuş olarak, böylece çocuk olduğu yerde kalır. Oynamaya devam etmek için bu menüyü yeniden aç ve işareti kaldır. Bir atlama onu kapatır.",
+    "Pause the game": "Oyunu duraklat",
+    "Stop time": "Zamanı durdur",
+    "Freeze##photofreeze": "Dondurma##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Dünyanın nasıl dondurulduğu. Oyunu duraklat: oyunun kendi duraklatması, her şey durur. Zamanı durdur: oyunun kendi ağır çekimi, hiçbir şey kıpırdamayana kadar kısılır; ilkiyle kamera hareket etmiyorsa bunu dene.",
+    "Camera keeps the boy as its target##phototarget": "Kamera çocuğu hedef olarak tutar##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "Açık, geliştiricilerin kendi kamera düğmesinin ayarıdır. Kamera çocuğa bağlı kalıyorsa kapat."
   }
 }

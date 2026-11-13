@@ -1050,6 +1050,15 @@
     "Quitting...": "Fermeture...",
     "Quitting... (release to cancel)": "Fermeture... (relâchez pour annuler)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Quitter le jeu : maintenez %s 2 secondes ou appuyez sur Alt+Q",
-    "Quit game: press Alt+Q": "Quitter le jeu : appuyez sur Alt+Q"
+    "Quit game: press Alt+Q": "Quitter le jeu : appuyez sur Alt+Q",
+    "Photo mode": "Mode photo",
+    "Photo mode##photo": "Mode photo##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "Le monde s'arrête et vous pilotez la caméra pour prendre une photo : la caméra libre des développeurs eux-mêmes, avec le jeu figé pour que le garçon reste où il est. Rouvrez ce menu et décochez la case pour continuer à jouer. Un saut le désactive.",
+    "Pause the game": "Mettre le jeu en pause",
+    "Stop time": "Arrêter le temps",
+    "Freeze##photofreeze": "Figer##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Comment le monde est figé. Mettre le jeu en pause : la pause du jeu lui-même, tout s'arrête. Arrêter le temps : le ralenti du jeu lui-même, baissé jusqu'à ce que plus rien ne bouge ; essayez-le si la caméra ne bouge pas avec la première option.",
+    "Camera keeps the boy as its target##phototarget": "La caméra garde le garçon comme cible##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "Activé correspond au réglage du bouton de caméra des développeurs. Désactivez-le si la caméra reste attachée au garçon."
   }
 }

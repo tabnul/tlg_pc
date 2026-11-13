@@ -1050,6 +1050,15 @@
     "Quitting...": "正在退出...",
     "Quitting... (release to cancel)": "正在退出...（松开以取消）",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "退出游戏：按住 %s 2 秒，或按 Alt+Q",
-    "Quit game: press Alt+Q": "退出游戏：按 Alt+Q"
+    "Quit game: press Alt+Q": "退出游戏：按 Alt+Q",
+    "Photo mode": "拍照模式",
+    "Photo mode##photo": "拍照模式##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "世界静止，你可以自由移动镜头拍照：使用开发者自己的自由镜头，并冻结游戏，让少年留在原地。要继续游戏，请再次打开此菜单并取消勾选。跳转会关闭它。",
+    "Pause the game": "暂停游戏",
+    "Stop time": "停止时间",
+    "Freeze##photofreeze": "冻结方式##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "世界如何被冻结。暂停游戏：游戏自身的暂停，一切停止。停止时间：游戏自身的慢动作，调低到什么都不动；如果第一种方式下镜头不动，请试试这个。",
+    "Camera keeps the boy as its target##phototarget": "镜头以少年为目标##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "开启即开发者自己的镜头按键所用的设置。如果镜头仍然绑在少年身上，请关闭它。"
   }
 }

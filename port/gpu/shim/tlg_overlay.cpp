@@ -1321,10 +1321,34 @@ void FunTab() {
 
     ImGui::SeparatorText("Free camera");
     bool free_cam = TlgFun::FreeCameraOn();
+    ImGui::BeginDisabled(TlgFun::PhotoModeOn());
     if (ImGui::Checkbox("Free camera##freecam", &free_cam)) {
         TlgFun::FreeCamera(free_cam);
     }
+    ImGui::EndDisabled();
     Help("The developers' own camera: it lets go of the normal camera that follows the boy. Turn it off to get the normal camera back. A jump or a new stage turns it off.");
+
+    ImGui::SeparatorText(TR("Photo mode"));
+    bool photo = TlgFun::PhotoModeOn();
+    if (ImGui::Checkbox(TR("Photo mode##photo"), &photo)) {
+        TlgFun::PhotoMode(photo);
+        if (photo) SetOpen(false);
+    }
+    Help(TR("The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off."));
+    ImGui::BeginDisabled(photo);
+    int freeze = int(TlgFun::PhotoModeFreeze());
+    const char* freeze_names[] = {TR(TlgFun::PhotoFreezeNames[0]), TR(TlgFun::PhotoFreezeNames[1])};
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::Combo(TR("Freeze##photofreeze"), &freeze, freeze_names, 2)) {
+        TlgFun::PhotoModeFreeze(TlgFun::PhotoFreeze(freeze));
+    }
+    Help(TR("How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one."));
+    bool target = TlgFun::PhotoModeTarget();
+    if (ImGui::Checkbox(TR("Camera keeps the boy as its target##phototarget"), &target)) {
+        TlgFun::PhotoModeTarget(target);
+    }
+    Help(TR("On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy."));
+    ImGui::EndDisabled();
 
     ImGui::SeparatorText("Tricopilot");
     const bool pilot = TlgFun::TricopilotOn();

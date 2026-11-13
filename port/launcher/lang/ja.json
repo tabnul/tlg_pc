@@ -1050,6 +1050,15 @@
     "Quitting...": "終了中...",
     "Quitting... (release to cancel)": "終了中...（離すとキャンセル）",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "ゲーム終了: %s を2秒長押し、または Alt+Q",
-    "Quit game: press Alt+Q": "ゲーム終了: Alt+Q"
+    "Quit game: press Alt+Q": "ゲーム終了: Alt+Q",
+    "Photo mode": "フォトモード",
+    "Photo mode##photo": "フォトモード##photo",
+    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "世界が止まり、カメラを自由に動かして写真を撮れます。開発者自身のフリーカメラを使い、ゲームを止めるので少年はその場にとどまります。続けて遊ぶには、このメニューをもう一度開いてチェックを外してください。ジャンプするとオフになります。",
+    "Pause the game": "ゲームを一時停止",
+    "Stop time": "時間を止める",
+    "Freeze##photofreeze": "停止方法##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "世界の止め方。ゲームを一時停止：ゲーム自身のポーズで、すべてが止まります。時間を止める：ゲーム自身のスローモーションを、何も動かなくなるまで下げます。最初の方法でカメラが動かない場合に試してください。",
+    "Camera keeps the boy as its target##phototarget": "カメラが少年をターゲットにする##phototarget",
+    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "オンは開発者自身のカメラボタンと同じ設定です。カメラが少年に固定されたままの場合はオフにしてください。"
   }
 }
