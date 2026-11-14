@@ -440,6 +440,7 @@
     "pad.combo_quit": "Wyjdź z gry (przytrzymaj 2 sekundy)",
     "pad.combo_menu": "Menu w grze",
     "pad.combo_qa": "Menu QA",
+    "pad.combo_photo": "Tryb zdjęć wł. / wył.",
     "pad.combo_press": "przytrzymaj przyciski, potem puść…",
     "pad.combo_help": "Dwa lub więcej przycisków razem. Klawiatura: Alt+Q wychodzi, Insert otwiera menu w grze."
   },
@@ -1066,12 +1067,23 @@
     "Quit game: press Alt+Q": "Wyjdź z gry: naciśnij Alt+Q",
     "Photo mode": "Tryb fotograficzny",
     "Photo mode##photo": "Tryb fotograficzny##photo",
-    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "Świat stoi w miejscu, a ty latasz kamerą, żeby zrobić zdjęcie: własna wolna kamera twórców, z zamrożoną grą, więc chłopiec zostaje tam, gdzie jest. Otwórz to menu ponownie i odznacz, aby grać dalej. Skok go wyłącza.",
     "Pause the game": "Wstrzymaj grę",
     "Stop time": "Zatrzymaj czas",
     "Freeze##photofreeze": "Zamrożenie##photofreeze",
     "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Jak świat jest zamrażany. Wstrzymaj grę: własna pauza gry, wszystko staje. Zatrzymaj czas: własne spowolnienie gry, zmniejszone tak, że nic się nie rusza; spróbuj, jeśli kamera nie rusza się przy pierwszej opcji.",
-    "Camera keeps the boy as its target##phototarget": "Kamera trzyma chłopca jako cel##phototarget",
-    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "Włączone to ustawienie własnego przycisku kamery twórców. Wyłącz, jeśli kamera pozostaje przywiązana do chłopca."
+    "Photo mode on / off": "Tryb zdjęć wł. / wył.",
+    "Photo mode on": "Tryb zdjęć włączony",
+    "Photo mode off": "Tryb zdjęć wyłączony",
+    "Cross / Print Screen": "Krzyżyk / Print Screen",
+    "Screenshot": "Zrzut ekranu",
+    "Left stick": "Lewa gałka",
+    "Fly": "Lot",
+    "Right stick": "Prawa gałka",
+    "Look around": "Rozglądanie się",
+    "Down / up": "W dół / w górę",
+    "Hold R1 / L1": "Przytrzymaj R1 / L1",
+    "Fast / slow": "Szybko / wolno",
+    "Exit photo mode": "Wyjdź z trybu zdjęć",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Świat zamiera, a ty latasz kamerą, aby zrobić zdjęcie. Lewa gałka: lot. Prawa gałka: rozglądanie się. L2 / R2: w dół / w górę. Przytrzymaj R1: szybko, przytrzymaj L1: wolno. Krzyżyk lub Print Screen: zapisz zrzut ekranu w user/screenshots. L3 + R3, F9 (lub to menu) włącza i wyłącza tryb. Skok go wyłącza."
   }
 }

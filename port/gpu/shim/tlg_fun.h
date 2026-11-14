@@ -115,7 +115,7 @@ void Size(float scale);
 float SizeNow();
 void FreeCamera(bool on);
 bool FreeCameraOn();
-// Photo mode: the developers' own fly camera (the Free camera above), with the world frozen so
+// Photo mode: our own fly camera (on the developers' editor camera), with the world frozen so
 // the pad flies only the camera and the boy stays where he is. Two ways to freeze, because it is
 // not yet tested which one keeps the fly camera moving:
 //  Pause     - the game's own pause (luaCommand "trico pause", as the pause menu does).
@@ -128,9 +128,6 @@ void PhotoMode(bool on);
 bool PhotoModeOn();
 void PhotoModeFreeze(PhotoFreeze how); // takes effect at the next start of photo mode
 PhotoFreeze PhotoModeFreeze();
-// The fly camera's "WithTarget" flag: on is what the game's own debug toggle (R3) uses.
-void PhotoModeTarget(bool on);
-bool PhotoModeTarget();
 // Tricopilot: the developers' self-driving Trico, left in the retail game
 // (game/scripts/ai2/condor/condordebugautotrico.lua). Trico walks the scene by himself and the
 // camera follows him. The launcher's benchmark can keep it on for a whole run (TLG_TRICOPILOT=1).

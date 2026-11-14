@@ -41,6 +41,7 @@ enum PadCombo : uint32_t {
     PadL1 = 1u << 9, PadR1 = 1u << 10, PadUp = 1u << 11, PadDown = 1u << 12, PadLeft = 1u << 13,
     PadRight = 1u << 14, PadTouchpad = 1u << 20, PadL2 = 1u << 24, PadR2 = 1u << 25,
     PadComboQuit = PadShare | PadOptions, PadComboMenu = PadR3 | PadL2, PadComboQa = PadL1 | PadL3,
+    PadComboPhoto = PadL3 | PadR3,
 };
 
 struct Values {
@@ -199,8 +200,9 @@ struct Values {
     std::atomic<bool> audio_surround{false};
     /// Controller button combos (Controls tab + launcher Controller page, tlg.ini pad_combo_*):
     /// PadCombo bits. Quit game (held 2 s, tlg_overlay.cpp), our menu (tlg_overlay.cpp) and the
-    /// QA menu of level_select (tlg_lua.cpp). Defaults are the combos the port always used.
-    std::atomic<uint32_t> combo_quit{PadComboQuit}, combo_menu{PadComboMenu}, combo_qa{PadComboQa};
+    /// QA menu of level_select (tlg_lua.cpp) and photo mode on/off (tlg_overlay.cpp). Defaults are the combos the port always used.
+    std::atomic<uint32_t> combo_quit{PadComboQuit}, combo_menu{PadComboMenu}, combo_qa{PadComboQa},
+        combo_photo{PadComboPhoto};
 
     /// Startup settings for the explicit TLG_RENDER_RES compatibility patch only.
     int startup_preset = NativeAA;

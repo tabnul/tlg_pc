@@ -123,8 +123,11 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.audio_device = value;
         return;
     }
-    if (key == "pad_combo_quit" || key == "pad_combo_menu" || key == "pad_combo_qa") {
-        auto& target = key == "pad_combo_quit" ? v.combo_quit : key == "pad_combo_menu" ? v.combo_menu : v.combo_qa;
+    if (key == "pad_combo_quit" || key == "pad_combo_menu" || key == "pad_combo_qa" ||
+        key == "pad_combo_photo") {
+        auto& target = key == "pad_combo_quit" ? v.combo_quit : key == "pad_combo_menu" ? v.combo_menu
+                      : key == "pad_combo_qa"   ? v.combo_qa
+                                                : v.combo_photo;
         target = ParseCombo(value, target.load());
         return;
     }
@@ -732,8 +735,9 @@ void Save() {
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
-    std::fprintf(file, "pad_combo_quit=%s\npad_combo_menu=%s\npad_combo_qa=%s\n",
-                 ComboText(v.combo_quit).c_str(), ComboText(v.combo_menu).c_str(), ComboText(v.combo_qa).c_str());
+    std::fprintf(file, "pad_combo_quit=%s\npad_combo_menu=%s\npad_combo_qa=%s\npad_combo_photo=%s\n",
+                 ComboText(v.combo_quit).c_str(), ComboText(v.combo_menu).c_str(), ComboText(v.combo_qa).c_str(),
+                 ComboText(v.combo_photo).c_str());
     std::fprintf(file, "trico_drool=%d\n", v.trico_drool.load());
     std::fprintf(file, "mod_treasures=%d\nmod_horns=%d\n", int(v.mod_treasures.load()),
                  int(v.mod_horns.load()));

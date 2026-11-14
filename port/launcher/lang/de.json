@@ -433,6 +433,7 @@
     "pad.combo_quit": "Spiel beenden (2 Sekunden halten)",
     "pad.combo_menu": "Spielmenü",
     "pad.combo_qa": "QA-Menü",
+    "pad.combo_photo": "Fotomodus ein / aus",
     "pad.combo_press": "Tasten halten, dann loslassen…",
     "pad.combo_help": "Zwei oder mehr Tasten zusammen. Tastatur: Alt+Q beendet, Einfg öffnet das Spielmenü."
   },
@@ -1053,12 +1054,23 @@
     "Quit game: press Alt+Q": "Spiel beenden: Alt+Q drücken",
     "Photo mode": "Fotomodus",
     "Photo mode##photo": "Fotomodus##photo",
-    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "Die Welt steht still und du fliegst mit der Kamera, um ein Bild zu machen: die eigene freie Kamera der Entwickler, mit eingefrorenem Spiel, damit der Junge bleibt, wo er ist. Öffne dieses Menü erneut und entferne den Haken, um weiterzuspielen. Ein Sprung schaltet es aus.",
     "Pause the game": "Spiel pausieren",
     "Stop time": "Zeit anhalten",
     "Freeze##photofreeze": "Einfrieren##photofreeze",
     "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Wie die Welt eingefroren wird. Spiel pausieren: die eigene Pause des Spiels, alles stoppt. Zeit anhalten: die eigene Zeitlupe des Spiels, so weit heruntergedreht, dass sich nichts mehr bewegt; probiere das, wenn sich die Kamera mit der ersten Variante nicht bewegt.",
-    "Camera keeps the boy as its target##phototarget": "Kamera behält den Jungen als Ziel##phototarget",
-    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "An ist die Einstellung der eigenen Kamerataste der Entwickler. Schalte es aus, wenn die Kamera am Jungen hängen bleibt."
+    "Photo mode on / off": "Fotomodus ein / aus",
+    "Photo mode on": "Fotomodus ein",
+    "Photo mode off": "Fotomodus aus",
+    "Cross / Print Screen": "Kreuz / Druck",
+    "Screenshot": "Screenshot",
+    "Left stick": "Linker Stick",
+    "Fly": "Fliegen",
+    "Right stick": "Rechter Stick",
+    "Look around": "Umsehen",
+    "Down / up": "Runter / hoch",
+    "Hold R1 / L1": "R1 / L1 halten",
+    "Fast / slow": "Schnell / langsam",
+    "Exit photo mode": "Fotomodus beenden",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Die Welt steht still und du fliegst mit der Kamera, um ein Bild zu machen. Linker Stick: fliegen. Rechter Stick: umsehen. L2 / R2: runter / hoch. R1 halten: schnell, L1 halten: langsam. Kreuz oder Druck-Taste: Screenshot in user/screenshots speichern. L3 + R3, F9 (oder dieses Menü) schaltet ihn ein und aus. Ein Sprung schaltet ihn aus."
   }
 }

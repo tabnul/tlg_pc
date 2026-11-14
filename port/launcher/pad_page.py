@@ -50,6 +50,7 @@ TEXT = {
     'combo_quit': 'Quit game (hold 2 seconds)',
     'combo_menu': 'In-game menu',
     'combo_qa': 'QA menu',
+    'combo_photo': 'Photo mode on / off',
     'combo_press': 'hold the buttons, then release…',
     'combo_help': 'Two or more buttons together. Keyboard: Alt+Q quits, Insert opens the in-game menu.',
     'credit': 'Drawing: RPCS3 DualShock 3 by HerrHulaHoop (GPL-2.0), made a DualShock 4 for this port.',
@@ -80,7 +81,8 @@ COMBO_LABELS = {'share': 'Share', 'options': 'Options', 'touchpad': 'Touchpad', 
                 'circle': 'Circle', 'square': 'Square', 'triangle': 'Triangle', 'up': 'Up', 'down': 'Down',
                 'left': 'Left', 'right': 'Right'}
 COMBOS = (('pad_combo_quit', 'combo_quit', 'share+options'), ('pad_combo_menu', 'combo_menu', 'l2+r3'),
-          ('pad_combo_qa', 'combo_qa', 'l1+l3'))
+          ('pad_combo_qa', 'combo_qa', 'l1+l3'),
+          ('pad_combo_photo', 'combo_photo', 'l3+r3'))
 
 
 def parse_combo(text, fallback):

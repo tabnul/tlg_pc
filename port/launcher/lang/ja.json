@@ -433,6 +433,7 @@
     "pad.combo_quit": "ゲームを終了（2秒長押し）",
     "pad.combo_menu": "ゲーム内メニュー",
     "pad.combo_qa": "QAメニュー",
+    "pad.combo_photo": "フォトモード オン / オフ",
     "pad.combo_press": "ボタンを押したまま、離してください…",
     "pad.combo_help": "2つ以上のボタンを同時に。キーボード: Alt+Qで終了、Insertでゲーム内メニューを開きます。"
   },
@@ -1053,12 +1054,23 @@
     "Quit game: press Alt+Q": "ゲーム終了: Alt+Q",
     "Photo mode": "フォトモード",
     "Photo mode##photo": "フォトモード##photo",
-    "The world stands still and you fly the camera to take a picture: the developers' own free camera, with the game frozen so the boy stays where he is. Open this menu again and untick it to play on. A jump turns it off.": "世界が止まり、カメラを自由に動かして写真を撮れます。開発者自身のフリーカメラを使い、ゲームを止めるので少年はその場にとどまります。続けて遊ぶには、このメニューをもう一度開いてチェックを外してください。ジャンプするとオフになります。",
     "Pause the game": "ゲームを一時停止",
     "Stop time": "時間を止める",
     "Freeze##photofreeze": "停止方法##photofreeze",
     "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "世界の止め方。ゲームを一時停止：ゲーム自身のポーズで、すべてが止まります。時間を止める：ゲーム自身のスローモーションを、何も動かなくなるまで下げます。最初の方法でカメラが動かない場合に試してください。",
-    "Camera keeps the boy as its target##phototarget": "カメラが少年をターゲットにする##phototarget",
-    "On is how the developers' own camera button sets it. Turn it off if the camera stays tied to the boy.": "オンは開発者自身のカメラボタンと同じ設定です。カメラが少年に固定されたままの場合はオフにしてください。"
+    "Photo mode on / off": "フォトモード オン / オフ",
+    "Photo mode on": "フォトモード オン",
+    "Photo mode off": "フォトモード オフ",
+    "Cross / Print Screen": "× / Print Screen",
+    "Screenshot": "スクリーンショット",
+    "Left stick": "左スティック",
+    "Fly": "移動",
+    "Right stick": "右スティック",
+    "Look around": "見回す",
+    "Down / up": "下 / 上",
+    "Hold R1 / L1": "R1 / L1 長押し",
+    "Fast / slow": "速く / ゆっくり",
+    "Exit photo mode": "フォトモード終了",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "世界が止まり、カメラを自由に飛ばして写真を撮れます。左スティック：移動。右スティック：見回す。L2 / R2：下 / 上。R1 長押し：速く、L1 長押し：ゆっくり。× または Print Screen：user/screenshots にスクリーンショットを保存。L3 + R3, F9（またはこのメニュー）でオン / オフ。ジャンプするとオフになります。"
   }
 }

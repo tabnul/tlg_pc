@@ -9,7 +9,8 @@
 </p>
 
 A native Windows and Linux port of The Last Guardian (PS4). It adds DLSS and FSR, frame generation,
-ultrawide support, an optional texture pack and an in-game graphics menu. It also brings back many
+ultrawide support, an optional texture pack, an in-game graphics menu and a [photo mode](#photo-mode).
+It also brings back many
 things the developers cut or hid in the game's files, which you can't find in any other version:
 see [Cut and hidden content](#cut-and-hidden-content) and the [full guide](docs/fun.md).
 
@@ -18,7 +19,7 @@ see [Cut and hidden content](#cut-and-hidden-content) and the [full guide](docs/
 
 No game files are included. You need your own copy, dumped from your own PS4.
 
-**Contents:** [Get started](#get-started) · [Graphics](#graphics) ·
+**Contents:** [Get started](#get-started) · [Graphics](#graphics) · [Photo mode](#photo-mode) ·
 [Cut and hidden content](#cut-and-hidden-content) · [Sound](#sound) · [Soundtrack](#soundtrack) ·
 [Controllers and languages](#controllers-and-languages) · [For testers](#for-testers) ·
 [Building](#building) · [Credits](#credits)
@@ -130,6 +131,21 @@ the full screenshot. Most of the difference is in motion (less shimmer), which a
 [<img src="docs/screenshots/crops/TEXTURE_ROCK_AFTER.jpg" alt="moss and rock, with the texture pack">](docs/screenshots/TEXTURE_AFTER.png)
 
 </details>
+
+## Photo mode
+
+The original game has no photo mode. This port adds one. The world stops, and you fly a free camera
+anywhere you like: around Trico, high above the gorge, right up to the boy's face. Then you save
+the picture.
+
+- **Start and stop:** **L3 + R3** on a controller, **F9** on the keyboard, or **Photo mode** in the
+  in-game menu (Fun tab). You can change the controller combo under Controls.
+- **Fly:** left stick to move, right stick to look around, **L2 / R2** down and up, hold **R1** to
+  go faster or **L1** to go slower.
+- **Save a picture:** **Cross** or **Print Screen**. It is saved as a lossless PNG at the full
+  render resolution in `user/screenshots`. The button help on screen is not in the picture.
+
+<p align="center"><a href="docs/fun.md#photo-mode"><img src="docs/screenshots/fun/photo-mode.jpg" alt="Photo mode: the camera hangs above the gorge, looking down on Trico on a grassy cliff"></a></p>
 
 ## Cut and hidden content
 
