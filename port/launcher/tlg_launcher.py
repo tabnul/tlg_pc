@@ -728,12 +728,14 @@ class BenchmarkWindow:
         self.custom = tk.Text(custom_box, width=56, height=10, background=FIELD,
                               foreground=TEXT_COLOR, insertbackground=TEXT_COLOR, relief='flat',
                               font=('TkDefaultFont', 9))
-        self.custom.insert('1.0', '\n'.join(benchmark.EXAMPLE_POINTS))
+        # #68: the pasted list survives closing the launcher (pasting is awkward in Steam's
+        # gaming mode). Empty setting = the examples.
+        self.custom.insert('1.0', app.settings.get('bench_custom_points') or '\n'.join(benchmark.EXAMPLE_POINTS))
         self.custom.grid(row=0, column=0, sticky='ew')
         custom_bar = ttk.Scrollbar(custom_box, orient='vertical', command=self.custom.yview)
         custom_bar.grid(row=0, column=1, sticky='ns')
         self.custom.configure(yscrollcommand=custom_bar.set)
-        self.custom.bind('<KeyRelease>', lambda _e: self.refresh())
+        self.custom.bind('<KeyRelease>', lambda _e: (self.remember_custom(), self.refresh()))
 
         line = ttk.Frame(win)
         line.grid(row=7, column=0, columnspan=3, sticky='w', pady=(8, 0))
@@ -793,6 +795,15 @@ class BenchmarkWindow:
             return [points[i] for i in self.pick.curselection()], []
         return self.bm.parse_points(self.custom.get('1.0', 'end'))
 
+    def remember_custom(self):
+        """Save the custom list when it changed (settings.json), so it is back next time."""
+        text = self.custom.get('1.0', 'end').strip()
+        if text == '\n'.join(self.bm.EXAMPLE_POINTS):
+            text = ''
+        if text != self.app.settings.get('bench_custom_points', ''):
+            self.app.settings['bench_custom_points'] = text
+            tlg_run.save_settings(self.app.settings)
+
     def chosen_seconds(self):
         try:
             return max(5, min(600, int(self.seconds.get())))
@@ -824,6 +835,7 @@ class BenchmarkWindow:
         if app.process or tlg_run.game_running():
             messagebox.showinfo(app.t('bench_title'), app.t('bench_game_running'), parent=self.win)
             return
+        self.remember_custom()
         points, bad = self.chosen()
         if bad:
             messagebox.showerror(app.t('bench_title'),
