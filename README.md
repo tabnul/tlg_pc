@@ -19,10 +19,48 @@ see [Cut and hidden content](#cut-and-hidden-content) and the [full guide](docs/
 
 No game files are included. You need your own copy, dumped from your own PS4.
 
-**Contents:** [Get started](#get-started) · [Graphics](#graphics) · [Photo mode](#photo-mode) ·
+**Contents:** [Features](#features) · [Get started](#get-started) · [Graphics](#graphics) · [Photo mode](#photo-mode) ·
 [Cut and hidden content](#cut-and-hidden-content) · [Sound](#sound) · [Soundtrack](#soundtrack) ·
 [Controllers and languages](#controllers-and-languages) · [For testers](#for-testers) ·
 [Building](#building) · [Credits](#credits)
+
+## Features
+
+**Made by us, not in any version of the game:**
+
+- **[Photo mode](#photo-mode):** freeze the world, fly a free camera anywhere and save lossless
+  PNG screenshots at full render resolution.
+- **[ICO horns](#ico-horns-only-in-this-port):** the Horned Apparel outfit finally gives the boy
+  Ico's horns.
+- **[Trico Tricks](docs/fun.md#trico-tricks-make-trico-move):** 30 of Trico's own moves on a bar (**F12**), including the throw-up animation
+  the developers sealed.
+- **[Soundtrack](#soundtrack):** a music player in the launcher with all 100 pieces of the game's
+  music, from your own game files.
+- **[Controllers](#controllers-and-languages):** remap buttons, dead zones and trigger points,
+  a stick drift check, your own button combos and quit from anywhere.
+
+**Brought back from the game's files**, cut or hidden by the developers
+([full guide](docs/fun.md)):
+
+- **Trico's drool:** switched off just before release.
+- **Trico's play:** Trico sniffs and paws at the boy. A sealed feature that works as originally
+  intended, on demand from Trico Tricks.
+- **Extra Tricos:** up to 8 more next to the boy, the armoured one too.
+- **Trico's size:** from half to twice his size.
+- **Trico's eyes:** the hidden disco-eye effect, or any colour.
+- **Trico's toilet:** he goes right away, in front of you.
+- **Developer tools:** their free camera, Tricopilot (self-driving Trico) and their QA menu with
+  level select.
+
+**Added by the port:**
+
+- Native Windows and Linux builds
+- DLSS, FSR 4 and FSR 3.1 anti-aliasing and upscaling, and DLSS or FSR frame generation
+- Any resolution including 21:9 ultrawide (32:9 experimental), and 30, 60 or unlocked FPS
+- An in-game settings menu (**Insert**) with presets, shadows, field of view, effects, colour and HDR10
+- Shader recipes against stutter, calmer wind, and an optional 4x texture pack
+- 7.1 surround, output device choice and headphone surround
+- Language packs for 14 languages
 
 ## Get started
 
