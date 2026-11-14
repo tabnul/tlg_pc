@@ -440,6 +440,7 @@
     "pad.combo_quit": "Oyundan çık (2 saniye basılı tut)",
     "pad.combo_menu": "Oyun içi menü",
     "pad.combo_qa": "QA menüsü",
+    "pad.combo_photo": "Fotoğraf modu aç / kapat",
     "pad.combo_press": "tuşları basılı tutun, sonra bırakın…",
     "pad.combo_help": "İki veya daha fazla tuş birlikte. Klavye: Alt+Q çıkar, Insert oyun içi menüyü açar."
   },
@@ -1069,6 +1070,26 @@
     "QA menu: %s, or press 1 + Z": "QA menüsü: %s veya 1 + Z'ye bas",
     "QA menu: %s": "QA menüsü: %s",
     "QA menu: off": "QA menüsü: kapalı",
-    "(turn on Level select and QA menu in the launcher first)": "(önce başlatıcıda Bölüm seçimi ve QA menüsünü aç)"
+    "(turn on Level select and QA menu in the launcher first)": "(önce başlatıcıda Bölüm seçimi ve QA menüsünü aç)",
+    "Photo mode": "Fotoğraf modu",
+    "Photo mode##photo": "Fotoğraf modu##photo",
+    "Pause the game": "Oyunu duraklat",
+    "Stop time": "Zamanı durdur",
+    "Freeze##photofreeze": "Dondurma##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Dünyanın nasıl dondurulduğu. Oyunu duraklat: oyunun kendi duraklatması, her şey durur. Zamanı durdur: oyunun kendi ağır çekimi, hiçbir şey kıpırdamayana kadar kısılır; ilkiyle kamera hareket etmiyorsa bunu dene.",
+    "Photo mode on / off": "Fotoğraf modu aç / kapat",
+    "Photo mode on": "Fotoğraf modu açık",
+    "Photo mode off": "Fotoğraf modu kapalı",
+    "Cross / Print Screen": "Çarpı / Print Screen",
+    "Screenshot": "Ekran görüntüsü",
+    "Left stick": "Sol çubuk",
+    "Fly": "Uç",
+    "Right stick": "Sağ çubuk",
+    "Look around": "Etrafa bak",
+    "Down / up": "Aşağı / yukarı",
+    "Hold R1 / L1": "R1 / L1 basılı tut",
+    "Fast / slow": "Hızlı / yavaş",
+    "Exit photo mode": "Fotoğraf modundan çık",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Dünya durur ve fotoğraf çekmek için kamerayı uçurursun. Sol çubuk: uç. Sağ çubuk: etrafa bak. L2 / R2: aşağı / yukarı. R1'i basılı tut: hızlı, L1'i basılı tut: yavaş. Çarpı veya Print Screen: ekran görüntüsünü user/screenshots klasörüne kaydet. L3 + R3, F9 (veya bu menü) açar ve kapatır. Bir atlama bunu kapatır."
   }
 }

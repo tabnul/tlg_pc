@@ -440,6 +440,7 @@
     "pad.combo_quit": "Esci dal gioco (tieni premuto 2 secondi)",
     "pad.combo_menu": "Menu di gioco",
     "pad.combo_qa": "Menu QA",
+    "pad.combo_photo": "Modalità foto sì / no",
     "pad.combo_press": "tieni premuti i tasti, poi rilascia…",
     "pad.combo_help": "Due o più tasti insieme. Tastiera: Alt+Q esce, Ins apre il menu di gioco."
   },
@@ -1069,6 +1070,26 @@
     "QA menu: %s, or press 1 + Z": "Menu QA: %s o premi 1 + Z",
     "QA menu: %s": "Menu QA: %s",
     "QA menu: off": "Menu QA: disattivato",
-    "(turn on Level select and QA menu in the launcher first)": "(attiva prima Selezione livello e menu QA nel launcher)"
+    "(turn on Level select and QA menu in the launcher first)": "(attiva prima Selezione livello e menu QA nel launcher)",
+    "Photo mode": "Modalità foto",
+    "Photo mode##photo": "Modalità foto##photo",
+    "Pause the game": "Metti in pausa il gioco",
+    "Stop time": "Ferma il tempo",
+    "Freeze##photofreeze": "Blocca##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Come viene bloccato il mondo. Metti in pausa il gioco: la pausa del gioco stesso, tutto si ferma. Ferma il tempo: il rallentatore del gioco stesso, abbassato finché nulla si muove; provalo se la telecamera non si muove con la prima opzione.",
+    "Photo mode on / off": "Modalità foto sì / no",
+    "Photo mode on": "Modalità foto attiva",
+    "Photo mode off": "Modalità foto disattivata",
+    "Cross / Print Screen": "Croce / Stamp",
+    "Screenshot": "Screenshot",
+    "Left stick": "Levetta sinistra",
+    "Fly": "Volare",
+    "Right stick": "Levetta destra",
+    "Look around": "Guardarsi intorno",
+    "Down / up": "Giù / su",
+    "Hold R1 / L1": "Tieni R1 / L1",
+    "Fast / slow": "Veloce / lento",
+    "Exit photo mode": "Esci dalla modalità foto",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Il mondo si ferma e tu muovi la telecamera per scattare una foto. Levetta sinistra: volare. Levetta destra: guardarsi intorno. L2 / R2: giù / su. Tieni premuto R1: veloce, tieni premuto L1: lento. Croce o Stamp: salva uno screenshot in user/screenshots. L3 + R3, F9 (o questo menu) lo attiva e disattiva. Un salto lo disattiva."
   }
 }

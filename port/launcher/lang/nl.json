@@ -440,6 +440,7 @@
     "pad.combo_quit": "Spel afsluiten (2 seconden vasthouden)",
     "pad.combo_menu": "Menu in het spel",
     "pad.combo_qa": "QA-menu",
+    "pad.combo_photo": "Fotomodus aan / uit",
     "pad.combo_press": "houd de knoppen vast en laat los…",
     "pad.combo_help": "Twee of meer knoppen samen. Toetsenbord: Alt+Q sluit af, Insert opent het menu in het spel."
   },
@@ -1069,6 +1070,26 @@
     "QA menu: %s, or press 1 + Z": "QA-menu: %s, of druk op 1 + Z",
     "QA menu: %s": "QA-menu: %s",
     "QA menu: off": "QA-menu: uit",
-    "(turn on Level select and QA menu in the launcher first)": "(zet eerst Levelselectie en QA-menu aan in de launcher)"
+    "(turn on Level select and QA menu in the launcher first)": "(zet eerst Levelselectie en QA-menu aan in de launcher)",
+    "Photo mode": "Fotomodus",
+    "Photo mode##photo": "Fotomodus##photo",
+    "Pause the game": "Pauzeer de game",
+    "Stop time": "Tijd stilzetten",
+    "Freeze##photofreeze": "Bevriezen##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Hoe de wereld wordt bevroren. Pauzeer de game: de eigen pauze van de game, alles stopt. Tijd stilzetten: de eigen slow motion van de game, zo ver teruggedraaid dat niets meer beweegt; probeer dit als de camera met de eerste niet beweegt.",
+    "Photo mode on / off": "Fotomodus aan / uit",
+    "Photo mode on": "Fotomodus aan",
+    "Photo mode off": "Fotomodus uit",
+    "Cross / Print Screen": "Kruis / Print Screen",
+    "Screenshot": "Screenshot",
+    "Left stick": "Linker stick",
+    "Fly": "Vliegen",
+    "Right stick": "Rechter stick",
+    "Look around": "Rondkijken",
+    "Down / up": "Omlaag / omhoog",
+    "Hold R1 / L1": "R1 / L1 ingedrukt",
+    "Fast / slow": "Snel / langzaam",
+    "Exit photo mode": "Fotomodus verlaten",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "De wereld staat stil en je vliegt met de camera om een foto te maken. Linker stick: vliegen. Rechter stick: rondkijken. L2 / R2: omlaag / omhoog. R1 ingedrukt: snel, L1 ingedrukt: langzaam. Kruis of Print Screen: screenshot opslaan in user/screenshots. L3 + R3, F9 (of dit menu) zet hem aan en uit. Een sprong zet hem uit."
   }
 }

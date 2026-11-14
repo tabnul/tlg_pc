@@ -19,6 +19,7 @@ Open the in-game menu with **Insert** (or **R3 + L2** on a controller) and go to
 - [Trico's size](#tricos-size)
 - [Extra Tricos](#extra-tricos)
 - [Trico's eyes](#tricos-eyes)
+- [Photo mode](#photo-mode), only in this port
 - [Free camera](#free-camera)
 - [Tricopilot](#tricopilot), the developers' self-driving Trico
 - [Trico Tricks: make Trico move](#trico-tricks-make-trico-move)
@@ -99,7 +100,7 @@ brings back his normal size.
 
 ## Extra Tricos
 
-Adds more Tricos next to the boy (**Add a Trico**, or **F9** at any time). **Add an enemy Trico**
+Adds more Tricos next to the boy (**Add a Trico**). **Add an enemy Trico**
 brings in the armoured one from later in the story, a bit further away. **Remove extra Tricos**
 takes them all away again.
 
@@ -117,6 +118,28 @@ fun only: they do not follow the story and can block the way. A jump or another 
 A jump turns the effect off.
 
 ![Trico with coloured eyes](screenshots/fun/eye-colour.jpg)
+
+## Photo mode
+
+The original game has no photo mode; this port adds one. The world stops (the game's own pause) and
+you fly a free camera wherever you want, then save the picture. The button help in the bottom left
+shows the controls and is left out of the saved picture.
+
+| Button | What it does |
+|---|---|
+| L3 + R3, or F9 | Photo mode on and off (the combo can be changed in the menu, Controls) |
+| Left stick | Fly forward, back, left and right, in the direction you look |
+| Right stick | Look around |
+| L2 / R2 | Down / up |
+| Hold R1 / L1 | Faster / slower |
+| Cross, or Print Screen | Save a screenshot |
+
+Screenshots are lossless PNG files at the full render resolution, in `user/screenshots`. You can
+also turn photo mode on with **Photo mode** in the Fun tab. **Freeze** chooses how the world
+stops: **Pause the game** (everything stops) or **Stop time** (the game's slow motion turned down
+until nothing moves). A jump to another place turns photo mode off.
+
+![Photo mode: the camera hangs above the gorge, looking down on Trico](screenshots/fun/photo-mode.jpg)
 
 ## Free camera
 
@@ -221,6 +244,7 @@ The game's own level select and debug menu (launcher, Settings → Debug) come f
 | Key | What it does |
 |---|---|
 | Insert (R3 + L2) | Opens the in-game menu |
-| F9 | Adds a Trico |
+| F9 (L3 + R3) | Photo mode on and off |
+| Print Screen (Cross) | Saves a screenshot in photo mode |
 | F12 | Shows or hides the Trico Tricks bar |
 | F10 | Shows or hides the FPS counter |

@@ -41,6 +41,9 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent);
 
 /// A short message at the top of the screen for `seconds` (any thread), e.g. an input mode change.
 void Notice(const std::string& text, float seconds);
+/// Photo mode screenshot: Cross (photo mode) or Print Screen asks; the presenter takes the request
+/// once and saves the next presented frame (render resolution, no overlay) as a PNG.
+bool TakeScreenshotRequest();
 /// The game's pause menu opened or closed (shows the quit hint).
 void SetPauseMenu(bool open);
 

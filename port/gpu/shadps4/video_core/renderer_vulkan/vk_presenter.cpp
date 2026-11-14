@@ -39,6 +39,8 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <miniz.h>
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -583,6 +585,94 @@ static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandB
     });
 }
 
+// tlg: photo mode screenshot. The frame image (in TransferSrcOptimal) is copied to a host buffer;
+// once the GPU is done, a worker thread turns it into 8-bit RGB and writes a lossless PNG to
+// <user>/screenshots (TLG_GPU_USER_DIR, else "user"), so the frame itself never waits on the encode.
+void Presenter::SaveScreenshot(vk::CommandBuffer cmdbuf, Scheduler& scheduler, vk::Image image,
+                               u32 w, u32 h, vk::Format format) {
+    const bool ten_bit = format == vk::Format::eA2B10G10R10UnormPack32 ||
+                         format == vk::Format::eA2R10G10B10UnormPack32;
+    const bool bgr = format == vk::Format::eB8G8R8A8Unorm || format == vk::Format::eB8G8R8A8Srgb ||
+                     format == vk::Format::eA2R10G10B10UnormPack32;
+    if (!ten_bit && !bgr && format != vk::Format::eR8G8B8A8Unorm &&
+        format != vk::Format::eR8G8B8A8Srgb) {
+        std::printf("Screenshot: frame format %s not supported\n", vk::to_string(format).c_str());
+        TlgOverlay::Notice("Screenshot failed", 3.0f);
+        return;
+    }
+    const VkBufferCreateInfo buffer_ci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                                       .size = VkDeviceSize(w) * h * 4,
+                                       .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+    const VmaAllocationCreateInfo alloc_ci{
+        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST};
+    VkBuffer buffer{};
+    VmaAllocation allocation{};
+    VmaAllocationInfo info{};
+    if (vmaCreateBuffer(instance.GetAllocator(), &buffer_ci, &alloc_ci, &buffer, &allocation,
+                        &info) != VK_SUCCESS) {
+        TlgOverlay::Notice("Screenshot failed", 3.0f);
+        return;
+    }
+    cmdbuf.copyImageToBuffer(image, vk::ImageLayout::eTransferSrcOptimal, buffer,
+                             vk::BufferImageCopy{.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+                                                 .imageExtent = {w, h, 1}});
+    const char* user = std::getenv("TLG_GPU_USER_DIR");
+    const std::filesystem::path dir =
+        std::filesystem::path(user && user[0] ? user : "user") / "screenshots";
+    const std::time_t now = std::time(nullptr);
+    char stamp[40];
+    std::strftime(stamp, sizeof(stamp), "TLG-%Y%m%d-%H%M%S", std::localtime(&now));
+    static int count = 0;
+    const std::filesystem::path file =
+        dir / (std::string(stamp) + "-" + std::to_string(++count) + ".png");
+    scheduler.DeferPriorityOperation([allocator = instance.GetAllocator(), buffer, allocation, info,
+                                      w, h, ten_bit, bgr, dir, file] {
+        vmaInvalidateAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
+        std::vector<u32> pixels(size_t(w) * h);
+        std::memcpy(pixels.data(), info.pMappedData, pixels.size() * 4);
+        vmaDestroyBuffer(allocator, buffer, allocation);
+        std::thread([pixels = std::move(pixels), w, h, ten_bit, bgr, dir, file] {
+            std::vector<u8> rgb(size_t(w) * h * 3);
+            for (size_t i = 0; i < pixels.size(); ++i) {
+                const u32 p = pixels[i];
+                u32 r, g, b;
+                if (ten_bit) { // 10 bits per channel, red in the low bits (B and R swapped for A2R10)
+                    r = ((p >> 0) & 1023) >> 2;
+                    g = ((p >> 10) & 1023) >> 2;
+                    b = ((p >> 20) & 1023) >> 2;
+                } else {
+                    r = p & 255;
+                    g = (p >> 8) & 255;
+                    b = (p >> 16) & 255;
+                }
+                if (bgr) {
+                    std::swap(r, b);
+                }
+                rgb[i * 3 + 0] = u8(r);
+                rgb[i * 3 + 1] = u8(g);
+                rgb[i * 3 + 2] = u8(b);
+            }
+            size_t size = 0;
+            void* png = tdefl_write_image_to_png_file_in_memory_ex(rgb.data(), int(w), int(h), 3,
+                                                                   &size, 6, MZ_FALSE);
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            bool ok = false;
+            if (png) {
+                std::ofstream out(file, std::ios::binary);
+                out.write(static_cast<const char*>(png), std::streamsize(size));
+                ok = bool(out);
+                mz_free(png);
+            }
+            std::printf("Screenshot: %s %ux%u %s\n", ok ? "saved" : "FAILED", w, h,
+                        file.string().c_str());
+            std::fflush(stdout);
+            TlgOverlay::Notice(ok ? "Screenshot saved (user/screenshots)" : "Screenshot failed", 3.0f);
+        }).detach();
+    });
+}
+
 Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
                                VAddr cpu_address) {
     // tlg: TLG_FRAME_DUMP_TRIGGER=<file>: when the file exists it is removed and this frame's
@@ -1044,6 +1134,12 @@ bool Presenter::PresentImage(Frame* frame, vk::Image source, bool last) {
                          MakeImageBlit(frame->width, frame->height, fit.extent.width,
                                        fit.extent.height, fit.offset.x, fit.offset.y),
                          one_to_one ? vk::Filter::eNearest : vk::Filter::eLinear);
+        // tlg: photo mode screenshot: the finished frame at render resolution, before our
+        // overlay (menu, FPS, notices) is drawn over it.
+        if (TlgOverlay::TakeScreenshotRequest()) {
+            SaveScreenshot(cmdbuf, scheduler, source, u32(frame->width), u32(frame->height),
+                           FrameFormat(swapchain));
+        }
         // tlg: the settings menu / FPS counter over the frame, at display resolution.
         const bool overlay = TlgOverlay::Visible();
         const std::array post_barriers{

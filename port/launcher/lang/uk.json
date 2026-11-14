@@ -440,6 +440,7 @@
     "pad.combo_quit": "Вийти з гри (утримувати 2 секунди)",
     "pad.combo_menu": "Меню в грі",
     "pad.combo_qa": "Меню QA",
+    "pad.combo_photo": "Фоторежим увімк. / вимк.",
     "pad.combo_press": "утримуйте кнопки, потім відпустіть…",
     "pad.combo_help": "Дві або більше кнопок разом. Клавіатура: Alt+Q — вихід, Insert відкриває меню в грі."
   },
@@ -1069,6 +1070,26 @@
     "QA menu: %s, or press 1 + Z": "Меню QA: %s або натисніть 1 + Z",
     "QA menu: %s": "Меню QA: %s",
     "QA menu: off": "Меню QA: вимкнено",
-    "(turn on Level select and QA menu in the launcher first)": "(спершу увімкніть Вибір рівня та меню QA у лаунчері)"
+    "(turn on Level select and QA menu in the launcher first)": "(спершу увімкніть Вибір рівня та меню QA у лаунчері)",
+    "Photo mode": "Фоторежим",
+    "Photo mode##photo": "Фоторежим##photo",
+    "Pause the game": "Поставити гру на паузу",
+    "Stop time": "Зупинити час",
+    "Freeze##photofreeze": "Заморожування##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "Як заморожується світ. Поставити гру на паузу: власна пауза гри, усе зупиняється. Зупинити час: власне сповільнення гри, зменшене так, що ніщо не рухається; спробуйте, якщо з першим варіантом камера не рухається.",
+    "Photo mode on / off": "Фоторежим увімк. / вимк.",
+    "Photo mode on": "Фоторежим увімкнено",
+    "Photo mode off": "Фоторежим вимкнено",
+    "Cross / Print Screen": "Хрестик / Print Screen",
+    "Screenshot": "Знімок екрана",
+    "Left stick": "Лівий стик",
+    "Fly": "Політ",
+    "Right stick": "Правий стик",
+    "Look around": "Роззирнутися",
+    "Down / up": "Вниз / вгору",
+    "Hold R1 / L1": "Утримувати R1 / L1",
+    "Fast / slow": "Швидко / повільно",
+    "Exit photo mode": "Вийти з фоторежиму",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Світ завмирає, а ви керуєте камерою, щоб зробити знімок. Лівий стик: політ. Правий стик: роззирнутися. L2 / R2: вниз / вгору. Утримуйте R1: швидко, утримуйте L1: повільно. Хрестик або Print Screen: зберегти знімок екрана в user/screenshots. L3 + R3, F9 (або це меню) вмикає і вимикає режим. Стрибок вимикає режим."
   }
 }

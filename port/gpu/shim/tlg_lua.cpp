@@ -317,6 +317,8 @@ std::string size_pending; // the latest Trico size, under fun_mutex: a slider dr
 std::atomic<float> trico_size{1.0f};
 std::string cam_pending; // the latest free camera wish, under fun_mutex
 std::atomic<bool> free_cam{false};
+std::atomic<bool> photo{false};
+std::atomic<TlgFun::PhotoFreeze> photo_freeze{TlgFun::PhotoFreeze::Pause};
 std::atomic<bool> pilot{false}; // Tricopilot (TlgFun::Tricopilot)
 // Which camera watches him (TlgFun::PilotCam). Middle is what autoTrico() picks itself, so that
 // stays our default; the launcher and the Fun tab can pick another one, also while he drives.
@@ -1036,6 +1038,7 @@ void Jump(const char* stage, const char* area) {
     BackupSaves("jump"); // a jump moves the story; the game saves at its next checkpoint
     trico_size = 1.0f; // the new stage's Trico has his normal size
     free_cam = false;  // and the game's own camera
+    if (photo) PhotoMode(false); // unfreeze first, or the new stage would start paused
     // As the QA menu does: _TLGQA_UNLOAD makes StartStage unload the current stage first
     // (GameEdits, GameSetupTbl.lua).
     std::printf("Fun: jump to %s %s\n", stage, area);
@@ -1257,6 +1260,109 @@ void FreeCamera(bool on) {
 
 bool FreeCameraOn() {
     return free_cam;
+}
+
+// Photo mode (tlg_fun.h). Our own fly camera: the developers' editor camera (_default_camera,
+// the one their PC editor flies with WASD), placed where the game camera was and moved by our tick
+// from the pad: left stick flies in the look direction, right stick looks around, L2/R2 down/up,
+// R1 fast, L1 slow. The engine's FixCamera (the Free camera above) could not turn and kept the boy
+// as its target (user test 2026-11-14). The editor camera does not read the pad itself.
+// Angles are degrees (the game's scripts compare ToEuler() values with 90 and 180), X = pitch,
+// Y = yaw. Moves set the camera position directly in world space (EntityMove went
+// through something tied to the boy: directions swapped with his facing, user 2026-11-14), on world axes, turned by our yaw (forward = -Z at yaw 0). Flipping the yaw turn made it worse (user 2026-11-14);
+// the tick logs yaw, the camera's own angles and the real move per tick to find the rule, as their
+// keyboard camera does (camera/camerasetup.lua DbgCamConfig).
+// The world is frozen as before. Ticks keep running during the game's pause (the developers' QA
+// menu relies on the same), so our camera and leaving both work while paused.
+// _TLG_PHOTO remembers what we changed, so leaving undoes only that: a pause we did not make
+// (the pause menu) stays, and the scene's own slow motion comes back at its own speed.
+// The first test (2026-11-14) logged paused=false right after "trico pause" and the boy kept
+// moving; the tick logs the pause state again 30 frames in, to see whether it took later.
+constexpr std::string_view PhotoOnLua =
+    "if not _TLG_PHOTO then local P={} _TLG_PHOTO=P\n"
+    " local w=FindObject('_world') local src=w.activeCamera\n"
+    " local pos=Vector(src.worldPosition) local rot=Vector(src.worldRotation:ToEuler())\n"
+    " P.from=tostring(src:GetName())\n"
+    " CameraManager:SetActiveCamera('default')\n"
+    " P.name='_default_camera' local cam=FindObject(P.name)\n"
+    " P.x,P.y,P.z=pos.X,pos.Y,pos.Z cam.position=pos P.pitch=rot.X P.yaw=rot.Y cam.rotation=Vector(P.pitch,P.yaw,0)\n"
+    " if %STOPTIME% then P.speed=MS.GetGameSpeed() MS.SetGameSpeed(0.001,0)\n"
+    " elseif not TricoGame_IsGamePause() then luaCommand('trico pause') P.paused=true end\n"
+    " P.n=0\n"
+    " P.tick=function(dt,edt)\n"
+    "  local p=_TLG_PHOTO if not p or p.dead then return end\n"
+    "  local ok,e=pcall(function()\n"
+    "   local t=edt if type(t)~='number' or t<=0 or t>0.25 then t=1/60 end\n"
+    "   p.n=p.n+1\n"
+    "   if p.n==30 then L('fun photo tick dt='..tostring(dt)..' edt='..tostring(edt)..' paused='"
+    "..tostring(TricoGame_IsGamePause())..' speed='..tostring(MS.GetGameSpeed())..' cam='"
+    "..tostring(w.activeCamera:GetName())) end\n"
+    "   local c=FindObject(p.name) if not c then return end\n"
+    "   local pd=Input.pad1\n"
+    "   local function dz(v) if math.abs(v)<0.15 then return 0 end return v end\n"
+    "   local lx,ly=dz(pd.LX*pd.LMag),dz(pd.LY*pd.LMag)\n"
+    "   local rx,ry=dz(pd.RX*pd.RMag),dz(pd.RY*pd.RMag)\n"
+    "   if not p.said and (math.abs(ly)>0.8 or math.abs(ry)>0.8) then p.said=true "
+    "L('fun photo stick ly='..tostring(ly)..' ry='..tostring(ry)) end\n"
+    "   local sp=3 if MS.PadGetHold(PadButton.R1) then sp=12 elseif MS.PadGetHold(PadButton.L1) then sp=0.6 end\n"
+    "   p.yaw=p.yaw-rx*100*t\n"
+    "   p.pitch=math.max(-85,math.min(85,p.pitch-ry*70*t))\n"
+    "   c.rotation=Vector(p.pitch,p.yaw,0)\n"
+    "   local d=sp*t\n"
+    "   if lx~=0 or ly~=0 then local y=math.rad(p.yaw) local cy,sy=math.cos(y),math.sin(y)\n"
+    "    p.x=p.x+(lx*cy-ly*sy)*d p.z=p.z+(-ly*cy-lx*sy)*d end\n"
+    "   local q=Vector(c.worldPosition) local e=Vector(c.worldRotation:ToEuler())\n"
+    "   if p.lq and (p.logs or 0)<40 and p.n%15==0 and (lx~=0 or ly~=0) then p.logs=(p.logs or 0)+1 "
+    "L('fun photo move yaw='..tostring(p.yaw)..' euler='..tostring(e.X)..','..tostring(e.Y)..','..tostring(e.Z)..' lx='..tostring(lx)..' ly='..tostring(ly)..' dx='..tostring(q.X-p.lq.X)..' dz='..tostring(q.Z-p.lq.Z)) end\n"
+    "   p.lq=q\n"
+    "   local function held(b) local ok,v=pcall(MS.PadGetHold,b) return ok and v and true or false end\n"
+    "   local function trig(k) local ok,v=pcall(function() return pd[k] end) if ok and type(v)=='number' then return v end return 0 end\n"
+    "   local r2,l2=held(PadButton.R2),held(PadButton.L2) local tr,tl=trig('R2'),trig('L2')\n"
+    "   if (r2 or l2 or tr>0.3 or tl>0.3 or held(PadButton.R1)) and (p.tlogs or 0)<5 and p.n%15==0 then p.tlogs=(p.tlogs or 0)+1 "
+    "L('fun photo trig R2='..tostring(r2)..' L2='..tostring(l2)..' aR2='..tostring(tr)..' aL2='..tostring(tl)) end\n"
+    "   local up=0 if r2 or tr>0.3 then up=up+1 end if l2 or tl>0.3 then up=up-1 end\n"
+    "   p.y=p.y+up*d c.position=Vector(p.x,p.y,p.z)\n"
+    "  end)\n"
+    "  if not ok then p.dead=true L('fun photo tick error: '..tostring(e)) end\n"
+    " end\n"
+    " RegisterTick(P.tick)\n"
+    " L('fun photo on from='..P.from..' cam='..tostring(w.activeCamera:GetName())..' paused='"
+    "..tostring(TricoGame_IsGamePause())..' speed='..tostring(MS.GetGameSpeed()))\n"
+    "end\n";
+constexpr std::string_view PhotoOffLua =
+    "if _TLG_PHOTO then local p=_TLG_PHOTO _TLG_PHOTO=nil\n"
+    " if p.tick then pcall(UnRegisterTick,p.tick) end\n"
+    " if p.paused then luaCommand('trico resume') end\n"
+    " if p.speed then MS.SetGameSpeed(p.speed,0) end\n"
+    " GameCamera:ToActive()\n"
+    " L('fun photo off')\n"
+    "end\n";
+
+void PhotoMode(bool on) {
+    photo = on;
+    std::printf("Fun: photo mode %s\n", on ? "on" : "off");
+    std::string code(on ? PhotoOnLua : PhotoOffLua);
+    if (on) {
+        auto put = [&](const std::string& mark, const std::string& with) {
+            code.replace(code.find(mark), mark.size(), with);
+        };
+        put("%STOPTIME%", photo_freeze == TlgFun::PhotoFreeze::StopTime ? "true" : "false");
+    }
+    if (!on) free_cam = false; // leaving gives the normal camera back, whatever was on before
+    FunQueue("\ndo local ok,e=pcall(function()\n" + code +
+             "end) if not ok then L('fun error: '..tostring(e)) end end\n");
+}
+
+bool PhotoModeOn() {
+    return photo;
+}
+
+void PhotoModeFreeze(TlgFun::PhotoFreeze how) {
+    photo_freeze = how;
+}
+
+TlgFun::PhotoFreeze PhotoModeFreeze() {
+    return photo_freeze.load();
 }
 
 // Tricopilot: the developers' own self-driving Trico (game/scripts/ai2/condor/

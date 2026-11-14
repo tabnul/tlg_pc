@@ -440,6 +440,7 @@
     "pad.combo_quit": "退出遊戲（按住 2 秒）",
     "pad.combo_menu": "遊戲內選單",
     "pad.combo_qa": "QA 選單",
+    "pad.combo_photo": "拍照模式 開 / 關",
     "pad.combo_press": "按住按鍵，然後放開…",
     "pad.combo_help": "兩個或更多按鍵同時按下。鍵盤：Alt+Q 退出，Insert 開啟遊戲內選單。"
   },
@@ -1069,6 +1070,26 @@
     "QA menu: %s, or press 1 + Z": "QA 選單：%s，或按 1 + Z",
     "QA menu: %s": "QA 選單：%s",
     "QA menu: off": "QA 選單：關閉",
-    "(turn on Level select and QA menu in the launcher first)": "（請先在啟動器中開啟關卡選擇與 QA 選單）"
+    "(turn on Level select and QA menu in the launcher first)": "（請先在啟動器中開啟關卡選擇與 QA 選單）",
+    "Photo mode": "拍照模式",
+    "Photo mode##photo": "拍照模式##photo",
+    "Pause the game": "暫停遊戲",
+    "Stop time": "停止時間",
+    "Freeze##photofreeze": "凍結方式##photofreeze",
+    "How the world is frozen. Pause the game: the game's own pause, everything stops. Stop time: the game's own slow motion, turned down until nothing moves; try it if the camera does not move with the first one.": "世界如何被凍結。暫停遊戲：遊戲本身的暫停，一切停止。停止時間：遊戲本身的慢動作，調低到什麼都不動；如果第一種方式下鏡頭不動，請試試這個。",
+    "Photo mode on / off": "拍照模式 開 / 關",
+    "Photo mode on": "拍照模式已開啟",
+    "Photo mode off": "拍照模式已關閉",
+    "Cross / Print Screen": "× / Print Screen",
+    "Screenshot": "截圖",
+    "Left stick": "左搖桿",
+    "Fly": "飛行",
+    "Right stick": "右搖桿",
+    "Look around": "環顧四周",
+    "Down / up": "下降 / 上升",
+    "Hold R1 / L1": "按住 R1 / L1",
+    "Fast / slow": "快速 / 慢速",
+    "Exit photo mode": "退出拍照模式",
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "世界靜止，你可以自由移動鏡頭來拍照。左搖桿：飛行。右搖桿：環顧四周。L2 / R2：下降 / 上升。按住 R1：快速，按住 L1：慢速。× 或 Print Screen：將截圖儲存到 user/screenshots。L3 + R3, F9（或此選單）開啟和關閉。跳轉會將其關閉。"
   }
 }
