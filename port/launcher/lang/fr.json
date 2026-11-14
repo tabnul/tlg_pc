@@ -727,6 +727,22 @@
     "menu:mod_horns": {
       "name": "Cornes d'ICO",
       "what": "Le garçon porte des cornes, un clin d'œil à Ico : blanc os avec la pointe noire. Elles peuvent se combiner avec la tenue d'Ico du jeu (l'un des trésors)."
+    },
+    "menu:mod_plays": {
+      "name": "Trico joue",
+      "what": "Un comportement de Trico que les développeurs ont créé puis scellé « pour l'instant » : de temps en temps, il renifle le garçon et le tapote de la patte. Cela n'arrive que là où ses frottements de joue peuvent aussi arriver, avec le garçon loin des rebords."
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico vomit",
+      "what": "Les développeurs ont scellé le vomissement de Trico « sur ordre » en 2016. Comme prévu par les développeurs : quand son estomac est plein de tonneaux, il vomit comme ils l'avaient prévu. Le bouton Vomir des tours de Trico fonctionne dans les deux cas.",
+      "choices": {
+        "0": "Désactivé (comme à la sortie)",
+        "1": "Comme prévu par les développeurs"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "Indices du narrateur coupés",
+      "what": "Les 23 indices du narrateur que les développeurs ont coupés en septembre 2016. Activé : quand vous semblez bloqué, le narrateur vous aide à nouveau, là où ils avaient placé ses phrases au départ. Ils dévoilent des solutions d'énigmes."
     }
   },
   "menu": {
@@ -1019,6 +1035,14 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Débloque tous les trésors (tenues, plumes de Trico) et l'entrée Trésors du menu des options, avec le déblocage des développeurs eux-mêmes. Enregistré dans ta sauvegarde : le désactiver ne les retire pas. Tes sauvegardes sont copiées avant le premier déblocage (le gestionnaire de sauvegardes du launcher peut les restaurer). Choisissez-les dans le menu pause du jeu, sous Objets.",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "Le garçon porte des cornes, un clin d'œil à Ico. Elles peuvent se combiner avec la tenue d'Ico du jeu (l'un des trésors). Activez-les d'abord une fois dans le launcher : le launcher crée les modèles des cornes sur votre PC.",
     "ICO horns": "Cornes d'ICO",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "Activez d'abord une fois les cornes d'ICO dans le launcher (page Mods)."
+    "Turn on ICO horns in the launcher (Mods page) once first.": "Activez d'abord une fois les cornes d'ICO dans le launcher (page Mods).",
+    "Trico plays": "Trico joue",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "Un comportement de Trico que les développeurs ont créé puis scellé « pour l'instant » : de temps en temps, il renifle le garçon et le tapote de la patte. Cela n'arrive que là où ses frottements de joue peuvent aussi arriver, avec le garçon loin des rebords.",
+    "Off (as released)": "Désactivé (comme à la sortie)",
+    "As the developers designed": "Comme prévu par les développeurs",
+    "Trico throws up": "Trico vomit",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "Les développeurs ont scellé le vomissement de Trico « sur ordre » en 2016. Comme prévu par les développeurs : quand son estomac est plein de tonneaux, il vomit comme ils l'avaient prévu. Le bouton Vomir des tours de Trico fonctionne dans les deux cas.",
+    "Cut narrator hints": "Indices du narrateur coupés",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "Les 23 indices du narrateur que les développeurs ont coupés en septembre 2016. Activé : quand vous semblez bloqué, le narrateur vous aide à nouveau, là où ils avaient placé ses phrases au départ. Ils dévoilent des solutions d'énigmes."
   }
 }

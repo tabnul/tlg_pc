@@ -1365,6 +1365,14 @@ void FunTab() {
             ImGui::TextDisabled("%s", TR("Turn on ICO horns in the launcher (Mods page) once first."));
             ImGui::PopID();
         }
+        CheckRow(TR("Trico plays"), TlgSettings::Get().mod_plays,
+                 TR("A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges."), true);
+        static const char* const throw_labels[] = {TR("Off (as released)"), TR("As the developers designed")};
+        static const int throw_values[] = {0, 1};
+        ChoiceRow(TR("Trico throws up"), TlgSettings::Get().mod_throw_up, throw_labels, throw_values, 2,
+                  TR("The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way."), 0);
+        CheckRow(TR("Cut narrator hints"), TlgSettings::Get().mod_hints,
+                 TR("The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away."), true);
         ImGui::EndTable();
     }
 }

@@ -727,6 +727,22 @@
     "menu:mod_horns": {
       "name": "ICOの角",
       "what": "少年が角を身に着けます。ICOへのオマージュで、先端が黒い骨白色の角です。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。"
+    },
+    "menu:mod_plays": {
+      "name": "トリコが遊ぶ",
+      "what": "開発者が作り、「一旦」封印したトリコの行動です。ときどき少年のにおいを嗅いで、前足で触れます。頬ずりができる場所、つまり少年が足場の縁から離れているときだけ起こります。"
+    },
+    "menu:mod_throw_up": {
+      "name": "トリコが吐く",
+      "what": "トリコが吐く演技は2016年に「オーダーにより」封印されました。開発者が設計したとおり: お腹がタルでいっぱいになると、予定されていたとおりに吐きます。トリコの技の「吐く」ボタンはどちらの設定でも使えます。",
+      "choices": {
+        "0": "オフ(発売時のまま)",
+        "1": "開発者が設計したとおり"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "カットされた語りのヒント",
+      "what": "開発者が2016年9月にカットした語り手のヒント23件です。オン: 行き詰まっているようなとき、最初に配置された場所で語り手が再び助けてくれます。謎解きの答えが分かってしまいます。"
     }
   },
   "menu": {
@@ -1019,6 +1035,14 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年が角を身に着けます。ICOへのオマージュです。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。まずランチャーで一度オンにしてください。ランチャーがお使いの PC で角のモデルを作成します。",
     "ICO horns": "ICOの角",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "まずランチャー（Mods ページ）で ICO の角を一度オンにしてください。"
+    "Turn on ICO horns in the launcher (Mods page) once first.": "まずランチャー（Mods ページ）で ICO の角を一度オンにしてください。",
+    "Trico plays": "トリコが遊ぶ",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "開発者が作り、「一旦」封印したトリコの行動です。ときどき少年のにおいを嗅いで、前足で触れます。頬ずりができる場所、つまり少年が足場の縁から離れているときだけ起こります。",
+    "Off (as released)": "オフ(発売時のまま)",
+    "As the developers designed": "開発者が設計したとおり",
+    "Trico throws up": "トリコが吐く",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "トリコが吐く演技は2016年に「オーダーにより」封印されました。開発者が設計したとおり: お腹がタルでいっぱいになると、予定されていたとおりに吐きます。トリコの技の「吐く」ボタンはどちらの設定でも使えます。",
+    "Cut narrator hints": "カットされた語りのヒント",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "開発者が2016年9月にカットした語り手のヒント23件です。オン: 行き詰まっているようなとき、最初に配置された場所で語り手が再び助けてくれます。謎解きの答えが分かってしまいます。"
   }
 }

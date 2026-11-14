@@ -1383,7 +1383,7 @@ class Launcher:
         ttk.Label(box, text=drool.what, foreground=DIM, wraplength=420, justify='left').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
         ini = tlg_run.read_ini(tlg_run.USER_DIR / 'tlg.ini')
-        for key in ('mod_treasures', 'mod_horns'):
+        for key in ('mod_treasures', 'mod_horns', 'mod_plays', 'mod_throw_up', 'mod_hints'):
             item = next(i for i in backports_table.MENU if i.key == key)
             mod = section(parent, item.name)
             mod.pack(fill='x', anchor='w', pady=(0, 8))

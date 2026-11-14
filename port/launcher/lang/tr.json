@@ -734,6 +734,22 @@
       "name": "Eşzamansız fence'ler",
       "what": "Oyunun fence'lerini, onları beklemek yerine öncesindeki bellek kopyaları bittiği anda sinyaller.",
       "why": "Daha yavaş ölçüldü (83'e karşı 79 FPS): oyun bu fence'leri bekliyor."
+    },
+    "menu:mod_plays": {
+      "name": "Trico oynuyor",
+      "what": "Geliştiricilerin yapıp sonra \"şimdilik\" mühürlediği bir Trico davranışı: arada bir çocuğu koklar ve patisiyle dokunur. Yalnızca yanak sürtmelerinin de olabildiği yerlerde, çocuk kenarlardan uzaktayken olur."
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico kusuyor",
+      "what": "Geliştiriciler Trico'nun kusmasını 2016'da \"talimatla\" mühürledi. Geliştiricilerin tasarladığı gibi: midesi fıçılarla dolunca planlandığı şekilde kusar. Trico Numaraları'ndaki Kus düğmesi her iki durumda da çalışır.",
+      "choices": {
+        "0": "Kapalı (çıktığı gibi)",
+        "1": "Geliştiricilerin tasarladığı gibi"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "Kesilen anlatıcı ipuçları",
+      "what": "Geliştiricilerin Eylül 2016'da kestiği 23 anlatıcı ipucu. Açık: takılmış gibi göründüğünde anlatıcı, repliklerinin ilk konduğu yerlerde yine yardım eder. Bulmaca çözümlerini ele verirler."
     }
   },
   "menu": {
@@ -1032,6 +1048,14 @@
     "Do not close the game.": "Oyunu kapatmayın.",
     "Save loaded": "Kayıt yüklendi",
     "Save deleted": "Kayıt silindi",
-    "Game saved": "Oyun kaydedildi"
+    "Game saved": "Oyun kaydedildi",
+    "Trico plays": "Trico oynuyor",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "Geliştiricilerin yapıp sonra \"şimdilik\" mühürlediği bir Trico davranışı: arada bir çocuğu koklar ve patisiyle dokunur. Yalnızca yanak sürtmelerinin de olabildiği yerlerde, çocuk kenarlardan uzaktayken olur.",
+    "Off (as released)": "Kapalı (çıktığı gibi)",
+    "As the developers designed": "Geliştiricilerin tasarladığı gibi",
+    "Trico throws up": "Trico kusuyor",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "Geliştiriciler Trico'nun kusmasını 2016'da \"talimatla\" mühürledi. Geliştiricilerin tasarladığı gibi: midesi fıçılarla dolunca planlandığı şekilde kusar. Trico Numaraları'ndaki Kus düğmesi her iki durumda da çalışır.",
+    "Cut narrator hints": "Kesilen anlatıcı ipuçları",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "Geliştiricilerin Eylül 2016'da kestiği 23 anlatıcı ipucu. Açık: takılmış gibi göründüğünde anlatıcı, repliklerinin ilk konduğu yerlerde yine yardım eder. Bulmaca çözümlerini ele verirler."
   }
 }

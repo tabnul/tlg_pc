@@ -734,6 +734,22 @@
       "name": "Asynchrone fences",
       "what": "Geeft de fences van de game een signaal zodra de geheugenkopieën ervoor klaar zijn, in plaats van erop te wachten.",
       "why": "Trager gemeten (79 tegen 83 FPS): de game wacht op deze fences."
+    },
+    "menu:mod_plays": {
+      "name": "Trico speelt",
+      "what": "Gedrag van Trico dat de ontwikkelaars bouwden en daarna \"voorlopig\" verzegelden: af en toe besnuffelt hij de jongen en tikt hem aan met zijn poot. Het gebeurt alleen waar zijn wangkopjes ook kunnen, met de jongen ver genoeg van randen."
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico geeft over",
+      "what": "De ontwikkelaars verzegelden Trico's overgeven in 2016 \"in opdracht\". Zoals de ontwikkelaars het ontwierpen: als zijn maag vol tonnen zit, geeft hij over zoals zij het bedacht hadden. De knop Overgeven bij Trico-trucs werkt hoe dan ook.",
+      "choices": {
+        "0": "Uit (zoals uitgebracht)",
+        "1": "Zoals de ontwikkelaars het ontwierpen"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "Geschrapte vertellerhints",
+      "what": "De 23 hints van de verteller die de ontwikkelaars in september 2016 schrapten. Aan: als je vast lijkt te zitten, helpt de verteller weer, op de plekken waar ze zijn zinnen eerst hadden gezet. Ze verklappen oplossingen van puzzels."
     }
   },
   "menu": {
@@ -1032,6 +1048,14 @@
     "Do not close the game.": "Sluit de game niet af.",
     "Save loaded": "Save geladen",
     "Save deleted": "Save verwijderd",
-    "Game saved": "Game opgeslagen"
+    "Game saved": "Game opgeslagen",
+    "Trico plays": "Trico speelt",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "Gedrag van Trico dat de ontwikkelaars bouwden en daarna \"voorlopig\" verzegelden: af en toe besnuffelt hij de jongen en tikt hem aan met zijn poot. Het gebeurt alleen waar zijn wangkopjes ook kunnen, met de jongen ver genoeg van randen.",
+    "Off (as released)": "Uit (zoals uitgebracht)",
+    "As the developers designed": "Zoals de ontwikkelaars het ontwierpen",
+    "Trico throws up": "Trico geeft over",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "De ontwikkelaars verzegelden Trico's overgeven in 2016 \"in opdracht\". Zoals de ontwikkelaars het ontwierpen: als zijn maag vol tonnen zit, geeft hij over zoals zij het bedacht hadden. De knop Overgeven bij Trico-trucs werkt hoe dan ook.",
+    "Cut narrator hints": "Geschrapte vertellerhints",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "De 23 hints van de verteller die de ontwikkelaars in september 2016 schrapten. Aan: als je vast lijkt te zitten, helpt de verteller weer, op de plekken waar ze zijn zinnen eerst hadden gezet. Ze verklappen oplossingen van puzzels."
   }
 }

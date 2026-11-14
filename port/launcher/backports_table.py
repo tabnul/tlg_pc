@@ -156,6 +156,17 @@ MENU = [
           'The boy wears horns, a nod to Ico. '
           'Can be combined with the game\'s own Ico outfit (one of the treasures). '
           'Turn it on in the launcher once first: the launcher builds the horn models on your PC.'),
+    _menu('Fun', 'mod_plays', 'bool', '1', 'Trico plays',
+          'A Trico behaviour the developers built and then sealed "for now": now and then he sniffs the boy '
+          'and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.'),
+    _menu('Fun', 'mod_throw_up', 'choice', '0', 'Trico throws up',
+          'The developers sealed Trico throwing up "by order" in 2016. As the developers designed: when his '
+          'stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks '
+          'works either way.',
+          choices=(('0', 'Off (as released)'), ('1', 'As the developers designed'))),
+    _menu('Fun', 'mod_hints', 'bool', '0', 'Cut narrator hints',
+          'The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator '
+          'helps again, where they first placed his lines. They give puzzle solutions away.'),
     _menu('Performance', 'frames_queued', 'choice', '1', 'Frames queued',
           'More frames queued: steadier FPS, slower response to input.',
           choices=(('1', '1 (lowest latency)'), ('2', '2'),
