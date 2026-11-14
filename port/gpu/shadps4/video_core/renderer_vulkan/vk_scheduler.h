@@ -862,6 +862,14 @@ public:
     }
 
     /// Whether BeginRendering(state) would start a new render pass.
+    /// tlg (PR #174): work recorded since the last SubmitExecution().
+    void CountWork() noexcept {
+        work_since_submit.fetch_add(1, std::memory_order_relaxed);
+    }
+    [[nodiscard]] u32 WorkSinceSubmit() const noexcept {
+        return work_since_submit.load(std::memory_order_relaxed);
+    }
+
     [[nodiscard]] bool WillBeginRendering(const RenderState& state) const {
         return !(is_rendering && render_state == state);
     }
@@ -978,6 +986,7 @@ private:
     // tlg: whether recorder_thread runs, read on every Record(). std::jthread::joinable()
     // compares thread ids, which on Windows (libc++ over winpthreads) costs two system calls.
     bool recording_threaded{false};
+    std::atomic<u32> work_since_submit{0}; // tlg (PR #174): draws/dispatches since a submit
     std::jthread recorder_thread;
     tracy::VkCtxScope* profiler_scope{};
 };

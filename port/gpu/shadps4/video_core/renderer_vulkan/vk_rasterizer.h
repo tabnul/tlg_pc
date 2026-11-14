@@ -312,6 +312,10 @@ private:
 
     /// Display pass: counts the frame (TlgStats::gpu_frames) and, with TLG_BUFFER_STATS, the lag.
     void NoteFrameStart();
+    /// tlg (PR #174, @YsraEstudos): TLG_SUBMIT_DRAWS=<n> submits at a render-pass boundary once
+    /// n draws/dispatches piled up (0 or unset = off, as before).
+    void SubmitIfWorkPiledUp(const RenderState& next_state);
+    u64 work_submits = 0;
     /// TLG_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
     void MarkPass(const GraphicsPipeline* pipeline, const RenderState& state);
     void BindVertexBuffers(const GraphicsPipeline* pipeline,

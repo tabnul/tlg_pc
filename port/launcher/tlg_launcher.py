@@ -100,6 +100,18 @@ TEXT = {
     'flag_arena_free_hint': 'Test switch from issue #79: gives memory blocks that were replaced by a larger one back to the graphics driver. For "out of memory" crashes shortly after loading. Off by default.',
     'flag_granule': 'Group buffer memory',
     'flag_granule_hint': "Fix for issue #79: takes buffer memory from the graphics driver in larger pieces instead of many small ones. Older AMD cards on Windows can crash with \"out of memory\" without it. On by default.",
+    'flags_game': 'Experimental game fixes',
+    'game_tail_climb': "Trico's tail climbing fix",
+    'game_tail_climb_hint': "Experimental: the boy should no longer climb in place on Trico's moving tail. Changes the game's climbing code, so it works on every graphics card. Not fully tested: letting go, shake-offs, ropes and chains may behave differently. By @YsraEstudos. Off by default.",
+    'flags_rdna': 'RDNA2: possible improvements',
+    'rdna_memory_priority': 'Memory priority',
+    'rdna_memory_priority_hint': 'Tells the graphics driver which memory matters most, so it stays on the card. May help older AMD cards (RDNA2, such as RX 6000). No gain measured on newer cards. By @YsraEstudos. Off by default.',
+    'rdna_wave64': 'Wave64 shader stages',
+    'rdna_wave64_hint': 'Runs more shader stages in the AMD wave64 mode. May help RDNA2 cards (RX 6000). On RX 9000 and RTX no gain, sometimes a few percent slower. By @YsraEstudos. Off by default.',
+    'rdna_sem_spin': 'Short spin-wait',
+    'rdna_sem_spin_hint': 'Waits a moment actively before the game thread sleeps, for faster wake-ups. May help RDNA2 systems. Within noise on our test PCs. By @YsraEstudos. Off by default.',
+    'rdna_submit_draws': 'Early draw submit',
+    'rdna_submit_draws_hint': 'Sends work to the graphics card after every 1024 draws instead of once per frame. AMD cards only. May help RDNA2 cards. By @YsraEstudos. Off by default.',
     'flag_vk_validation': 'Vulkan validation',
     'flag_vk_validation_hint': 'Checks every graphics call. Very slow, and only works with the Vulkan SDK installed. For developers.',
     'home_soundtrack': 'Soundtrack',
@@ -1549,6 +1561,14 @@ class Launcher:
         heading('flags_crash')
         for name, _, _, _, default in tlg_run.DEBUG_FLAGS:
             if name.startswith('flag_'):
+                flag_box(name, default)
+        heading('flags_game')
+        for name, _, _, _, default in tlg_run.DEBUG_FLAGS:
+            if name.startswith('game_'):
+                flag_box(name, default)
+        heading('flags_rdna')
+        for name, _, _, _, default in tlg_run.DEBUG_FLAGS:
+            if name.startswith('rdna_'):
                 flag_box(name, default)
         # Memory test switches (issue #38; tlg.ini, apply at once), moved from Advanced (2026-11-12).
         heading('flags_memory')

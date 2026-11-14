@@ -106,6 +106,10 @@ void UniqueImage::Destroy() {
 void UniqueImage::Create(const vk::ImageCreateInfo& image_ci, VmaPool pool) {
     this->image_ci = image_ci;
     ASSERT(!image);
+    const bool is_render_or_depth = static_cast<bool>(
+        image_ci.usage & (vk::ImageUsageFlagBits::eColorAttachment |
+                          vk::ImageUsageFlagBits::eDepthStencilAttachment |
+                          vk::ImageUsageFlagBits::eStorage));
     const VmaAllocationCreateInfo alloc_ci = {
         .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT,
         .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
@@ -113,6 +117,7 @@ void UniqueImage::Create(const vk::ImageCreateInfo& image_ci, VmaPool pool) {
         .preferredFlags = 0,
         .pool = pool,
         .pUserData = nullptr,
+        .priority = is_render_or_depth ? 1.0f : 0.6f, // tlg (PR #172)
     };
 
     const VkImageCreateInfo image_ci_unsafe = static_cast<VkImageCreateInfo>(image_ci);
