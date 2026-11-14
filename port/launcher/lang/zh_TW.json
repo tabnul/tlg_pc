@@ -1063,6 +1063,12 @@
     "Quitting...": "正在退出...",
     "Quitting... (release to cancel)": "正在退出...（放開以取消）",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "離開遊戲：按住 %s 2 秒，或按 Alt+Q",
-    "Quit game: press Alt+Q": "離開遊戲：按 Alt+Q"
+    "Quit game: press Alt+Q": "離開遊戲：按 Alt+Q",
+    "Port menu: %s, or press Insert": "移植選單：%s，或按 Insert",
+    "Port menu: press Insert": "移植選單：按 Insert",
+    "QA menu: %s, or press 1 + Z": "QA 選單：%s，或按 1 + Z",
+    "QA menu: %s": "QA 選單：%s",
+    "QA menu: off": "QA 選單：關閉",
+    "(turn on Level select and QA menu in the launcher first)": "（請先在啟動器中開啟關卡選擇與 QA 選單）"
   }
 }

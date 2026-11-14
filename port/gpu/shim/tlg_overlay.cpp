@@ -2075,7 +2075,7 @@ void NoticeBox() {
     ImGui::End();
 }
 
-/// tlg: while the game's pause menu is open, how to quit (the player's own combo).
+/// tlg: while the game's pause menu is open: how to quit and open the menus (the player's own combos).
 void QuitHintBox() {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
@@ -2087,14 +2087,25 @@ void QuitHintBox() {
                      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
                      ImGuiWindowFlags_NoFocusOnAppearing);
     ImGui::SetWindowFontScale(1.1f);
-    std::string text = TR("Quit game: hold %s for 2 seconds, or press Alt+Q");
-    const u32 combo = TlgSettings::Get().combo_quit;
-    if (!combo) {
-        text = TR("Quit game: press Alt+Q");
-    } else if (const size_t at = text.find("%s"); at != std::string::npos) {
-        text.replace(at, 2, TlgSettings::ComboLabel(combo));
-    }
-    ImGui::TextUnformatted(text.c_str());
+    // One line per combo, with the player's own buttons.
+    const auto line = [](const char* with, const char* without, u32 combo) {
+        std::string text = combo ? with : without;
+        if (const size_t at = text.find("%s"); combo && at != std::string::npos) {
+            text.replace(at, 2, TlgSettings::ComboLabel(combo));
+        }
+        ImGui::TextUnformatted(text.c_str());
+    };
+    const auto& s = TlgSettings::Get();
+    line(TR("Quit game: hold %s for 2 seconds, or press Alt+Q"), TR("Quit game: press Alt+Q"), s.combo_quit);
+    line(TR("Port menu: %s, or press Insert"), TR("Port menu: press Insert"), s.combo_menu);
+    // The keyboard keys (1 + Z) reach the QA menu only through the default combo (game pad map).
+    // The launcher note shows always, so players learn the QA menu exists.
+    std::string qa_with = s.combo_qa == TlgSettings::PadComboQa ? TR("QA menu: %s, or press 1 + Z") : TR("QA menu: %s");
+    std::string qa_without = TR("QA menu: off");
+    const std::string note = std::string(" ") + TR("(turn on Level select and QA menu in the launcher first)");
+    qa_with += note;
+    qa_without += note;
+    line(qa_with.c_str(), qa_without.c_str(), s.combo_qa);
     ImGui::End();
 }
 

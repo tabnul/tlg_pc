@@ -1050,6 +1050,12 @@
     "Quitting...": "終了中...",
     "Quitting... (release to cancel)": "終了中...（離すとキャンセル）",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "ゲーム終了: %s を2秒長押し、または Alt+Q",
-    "Quit game: press Alt+Q": "ゲーム終了: Alt+Q"
+    "Quit game: press Alt+Q": "ゲーム終了: Alt+Q",
+    "Port menu: %s, or press Insert": "ポートメニュー: %s または Insert",
+    "Port menu: press Insert": "ポートメニュー: Insert",
+    "QA menu: %s, or press 1 + Z": "QAメニュー: %s または 1 + Z",
+    "QA menu: %s": "QAメニュー: %s",
+    "QA menu: off": "QAメニュー: オフ",
+    "(turn on Level select and QA menu in the launcher first)": "(先にランチャーでレベル選択とQAメニューをオン)"
   }
 }

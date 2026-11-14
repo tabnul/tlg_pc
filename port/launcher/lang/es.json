@@ -1050,6 +1050,12 @@
     "Quitting...": "Saliendo...",
     "Quitting... (release to cancel)": "Saliendo... (suelta para cancelar)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Salir del juego: mantén %s 2 segundos o pulsa Alt+Q",
-    "Quit game: press Alt+Q": "Salir del juego: pulsa Alt+Q"
+    "Quit game: press Alt+Q": "Salir del juego: pulsa Alt+Q",
+    "Port menu: %s, or press Insert": "Menú del port: %s o pulsa Insert",
+    "Port menu: press Insert": "Menú del port: pulsa Insert",
+    "QA menu: %s, or press 1 + Z": "Menú QA: %s o pulsa 1 + Z",
+    "QA menu: %s": "Menú QA: %s",
+    "QA menu: off": "Menú QA: desactivado",
+    "(turn on Level select and QA menu in the launcher first)": "(activa primero Selección de nivel y menú QA en el launcher)"
   }
 }

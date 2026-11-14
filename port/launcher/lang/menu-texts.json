@@ -304,6 +304,12 @@
  "Game saved",
  "Quit game: hold %s for 2 seconds, or press Alt+Q",
  "Quit game: press Alt+Q",
+ "Port menu: %s, or press Insert",
+ "Port menu: press Insert",
+ "QA menu: %s, or press 1 + Z",
+ "QA menu: %s",
+ "QA menu: off",
+ "(turn on Level select and QA menu in the launcher first)",
  "Quitting...",
  "Quitting... (release to cancel)"
 ]

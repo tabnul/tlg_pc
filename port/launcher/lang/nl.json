@@ -1063,6 +1063,12 @@
     "Quitting...": "Afsluiten...",
     "Quitting... (release to cancel)": "Afsluiten... (loslaten om te annuleren)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Spel afsluiten: houd %s 2 seconden vast, of druk op Alt+Q",
-    "Quit game: press Alt+Q": "Spel afsluiten: druk op Alt+Q"
+    "Quit game: press Alt+Q": "Spel afsluiten: druk op Alt+Q",
+    "Port menu: %s, or press Insert": "Port-menu: %s, of druk op Insert",
+    "Port menu: press Insert": "Port-menu: druk op Insert",
+    "QA menu: %s, or press 1 + Z": "QA-menu: %s, of druk op 1 + Z",
+    "QA menu: %s": "QA-menu: %s",
+    "QA menu: off": "QA-menu: uit",
+    "(turn on Level select and QA menu in the launcher first)": "(zet eerst Levelselectie en QA-menu aan in de launcher)"
   }
 }

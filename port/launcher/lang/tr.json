@@ -1063,6 +1063,12 @@
     "Quitting...": "Çıkılıyor...",
     "Quitting... (release to cancel)": "Çıkılıyor... (iptal için bırakın)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Oyundan çık: %s tuşlarını 2 saniye basılı tut veya Alt+Q'ya bas",
-    "Quit game: press Alt+Q": "Oyundan çık: Alt+Q'ya bas"
+    "Quit game: press Alt+Q": "Oyundan çık: Alt+Q'ya bas",
+    "Port menu: %s, or press Insert": "Port menüsü: %s veya Insert'e bas",
+    "Port menu: press Insert": "Port menüsü: Insert'e bas",
+    "QA menu: %s, or press 1 + Z": "QA menüsü: %s veya 1 + Z'ye bas",
+    "QA menu: %s": "QA menüsü: %s",
+    "QA menu: off": "QA menüsü: kapalı",
+    "(turn on Level select and QA menu in the launcher first)": "(önce başlatıcıda Bölüm seçimi ve QA menüsünü aç)"
   }
 }

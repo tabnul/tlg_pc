@@ -1063,6 +1063,12 @@
     "Quitting...": "Вихід...",
     "Quitting... (release to cancel)": "Вихід... (відпустіть, щоб скасувати)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "Вийти з гри: утримуйте %s 2 секунди або натисніть Alt+Q",
-    "Quit game: press Alt+Q": "Вийти з гри: натисніть Alt+Q"
+    "Quit game: press Alt+Q": "Вийти з гри: натисніть Alt+Q",
+    "Port menu: %s, or press Insert": "Меню порту: %s або натисніть Insert",
+    "Port menu: press Insert": "Меню порту: натисніть Insert",
+    "QA menu: %s, or press 1 + Z": "Меню QA: %s або натисніть 1 + Z",
+    "QA menu: %s": "Меню QA: %s",
+    "QA menu: off": "Меню QA: вимкнено",
+    "(turn on Level select and QA menu in the launcher first)": "(спершу увімкніть Вибір рівня та меню QA у лаунчері)"
   }
 }

@@ -1063,6 +1063,12 @@
     "Quitting...": "종료하는 중...",
     "Quitting... (release to cancel)": "종료하는 중... (떼면 취소)",
     "Quit game: hold %s for 2 seconds, or press Alt+Q": "게임 종료: %s 2초 길게 누르기 또는 Alt+Q",
-    "Quit game: press Alt+Q": "게임 종료: Alt+Q"
+    "Quit game: press Alt+Q": "게임 종료: Alt+Q",
+    "Port menu: %s, or press Insert": "포트 메뉴: %s 또는 Insert",
+    "Port menu: press Insert": "포트 메뉴: Insert",
+    "QA menu: %s, or press 1 + Z": "QA 메뉴: %s 또는 1 + Z",
+    "QA menu: %s": "QA 메뉴: %s",
+    "QA menu: off": "QA 메뉴: 꺼짐",
+    "(turn on Level select and QA menu in the launcher first)": "(먼저 런처에서 레벨 선택 및 QA 메뉴를 켜세요)"
   }
 }
