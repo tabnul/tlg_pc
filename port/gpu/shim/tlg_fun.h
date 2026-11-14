@@ -149,3 +149,16 @@ inline constexpr const char* TricopilotHelp =
     "into a load trigger, and the story keeps running around him.";
 bool EyeCustom();
 } // namespace TlgFun
+
+// tlg: quitting from the keyboard (Alt+Q, window close) and the controller (Controls tab combo, held
+// 2 s). Runs the game's own luaCommand("quit") once no load is running, so its exit callbacks save
+// the config and perpetual data; the game then ends in sceSystemServiceLoadExec (src/runtime_tlg.c),
+// which exits instead of restarting. Closes anyway when the game has not finished after a while.
+namespace TlgQuit {
+void Request(const char* why);
+bool Requested();
+}
+// tlg: the QA menu combo of Controls (when it is not the default L1+L3, which the game's pad check handles).
+namespace TlgFun {
+void ToggleQaMenu();
+}

@@ -426,7 +426,13 @@
     "launcher.pack_zar_done": "Compactado em {path}. A configuração do jogo agora aponta para o .zar.",
     "launcher.pack_zar_failed": "Falha ao compactar: {error}",
     "launcher.horns_built": "Os modelos dos chifres foram criados neste PC.",
-    "launcher.horns_failed": "Não foi possível criar os modelos dos chifres: {error}"
+    "launcher.horns_failed": "Não foi possível criar os modelos dos chifres: {error}",
+    "pad.combos": "Combinações",
+    "pad.combo_quit": "Sair do jogo (segurar 2 segundos)",
+    "pad.combo_menu": "Menu do jogo",
+    "pad.combo_qa": "Menu QA",
+    "pad.combo_press": "segure os botões e depois solte…",
+    "pad.combo_help": "Dois ou mais botões juntos. Teclado: Alt+Q sai, Insert abre o menu do jogo."
   },
   "items": {
     "menu:sharpen": {
@@ -1027,6 +1033,17 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Desbloqueia todos os tesouros (roupas, penas do Trico) e a entrada Tesouros no menu de opções, com o desbloqueio dos próprios desenvolvedores. Fica salvo no seu save: desligar não os remove. Seus saves são copiados antes do primeiro desbloqueio (o gerenciador de saves do launcher pode restaurá-los). Escolha-os no menu de pausa do jogo, em Itens.",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "O menino usa chifres, uma homenagem a Ico. Podem ser combinados com a roupa do Ico do próprio jogo (um dos tesouros). Ative primeiro uma vez no launcher: o launcher cria os modelos dos chifres no seu PC.",
     "ICO horns": "Chifres do ICO",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "Ative primeiro uma vez os chifres de ICO no launcher (página Mods)."
+    "Turn on ICO horns in the launcher (Mods page) once first.": "Ative primeiro uma vez os chifres de ICO no launcher (página Mods).",
+    "Controller": "Controle",
+    "Quit game (hold 2 seconds)": "Sair do jogo (segurar 2 segundos)",
+    "In-game menu": "Menu do jogo",
+    "QA menu": "Menu QA",
+    "Hold the buttons, then release...": "Segure os botões e depois solte...",
+    "Set": "Definir",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Definir: segure dois ou mais botões juntos e depois solte. Teclado: Alt+Q sai, Insert abre este menu.",
+    "Quitting...": "Saindo...",
+    "Quitting... (release to cancel)": "Saindo... (solte para cancelar)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Sair do jogo: segure %s por 2 segundos ou pressione Alt+Q",
+    "Quit game: press Alt+Q": "Sair do jogo: pressione Alt+Q"
   }
 }

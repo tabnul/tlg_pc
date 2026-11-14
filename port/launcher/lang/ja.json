@@ -428,7 +428,13 @@
     "launcher.pack_zar_done": "{path} にパックしました。ゲームの設定は .zar を指すようになりました。",
     "launcher.pack_zar_failed": "パックに失敗しました: {error}",
     "launcher.horns_built": "角のモデルをこの PC で作成しました。",
-    "launcher.horns_failed": "角のモデルを作成できませんでした: {error}"
+    "launcher.horns_failed": "角のモデルを作成できませんでした: {error}",
+    "pad.combos": "コンボ",
+    "pad.combo_quit": "ゲームを終了（2秒長押し）",
+    "pad.combo_menu": "ゲーム内メニュー",
+    "pad.combo_qa": "QAメニュー",
+    "pad.combo_press": "ボタンを押したまま、離してください…",
+    "pad.combo_help": "2つ以上のボタンを同時に。キーボード: Alt+Qで終了、Insertでゲーム内メニューを開きます。"
   },
   "items": {
     "menu:sharpen": {
@@ -1033,6 +1039,17 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "開発者自身の解放機能で、すべての宝物（衣装、トリコの羽根）とオプションメニューの「宝物」項目を解放します。セーブデータに保存されます。オフにしても元に戻りません。最初の解放の前にセーブデータがバックアップされます（ランチャーのセーブ管理で復元できます）。ゲームのポーズメニューの「アイテム」で選べます。",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年が角を身に着けます。ICOへのオマージュです。ゲーム本編のICOの衣装（宝物のひとつ）と組み合わせられます。まずランチャーで一度オンにしてください。ランチャーがお使いの PC で角のモデルを作成します。",
     "ICO horns": "ICOの角",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "まずランチャー（Mods ページ）で ICO の角を一度オンにしてください。"
+    "Turn on ICO horns in the launcher (Mods page) once first.": "まずランチャー（Mods ページ）で ICO の角を一度オンにしてください。",
+    "Controller": "コントローラー",
+    "Quit game (hold 2 seconds)": "ゲームを終了（2秒長押し）",
+    "In-game menu": "ゲーム内メニュー",
+    "QA menu": "QAメニュー",
+    "Hold the buttons, then release...": "ボタンを押したまま、離してください...",
+    "Set": "設定",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "設定: 2つ以上のボタンを同時に長押しして離します。キーボード: Alt+Qで終了、Insertでこのメニューを開きます。",
+    "Quitting...": "終了中...",
+    "Quitting... (release to cancel)": "終了中...（離すとキャンセル）",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "ゲーム終了: %s を2秒長押し、または Alt+Q",
+    "Quit game: press Alt+Q": "ゲーム終了: Alt+Q"
   }
 }

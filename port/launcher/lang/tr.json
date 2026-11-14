@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "Yok sayıldı, bilinmeyen seçenek: {detail}",
     "preset.ps_p_unknown_setting": "Yok sayıldı, bilinmeyen veya makineye özgü ayar: {detail}",
     "preset.ps_p_bad_item": "Reddedildi, geçersiz değer: {detail}",
-    "preset.ps_p_bad_setting": "Reddedildi, geçersiz değer: {detail}"
+    "preset.ps_p_bad_setting": "Reddedildi, geçersiz değer: {detail}",
+    "pad.combos": "Kombinasyonlar",
+    "pad.combo_quit": "Oyundan çık (2 saniye basılı tut)",
+    "pad.combo_menu": "Oyun içi menü",
+    "pad.combo_qa": "QA menüsü",
+    "pad.combo_press": "tuşları basılı tutun, sonra bırakın…",
+    "pad.combo_help": "İki veya daha fazla tuş birlikte. Klavye: Alt+Q çıkar, Insert oyun içi menüyü açar."
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "Oyunu kapatmayın.",
     "Save loaded": "Kayıt yüklendi",
     "Save deleted": "Kayıt silindi",
-    "Game saved": "Oyun kaydedildi"
+    "Game saved": "Oyun kaydedildi",
+    "Controller": "Kumanda",
+    "Quit game (hold 2 seconds)": "Oyundan çık (2 saniye basılı tut)",
+    "In-game menu": "Oyun içi menü",
+    "QA menu": "QA menüsü",
+    "Hold the buttons, then release...": "Tuşları basılı tutun, sonra bırakın...",
+    "Set": "Ayarla",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Ayarla: iki veya daha fazla tuşu birlikte basılı tutun, sonra bırakın. Klavye: Alt+Q çıkar, Insert bu menüyü açar.",
+    "Quitting...": "Çıkılıyor...",
+    "Quitting... (release to cancel)": "Çıkılıyor... (iptal için bırakın)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Oyundan çık: %s tuşlarını 2 saniye basılı tut veya Alt+Q'ya bas",
+    "Quit game: press Alt+Q": "Oyundan çık: Alt+Q'ya bas"
   }
 }

@@ -46,6 +46,12 @@ TEXT = {
     'test': 'Test',
     'rumble': 'Rumble',
     'gyro': 'Motion',
+    'combos': 'Combos',
+    'combo_quit': 'Quit game (hold 2 seconds)',
+    'combo_menu': 'In-game menu',
+    'combo_qa': 'QA menu',
+    'combo_press': 'hold the buttons, then release…',
+    'combo_help': 'Two or more buttons together. Keyboard: Alt+Q quits, Insert opens the in-game menu.',
     'credit': 'Drawing: RPCS3 DualShock 3 by HerrHulaHoop (GPL-2.0), made a DualShock 4 for this port.',
 }
 KINDS = {'ps3': 'DualShock 3 (PS3)', 'ps4': 'DualShock 4 (PS4)', 'ps5': 'DualSense (PS5)',
@@ -65,6 +71,36 @@ XBOX_LABEL = ['A', 'B', 'X', 'Y', 'View', 'Xbox', 'Menu', 'LS', 'RS', 'LB', 'RB'
 DRAWING = {0: 'ButtonCross', 1: 'ButtonCircle', 2: 'ButtonSquare', 3: 'ButtonTriangle', 4: 'ShareButton',
            5: 'PSButton', 6: 'OptionsButton', 9: 'LeftShoulder', 10: 'RightShoulder', 11: 'DpadButtonTop',
            12: 'DpadButtonBottom', 13: 'DpadButtonLeft', 14: 'DpadButtonRight', 20: 'Touchpad'}
+# Controller combos (tlg.ini pad_combo_*, tlg_settings.cpp ComboNames): name -> bit. Bits 0-20 are the
+# SDL buttons, L2/R2 (the triggers) are bits 24/25, as in the game.
+COMBO_BITS = {'cross': 0, 'circle': 1, 'square': 2, 'triangle': 3, 'l1': 9, 'r1': 10, 'l2': 24, 'r2': 25,
+              'l3': 7, 'r3': 8, 'share': 4, 'options': 6, 'touchpad': 20, 'ps': 5, 'up': 11, 'down': 12,
+              'left': 13, 'right': 14}
+COMBO_LABELS = {'share': 'Share', 'options': 'Options', 'touchpad': 'Touchpad', 'ps': 'PS', 'cross': 'Cross',
+                'circle': 'Circle', 'square': 'Square', 'triangle': 'Triangle', 'up': 'Up', 'down': 'Down',
+                'left': 'Left', 'right': 'Right'}
+COMBOS = (('pad_combo_quit', 'combo_quit', 'share+options'), ('pad_combo_menu', 'combo_menu', 'l2+r3'),
+          ('pad_combo_qa', 'combo_qa', 'l1+l3'))
+
+
+def parse_combo(text, fallback):
+    bits = 0
+    for part in (text or '').lower().split('+'):
+        if part.strip() in COMBO_BITS:
+            bits |= 1 << COMBO_BITS[part.strip()]
+    if not bits and fallback:
+        return parse_combo(fallback, '')
+    return bits
+
+
+def combo_text(bits):
+    return '+'.join(name for name, bit in COMBO_BITS.items() if bits & (1 << bit))
+
+
+def combo_label(bits):
+    return ' + '.join(COMBO_LABELS.get(n, n.upper()) for n in combo_text(bits).split('+') if n)
+
+
 # The game's PS4 buttons that take gamepad buttons, with their default SDL source (runtime_pad.c pad_map).
 REMAP = [('cross', 'Cross', 'a'), ('circle', 'Circle', 'b'), ('square', 'Square', 'x'),
          ('triangle', 'Triangle', 'y'), ('l1', 'L1', 'leftshoulder'), ('r1', 'R1', 'rightshoulder'),
@@ -210,6 +246,23 @@ class ControllerPage:
                        command=lambda p=ps, l=shown: self.start_capture(p, l)).grid(row=index, column=2, pady=1)
             self.sources[ps] = shown
         ttk.Button(right, text=self.t('reset'), command=self.reset).pack(anchor='w', pady=(8, 0))
+        ttk.Label(right, text=self.t('combos'), font=('TkDefaultFont', 10, 'bold')).pack(anchor='w', pady=(8, 0))
+        grid = ttk.Frame(right)
+        grid.pack(fill='x')
+        ini = tlg_run.read_ini(tlg_run.user_dir() / 'tlg.ini')
+        self.combo_shown = {}
+        for index, (key, text, default) in enumerate(COMBOS):
+            ttk.Label(grid, text=self.t(text), width=26).grid(row=index, column=0, sticky='w')
+            shown = ttk.Label(grid, text=combo_label(parse_combo(ini.get(key), default)), width=18,
+                              foreground=self.MUTED)
+            shown.grid(row=index, column=1, sticky='w')
+            ttk.Button(grid, text=self.t('set'), width=8,
+                       command=lambda k=key: self.start_combo(k)).grid(row=index, column=2, pady=1)
+            ttk.Button(grid, text=self.t('default'), width=8,
+                       command=lambda k=key, d=default: self.store_combo(k, parse_combo(d, ''))).grid(
+                row=index, column=3, pady=1, padx=(4, 0))
+            self.combo_shown[key] = shown
+        ttk.Label(right, text=self.t('combo_help'), foreground=self.MUTED, wraplength=420).pack(anchor='w')
         self.show_sources()
 
     # -- settings --------------------------------------------------------------------------
@@ -247,6 +300,31 @@ class ControllerPage:
         state = self.state.get(self.shown_id())
         self.capture_mask = state[0] if state else 0   # only a new press counts
         label.configure(text=self.t('press'), foreground=self.ACCENT)
+
+    # -- combos (written to tlg.ini at once; the in-game Controls tab edits the same keys) ----
+    def start_combo(self, key):
+        self.combo_capture = [key, None, 0]   # key, buttons held at the start, buttons pressed since
+        self.combo_shown[key].configure(text=self.t('combo_press'), foreground=self.ACCENT)
+
+    def store_combo(self, key, bits):
+        tlg_run.update_ini(tlg_run.user_dir() / 'tlg.ini', {key: combo_text(bits)})
+        self.combo_shown[key].configure(text=combo_label(bits), foreground=self.MUTED)
+
+    def combo_poll(self, buttons, lt, rt):
+        threshold = self.trigger.get() / 100
+        held = buttons & 0x1fffff
+        held |= (1 << 24) if lt / 32767 > threshold else 0
+        held |= (1 << 25) if rt / 32767 > threshold else 0
+        key, ignore, pressed = self.combo_capture
+        ignore = held if ignore is None else ignore & held
+        pressed |= held & ~ignore
+        self.combo_capture = [key, ignore, pressed]
+        if not held and pressed:
+            if bin(pressed).count('1') >= 2:
+                self.combo_capture = None
+                self.store_combo(key, pressed)
+            else:
+                self.combo_capture[2] = 0   # one button only: keep waiting
 
     def finish_capture(self, bit):
         ps, _ = self.capture
@@ -403,6 +481,8 @@ class ControllerPage:
             c.coords(mark, x0 + 60 * threshold, 0, x0 + 60 * threshold, 12)
         pad = self.pads.get(self.shown_id())
         self.gyro.configure(text=f"{self.t('gyro')}: {gx:+.2f} {gy:+.2f} {gz:+.2f}" if pad and pad['gyro'] else '')
+        if getattr(self, 'combo_capture', None) and state:
+            self.combo_poll(buttons, lt, rt)
         if self.capture and state:
             new = buttons & ~self.capture_mask
             self.capture_mask &= buttons

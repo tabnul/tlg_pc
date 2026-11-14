@@ -123,6 +123,11 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.audio_device = value;
         return;
     }
+    if (key == "pad_combo_quit" || key == "pad_combo_menu" || key == "pad_combo_qa") {
+        auto& target = key == "pad_combo_quit" ? v.combo_quit : key == "pad_combo_menu" ? v.combo_menu : v.combo_qa;
+        target = ParseCombo(value, target.load());
+        return;
+    }
     if (key == "audio_surround") {
         v.audio_surround = std::atoi(value.c_str()) != 0;
         return;
@@ -271,6 +276,44 @@ void Set(Values& v, const std::string& key, const std::string& value) {
 }
 
 } // namespace
+
+namespace {
+struct ComboName { uint32_t bit; const char* key; const char* label; };
+constexpr ComboName ComboNames[] = {
+    {PadCross, "cross", "Cross"}, {PadCircle, "circle", "Circle"}, {PadSquare, "square", "Square"},
+    {PadTriangle, "triangle", "Triangle"}, {PadL1, "l1", "L1"}, {PadR1, "r1", "R1"}, {PadL2, "l2", "L2"},
+    {PadR2, "r2", "R2"}, {PadL3, "l3", "L3"}, {PadR3, "r3", "R3"}, {PadShare, "share", "Share"},
+    {PadOptions, "options", "Options"}, {PadTouchpad, "touchpad", "Touchpad"}, {PadPs, "ps", "PS"},
+    {PadUp, "up", "Up"}, {PadDown, "down", "Down"}, {PadLeft, "left", "Left"}, {PadRight, "right", "Right"},
+};
+} // namespace
+
+uint32_t ParseCombo(const std::string& text, uint32_t fallback) {
+    uint32_t bits = 0;
+    size_t start = 0;
+    while (start <= text.size()) {
+        size_t end = text.find('+', start);
+        if (end == std::string::npos) end = text.size();
+        std::string part = text.substr(start, end - start);
+        for (char& c : part) c = char(std::tolower(static_cast<unsigned char>(c)));
+        for (const auto& n : ComboNames)
+            if (part == n.key) bits |= n.bit;
+        start = end + 1;
+    }
+    return bits ? bits : fallback;
+}
+
+static std::string ComboJoin(uint32_t bits, bool label) {
+    std::string out;
+    for (const auto& n : ComboNames) {
+        if (!(bits & n.bit)) continue;
+        if (!out.empty()) out += label ? " + " : "+";
+        out += label ? n.label : n.key;
+    }
+    return out;
+}
+std::string ComboText(uint32_t bits) { return ComboJoin(bits, false); }
+std::string ComboLabel(uint32_t bits) { return ComboJoin(bits, true); }
 
 Values& Get() {
     static Values values;
@@ -689,6 +732,8 @@ void Save() {
                  int(v.color_adjust.load()), v.brightness.load(), v.contrast.load(),
                  v.saturation.load(), v.color_gamma.load());
     std::fprintf(file, "level_select=%d\n", int(v.level_select.load()));
+    std::fprintf(file, "pad_combo_quit=%s\npad_combo_menu=%s\npad_combo_qa=%s\n",
+                 ComboText(v.combo_quit).c_str(), ComboText(v.combo_menu).c_str(), ComboText(v.combo_qa).c_str());
     std::fprintf(file, "trico_drool=%d\n", v.trico_drool.load());
     std::fprintf(file, "mod_treasures=%d\nmod_horns=%d\n", int(v.mod_treasures.load()),
                  int(v.mod_horns.load()));

@@ -21,6 +21,9 @@ int tlggpu_init(const TlgGpuConfig *config);
 /* Unless TLG_CACHE_FLUSH_ON_EXIT=0: waits at most two seconds for queued shader-cache writes
  * before window close or restart skips destructors (from SpartanPort, @maze1377). */
 void tlggpu_flush_cache(void);
+/* 1 after the player asked to quit (Alt+Q, window close, controller combo; tlg_lua.cpp TlgQuit): the
+ * game's own exit then ends in sceSystemServiceLoadExec, which closes instead of restarting. */
+int tlggpu_quit_requested(void);
 /* Function for an imported NID ("NID#lib#mod"), or 0 when the GPU library does not provide it. */
 uintptr_t tlggpu_resolve(const char *scoped_nid);
 /* Called first by the loader's SIGSEGV handler: 1 when a GPU page-tracking fault was handled. */

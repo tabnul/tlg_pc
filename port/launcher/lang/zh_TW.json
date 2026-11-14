@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "已忽略，未知選項：{detail}",
     "preset.ps_p_unknown_setting": "已忽略，未知或特定於本機的設定：{detail}",
     "preset.ps_p_bad_item": "已拒絕，無效的值：{detail}",
-    "preset.ps_p_bad_setting": "已拒絕，無效的值：{detail}"
+    "preset.ps_p_bad_setting": "已拒絕，無效的值：{detail}",
+    "pad.combos": "組合鍵",
+    "pad.combo_quit": "退出遊戲（按住 2 秒）",
+    "pad.combo_menu": "遊戲內選單",
+    "pad.combo_qa": "QA 選單",
+    "pad.combo_press": "按住按鍵，然後放開…",
+    "pad.combo_help": "兩個或更多按鍵同時按下。鍵盤：Alt+Q 退出，Insert 開啟遊戲內選單。"
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "請勿關閉遊戲。",
     "Save loaded": "存檔已讀取",
     "Save deleted": "存檔已刪除",
-    "Game saved": "遊戲已儲存"
+    "Game saved": "遊戲已儲存",
+    "Controller": "控制器",
+    "Quit game (hold 2 seconds)": "退出遊戲（按住 2 秒）",
+    "In-game menu": "遊戲內選單",
+    "QA menu": "QA 選單",
+    "Hold the buttons, then release...": "按住按鍵，然後放開...",
+    "Set": "設定",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "設定：同時按住兩個或更多按鍵，然後放開。鍵盤：Alt+Q 退出，Insert 開啟此選單。",
+    "Quitting...": "正在退出...",
+    "Quitting... (release to cancel)": "正在退出...（放開以取消）",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "離開遊戲：按住 %s 2 秒，或按 Alt+Q",
+    "Quit game: press Alt+Q": "離開遊戲：按 Alt+Q"
   }
 }

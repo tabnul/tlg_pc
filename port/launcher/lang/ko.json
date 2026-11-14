@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "무시됨, 알 수 없는 옵션: {detail}",
     "preset.ps_p_unknown_setting": "무시됨, 알 수 없거나 PC 전용 설정: {detail}",
     "preset.ps_p_bad_item": "거부됨, 잘못된 값: {detail}",
-    "preset.ps_p_bad_setting": "거부됨, 잘못된 값: {detail}"
+    "preset.ps_p_bad_setting": "거부됨, 잘못된 값: {detail}",
+    "pad.combos": "조합",
+    "pad.combo_quit": "게임 종료 (2초 누르기)",
+    "pad.combo_menu": "게임 내 메뉴",
+    "pad.combo_qa": "QA 메뉴",
+    "pad.combo_press": "버튼을 누른 채로 있다가 떼세요…",
+    "pad.combo_help": "두 개 이상의 버튼을 함께. 키보드: Alt+Q는 종료, Insert는 게임 내 메뉴를 엽니다."
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "게임을 종료하지 마세요.",
     "Save loaded": "세이브 불러옴",
     "Save deleted": "세이브 삭제됨",
-    "Game saved": "게임 저장됨"
+    "Game saved": "게임 저장됨",
+    "Controller": "컨트롤러",
+    "Quit game (hold 2 seconds)": "게임 종료 (2초 누르기)",
+    "In-game menu": "게임 내 메뉴",
+    "QA menu": "QA 메뉴",
+    "Hold the buttons, then release...": "버튼을 누른 채로 있다가 떼세요...",
+    "Set": "설정",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "설정: 두 개 이상의 버튼을 함께 누르고 있다가 떼세요. 키보드: Alt+Q는 종료, Insert는 이 메뉴를 엽니다.",
+    "Quitting...": "종료하는 중...",
+    "Quitting... (release to cancel)": "종료하는 중... (떼면 취소)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "게임 종료: %s 2초 길게 누르기 또는 Alt+Q",
+    "Quit game: press Alt+Q": "게임 종료: Alt+Q"
   }
 }

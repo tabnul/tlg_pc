@@ -1,4 +1,9 @@
 #include <thread>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tlg: the game's Lua loadbuffer (HavokScript) is redirected here (src/probe.c,
 // install_lua_hook). utils.lua gets a tick that loads "--TLGSET" every 15 frames; that chunk
@@ -11,8 +16,10 @@
 #include "tlg_fun.h"
 #include "tlg_fun_points.h"
 #include "tlg_lab.h"
+#include "tlg_overlay.h"
 #include "tlg_settings.h"
 #include "tlg_toggles.h"
+#include "../tlggpu.h"
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -597,6 +604,10 @@ std::string SetChunk() {
     code += DevChunk();
     code += FunChunk();
     code += PerRun;
+    // Proof that the game's exit list ran (config and perpetual data are saved there, gameflag.lua).
+    code += "if not _TLGEXITCB and type(ExitCallback)=='table' then _TLGEXITCB=true "
+            "ExitCallback:Add(function() L('exit callbacks ran') end) end\n";
+    code += std::string("_TLGQA_PAD=") + (s.combo_qa.load() == TlgSettings::PadComboQa ? "true" : "false") + "\n";
     char line[1024];
     std::snprintf(line, sizeof(line),
                   "Scale(pp,'bloom','bloomAmount',%d) Feature(pp,'Bloom',%d)\n"
@@ -654,12 +665,15 @@ void Dump(const char* buffer, uint64_t size, const char* name) {
 constexpr std::string_view QaMenu = R"(
 if not _TLGQA then _TLGQA=true
 local function Registered(f) for _,v in ipairs(tick_funcs) do if v==f then return true end end return false end
+_TLGQA_TOGGLE=function()
+  if Registered(ControllerMenu.Tick) then
+    if ControllerMenu.Hide then ControllerMenu.Hide() end
+  else _TLGQA_UNLOAD=true DelayExec(function() RegisterTick(ControllerMenu.Tick) end) luaCommand("trico pause") end
+end
+-- _TLGQA_PAD (settings tick): the Controls combo is the default L1+L3, read here through the game's
+-- pad (keyboard keys too); another combo comes from the controller through TlgFun::ToggleQaMenu.
 RegisterTick(function()
-  if MS.PadGetHold(PadButton.L1) and MS.PadGetDown(PadButton.L3) then
-    if Registered(ControllerMenu.Tick) then
-      if ControllerMenu.Hide then ControllerMenu.Hide() end
-    else _TLGQA_UNLOAD=true DelayExec(function() RegisterTick(ControllerMenu.Tick) end) luaCommand("trico pause") end
-  end
+  if _TLGQA_PAD~=false and MS.PadGetHold(PadButton.L1) and MS.PadGetDown(PadButton.L3) then _TLGQA_TOGGLE() end
 end)
 Load("game/scripts/_editor/ControllerMenu")
 local hide = ControllerMenu.Hide
@@ -672,6 +686,20 @@ bool GameEdits(std::string& patched, std::string_view name) {
     const auto& s = TlgSettings::Get();
     if (s.level_select && name == "data_trico/game/scripts/startup.lua") {
         patched += QaMenu;
+        return true;
+    }
+    if (name == "data_trico/game/scripts/common/PauseMenuUI.lua") {
+        // The pause menu tells the overlay when it opens and closes: the quit hint shows meanwhile.
+        static constexpr std::string_view Open = "GameMenu_Start(\"PauseMenu\")";
+        static constexpr std::string_view Close = "isGameMenuView = false";
+        const size_t open = patched.find(Open);
+        if (open == std::string::npos) {
+            return false;
+        }
+        patched.insert(open + Open.size(), " do local f=(loadstring or load)('--TLGPAUSE1') if f then f() end end");
+        for (size_t at = patched.find(Close); at != std::string::npos; at = patched.find(Close, at + 1)) {
+            patched.insert(at + Close.size(), " do local f=(loadstring or load)('--TLGPAUSE0') if f then f() end end");
+        }
         return true;
     }
     if (name == "data_trico/game/scripts/common/GameSetupTbl.lua") {
@@ -966,6 +994,10 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     }
     if (StartsWith(buffer, size, "--TLGVAL ")) {
         TlgLab::Report(std::string_view(buffer + 9, size - 9));
+        return original(L, options, Empty.data(), Empty.size(), name);
+    }
+    if (StartsWith(buffer, size, "--TLGPAUSE")) {
+        TlgOverlay::SetPauseMenu(size > 10 && buffer[10] == '1');
         return original(L, options, Empty.data(), Empty.size(), name);
     }
     if (StartsWith(buffer, size, "--TLGLOADED")) {
@@ -1317,3 +1349,54 @@ bool EyeCustom() {
     return eye_custom;
 }
 } // namespace TlgFun
+
+namespace TlgFun {
+void ToggleQaMenu() {
+    if (!TlgSettings::Get().level_select) return;
+    FunQueue("if _TLGQA_TOGGLE then _TLGQA_TOGGLE() end");
+}
+} // namespace TlgFun
+
+namespace TlgQuit {
+namespace {
+std::atomic<bool> requested{false};
+// Waits for a running load (a quit then would break it); the game's quit runs its exit callbacks.
+constexpr const char* QuitLua =
+    "L('quit requested')\n"
+    "if _TLGQUIT then pcall(UnRegisterTick,_TLGQUIT) end\n"
+    "_TLGQUIT=function() local ok,ld=pcall(Loading) if ok and ld then return end\n"
+    // What the game's exit list saves (gameflag.lua), done here so it does not depend on the
+    // engine reaching that list before the process ends.
+    "  pcall(UnRegisterTick,_TLGQUIT) local c=pcall(SaveConfig) local p=pcall(SavePerpetual)\n"
+    "  L('quit: config saved '..tostring(c)..', perpetual saved '..tostring(p)) luaCommand('quit') end\n"
+    "RegisterTick(_TLGQUIT)";
+// The settings tick runs every 15 frames and a load can take a while: after this the window closes anyway.
+constexpr auto Fallback = std::chrono::seconds(10);
+// std::_Exit hangs on Windows once the game is shutting down; end the process directly.
+[[noreturn]] void TlgQuitHard() {
+#ifdef _WIN32
+    TerminateProcess(GetCurrentProcess(), 0);
+#endif
+    std::_Exit(0);
+}
+} // namespace
+
+bool Requested() { return requested.load(); }
+
+void Request(const char* why) {
+    if (requested.exchange(true)) return;
+    std::printf("Quit: requested (%s)\n", why);
+    std::fflush(stdout);
+    FunQueue(QuitLua);
+    std::thread([] {
+        std::this_thread::sleep_for(Fallback);
+        std::printf("Quit: the game did not finish in %d s, closing\n", int(Fallback.count()));
+        std::fflush(stdout);
+        tlggpu_flush_cache();
+        std::fflush(NULL);
+        TlgQuitHard();
+    }).detach();
+}
+} // namespace TlgQuit
+
+extern "C" int tlggpu_quit_requested(void) { return TlgQuit::Requested() ? 1 : 0; }

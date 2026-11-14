@@ -65,6 +65,7 @@ On Linux, `./install_desktop.sh` adds the game to the applications menu.
 
 - **F10**: toggles the FPS counter
 - **Insert** (or R3 + L2 on a controller): opens the port's menu (image, performance, overlay)
+- **Alt+Q** (or hold Share + Options for 2 seconds; the window X and Alt+F4 work too): quits the game the way the game's own Quit does. Change the controller combos (quit, the port's menu, the QA menu) in the port's menu (Controls) or the launcher (Controller).
 - **F8**: switches between the chosen upscaler and the game's own anti-aliasing. DLSS (RTX cards), FSR 4 (recent cards, Windows and Linux) or FSR 3.1 (any card) keep foliage and thin edges stable. At the Native AA quality (the default, DLSS on RTX cards) the game renders at your screen size; at Quality, Balanced, Performance or Ultra Performance it renders smaller and DLSS or FSR upscale it, for more FPS. Change it in the launcher or under Upscaling and anti-aliasing in the port's menu (Quality needs a restart). FSR 4 is chosen once by itself on a card that runs it.
 - PS4/PS5, Xbox and 8BitDo controllers work through SDL3, over USB or Bluetooth.
 

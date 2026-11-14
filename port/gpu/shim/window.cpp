@@ -1,4 +1,5 @@
 // tlg: SDL3 window for the Vulkan swapchain (X11 or Wayland).
+#include <chrono>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +10,7 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "sdl_window.h"
+#include "tlg_fun.h"
 #include "tlg_overlay.h"
 #include "../../src/runtime_menu.h"
 #include "tlg_graphics.h"
@@ -383,7 +385,19 @@ bool WindowSDL::PollEvents() {
         }
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            is_open = false;
+            // First close: the game's own quit (saves settings). A second close
+            // while that runs closes the window the old way. One click on X sends
+            // SDL_EVENT_QUIT and CLOSE_REQUESTED together: only a close 1 s later counts.
+            {
+                static auto first_close = std::chrono::steady_clock::time_point{};
+                const auto now = std::chrono::steady_clock::now();
+                if (!TlgQuit::Requested()) {
+                    first_close = now;
+                    TlgQuit::Request("window");
+                } else if (now - first_close > std::chrono::seconds(1)) {
+                    is_open = false;
+                }
+            }
             break;
         default:
             break;

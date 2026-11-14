@@ -70,7 +70,19 @@ std::atomic<bool> menu_open{false};
 // tlg: the Fun move bar (F12): Trico's working moves as icons; the mouse goes to it while it is up.
 std::atomic<bool> move_bar_open{false};
 ImTextureData* move_icons = nullptr; // TlgFunIcons atlas, made on first use (present thread)
-bool r3_down = false, l2_down = false;
+// tlg: controller combos (tlg.ini pad_combo_*). pad_mask = buttons held now (PadCombo bits).
+u32 pad_mask = 0;
+int capture_slot = -1;  // Controls tab: the combo being set (0 quit, 1 menu, 2 QA menu), -1 = none
+u32 capture_mask = 0;   // buttons pressed during the capture
+u32 capture_ignore = 0; // buttons already held when the capture started (the click on "Set")
+std::atomic<bool> pause_menu_open{false}; // the game's own pause menu is open (PauseMenuUI.lua)
+std::atomic<int64_t> quit_hold_start{0}; // steady ms when the quit combo was complete, 0 = not held
+constexpr int64_t QuitHoldMs = 2000;     // fixed: the quit combo is always a 2 second hold
+std::atomic<u32>* ComboSlot(int slot) {
+    auto& s = TlgSettings::Get();
+    return slot == 0 ? &s.combo_quit : slot == 1 ? &s.combo_menu : &s.combo_qa;
+}
+
 std::atomic<bool> loading{false};
 std::atomic<u32> loading_done{0}, loading_total{0};
 std::atomic<u32> background_done{0}, background_total{0};
@@ -1007,6 +1019,42 @@ void ControlsTab() {
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
+    ImGui::SeparatorText(TR("Controller"));
+    if (BeginRows("##combos")) {
+        const char* labels[3] = {TR("Quit game (hold 2 seconds)"), TR("In-game menu"), TR("QA menu")};
+        const u32 defaults[3] = {TlgSettings::PadComboQuit, TlgSettings::PadComboMenu, TlgSettings::PadComboQa};
+        for (int slot = 0; slot < 3; ++slot) {
+            Row(labels[slot]);
+            if (capture_slot == slot) {
+                ImGui::TextUnformatted(TR("Hold the buttons, then release..."));
+                ImGui::SameLine();
+                if (ImGui::SmallButton(TR("Cancel"))) {
+                    capture_slot = -1;
+                }
+            } else {
+                const u32 combo = ComboSlot(slot)->load();
+                ImGui::TextUnformatted(TlgSettings::ComboLabel(combo).c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton(TR("Set"))) {
+                    capture_slot = slot;
+                    capture_mask = 0;
+                    capture_ignore = pad_mask;
+                }
+                if (combo != defaults[slot]) {
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton(TR("Default"))) {
+                        ComboSlot(slot)->store(defaults[slot]);
+                        dirty = true;
+                    }
+                }
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", TR("Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu."));
+    ImGui::PopTextWrapPos();
     ImGui::SeparatorText(TR("Keyboard and mouse layout"));
     if (BeginRows("##layout")) {
         InfoRow(TR("Move / camera"), TR("WASD / mouse or arrow keys"));
@@ -2027,6 +2075,29 @@ void NoticeBox() {
     ImGui::End();
 }
 
+/// tlg: while the game's pause menu is open, how to quit (the player's own combo).
+void QuitHintBox() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+                                   viewport->WorkPos.y + viewport->WorkSize.y - 40.0f * base_scale),
+                            ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowBgAlpha(0.6f);
+    ImGui::Begin("##quit_hint", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                     ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                     ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::SetWindowFontScale(1.1f);
+    std::string text = TR("Quit game: hold %s for 2 seconds, or press Alt+Q");
+    const u32 combo = TlgSettings::Get().combo_quit;
+    if (!combo) {
+        text = TR("Quit game: press Alt+Q");
+    } else if (const size_t at = text.find("%s"); at != std::string::npos) {
+        text.replace(at, 2, TlgSettings::ComboLabel(combo));
+    }
+    ImGui::TextUnformatted(text.c_str());
+    ImGui::End();
+}
+
 void BackgroundLoading() {
     const u32 done = background_done, total = std::max(background_total.load(), 1u);
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -2275,10 +2346,105 @@ bool HandleSaveEvent(const SDL_Event& event) {
     return true;
 }
 
+int64_t SteadyMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+/// tlg: tracks the held controller buttons and runs the combos (quit hold, our menu, QA menu).
+/// Returns true when the event is used up. Caller holds imgui_mutex.
+bool PadEvent(const SDL_Event& event) {
+    u32 bit = 0;
+    bool down = false;
+    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+        if (event.gbutton.button >= 24) {
+            return false;
+        }
+        bit = 1u << event.gbutton.button;
+        down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+    } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
+        if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) {
+            bit = TlgSettings::PadL2;
+        } else if (event.gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
+            bit = TlgSettings::PadR2;
+        } else {
+            return false;
+        }
+        down = event.gaxis.value > 16000;
+        if (down == ((pad_mask & bit) != 0)) {
+            return false; // trigger moved, but stayed on the same side of the threshold
+        }
+    } else {
+        return false;
+    }
+    const u32 before = pad_mask;
+    pad_mask = down ? pad_mask | bit : pad_mask & ~bit;
+    if (capture_slot >= 0) {
+        capture_ignore &= pad_mask;
+        capture_mask |= pad_mask & ~capture_ignore;
+        if (!pad_mask && capture_mask) {
+            // All released: two or more buttons make the new combo; a single button keeps waiting.
+            if (__builtin_popcount(capture_mask) >= 2) {
+                ComboSlot(capture_slot)->store(capture_mask);
+                std::printf("Settings: controller combo %d set to %s\n", capture_slot,
+                            TlgSettings::ComboText(capture_mask).c_str());
+                dirty = true;
+                capture_slot = -1;
+            }
+            capture_mask = 0;
+        }
+        return true;
+    }
+    auto& s = TlgSettings::Get();
+    const u32 quit = s.combo_quit;
+    if (quit && (pad_mask & quit) == quit) {
+        if (!quit_hold_start) {
+            quit_hold_start = SteadyMs();
+        }
+    } else {
+        quit_hold_start = 0;
+    }
+    if (!down) {
+        return false;
+    }
+    // A combo fires when the press completes it (not again while it stays held).
+    const auto completes = [&](u32 combo) {
+        return combo && (bit & combo) && (pad_mask & combo) == combo && (before & combo) != combo;
+    };
+    if (completes(s.combo_menu)) {
+        SetOpen(!menu_open);
+        return true;
+    }
+    // The default QA combo stays in the game's Lua (works with keyboard keys too).
+    if (s.combo_qa != TlgSettings::PadComboQa && completes(s.combo_qa)) {
+        TlgFun::ToggleQaMenu();
+        return true;
+    }
+    return false;
+}
+
+/// tlg: the quit hold, once per presented frame: the note while held, the quit after 2 s.
+void QuitHoldTick() {
+    const int64_t start = quit_hold_start;
+    if (!start || TlgQuit::Requested()) {
+        return;
+    }
+    if (SteadyMs() - start >= QuitHoldMs) {
+        quit_hold_start = 0;
+        Notice(TR("Quitting..."), 10.0f);
+        TlgQuit::Request("controller");
+    } else {
+        Notice(TR("Quitting... (release to cancel)"), 0.2f);
+    }
+}
+
 bool HandleEvent(const SDL_Event& event) {
     std::scoped_lock lock{imgui_mutex};
     if (!initialized) {
         return false;
+    }
+    if (PadEvent(event)) {
+        return true;
     }
     if ((choice_active || message_active) && !menu_open) {
         return HandleSaveEvent(event);
@@ -2346,6 +2512,11 @@ bool HandleEvent(const SDL_Event& event) {
             io.MouseDrawCursor = is_open || move_bar_open;
             return true;
         }
+        // tlg: Alt+Q quits through the game's own quit (settings and progress saved).
+        if (down && !event.key.repeat && event.key.key == SDLK_Q && (event.key.mod & SDL_KMOD_ALT)) {
+            TlgQuit::Request("Alt+Q");
+            return true;
+        }
         // tlg: F10 shows or hides the performance overlay (FPS counter) at any time.
         if (down && !event.key.repeat && event.key.key == SDLK_F10) {
             auto& settings = TlgSettings::Get();
@@ -2372,14 +2543,7 @@ bool HandleEvent(const SDL_Event& event) {
     case SDL_EVENT_GAMEPAD_BUTTON_UP: {
         const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
         const u8 button = event.gbutton.button;
-        // R3+L2 opens the menu, not L3+R3, which games use as an action.
-        if (button == SDL_GAMEPAD_BUTTON_RIGHT_STICK) {
-            r3_down = down;
-            if (down && l2_down) {
-                SetOpen(!is_open);
-                return true;
-            }
-        }
+        // The menu combo (default R3+L2) is handled in PadEvent.
         if (!is_open) {
             return false;
         }
@@ -2389,16 +2553,7 @@ bool HandleEvent(const SDL_Event& event) {
         return true;
     }
     case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
-        if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) {
-            const bool down = event.gaxis.value > 16000;
-            if (down && !l2_down && r3_down) {
-                l2_down = true;
-                SetOpen(!is_open);
-                return true;
-            }
-            l2_down = down;
-        }
-        return false;
+        return false; // triggers: PadEvent
     }
     case SDL_EVENT_TEXT_INPUT: {
         // Typed characters (Ctrl+click on a slider, a text field): key events alone erase but
@@ -2466,6 +2621,10 @@ void SetLoading(bool active, u32 done, u32 total) {
     loading = active;
 }
 
+void SetPauseMenu(bool open) {
+    pause_menu_open = open;
+}
+
 void Notice(const std::string& text, float seconds) {
     std::scoped_lock lock{imgui_mutex};
     notice_text = text;
@@ -2489,7 +2648,7 @@ bool Visible() {
     const auto now = std::chrono::steady_clock::now();
     return initialized && (loading || background_total || menu_open || text_entry_active || choice_active ||
                            message_active || progress_on || now < progress_until || now < toast_until || AaLabelOn() ||
-                           NoticeActive() ||
+                           NoticeActive() || quit_hold_start != 0 || pause_menu_open ||
                            choice_retiring || s.show_fps || move_bar_open);
 }
 
@@ -2609,6 +2768,7 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
         frame_ms_avg = frame_ms_avg == 0.0f ? ms : frame_ms_avg * 0.95f + ms * 0.05f;
     }
     ConfirmRestart();
+    QuitHoldTick();
     if (!Visible()) {
         return;
     }
@@ -2649,6 +2809,9 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     }
     if (NoticeActive() && !menu_open) {
         NoticeBox();
+    }
+    if (pause_menu_open && !menu_open && !quit_hold_start) {
+        QuitHintBox();
     }
     if (move_bar_open && !menu_open && !loading) {
         MoveBarWindow();

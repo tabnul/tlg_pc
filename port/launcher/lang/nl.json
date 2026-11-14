@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "Genegeerd, onbekende optie: {detail}",
     "preset.ps_p_unknown_setting": "Genegeerd, onbekende of pc-specifieke instelling: {detail}",
     "preset.ps_p_bad_item": "Geweigerd, ongeldige waarde: {detail}",
-    "preset.ps_p_bad_setting": "Geweigerd, ongeldige waarde: {detail}"
+    "preset.ps_p_bad_setting": "Geweigerd, ongeldige waarde: {detail}",
+    "pad.combos": "Combinaties",
+    "pad.combo_quit": "Spel afsluiten (2 seconden vasthouden)",
+    "pad.combo_menu": "Menu in het spel",
+    "pad.combo_qa": "QA-menu",
+    "pad.combo_press": "houd de knoppen vast en laat los…",
+    "pad.combo_help": "Twee of meer knoppen samen. Toetsenbord: Alt+Q sluit af, Insert opent het menu in het spel."
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "Sluit de game niet af.",
     "Save loaded": "Save geladen",
     "Save deleted": "Save verwijderd",
-    "Game saved": "Game opgeslagen"
+    "Game saved": "Game opgeslagen",
+    "Controller": "Controller",
+    "Quit game (hold 2 seconds)": "Spel afsluiten (2 seconden vasthouden)",
+    "In-game menu": "Menu in het spel",
+    "QA menu": "QA-menu",
+    "Hold the buttons, then release...": "Houd de knoppen vast en laat los...",
+    "Set": "Instellen",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Instellen: houd twee of meer knoppen samen vast en laat dan los. Toetsenbord: Alt+Q sluit af, Insert opent dit menu.",
+    "Quitting...": "Afsluiten...",
+    "Quitting... (release to cancel)": "Afsluiten... (loslaten om te annuleren)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Spel afsluiten: houd %s 2 seconden vast, of druk op Alt+Q",
+    "Quit game: press Alt+Q": "Spel afsluiten: druk op Alt+Q"
   }
 }

@@ -50,6 +50,7 @@ Control.
 | Key | In game |
 |---|---|
 | Insert (R3 + L2) | The port's menu |
+| Alt+Q (hold Share + Options 2 s) | Quit the game (settings and progress saved) |
 | F8 | Switch between DLSS/FSR and the game's own anti-aliasing |
 | F10 | FPS counter |
 | F12 | Trico Tricks bar |
@@ -224,6 +225,13 @@ DualSense, DualShock 4 and Xbox controllers work out of the box, including rumbl
 sensor. On the launcher's **Controls** page you can remap buttons, set stick dead zones and
 trigger points, check for stick drift, and remap keyboard and mouse. See
 [port/packaging/README-player.md](port/packaging/README-player.md).
+
+- **Quit from anywhere:** **Alt+Q** on the keyboard, or hold **Share + Options** for 2 seconds
+  on a controller (a note shows while you hold; let go to cancel). The window's X and Alt+F4 work
+  the same way. It quits the way the game's own Quit does, so settings and progress are saved.
+- **Your own button combos:** the quit combo, the port's menu (R3 + L2) and the QA menu
+  (L1 + L3) can each be set to other buttons, on the launcher's **Controller** page (Combos) or
+  under Controls in the port's menu. The quit combo is always held for 2 seconds.
 
 <p align="center"><img src="docs/screenshots/fun/controller.png" width="80%" alt="The launcher's Controls page"></p>
 

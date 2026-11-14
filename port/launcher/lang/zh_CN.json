@@ -428,7 +428,13 @@
     "launcher.pack_zar_done": "已打包到 {path}。游戏设置现在指向该 .zar。",
     "launcher.pack_zar_failed": "打包失败：{error}",
     "launcher.horns_built": "角的模型已在这台电脑上生成。",
-    "launcher.horns_failed": "无法生成角的模型：{error}"
+    "launcher.horns_failed": "无法生成角的模型：{error}",
+    "pad.combos": "组合键",
+    "pad.combo_quit": "退出游戏（按住 2 秒）",
+    "pad.combo_menu": "游戏内菜单",
+    "pad.combo_qa": "QA 菜单",
+    "pad.combo_press": "按住按键，然后松开…",
+    "pad.combo_help": "两个或更多按键同时按下。键盘：Alt+Q 退出，Insert 打开游戏内菜单。"
   },
   "items": {
     "menu:sharpen": {
@@ -1033,6 +1039,17 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "使用开发者自己的解锁功能，解锁所有宝物（服装、Trico 的羽毛）以及选项菜单中的“宝物”项。保存在存档中：关闭后不会收回。首次解锁前会备份你的存档（启动器的存档管理可以恢复）。可在游戏暂停菜单的“物品”中选择。",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "少年戴上角，向《ICO》致敬。可与游戏自带的 Ico 服装（宝物之一）搭配。请先在启动器中开启一次：启动器会在你的电脑上生成角的模型。",
     "ICO horns": "ICO 的角",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "请先在启动器（Mods 页面）中开启一次 ICO 角。"
+    "Turn on ICO horns in the launcher (Mods page) once first.": "请先在启动器（Mods 页面）中开启一次 ICO 角。",
+    "Controller": "手柄",
+    "Quit game (hold 2 seconds)": "退出游戏（按住 2 秒）",
+    "In-game menu": "游戏内菜单",
+    "QA menu": "QA 菜单",
+    "Hold the buttons, then release...": "按住按键，然后松开...",
+    "Set": "设置",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "设置：同时按住两个或更多按键，然后松开。键盘：Alt+Q 退出，Insert 打开此菜单。",
+    "Quitting...": "正在退出...",
+    "Quitting... (release to cancel)": "正在退出...（松开以取消）",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "退出游戏：按住 %s 2 秒，或按 Alt+Q",
+    "Quit game: press Alt+Q": "退出游戏：按 Alt+Q"
   }
 }

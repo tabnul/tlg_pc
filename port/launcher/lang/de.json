@@ -428,7 +428,13 @@
     "launcher.pack_zar_done": "Gepackt nach {path}. Die Spieleinstellung zeigt jetzt auf die .zar.",
     "launcher.pack_zar_failed": "Packen fehlgeschlagen: {error}",
     "launcher.horns_built": "Die Hörner-Modelle sind auf diesem PC gebaut.",
-    "launcher.horns_failed": "Die Hörner-Modelle konnten nicht gebaut werden: {error}"
+    "launcher.horns_failed": "Die Hörner-Modelle konnten nicht gebaut werden: {error}",
+    "pad.combos": "Kombinationen",
+    "pad.combo_quit": "Spiel beenden (2 Sekunden halten)",
+    "pad.combo_menu": "Spielmenü",
+    "pad.combo_qa": "QA-Menü",
+    "pad.combo_press": "Tasten halten, dann loslassen…",
+    "pad.combo_help": "Zwei oder mehr Tasten zusammen. Tastatur: Alt+Q beendet, Einfg öffnet das Spielmenü."
   },
   "items": {
     "menu:sharpen": {
@@ -1033,6 +1039,17 @@
     "Unlocks every treasure (outfits, Trico's feathers) and the Treasures entry in the options menu, with the developers' own unlock. Stored in your save: turning it off does not take them back. Your saves are backed up before the first unlock (the launcher's save manager can restore them). Select them in the game's pause menu, under Items.": "Schaltet jeden Schatz (Kostüme, Tricos Federn) und den Eintrag Schätze im Optionsmenü frei, mit der eigenen Freischaltung der Entwickler. Im Spielstand gespeichert: Ausschalten nimmt sie nicht zurück. Deine Spielstände werden vor der ersten Freischaltung gesichert (die Spielstandverwaltung des Launchers kann sie wiederherstellen). Wähle sie im Pausenmenü des Spiels unter Gegenstände aus.",
     "The boy wears horns, a nod to Ico. Can be combined with the game's own Ico outfit (one of the treasures). Turn it on in the launcher once first: the launcher builds the horn models on your PC.": "Der Junge trägt Hörner, eine Anspielung auf Ico. Lässt sich mit dem Ico-Kostüm des Spiels kombinieren (einer der Schätze). Schalte sie zuerst einmal im Launcher ein: Der Launcher baut die Hörner-Modelle auf deinem PC.",
     "ICO horns": "ICO-Hörner",
-    "Turn on ICO horns in the launcher (Mods page) once first.": "Schalte ICO-Hörner zuerst einmal im Launcher ein (Seite Mods)."
+    "Turn on ICO horns in the launcher (Mods page) once first.": "Schalte ICO-Hörner zuerst einmal im Launcher ein (Seite Mods).",
+    "Controller": "Controller",
+    "Quit game (hold 2 seconds)": "Spiel beenden (2 Sekunden halten)",
+    "In-game menu": "Spielmenü",
+    "QA menu": "QA-Menü",
+    "Hold the buttons, then release...": "Tasten halten, dann loslassen...",
+    "Set": "Festlegen",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Festlegen: zwei oder mehr Tasten zusammen drücken und halten, dann loslassen. Tastatur: Alt+Q beendet, Einfg öffnet dieses Menü.",
+    "Quitting...": "Wird beendet...",
+    "Quitting... (release to cancel)": "Wird beendet... (loslassen zum Abbrechen)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Spiel beenden: %s 2 Sekunden halten oder Alt+Q drücken",
+    "Quit game: press Alt+Q": "Spiel beenden: Alt+Q drücken"
   }
 }

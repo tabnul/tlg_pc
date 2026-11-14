@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "Пропущено, невідомий параметр: {detail}",
     "preset.ps_p_unknown_setting": "Пропущено, невідоме або залежне від ПК налаштування: {detail}",
     "preset.ps_p_bad_item": "Відхилено, недійсне значення: {detail}",
-    "preset.ps_p_bad_setting": "Відхилено, недійсне значення: {detail}"
+    "preset.ps_p_bad_setting": "Відхилено, недійсне значення: {detail}",
+    "pad.combos": "Комбінації",
+    "pad.combo_quit": "Вийти з гри (утримувати 2 секунди)",
+    "pad.combo_menu": "Меню в грі",
+    "pad.combo_qa": "Меню QA",
+    "pad.combo_press": "утримуйте кнопки, потім відпустіть…",
+    "pad.combo_help": "Дві або більше кнопок разом. Клавіатура: Alt+Q — вихід, Insert відкриває меню в грі."
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "Не закривайте гру.",
     "Save loaded": "Збереження завантажено",
     "Save deleted": "Збереження видалено",
-    "Game saved": "Гру збережено"
+    "Game saved": "Гру збережено",
+    "Controller": "Контролер",
+    "Quit game (hold 2 seconds)": "Вийти з гри (утримувати 2 секунди)",
+    "In-game menu": "Меню в грі",
+    "QA menu": "Меню QA",
+    "Hold the buttons, then release...": "Утримуйте кнопки, потім відпустіть...",
+    "Set": "Призначити",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Призначити: утримуйте разом дві або більше кнопок, потім відпустіть. Клавіатура: Alt+Q — вихід, Insert відкриває це меню.",
+    "Quitting...": "Вихід...",
+    "Quitting... (release to cancel)": "Вихід... (відпустіть, щоб скасувати)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Вийти з гри: утримуйте %s 2 секунди або натисніть Alt+Q",
+    "Quit game: press Alt+Q": "Вийти з гри: натисніть Alt+Q"
   }
 }

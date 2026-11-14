@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #define KERR(n) ((int32_t)(UINT32_C(0x80020000)|(n)))
 #define KERR_ESRCH KERR(3)
@@ -240,7 +243,23 @@ static ABI int32_t posix_pthread_equal(void *a, void *b) { return a == b; }
 static ABI void guest_sincosf(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 
 /* ---- System services ---- */
+int tlggpu_quit_requested(void);
+void tlggpu_flush_cache(void);
 static ABI int32_t load_exec(const char *path,char *const *argv) {
+    if (tlggpu_quit_requested()) {
+        /* The player asked to quit (Alt+Q, window close, quit combo): close
+           instead of the restart the ending needs. */
+        printf("Runtime: sceSystemServiceLoadExec after player quit -> closing\n");
+        fflush(NULL);
+        tlggpu_flush_cache();
+        fflush(NULL);
+#ifdef _WIN32
+        /* exit() hangs on Windows here (shutdown of the other threads and DLLs); end the process
+           the way runtime_restart does. */
+        TerminateProcess(GetCurrentProcess(),0);
+#endif
+        _Exit(0);
+    }
     printf("Runtime: sceSystemServiceLoadExec(%s%s) -> restart\n",path ? path : "(null)",argv && argv[0] ? " ..." : "");
     fflush(NULL);
     runtime_restart();

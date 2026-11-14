@@ -435,7 +435,13 @@
     "preset.ps_p_unknown_item": "Ignorata, opzione sconosciuta: {detail}",
     "preset.ps_p_unknown_setting": "Ignorata, impostazione sconosciuta o specifica del PC: {detail}",
     "preset.ps_p_bad_item": "Rifiutato, valore non valido: {detail}",
-    "preset.ps_p_bad_setting": "Rifiutato, valore non valido: {detail}"
+    "preset.ps_p_bad_setting": "Rifiutato, valore non valido: {detail}",
+    "pad.combos": "Combinazioni",
+    "pad.combo_quit": "Esci dal gioco (tieni premuto 2 secondi)",
+    "pad.combo_menu": "Menu di gioco",
+    "pad.combo_qa": "Menu QA",
+    "pad.combo_press": "tieni premuti i tasti, poi rilascia…",
+    "pad.combo_help": "Due o più tasti insieme. Tastiera: Alt+Q esce, Ins apre il menu di gioco."
   },
   "items": {
     "menu:sharpen": {
@@ -1046,6 +1052,17 @@
     "Do not close the game.": "Non chiudere il gioco.",
     "Save loaded": "Salvataggio caricato",
     "Save deleted": "Salvataggio eliminato",
-    "Game saved": "Partita salvata"
+    "Game saved": "Partita salvata",
+    "Controller": "Controller",
+    "Quit game (hold 2 seconds)": "Esci dal gioco (tieni premuto 2 secondi)",
+    "In-game menu": "Menu di gioco",
+    "QA menu": "Menu QA",
+    "Hold the buttons, then release...": "Tieni premuti i tasti, poi rilascia...",
+    "Set": "Imposta",
+    "Set: press and hold two or more buttons together, then let go. Keyboard: Alt+Q quits, Insert opens this menu.": "Imposta: tieni premuti insieme due o più tasti, poi rilascia. Tastiera: Alt+Q esce, Ins apre questo menu.",
+    "Quitting...": "Uscita...",
+    "Quitting... (release to cancel)": "Uscita... (rilascia per annullare)",
+    "Quit game: hold %s for 2 seconds, or press Alt+Q": "Esci dal gioco: tieni premuto %s per 2 secondi o premi Alt+Q",
+    "Quit game: press Alt+Q": "Esci dal gioco: premi Alt+Q"
   }
 }
