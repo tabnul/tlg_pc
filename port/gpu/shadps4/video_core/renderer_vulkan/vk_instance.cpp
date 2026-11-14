@@ -409,6 +409,38 @@ bool Instance::CreateDevice() {
     }
     image_view_min_lod = add_extension(VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME);
     supports_memory_budget = add_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    // tlg (PR #172, @YsraEstudos): memory priority hints for VMA, opt-in via
+    // TLG_MEMORY_PRIORITY=1 (Debug > Flags) until tested.
+    wave64_stage_check = [] {
+        const char* env = std::getenv("TLG_WAVE64_STAGES");
+        return env && env[0] == '1';
+    }();
+    LOG_INFO(Render_Vulkan, "Wave64 stage check: {} (required-size stages {:#x})",
+             wave64_stage_check, static_cast<u32>(vk13_props.requiredSubgroupSizeStages));
+    const bool want_priority = [] {
+        const char* env = std::getenv("TLG_MEMORY_PRIORITY");
+        return env && env[0] == '1';
+    }();
+    const bool memory_priority =
+        want_priority && add_extension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+    if (memory_priority) {
+        const auto priority_chain = physical_device.getFeatures2<
+            vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceMemoryPriorityFeaturesEXT>();
+        memory_priority_supported =
+            priority_chain.get<vk::PhysicalDeviceMemoryPriorityFeaturesEXT>().memoryPriority;
+    }
+    const bool pageable_extension =
+        memory_priority_supported &&
+        add_extension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
+    if (pageable_extension) {
+        const auto pageable_chain = physical_device.getFeatures2<
+            vk::PhysicalDeviceFeatures2, vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT>();
+        pageable_device_local_memory =
+            pageable_chain.get<vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT>()
+                .pageableDeviceLocalMemory;
+    }
+    LOG_INFO(Render_Vulkan, "Memory priority: {} (pageable {})", memory_priority_supported,
+             pageable_device_local_memory);
     // tlg: FSR 4 v07 INT8 (vk_temporal_upscaler): quad derivatives in compute shaders.
     compute_shader_derivatives = add_extension(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
     // tlg: FSR 4.1.1 passes (dot2 of halves accumulated in float, as vkd3d-proton translates them).
@@ -587,6 +619,7 @@ bool Instance::CreateDevice() {
         },
         vk::PhysicalDeviceVulkan13Features{
             .robustImageAccess = vk13_features.robustImageAccess,
+            .pipelineCreationCacheControl = vk13_features.pipelineCreationCacheControl,
             .shaderDemoteToHelperInvocation = vk13_features.shaderDemoteToHelperInvocation,
             .subgroupSizeControl = vk13_features.subgroupSizeControl,
             .synchronization2 = vk13_features.synchronization2,
@@ -680,6 +713,12 @@ bool Instance::CreateDevice() {
         vk::PhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE{
             .shaderMixedFloatDotProductFloat16AccFloat32 = true,
         },
+        vk::PhysicalDeviceMemoryPriorityFeaturesEXT{
+            .memoryPriority = true,
+        },
+        vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT{
+            .pageableDeviceLocalMemory = true,
+        },
         vk::PhysicalDeviceFaultFeaturesEXT{
             .deviceFault = true,
         },
@@ -746,6 +785,12 @@ bool Instance::CreateDevice() {
     if (!mixed_float_dot_product) {
         device_chain.unlink<vk::PhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE>();
     }
+    if (!memory_priority_supported) {
+        device_chain.unlink<vk::PhysicalDeviceMemoryPriorityFeaturesEXT>();
+    }
+    if (!pageable_device_local_memory) {
+        device_chain.unlink<vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT>();
+    }
 
     auto [device_result, dev] = physical_device.createDeviceUnique(device_chain.get());
     if (device_result != vk::Result::eSuccess) {
@@ -809,7 +854,8 @@ void Instance::CreateAllocator() {
     };
 
     const VmaAllocatorCreateInfo allocator_info = {
-        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT |
+                 (memory_priority_supported ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT : 0u),
         .physicalDevice = physical_device,
         .device = *device,
         .pVulkanFunctions = &functions,

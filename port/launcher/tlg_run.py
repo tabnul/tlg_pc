@@ -224,7 +224,14 @@ DEBUG_FLAGS = (
     ('flag_object_motion', 'TLG_OBJECT_MOTION', '1', '0', False),      # ~10% FPS; unguarded reads
     ('flag_arena_free', 'TLG_ARENA_FREE', '1', None, False),           # #79: out of memory, 8 GB AMD
     ('flag_granule', 'TLG_RESIDENCY_GRANULE_MB', None, '0', True),    # #79: AMD Windows submit OOM
+    ('flag_sema_fast', 'TLG_SEMA_FAST', None, '0', True),            # #41 (@thearturord)
     ('flag_vk_validation', 'TLG_VK_VALIDATION', '1', None, False),     # needs the Vulkan SDK layer
+    ('game_tail_climb', 'TLG_TAIL_CLIMB_FIX', '1', None, False),      # PR #171, eboot patch, every GPU
+    # Possible RDNA2 (older AMD) gains, ports of @YsraEstudos PRs #172-#174; no gain on RDNA4 / RTX.
+    ('rdna_memory_priority', 'TLG_MEMORY_PRIORITY', '1', None, False),  # PR #172
+    ('rdna_wave64', 'TLG_WAVE64_STAGES', '1', None, False),            # PR #173
+    ('rdna_sem_spin', 'TLG_SEM_SPIN', '1', None, False),               # PR #174
+    ('rdna_submit_draws', 'TLG_SUBMIT_DRAWS', '1024', None, False),    # PR #174, AMD cards only
 )
 DEBUG_LOG_FLAGS = tuple(flag[0] for flag in DEBUG_FLAGS if flag[0].startswith('log_'))
 
@@ -713,9 +720,13 @@ def prepare(settings, log=print):
          *(['--skip-logos'] if settings.get('skip_logos') else []),
          '--menu-confirm', menu_confirm(settings)],
     ]
+    # Debug > Flags eboot patches (tail climb fix) are applied here, before the game starts.
+    step_env = dict(os.environ)
+    if debug_flag_on(settings, 'game_tail_climb'):
+        step_env.setdefault('TLG_TAIL_CLIMB_FIX', '1')
     for step in steps:
         result = subprocess.run(step, cwd=str(scripts), capture_output=True, text=True,
-                                creationflags=NO_WINDOW)
+                                creationflags=NO_WINDOW, env=step_env)
         if result.returncode:
             name = next(Path(arg).name for arg in step if arg.endswith('.py'))
             raise RuntimeError(f'{name}: {result.stderr.strip() or result.stdout.strip()}')

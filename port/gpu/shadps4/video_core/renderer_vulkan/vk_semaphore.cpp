@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <cstdlib>
 #include <limits>
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#endif
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_semaphore.h"
 
@@ -49,10 +53,25 @@ void Semaphore::Wait(u64 tick) {
     if (IsFree(tick)) {
         return;
     }
-    // Update the GPU tick and try again
-    Refresh();
-    if (IsFree(tick)) {
-        return;
+    // tlg (PR #174, @YsraEstudos): TLG_SEM_SPIN=1 polls a few more times with short pauses
+    // before the kernel wait (WDDM wait wake-up latency). Off = one refresh, as before.
+    static const bool spin = [] {
+        const char* env = std::getenv("TLG_SEM_SPIN");
+        return env && env[0] == '1';
+    }();
+    const u32 spins = spin ? 8u : 1u;
+    for (u32 iter = 0; iter < spins; ++iter) {
+        Refresh();
+        if (IsFree(tick)) {
+            return;
+        }
+#if defined(__x86_64__) || defined(_M_X64)
+        if (spin) {
+            for (u32 relax = 0; relax < 16; ++relax) {
+                _mm_pause();
+            }
+        }
+#endif
     }
 
     // If none of the above is hit, fallback to a regular wait
