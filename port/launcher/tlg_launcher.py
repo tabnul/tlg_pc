@@ -98,6 +98,8 @@ TEXT = {
     'flag_object_motion_hint': 'Experimental: per-object motion for DLSS and FSR, less smear on the boy and Trico. Costs about 10% FPS and may crash on AMD cards on Linux. Off by default.',
     'flag_arena_free': 'Free replaced buffer blocks',
     'flag_arena_free_hint': 'Test switch from issue #79: gives memory blocks that were replaced by a larger one back to the graphics driver. For "out of memory" crashes shortly after loading. Off by default.',
+    'flag_granule': 'Group buffer memory',
+    'flag_granule_hint': "Fix for issue #79: takes buffer memory from the graphics driver in larger pieces instead of many small ones. Older AMD cards on Windows can crash with \"out of memory\" without it. On by default.",
     'flag_vk_validation': 'Vulkan validation',
     'flag_vk_validation_hint': 'Checks every graphics call. Very slow, and only works with the Vulkan SDK installed. For developers.',
     'home_soundtrack': 'Soundtrack',

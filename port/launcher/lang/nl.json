@@ -55,6 +55,8 @@
     "launcher.flag_object_motion_hint": "Experimenteel: beweging per object voor DLSS en FSR, minder vegen bij de jongen en Trico. Kost ongeveer 10% FPS en kan crashen op AMD-kaarten onder Linux. Standaard uit.",
     "launcher.flag_arena_free": "Vervangen bufferblokken vrijgeven",
     "launcher.flag_arena_free_hint": "Testschakelaar uit issue #79: geeft geheugenblokken die door een groter blok zijn vervangen terug aan het grafische stuurprogramma. Voor crashes met \"out of memory\" kort na het laden. Standaard uit.",
+    "launcher.flag_granule": "Buffergeheugen bundelen",
+    "launcher.flag_granule_hint": "Fix voor issue #79: haalt buffergeheugen in grotere stukken bij de grafische driver in plaats van in veel kleine. Oudere AMD-kaarten op Windows kunnen zonder deze fix crashen met \"out of memory\". Standaard aan.",
     "launcher.flag_vk_validation": "Vulkan-validatie",
     "launcher.flag_vk_validation_hint": "Controleert elke grafische aanroep. Erg traag, en werkt alleen met de Vulkan SDK geïnstalleerd. Voor ontwikkelaars.",
     "launcher.home_soundtrack": "Soundtrack",

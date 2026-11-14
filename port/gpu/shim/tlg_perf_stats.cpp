@@ -2,6 +2,8 @@
 #include "tlg_perf_stats.h"
 
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -233,6 +235,32 @@ std::atomic<const Vulkan::Instance*> report_instance{nullptr};
 
 void SetMemoryReportInstance(const Vulkan::Instance* instance) {
     report_instance.store(instance, std::memory_order_release);
+    // tlg (issue #79, diagnostics): TLG_MEMORY_LINE_S=N prints the buffer arena pieces every N s.
+    const char* env = std::getenv("TLG_MEMORY_LINE_S");
+    const long seconds = env ? std::strtol(env, nullptr, 10) : 0;
+    static std::once_flag line_started;
+    if (seconds > 0) {
+        std::call_once(line_started, [seconds] {
+            std::thread([seconds] {
+                while (true) {
+                    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+                    std::printf("Memory now: %llu buffer arena pieces, %llu MiB filled, %llu "
+                                "arenas reserving %llu MiB, %llu sparse binds\n",
+                                static_cast<unsigned long long>(TlgStats::arena_backing_allocs.load(
+                                    std::memory_order_relaxed)),
+                                static_cast<unsigned long long>(TlgStats::arena_resident_bytes.load(
+                                    std::memory_order_relaxed) >> 20),
+                                static_cast<unsigned long long>(
+                                    TlgStats::arena_live_count.load(std::memory_order_relaxed)),
+                                static_cast<unsigned long long>(
+                                    TlgStats::arena_live_bytes.load(std::memory_order_relaxed) >> 20),
+                                static_cast<unsigned long long>(
+                                    TlgStats::arena_binds_total.load(std::memory_order_relaxed)));
+                    std::fflush(stdout);
+                }
+            }).detach();
+        });
+    }
 }
 
 void MemoryStopReport() {

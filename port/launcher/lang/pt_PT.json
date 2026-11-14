@@ -55,6 +55,8 @@
     "launcher.flag_object_motion_hint": "Experimental: movimento por objeto para DLSS e FSR, menos rastos no rapaz e no Trico. Custa cerca de 10% de FPS e pode bloquear em placas AMD no Linux. Desligado por padrão.",
     "launcher.flag_arena_free": "Libertar blocos de buffer substituídos",
     "launcher.flag_arena_free_hint": "Opção de teste do problema #79: devolve ao controlador gráfico os blocos de memória substituídos por um maior. Para falhas «out of memory» pouco depois do carregamento. Desativado por predefinição.",
+    "launcher.flag_granule": "Agrupar memória de buffer",
+    "launcher.flag_granule_hint": "Correção da issue #79: obtém a memória de buffer do controlador gráfico em pedaços maiores em vez de muitos pequenos. Sem ela, placas AMD mais antigas no Windows podem fechar com \"out of memory\". Ligado por predefinição.",
     "launcher.flag_vk_validation": "Validação Vulkan",
     "launcher.flag_vk_validation_hint": "Verifica cada chamada gráfica. Muito lento, e só funciona com o Vulkan SDK instalado. Para desenvolvedores.",
     "launcher.home_soundtrack": "Trilha sonora",

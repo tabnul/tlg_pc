@@ -134,6 +134,13 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
     if (free_replaced_arenas) {
         std::printf("GPU: buffer arenas replaced by a migration are freed (TLG_ARENA_FREE=1)\n");
     }
+    // tlg (issue #79): Debug > Flags "Group buffer memory" (TLG_RESIDENCY_GRANULE_MB, 0 = off).
+    if (const char* v = std::getenv("TLG_RESIDENCY_GRANULE_MB")) {
+        residency_granule_bytes = std::strtoull(v, nullptr, 10) << 20;
+    }
+    std::printf("GPU: buffer memory made resident in %llu MiB granules%s\n",
+                static_cast<unsigned long long>(residency_granule_bytes >> 20),
+                residency_granule_bytes ? "" : " (off, per block)");
     TlgPerfStats::SetMemoryReportInstance(&instance);
     // tlg: TLG_MAX_BUFFER_MB lowers the driver's buffer size limit as the arenas see it
     // (diagnostics: reproduces AMD on Windows 2048, RADV 4095 on any GPU).
@@ -1650,7 +1657,18 @@ const Buffer* BufferCache::GetArena(u64 first_block, u64 last_block) {
     return new_arena;
 }
 
+// tlg (issue #79): from iss_pc 662a787a (@HayatoG, after shadPS4-Infamous-FixBuild 4a206865 and
+// 0c3fada0). Memory used to become resident a block at a time as the game streamed data in, each
+// range its own driver allocation and sparse bind: ~2400 pieces made AMD's Windows driver fail a
+// queue submit with ErrorOutOfHostMemory on an RX 580 with gigabytes free. The range is widened
+// to aligned granules (kept inside the arena), so far fewer, larger pieces are made.
 void BufferCache::EnsureResident(const Buffer* arena, u64 first_block, u64 last_block) {
+    if (const u64 granule_blocks = residency_granule_bytes >> block_shift; granule_blocks > 1) {
+        const u64 arena_first = arena->CpuAddr() >> block_shift;
+        const u64 arena_end = (arena->CpuAddr() + arena->SizeBytes()) >> block_shift;
+        first_block = std::max(Common::AlignDown(first_block, granule_blocks), arena_first);
+        last_block = std::min(Common::AlignUp(last_block + 1, granule_blocks), arena_end) - 1;
+    }
     u32 resident_blocks{};
     IntervalList bind_ranges;
     resident_ranges.ForEachGap(first_block, last_block + 1, [&](u64 start, u64 end) {

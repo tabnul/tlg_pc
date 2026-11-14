@@ -55,6 +55,8 @@
     "launcher.flag_object_motion_hint": "Experimentell: Bewegung pro Objekt für DLSS und FSR, weniger Schlieren am Jungen und an Trico. Kostet etwa 10 % FPS und kann auf AMD-Karten unter Linux abstürzen. Standardmäßig aus.",
     "launcher.flag_arena_free": "Ersetzte Pufferblöcke freigeben",
     "launcher.flag_arena_free_hint": "Testschalter aus Issue #79: gibt Speicherblöcke, die durch einen größeren ersetzt wurden, an den Grafiktreiber zurück. Für Abstürze mit „out of memory“ kurz nach dem Laden. Standardmäßig aus.",
+    "launcher.flag_granule": "Puffer-Speicher bündeln",
+    "launcher.flag_granule_hint": "Fix für Issue #79: holt Puffer-Speicher in größeren Stücken statt in vielen kleinen vom Grafiktreiber. Ältere AMD-Karten unter Windows können ohne ihn mit „out of memory“ abstürzen. Standardmäßig an.",
     "launcher.flag_vk_validation": "Vulkan-Validierung",
     "launcher.flag_vk_validation_hint": "Prüft jeden Grafikaufruf. Sehr langsam und funktioniert nur mit installiertem Vulkan SDK. Für Entwickler.",
     "launcher.home_soundtrack": "Soundtrack",

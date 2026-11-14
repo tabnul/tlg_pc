@@ -336,6 +336,8 @@ private:
     };
     std::vector<RetiredArena> retired_arenas;
     bool free_replaced_arenas{};
+    // tlg (issue #79): memory becomes resident in aligned granules of this size (0 = per block).
+    u64 residency_granule_bytes{16_MB};
     std::vector<ArenaBinds> pending_binds;
     Vulkan::Semaphore memory_semaphore;
 
