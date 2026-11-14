@@ -31,7 +31,7 @@ No game files are included. You need your own copy, dumped from your own PS4.
 - **[Photo mode](#photo-mode):** freeze the world, fly a free camera anywhere and save lossless
   PNG screenshots at full render resolution.
 - **[ICO horns](#ico-horns-only-in-this-port):** the Horned Apparel outfit finally gives the boy
-  Ico's horns.
+  Ico's horns. Optional, off by default.
 - **[Trico Tricks](docs/fun.md#trico-tricks-make-trico-move):** 30 of Trico's own moves on a bar (**F12**), including the throw-up animation
   the developers sealed.
 - **[Soundtrack](#soundtrack):** a music player in the launcher with all 100 pieces of the game's
