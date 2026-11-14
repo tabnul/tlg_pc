@@ -755,6 +755,22 @@
       "name": "Fence asincroni",
       "what": "Segnala i fence del gioco appena le copie di memoria prima di essi sono finite, invece di aspettarle.",
       "why": "Misurato più lento (79 contro 83 FPS): il gioco aspetta su questi fence."
+    },
+    "menu:mod_plays": {
+      "name": "Trico gioca",
+      "what": "Un comportamento di Trico che gli sviluppatori hanno creato e poi sigillato \"per ora\": ogni tanto annusa il ragazzo e lo tocca con la zampa. Succede solo dove possono succedere anche i suoi strofinamenti di guancia, con il ragazzo lontano dai bordi."
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico vomita",
+      "what": "Gli sviluppatori hanno sigillato il vomito di Trico \"per ordine\" nel 2016. Come progettato dagli sviluppatori: quando ha lo stomaco pieno di barili, vomita come avevano previsto. Il pulsante Vomita nei trucchi di Trico funziona in entrambi i casi.",
+      "choices": {
+        "0": "Disattivato (come uscito)",
+        "1": "Come progettato dagli sviluppatori"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "Indizi del narratore tagliati",
+      "what": "I 23 indizi del narratore che gli sviluppatori hanno tagliato a settembre 2016. Attivo: quando sembri bloccato, il narratore ti aiuta di nuovo, dove avevano collocato le sue frasi in origine. Svelano le soluzioni degli enigmi."
     }
   },
   "menu": {
@@ -1090,6 +1106,14 @@
     "Hold R1 / L1": "Tieni R1 / L1",
     "Fast / slow": "Veloce / lento",
     "Exit photo mode": "Esci dalla modalità foto",
-    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Il mondo si ferma e tu muovi la telecamera per scattare una foto. Levetta sinistra: volare. Levetta destra: guardarsi intorno. L2 / R2: giù / su. Tieni premuto R1: veloce, tieni premuto L1: lento. Croce o Stamp: salva uno screenshot in user/screenshots. L3 + R3, F9 (o questo menu) lo attiva e disattiva. Un salto lo disattiva."
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Il mondo si ferma e tu muovi la telecamera per scattare una foto. Levetta sinistra: volare. Levetta destra: guardarsi intorno. L2 / R2: giù / su. Tieni premuto R1: veloce, tieni premuto L1: lento. Croce o Stamp: salva uno screenshot in user/screenshots. L3 + R3, F9 (o questo menu) lo attiva e disattiva. Un salto lo disattiva.",
+    "Trico plays": "Trico gioca",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "Un comportamento di Trico che gli sviluppatori hanno creato e poi sigillato \"per ora\": ogni tanto annusa il ragazzo e lo tocca con la zampa. Succede solo dove possono succedere anche i suoi strofinamenti di guancia, con il ragazzo lontano dai bordi.",
+    "Off (as released)": "Disattivato (come uscito)",
+    "As the developers designed": "Come progettato dagli sviluppatori",
+    "Trico throws up": "Trico vomita",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "Gli sviluppatori hanno sigillato il vomito di Trico \"per ordine\" nel 2016. Come progettato dagli sviluppatori: quando ha lo stomaco pieno di barili, vomita come avevano previsto. Il pulsante Vomita nei trucchi di Trico funziona in entrambi i casi.",
+    "Cut narrator hints": "Indizi del narratore tagliati",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "I 23 indizi del narratore che gli sviluppatori hanno tagliato a settembre 2016. Attivo: quando sembri bloccato, il narratore ti aiuta di nuovo, dove avevano collocato le sue frasi in origine. Svelano le soluzioni degli enigmi."
   }
 }

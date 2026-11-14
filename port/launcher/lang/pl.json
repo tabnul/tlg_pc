@@ -755,6 +755,22 @@
       "name": "Asynchroniczne fence",
       "what": "Sygnalizuje fence gry, gdy skończą się kopie pamięci przed nimi, zamiast na nie czekać.",
       "why": "Zmierzono wolniej (79 wobec 83 FPS): gra czeka na te fence."
+    },
+    "menu:mod_plays": {
+      "name": "Trico się bawi",
+      "what": "Zachowanie Trico, które twórcy zbudowali, a potem zapieczętowali „na razie”: od czasu do czasu obwąchuje chłopca i trąca go łapą. Dzieje się to tylko tam, gdzie mogą się zdarzyć jego przytulenia policzkiem, gdy chłopiec jest z dala od krawędzi."
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico wymiotuje",
+      "what": "Twórcy zapieczętowali wymiotowanie Trico „na polecenie” w 2016 roku. Tak, jak zaprojektowali twórcy: gdy ma żołądek pełen beczek, wymiotuje tak, jak zaplanowano. Przycisk Wymiotuj w sztuczkach Trico działa w obu przypadkach.",
+      "choices": {
+        "0": "Wyłączone (jak w wydaniu)",
+        "1": "Tak, jak zaprojektowali twórcy"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "Wycięte podpowiedzi narratora",
+      "what": "23 podpowiedzi narratora, które twórcy wycięli we wrześniu 2016. Włączone: gdy wygląda na to, że utknąłeś, narrator znów pomaga, tam gdzie pierwotnie umieszczono jego kwestie. Zdradzają rozwiązania zagadek."
     }
   },
   "menu": {
@@ -1090,6 +1106,14 @@
     "Hold R1 / L1": "Przytrzymaj R1 / L1",
     "Fast / slow": "Szybko / wolno",
     "Exit photo mode": "Wyjdź z trybu zdjęć",
-    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Świat zamiera, a ty latasz kamerą, aby zrobić zdjęcie. Lewa gałka: lot. Prawa gałka: rozglądanie się. L2 / R2: w dół / w górę. Przytrzymaj R1: szybko, przytrzymaj L1: wolno. Krzyżyk lub Print Screen: zapisz zrzut ekranu w user/screenshots. L3 + R3, F9 (lub to menu) włącza i wyłącza tryb. Skok go wyłącza."
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "Świat zamiera, a ty latasz kamerą, aby zrobić zdjęcie. Lewa gałka: lot. Prawa gałka: rozglądanie się. L2 / R2: w dół / w górę. Przytrzymaj R1: szybko, przytrzymaj L1: wolno. Krzyżyk lub Print Screen: zapisz zrzut ekranu w user/screenshots. L3 + R3, F9 (lub to menu) włącza i wyłącza tryb. Skok go wyłącza.",
+    "Trico plays": "Trico się bawi",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "Zachowanie Trico, które twórcy zbudowali, a potem zapieczętowali „na razie”: od czasu do czasu obwąchuje chłopca i trąca go łapą. Dzieje się to tylko tam, gdzie mogą się zdarzyć jego przytulenia policzkiem, gdy chłopiec jest z dala od krawędzi.",
+    "Off (as released)": "Wyłączone (jak w wydaniu)",
+    "As the developers designed": "Tak, jak zaprojektowali twórcy",
+    "Trico throws up": "Trico wymiotuje",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "Twórcy zapieczętowali wymiotowanie Trico „na polecenie” w 2016 roku. Tak, jak zaprojektowali twórcy: gdy ma żołądek pełen beczek, wymiotuje tak, jak zaplanowano. Przycisk Wymiotuj w sztuczkach Trico działa w obu przypadkach.",
+    "Cut narrator hints": "Wycięte podpowiedzi narratora",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "23 podpowiedzi narratora, które twórcy wycięli we wrześniu 2016. Włączone: gdy wygląda na to, że utknąłeś, narrator znów pomaga, tam gdzie pierwotnie umieszczono jego kwestie. Zdradzają rozwiązania zagadek."
   }
 }

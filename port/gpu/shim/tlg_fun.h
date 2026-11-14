@@ -88,6 +88,8 @@ inline constexpr Action Actions[] = {
     {"liedown_smell", "Sniff lying down", "lie", "smell"},
     {"touch_boy_right", "Touch the boy", "stand", "touch"},
     {"TC_reactionA_to_boy", "React to the boy", "stand", "reaction"},
+    {"A_smell", "Sniff", "stand", "smell"},              // first half of the sealed Play act (Mods > Trico plays)
+    {"touch_left_side_soft", "Paw", "stand", "touch"},   // second half (Common_touch_left)
 };
 void Act(const char* command);
 

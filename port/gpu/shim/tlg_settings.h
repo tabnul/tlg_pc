@@ -153,6 +153,16 @@ struct Values {
     /// Mods > ICO horns (tlg.ini mod_horns, env TLG_MOD_HORNS wins): the boy wears ICO-style horns
     /// (own models, tlg_lua.cpp Horns).
     std::atomic<bool> mod_horns{false};
+    /// Mods > Trico plays (tlg.ini mod_plays, env TLG_MOD_PLAYS wins): the developers' sealed act
+    /// where he sniffs the boy and paws at him (tlg_lua.cpp Plays). On by default (user 2026-11-14).
+    std::atomic<bool> mod_plays{true};
+    /// Mods > Trico throws up (tlg.ini mod_throw_up, env TLG_MOD_THROW_UP wins): 0 = sealed as
+    /// released, 1 = as the developers designed, after a stomach full of barrels (tlg_lua.cpp ThrowUp).
+    std::atomic<int> mod_throw_up{0};
+    /// Mods > Cut narrator hints (tlg.ini mod_hints, env TLG_MOD_HINTS wins): the 23 narrator
+    /// hints cut on 2016-09-20 play again where their triggers are (tlg_lua.cpp CutHints). Off by
+    /// default: they give puzzle solutions away.
+    std::atomic<bool> mod_hints{false};
     /// Set by tlg_lua.cpp when the game ends a stage load; the texture cache takes it.
     std::atomic<bool> stage_loaded{false};
     // Startup: tlg_run.py turns them into patches and environment variables; "Apply and restart".

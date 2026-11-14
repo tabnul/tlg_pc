@@ -181,6 +181,53 @@ local function Drool(m)
     end
   end
 end
+-- Mods > Trico plays (tlg.ini mod_plays, default on): the game's own "Play" act in his boy-interest
+-- table (intactprobabilitycondor_player.lua Player_Play: sniff the boy, then paw him left, right or
+-- with the claws) has ValidCnd "return false -- sealed for now". On: it may run under the same check
+-- as his cheek rubs (ActHierarchy_CheekActCheck: boy clear of ledges, not on a ladder, within 4 m
+-- height). Re-applied every run (a stage load rebuilds
+-- the table); off puts the game's own condition back.
+local function Plays(on)
+  local P=Ai2 and Ai2.IntActProbability and Ai2.IntActProbability.Condor
+  P=P and P.Player_Play
+  if not P or type(P.tbl)~='table' or type(ActHierarchy_CheekActCheck)~='function' then return end
+  local D=_TLGPL or {} _TLGPL=D
+  for _,e in ipairs(P.tbl) do
+    if e.name=='Play' then
+      if e.ValidCnd~=ActHierarchy_CheekActCheck then D.orig=e.ValidCnd end
+      local want=on and ActHierarchy_CheekActCheck or D.orig
+      if want and e.ValidCnd~=want then e.ValidCnd=want end
+    end
+  end
+end
+-- Mods > Trico throws up (tlg.ini mod_throw_up): AddSpitOutIntr (condorcommonactioneatable.lua),
+-- called when his stomach is full of barrels, only skips the act ("sealed by order 20160704,
+-- briefly back, sealed again 20160726"). 1 = run the developers' commented-out block instead (the
+-- same one the Throw up trick runs); the act's own marker events then empty his stomach.
+-- 0 = the game's own (skip). Any error falls back to the game's own.
+local function ThrowUp(m)
+  local C=Ai2 and Ai2.CommonScript and Ai2.CommonScript.Condor
+  if not C or type(C.AddSpitOutIntr)~='function' then return end
+  local D=_TLGTU or {} _TLGTU=D D.m=m
+  if m==0 and not D.f then return end
+  if C.AddSpitOutIntr~=D.f then
+    D.orig=C.AddSpitOutIntr
+    D.f=function(props)
+      if _TLGTU.m==0 then return _TLGTU.orig(props) end
+      local ok,e=pcall(function()
+        local work=props.currentInfo.work
+        if not work.LoadSpitOutIntr then work.LoadSpitOutIntr=Load('game/ai/condor_interest/SpitOut_intr') end
+        local intr=work.LoadSpitOutIntr Connect('_world',intr)
+        SetWorldPosition(intr,tostring(FindObject('game/ai/condor_interest/Idling_locater').worldPosition))
+        Ai2.CommonScript.Condor.AddIntrList(props,intr._object_name)
+        Ai2.CommonScript.Condor.ControlGazeLevel(props,intr._object_name,'SubSpitOutIntr','subMax')
+        L('mod throw up: natural')
+      end)
+      if not ok then L('mod throw up error: '..tostring(e)) return _TLGTU.orig(props) end
+    end
+    C.AddSpitOutIntr=D.f
+  end
+end
 -- Mods > All treasures (tlg.ini mod_treasures): the developers' Treasure.DbgFullOpen() owns every
 -- treasure; the Treasures entry of the options menu only shows after a finished run (lap 2). Both
 -- are written to the save (SavePerpetual), so they stay after the setting is turned off.
@@ -628,6 +675,9 @@ std::string SetChunk() {
                   s.grass_smooth.load() ? "true" : "false", s.boy_wind.load(), s.tree_wind.load());
     code += line;
     code += "Drool(" + std::to_string(std::clamp(s.trico_drool.load(), 0, 2)) + ")\n";
+    code += std::string("Plays(") + (s.mod_plays.load() ? "true" : "false") + ") ThrowUp(" +
+            std::to_string(s.mod_throw_up.load() ? 1 : 0) + ") _TLGHINTS=" +
+            (s.mod_hints.load() ? "true" : "false") + "\n";
     code += std::string("Treasures(") + (s.mod_treasures.load() ? "true" : "false") + ") Horns(" +
             (s.mod_horns.load() ? "true" : "false") +")\n";
     if (subtitle_shift) {
@@ -684,6 +734,69 @@ end
 )";
 
 /// Edits game chunk `name` for the debug menus and the bridge fix; true when it changed.
+// Mods > Cut narrator hints (tlg.ini mod_hints): the narrator lines cut on 2016-09-20 ("cut at
+// genDESIGN's request", common/hintlist.lua) whose triggers still run in the stage scripts; only
+// the play call is commented out. Each such call, and a commented SubTitleForcePlay() just above it,
+// becomes "if _TLGHINTS then ... end" in every load, so the switch works at once (the settings tick
+// sets _TLGHINTS); off, the scripts do what the game's own do. The hint table stays as it is (the
+// hints trophy counts its entries).
+bool CutHints(std::string& patched, std::string_view name) {
+    if (name.find("/stages/") == std::string_view::npos || !name.ends_with("missionScript.lua")) {
+        return false;
+    }
+    static constexpr std::string_view Ids[] = {
+        "s03/S03_CA_HNT_V_0021", "s03/S03_CA_HNT_V_0110", "s03/S03_CA_HNT_V_0120",
+        "s06/S06_FB_HNT_V_0040", "s06/S06_FB_HNT_V_0080", "s06/S06_FB_HNT_V_0092",
+        "s07/S07_AL_HNT_V_0050", "s08/S08_LT_HNT_V_0031", "s08/S08_LT_HNT_V_0040",
+        "s09/S09_FB2_HNT_V_0060", "s10/S10_PI_HNT_V_0030", "s10/S10_PI_MRY_V_0040",
+        "s10/S10_PI_MRY_V_0060", "s11/S11_CC_HNT_V_0020", "s11/S11_CC_HNT_V_0051",
+        "s11/S11_CC_HNT_V_0060", "s13/S13_FF_HNT_V_0001", "s13/S13_FF_HNT_V_0033",
+        "s14/S14_CH_HNT_V_0120", "s14/S14_CH_HNT_V_0130", "s14/S14_CH_HNT_V_0140",
+        "s15/S15_SF_HNT_V_0030", "s15/S15_SF_HNT_V_0040"};
+    static constexpr std::string_view On = "if _TLGHINTS then ";
+    // Wraps the commented call that starts on the line holding `at`: true if it was one.
+    const auto wrap = [&](size_t at, std::string_view call) {
+        const size_t line = patched.rfind('\n', at) + 1; // npos + 1 == 0
+        size_t c = patched.find_first_not_of(" \t", line);
+        if (c == std::string::npos || patched.compare(c, 2, "--") != 0) return false;
+        const size_t code = patched.find_first_not_of(" \t", c + 2);
+        if (code == std::string::npos || patched.compare(code, call.size(), call) != 0) return false;
+        const size_t close = patched.find(')', code);
+        const size_t eol = patched.find('\n', code);
+        if (close == std::string::npos || close > eol) return false;
+        patched.insert(close + 1, " end");
+        patched.replace(c, 2, On);
+        return true;
+    };
+    int done = 0;
+    for (const std::string_view id : Ids) {
+        size_t at = patched.find(id);
+        while (at != std::string::npos && (at == 0 || (patched[at - 1] != '"' && patched[at - 1] != '\''))) {
+            at = patched.find(id, at + 1);
+        }
+        if (at == std::string::npos) continue;
+        const size_t line = patched.rfind('\n', at) + 1;
+        if (!wrap(at, "MS.SubTitleStart(")) {
+            std::printf("Lua: cut hint %.*s not as expected, left out\n", int(id.size()), id.data());
+            continue;
+        }
+        ++done;
+        // The commented SubTitleForcePlay() of the same block (at most 4 lines up).
+        size_t up = line;
+        for (int n = 0; n < 4 && up > 1; ++n) {
+            up = patched.rfind('\n', up - 2) + 1;
+            const size_t f = patched.find("MS.SubTitleForcePlay()", up);
+            if (f != std::string::npos && f < patched.find('\n', up)) {
+                wrap(f, "MS.SubTitleForcePlay(");
+                break;
+            }
+            if (patched.find("SubTitleStart", up) < patched.find('\n', up)) break;
+        }
+    }
+    if (done) std::printf("Lua: cut narrator hints: %d in %.*s\n", done, int(name.size()), name.data());
+    return done > 0;
+}
+
 bool GameEdits(std::string& patched, std::string_view name) {
     const auto& s = TlgSettings::Get();
     if (s.level_select && name == "data_trico/game/scripts/startup.lua") {
@@ -1021,6 +1134,9 @@ extern "C" __attribute__((sysv_abi)) int tlg_lua_load(void* L, void* options, co
     if (patched.find(Marker) != std::string::npos) {
         patched += Bootstrap;
         std::printf("Lua: settings tick added to %s\n", name ? name : "?");
+        changed = true;
+    }
+    if (name && CutHints(patched, name)) {
         changed = true;
     }
     if (name && GameEdits(patched, name)) {

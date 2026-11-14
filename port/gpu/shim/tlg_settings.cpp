@@ -233,6 +233,12 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.mod_treasures = i != 0;
     } else if (key == "mod_horns") {
         v.mod_horns = i != 0;
+    } else if (key == "mod_plays") {
+        v.mod_plays = i != 0;
+    } else if (key == "mod_throw_up") {
+        v.mod_throw_up = i == 1 ? 1 : 0;
+    } else if (key == "mod_hints") {
+        v.mod_hints = i != 0;
     } else if (key == "keep_gpu_textures") {
         v.keep_gpu_textures = value.empty() || i != 0;
     } else if (key == "arena_release") {
@@ -424,6 +430,8 @@ void Load() {
         {"TLG_SMAA", "smaa"},                        {"TLG_DLAA", "dlaa"},
         {"TLG_LEVEL_SELECT", "level_select"},       {"TLG_TRICO_DROOL", "trico_drool"},
         {"TLG_MOD_TREASURES", "mod_treasures"},     {"TLG_MOD_HORNS", "mod_horns"},
+        {"TLG_MOD_PLAYS", "mod_plays"},             {"TLG_MOD_THROW_UP", "mod_throw_up"},
+        {"TLG_MOD_HINTS", "mod_hints"},
         {"TLG_CAS", "cas"},                          {"TLG_COLOR_ADJUST", "color_adjust"},
         {"TLG_HDR", "hdr"},                          {"TLG_FG", "frame_generation"},
         {"TLG_ARENA_RELEASE", "arena_release"},      {"TLG_GC_LIVE_BUDGET", "gc_live_budget"},
@@ -741,6 +749,8 @@ void Save() {
     std::fprintf(file, "trico_drool=%d\n", v.trico_drool.load());
     std::fprintf(file, "mod_treasures=%d\nmod_horns=%d\n", int(v.mod_treasures.load()),
                  int(v.mod_horns.load()));
+    std::fprintf(file, "mod_plays=%d\nmod_throw_up=%d\nmod_hints=%d\n", int(v.mod_plays.load()),
+                 v.mod_throw_up.load(), int(v.mod_hints.load()));
     for (const auto& [name, member] : EffectKeys)
         std::fprintf(file, "%s=%d\n", name, (v.*member).load());
     std::fprintf(file, "fov=%d\n", v.fov.load());

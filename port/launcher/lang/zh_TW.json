@@ -755,6 +755,22 @@
       "name": "非同步 fence",
       "what": "在 fence 之前的記憶體複製完成後即發出遊戲的 fence 訊號，而不是等待它們。",
       "why": "實測更慢（79 對 83 FPS）：遊戲會等待這些 fence。"
+    },
+    "menu:mod_plays": {
+      "name": "Trico 玩耍",
+      "what": "開發者製作後又「暫時」封印的 Trico 行為：他會不時嗅嗅少年，再用爪子碰碰他。只會在他能蹭臉的地方發生，也就是少年遠離邊緣時。"
+    },
+    "menu:mod_throw_up": {
+      "name": "Trico 嘔吐",
+      "what": "開發者在 2016 年「依指示」封印了 Trico 的嘔吐。依開發者的設計：當他肚子裡裝滿木桶時，會依原計畫嘔吐。無論哪種設定，Trico 技巧裡的「嘔吐」按鈕都能用。",
+      "choices": {
+        "0": "關閉（與發售版相同）",
+        "1": "依開發者的設計"
+      }
+    },
+    "menu:mod_hints": {
+      "name": "被刪減的旁白提示",
+      "what": "開發者在 2016 年 9 月刪減的 23 條旁白提示。開啟：當你看起來卡住時，旁白會在最初安排的位置再次提供幫助。會透露謎題的解法。"
     }
   },
   "menu": {
@@ -1090,6 +1106,14 @@
     "Hold R1 / L1": "按住 R1 / L1",
     "Fast / slow": "快速 / 慢速",
     "Exit photo mode": "退出拍照模式",
-    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "世界靜止，你可以自由移動鏡頭來拍照。左搖桿：飛行。右搖桿：環顧四周。L2 / R2：下降 / 上升。按住 R1：快速，按住 L1：慢速。× 或 Print Screen：將截圖儲存到 user/screenshots。L3 + R3, F9（或此選單）開啟和關閉。跳轉會將其關閉。"
+    "The world stands still and you fly the camera to take a picture. Left stick: fly. Right stick: look around. L2 / R2: down / up. Hold R1: fast, hold L1: slow. Cross or Print Screen: save a screenshot to user/screenshots. L3 + R3, F9 (or this menu) turns it on and off. A jump turns it off.": "世界靜止，你可以自由移動鏡頭來拍照。左搖桿：飛行。右搖桿：環顧四周。L2 / R2：下降 / 上升。按住 R1：快速，按住 L1：慢速。× 或 Print Screen：將截圖儲存到 user/screenshots。L3 + R3, F9（或此選單）開啟和關閉。跳轉會將其關閉。",
+    "Trico plays": "Trico 玩耍",
+    "A Trico behaviour the developers built and then sealed \"for now\": now and then he sniffs the boy and paws at him. It only happens where his cheek rubs can happen too, with the boy clear of ledges.": "開發者製作後又「暫時」封印的 Trico 行為：他會不時嗅嗅少年，再用爪子碰碰他。只會在他能蹭臉的地方發生，也就是少年遠離邊緣時。",
+    "Off (as released)": "關閉（與發售版相同）",
+    "As the developers designed": "依開發者的設計",
+    "Trico throws up": "Trico 嘔吐",
+    "The developers sealed Trico throwing up \"by order\" in 2016. As the developers designed: when his stomach is full of barrels, he throws up the way they planned. The Throw up button in Trico Tricks works either way.": "開發者在 2016 年「依指示」封印了 Trico 的嘔吐。依開發者的設計：當他肚子裡裝滿木桶時，會依原計畫嘔吐。無論哪種設定，Trico 技巧裡的「嘔吐」按鈕都能用。",
+    "Cut narrator hints": "被刪減的旁白提示",
+    "The 23 narrator hints the developers cut in September 2016. On: when you seem stuck, the narrator helps again, where they first placed his lines. They give puzzle solutions away.": "開發者在 2016 年 9 月刪減的 23 條旁白提示。開啟：當你看起來卡住時，旁白會在最初安排的位置再次提供幫助。會透露謎題的解法。"
   }
 }
