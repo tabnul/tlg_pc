@@ -44,7 +44,7 @@ No game files are included. You need your own copy, dumped from your own PS4.
 
 - **Trico's drool:** switched off just before release.
 - **Trico's play:** Trico sniffs and paws at the boy. A sealed feature that works as originally
-  intended, on demand from Trico Tricks.
+  intended, or on demand from Trico Tricks.
 - **Extra Tricos:** up to 8 more next to the boy, the armoured one too.
 - **Trico's size:** from half to twice his size.
 - **Trico's eyes:** the hidden disco-eye effect, or any colour.
