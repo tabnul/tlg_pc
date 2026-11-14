@@ -229,6 +229,8 @@ trigger points, check for stick drift, and remap keyboard and mouse. See
 - **Quit from anywhere:** **Alt+Q** on the keyboard, or hold **Share + Options** for 2 seconds
   on a controller (a note shows while you hold; let go to cancel). The window's X and Alt+F4 work
   the same way. It quits the way the game's own Quit does, so settings and progress are saved.
+  The game's pause menu (Options) shows your current buttons for quit, the port's menu and
+  the QA menu.
 - **Your own button combos:** the quit combo, the port's menu (R3 + L2) and the QA menu
   (L1 + L3) can each be set to other buttons, on the launcher's **Controller** page (Combos) or
   under Controls in the port's menu. The quit combo is always held for 2 seconds.
