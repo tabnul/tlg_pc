@@ -261,6 +261,7 @@ DEFAULT_SETTINGS = {
     'level_select': False,         # tlg.ini; tlg_lua.cpp
     'debug_logging': False,        # DEBUG_LOG_ENV
     'debug_flags': {},             # Debug > Flags ticks that differ from DEBUG_FLAGS defaults
+    'bench_custom_points': '',     # Debug > Benchmark custom list, kept across launcher restarts (#68)
     'gpu_id': -1,                  # TLG_GPU_ID: index in gpu_list(); -1 = automatic (most video memory)
     'vram_budget_mb': 7000,
     'native_audio': True,
